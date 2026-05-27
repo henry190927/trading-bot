@@ -13,7 +13,7 @@ It scans for setups where multiple independent technical signals agree (Fibonacc
 The `Makefile` lives in this directory. `cd trading/` once and use `make`:
 
 ```bash
-cd trading/
+cd trading-bot/
 make                                # show all available commands
 make analyze                        # 1h snapshot of all 4 symbols
 make analyze 15m                    # 15m snapshot
@@ -21,7 +21,7 @@ make validate BTC long 74500 15m    # score a proposed trade
 make serve 15m                      # live monitor (foreground)
 make serve-bg 15m                   # live monitor (detached background)
 make stop                           # kill the background daemon
-make logs                           # tail ~/trading.log
+make logs                           # tail ~/trading-bot.log
 make backtest                       # 60d 1h replay with fee model
 make backtest 30 15m                # 30d at 15m
 ```
@@ -70,8 +70,8 @@ The web UI is designed to bind to your **Tailscale IP** (looks like `100.x.x.x`)
 tailscale ip -4
 
 # Then set on the VPS:
-echo "WEB_BIND=$(tailscale ip -4):8080" | sudo tee -a /etc/systemd/system/trading-web.service.d/env.conf
-sudo systemctl daemon-reload && sudo systemctl restart trading-web
+echo "WEB_BIND=$(tailscale ip -4):8080" | sudo tee -a /etc/systemd/system/trading-bot-web.service.d/env.conf
+sudo systemctl daemon-reload && sudo systemctl restart trading-bot-web
 ```
 
 Replace any `100.x.x.x` you see in this README with your actual Tailscale IP when opening the web UI in a browser.
@@ -117,11 +117,11 @@ Positional args are read in order — no flags needed for common cases. For raw 
 Fetches the latest closed candle of `-tf` for all 4 symbols, runs the engine, prints per-symbol detail plus a summary table with the verdict. Use this when you want to know "what's actionable right now?".
 
 ```bash
-go run ./trading/cmd/analyze                  # default 1h
-go run ./trading/cmd/analyze -tf=15m          # 15-minute snapshot
-go run ./trading/cmd/analyze -tf=4h           # 4-hour snapshot
-go run ./trading/cmd/analyze -tf=4h -min-score=4   # stricter threshold
-go run ./trading/cmd/analyze -bias            # opt into MTF bias filter
+go run ./trading-bot/cmd/analyze                  # default 1h
+go run ./trading-bot/cmd/analyze -tf=15m          # 15-minute snapshot
+go run ./trading-bot/cmd/analyze -tf=4h           # 4-hour snapshot
+go run ./trading-bot/cmd/analyze -tf=4h -min-score=4   # stricter threshold
+go run ./trading-bot/cmd/analyze -bias            # opt into MTF bias filter
 ```
 
 ### `cmd/serve` — live monitor daemon
@@ -130,16 +130,16 @@ Runs forever. Wakes 2 seconds after every `-tf` boundary, scans, dedups, pushes 
 
 ```bash
 # Default 1h, alerts on score≥3, no sweep filter
-go run ./trading/cmd/serve
+go run ./trading-bot/cmd/serve
 
 # Recommended: 1h, score≥3, sweep-only
-go run ./trading/cmd/serve -tf=1h -min-score=3 -sweep-only
+go run ./trading-bot/cmd/serve -tf=1h -min-score=3 -sweep-only
 
 # Background it
-nohup go run ./trading/cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading.log 2>&1 &
+nohup go run ./trading-bot/cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading-bot.log 2>&1 &
 
 # 15-minute cadence (more frequent alerts; check live trades count first)
-go run ./trading/cmd/serve -tf=15m -min-score=3 -sweep-only
+go run ./trading-bot/cmd/serve -tf=15m -min-score=3 -sweep-only
 ```
 
 #### Heartbeat logging
@@ -170,11 +170,11 @@ This makes "why didn't I get a buzz?" diagnostics trivial — `tlog` shows exact
 Pulls `-days` of history at `-tf`, replays the engine, simulates each setup with a fee model. Prints per-symbol stats (WR, net R, max drawdown). Use to validate the strategy before live trading.
 
 ```bash
-go run ./trading/cmd/backtest                              # default 1h, 60 days
-go run ./trading/cmd/backtest -tf=15m -days=30             # 15-min over 30 days
-go run ./trading/cmd/backtest -tf=1h -sweep-only           # sweep-only
-go run ./trading/cmd/backtest -tf=1h -fee-bps=10           # taker fee assumption
-go run ./trading/cmd/backtest -tf=1h -v                    # print every trade
+go run ./trading-bot/cmd/backtest                              # default 1h, 60 days
+go run ./trading-bot/cmd/backtest -tf=15m -days=30             # 15-min over 30 days
+go run ./trading-bot/cmd/backtest -tf=1h -sweep-only           # sweep-only
+go run ./trading-bot/cmd/backtest -tf=1h -fee-bps=10           # taker fee assumption
+go run ./trading-bot/cmd/backtest -tf=1h -v                    # print every trade
 ```
 
 ### `cmd/validate` — score a proposed trade
@@ -182,9 +182,9 @@ go run ./trading/cmd/backtest -tf=1h -v                    # print every trade
 Given a symbol, side, entry price, and timeframe, scores **your proposed entry** 0–10 against the engine's current state and HVN structure. Use when you're considering a discretionary entry and want a sanity check.
 
 ```bash
-go run ./trading/cmd/validate -symbol=BTC -side=long -entry=74500 -tf=1h
-go run ./trading/cmd/validate -symbol=XAG -side=short -entry=75.80 -tf=15m
-go run ./trading/cmd/validate -symbol=ETH -side=long -entry=2030 -tf=1h -fee-bps=10
+go run ./trading-bot/cmd/validate -symbol=BTC -side=long -entry=74500 -tf=1h
+go run ./trading-bot/cmd/validate -symbol=XAG -side=short -entry=75.80 -tf=15m
+go run ./trading-bot/cmd/validate -symbol=ETH -side=long -entry=2030 -tf=1h -fee-bps=10
 ```
 
 Symbol aliases: `BTC` / `ETH` / `XAU` or `GOLD` / `XAG` or `SILVER`. Side: `long` / `short` (or `l` / `s`).
@@ -390,9 +390,9 @@ For `tlog` / `make remote-logs` to show daemon log lines in the same timezone as
 sudo timedatectl set-timezone Asia/Taipei
 
 # Daemon process — pass TZ to the binary via the systemd unit
-# Add this line to /etc/systemd/system/trading-bot.service under [Service]:
+# Add this line to /etc/systemd/system/trading-bot-bot.service under [Service]:
 Environment=TZ=Asia/Taipei
-sudo systemctl daemon-reload && sudo systemctl restart trading-bot
+sudo systemctl daemon-reload && sudo systemctl restart trading-bot-bot
 ```
 
 Without the unit-level `Environment=TZ=...`, the Go binary falls back to UTC in its `log.Printf` output even though systemd's prefix is in Taipei — splits the same line into two timezones, 8 hours apart. The line above keeps everything coherent.
@@ -707,7 +707,7 @@ Verdict: **take it full size, exit at HVN instead of mechanical TP2.**
 ## .env setup
 
 ```bash
-cp trading/.env.example trading/.env
+cp trading-bot/.env.example trading-bot/.env
 ```
 
 Then edit `trading/.env`:
@@ -784,9 +784,9 @@ Tap any price button → copies, flashes grey for 1s. Add to iPhone home screen 
 ### Web UI ops (from Mac)
 
 ```bash
-make deploy-web      # cross-compile, scp, restart trading-web unit
+make deploy-web      # cross-compile, scp, restart trading-bot-web unit
 make web-status      # systemctl status
-make web-logs        # tail journalctl -u trading-web
+make web-logs        # tail journalctl -u trading-bot-web
 make web-restart     # restart the unit
 ```
 
@@ -1012,23 +1012,23 @@ Run these on your **Mac** (replace `<vps-ip>` with your actual IP):
 cd ~/GolandProjects/myFirstGo
 
 # Update Makefile with your VPS IP if it's not your.vps.ip
-sed -i '' 's/^ORACLE_HOST ?=.*/ORACLE_HOST ?= <vps-ip>/' trading/Makefile
+sed -i '' 's/^ORACLE_HOST ?=.*/ORACLE_HOST ?= <vps-ip>/' trading-bot/Makefile
 
 # Cross-compile all 4 binaries
 mkdir -p /tmp/oracle-deploy
 for cmd in serve analyze validate backtest; do
-  GOOS=linux GOARCH=amd64 go build -o /tmp/oracle-deploy/trading-$cmd ./trading/cmd/$cmd
+  GOOS=linux GOARCH=amd64 go build -o /tmp/oracle-deploy/trading-bot-$cmd ./trading-bot/cmd/$cmd
 done
 
 # Copy .env and systemd files into the bundle
-cp trading/.env /tmp/oracle-deploy/
+cp trading-bot/.env /tmp/oracle-deploy/
 
 # Make sure .env contains TRADING_TF and TRADING_MIN_SCORE — the unit
 # references them in its ExecStart.
 grep -q '^TRADING_TF='        /tmp/oracle-deploy/.env || echo 'TRADING_TF=15m'  >> /tmp/oracle-deploy/.env
 grep -q '^TRADING_MIN_SCORE=' /tmp/oracle-deploy/.env || echo 'TRADING_MIN_SCORE=3' >> /tmp/oracle-deploy/.env
 
-cat > /tmp/oracle-deploy/trading-bot.service <<'EOF'
+cat > /tmp/oracle-deploy/trading-bot-bot.service <<'EOF'
 [Unit]
 Description=Trading bot daemon
 After=network-online.target
@@ -1049,11 +1049,11 @@ WantedBy=multi-user.target
 EOF
 
 # Scoped sudoers — lets `tstart/tstop/trestart/tconfig/tlog` work password-free.
-cat > /tmp/oracle-deploy/trading-bot-sudoers <<'EOF'
+cat > /tmp/oracle-deploy/trading-bot-bot-sudoers <<'EOF'
 ubuntu ALL=(root) NOPASSWD: /bin/systemctl start trading-bot, /bin/systemctl stop trading-bot, /bin/systemctl restart trading-bot, /bin/systemctl status trading-bot, /bin/systemctl status trading-bot --no-pager, /bin/journalctl -u trading-bot *
 EOF
 
-cat > /tmp/oracle-deploy/trading-aliases.sh <<'EOF'
+cat > /tmp/oracle-deploy/trading-bot-aliases.sh <<'EOF'
 TRADING_DIR=/opt/trading
 _load_trading_env() { set -a; [ -f "$TRADING_DIR/.env" ] && . "$TRADING_DIR/.env"; set +a; }
 # ta/tv/tbt accept either positional args (matching the Mac Makefile) or raw flags.
@@ -1113,19 +1113,19 @@ scp -i ~/.ssh/vps-key /tmp/oracle-deploy/* ubuntu@<vps-ip>:/tmp/
 
 # Install on VPS
 ssh -i ~/.ssh/vps-key ubuntu@<vps-ip> '
-  sudo mkdir -p /opt/trading
-  sudo mv /tmp/trading-serve /tmp/trading-analyze /tmp/trading-validate /tmp/trading-backtest /tmp/trading-journal /tmp/.env /opt/trading/
-  sudo chown -R ubuntu:ubuntu /opt/trading
-  sudo chmod 600 /opt/trading/.env
-  sudo mv /tmp/trading-bot.service /etc/systemd/system/
-  sudo mv /tmp/trading-bot-sudoers /etc/sudoers.d/trading-bot
-  sudo chmod 440 /etc/sudoers.d/trading-bot
-  sudo visudo -c -f /etc/sudoers.d/trading-bot
-  sudo cp /tmp/trading-aliases.sh /etc/profile.d/
+  sudo mkdir -p /opt/trading-bot
+  sudo mv /tmp/trading-bot-serve /tmp/trading-bot-analyze /tmp/trading-bot-validate /tmp/trading-bot-backtest /tmp/trading-bot-journal /tmp/.env /opt/trading-bot/
+  sudo chown -R ubuntu:ubuntu /opt/trading-bot
+  sudo chmod 600 /opt/trading-bot/.env
+  sudo mv /tmp/trading-bot-bot.service /etc/systemd/system/
+  sudo mv /tmp/trading-bot-bot-sudoers /etc/sudoers.d/trading-bot-bot
+  sudo chmod 440 /etc/sudoers.d/trading-bot-bot
+  sudo visudo -c -f /etc/sudoers.d/trading-bot-bot
+  sudo cp /tmp/trading-bot-aliases.sh /etc/profile.d/
   sudo systemctl daemon-reload
-  sudo systemctl enable trading-bot
-  sudo systemctl start trading-bot
-  sudo systemctl status trading-bot --no-pager
+  sudo systemctl enable trading-bot-bot
+  sudo systemctl start trading-bot-bot
+  sudo systemctl status trading-bot-bot --no-pager
 '
 ```
 
@@ -1303,7 +1303,7 @@ trading/
 1. **Pre-market sanity check** (10 sec): `go run ./trading/cmd/backtest -tf=1h -days=30 -fee-bps=6 -sweep-only` — verify the strategy still has edge on the last 30 days.
 2. **Start the monitor:**
    ```bash
-   nohup go run ./trading/cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading.log 2>&1 &
+   nohup go run ./trading-bot/cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading-bot.log 2>&1 &
    ```
 3. **macOS banner + stdout line** on every 1h close where a score≥3 sweep-anchored setup fires.
 4. **Place limit order** at the entry price shown. Set stop and TP brackets immediately.

@@ -1,6 +1,6 @@
 package indicator
 
-import "myFirstGo/trading/market"
+import "myFirstGo/trading-bot/market"
 
 // FibLevels are the canonical retracement ratios.
 var FibLevels = []float64{0.236, 0.382, 0.5, 0.618, 0.786}

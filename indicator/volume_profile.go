@@ -3,7 +3,7 @@ package indicator
 import (
 	"sort"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // VolumeBin is one slice of the volume profile.

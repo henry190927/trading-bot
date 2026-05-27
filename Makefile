@@ -1,4 +1,4 @@
-# Makefile for the trading toolkit.
+# Makefile for the trading-bot toolkit.
 #
 # Positional-style invocation — write commands like prose, not flag soup:
 #
@@ -14,7 +14,7 @@
 #   make backtest
 #   make backtest 30 15m
 #
-# Run from this directory (trading/).
+# Run from this directory (trading-bot/).
 
 SHELL    := /bin/bash
 GO       := go

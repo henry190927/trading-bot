@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"myFirstGo/trading/bingx"
-	"myFirstGo/trading/config"
-	"myFirstGo/trading/market"
-	"myFirstGo/trading/notify"
-	sig "myFirstGo/trading/signal"
+	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/notify"
+	sig "myFirstGo/trading-bot/signal"
 )
 
 // serve runs an infinite loop that wakes shortly after every timeframe
@@ -83,11 +83,11 @@ func main() {
 // scanResult is the per-symbol outcome of one scan iteration. Used to print
 // a single heartbeat line per scan covering all symbols.
 type scanResult struct {
-	Symbol  market.Symbol
-	Side    sig.Side
-	Score   int
-	Anchor  string // empty if no plan
-	Status  string // "FIRED" | "skipped: <reason>" | "error: <...>"
+	Symbol market.Symbol
+	Side   sig.Side
+	Score  int
+	Anchor string // empty if no plan
+	Status string // "FIRED" | "skipped: <reason>" | "error: <...>"
 }
 
 func (r scanResult) format() string {

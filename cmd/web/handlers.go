@@ -14,12 +14,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading/analyzer"
-	"myFirstGo/trading/bingx"
-	"myFirstGo/trading/journal"
-	"myFirstGo/trading/market"
-	"myFirstGo/trading/signal"
-	"myFirstGo/trading/validator"
+	"myFirstGo/trading-bot/analyzer"
+	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/journal"
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/signal"
+	"myFirstGo/trading-bot/validator"
 )
 
 type server struct {
@@ -77,10 +77,10 @@ func (s *server) handleDashboard(c *gin.Context) {
 	})
 
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
-		"TF":         tf,
-		"Symbols":    views,
-		"Now":        time.Now().Format("2006-01-02 15:04:05"),
-		"TFOptions":  []string{"5m", "15m", "1h", "4h", "1d"},
+		"TF":           tf,
+		"Symbols":      views,
+		"Now":          time.Now().Format("2006-01-02 15:04:05"),
+		"TFOptions":    []string{"5m", "15m", "1h", "4h", "1d"},
 		"MinTradeable": 3, // for verdict coloring
 	})
 }
@@ -128,20 +128,20 @@ func (s *server) handleJournalNew(c *gin.Context) {
 	// Default analyzed_at to current local time, formatted for <input type="datetime-local">.
 	now := time.Now().Local().Format("2006-01-02T15:04")
 	c.HTML(http.StatusOK, "journal_new.html", gin.H{
-		"Symbol":   c.Query("symbol"),
-		"Side":     c.Query("side"),
-		"Entry":    c.Query("entry"),
-		"Stop":     c.Query("stop"),
-		"TP1":      c.Query("tp1"),
-		"TP2":      c.Query("tp2"),
-		"Anchor":   c.Query("anchor"),
-		"TF":       c.Query("tf"),
-		"Score":    c.Query("score"),
-		"Notes":    "",
+		"Symbol":     c.Query("symbol"),
+		"Side":       c.Query("side"),
+		"Entry":      c.Query("entry"),
+		"Stop":       c.Query("stop"),
+		"TP1":        c.Query("tp1"),
+		"TP2":        c.Query("tp2"),
+		"Anchor":     c.Query("anchor"),
+		"TF":         c.Query("tf"),
+		"Score":      c.Query("score"),
+		"Notes":      "",
 		"AnalyzedAt": now,
-		"Symbols":  []string{"BTC", "ETH", "XAU", "XAG"},
-		"Anchors":  recommendedAnchors,
-		"Error":    "",
+		"Symbols":    []string{"BTC", "ETH", "XAU", "XAG"},
+		"Anchors":    recommendedAnchors,
+		"Error":      "",
 	})
 }
 

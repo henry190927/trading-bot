@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading/ansi"
-	"myFirstGo/trading/bingx"
-	"myFirstGo/trading/config"
-	"myFirstGo/trading/market"
-	"myFirstGo/trading/signal"
+	"myFirstGo/trading-bot/ansi"
+	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/signal"
 )
 
 func main() {

@@ -1,7 +1,7 @@
 // Command journal records opened/closed live trades to a CSV log, so live
 // outcomes can be reconciled against backtest expectations.
 //
-// All data-layer logic lives in package trading/journal. This main only
+// All data-layer logic lives in package trading-bot/journal. This main only
 // handles CLI parsing, output formatting, and color.
 package main
 
@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading/ansi"
-	"myFirstGo/trading/journal"
+	"myFirstGo/trading-bot/ansi"
+	"myFirstGo/trading-bot/journal"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"myFirstGo/trading/signal"
+	"myFirstGo/trading-bot/signal"
 )
 
 // Notifier is anything that can publish a signal alert.

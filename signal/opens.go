@@ -3,7 +3,7 @@ package signal
 import (
 	"time"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // Opens reports the most recent daily, weekly, and monthly opening prices

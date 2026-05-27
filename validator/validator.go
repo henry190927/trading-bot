@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"math"
 
-	"myFirstGo/trading/analyzer"
-	"myFirstGo/trading/indicator"
-	"myFirstGo/trading/market"
-	"myFirstGo/trading/signal"
+	"myFirstGo/trading-bot/analyzer"
+	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/signal"
 )
 
 // Factor is one line item contributing to the total validation score.

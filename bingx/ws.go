@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // Stream is the WebSocket consumer. BingX uses gzip-compressed frames and

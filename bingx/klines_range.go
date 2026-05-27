@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // KlinesRange fetches all candles in [start, end] by paging backward from `end`.

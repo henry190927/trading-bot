@@ -8,12 +8,12 @@ import (
 	"os"
 	"time"
 
-	"myFirstGo/trading/backtest"
-	"myFirstGo/trading/bingx"
-	"myFirstGo/trading/config"
-	"myFirstGo/trading/dxy"
-	"myFirstGo/trading/market"
-	"myFirstGo/trading/signal"
+	"myFirstGo/trading-bot/backtest"
+	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/dxy"
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/signal"
 )
 
 func main() {

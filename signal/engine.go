@@ -3,10 +3,10 @@ package signal
 import (
 	"fmt"
 
-	"myFirstGo/trading/analyzer"
-	"myFirstGo/trading/dxy"
-	"myFirstGo/trading/indicator"
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/analyzer"
+	"myFirstGo/trading-bot/dxy"
+	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/market"
 )
 
 type Side int
@@ -46,8 +46,8 @@ type Signal struct {
 // Context carries optional perpetual-market context (funding, OI) that the
 // engine uses for sanity filters. All fields are optional.
 type Context struct {
-	FundingRate     float64 // fraction per funding interval; >0 = longs pay shorts
-	OpenInterest    float64 // current OI notional; meaningful with prior snapshot
+	FundingRate      float64 // fraction per funding interval; >0 = longs pay shorts
+	OpenInterest     float64 // current OI notional; meaningful with prior snapshot
 	PrevOpenInterest float64 // optional previous OI for delta check
 }
 

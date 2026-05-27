@@ -1,6 +1,6 @@
 package analyzer
 
-import "myFirstGo/trading/market"
+import "myFirstGo/trading-bot/market"
 
 type CVDPoint struct {
 	Time  int64

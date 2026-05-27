@@ -1,4 +1,4 @@
-// Command web is the Gin-based UI for the trading bot. Renders an analyze
+// Command web is the Gin-based UI for the trading-bot bot. Renders an analyze
 // dashboard with click-to-copy price buttons; future phases add journal CRUD,
 // validate forms, live logs, and charts.
 //
@@ -17,8 +17,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading/bingx"
-	"myFirstGo/trading/config"
+	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/config"
 )
 
 //go:embed templates/*.html static/*
@@ -64,7 +64,7 @@ func main() {
 		c.String(http.StatusOK, "ok %s\n", time.Now().Format(time.RFC3339))
 	})
 
-	log.Printf("trading-web listening on %s (Asia/Taipei)", bind)
+	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
 	if err := r.Run(bind); err != nil {
 		log.Fatalf("server: %v", err)
 	}

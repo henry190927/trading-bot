@@ -3,7 +3,7 @@ package indicator
 import (
 	"math"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // ATR returns Wilder's Average True Range. Standard period is 14.

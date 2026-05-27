@@ -3,7 +3,7 @@ package analyzer
 import (
 	"math"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // DoubleSide tells whether a pattern is a double top (bearish) or bottom (bullish).
@@ -29,14 +29,14 @@ type DoublePattern struct {
 // bottoms. A pattern is included only if its second pivot is in the most
 // recent `recency` bars — older patterns are usually already faded.
 //
-//   pivotWidth     bars on each side that must be lower (highs) / higher (lows)
-//                  to confirm a pivot. Typical: 2.
-//   minSep         minimum bars between the two pivots. Typical: 5.
-//   recency        PivotB must be within this many bars of `len(cs)-1`. Typical: 5.
-//   priceTolerance fractional max distance between the two pivot prices. Typical: 0.003.
-//   valleyDepth    fractional minimum distance from the pivot level to the
-//                  intermediate extreme. Typical: 0.01. Without this, "double"
-//                  is just two adjacent bars at the same level.
+//	pivotWidth     bars on each side that must be lower (highs) / higher (lows)
+//	               to confirm a pivot. Typical: 2.
+//	minSep         minimum bars between the two pivots. Typical: 5.
+//	recency        PivotB must be within this many bars of `len(cs)-1`. Typical: 5.
+//	priceTolerance fractional max distance between the two pivot prices. Typical: 0.003.
+//	valleyDepth    fractional minimum distance from the pivot level to the
+//	               intermediate extreme. Typical: 0.01. Without this, "double"
+//	               is just two adjacent bars at the same level.
 func DetectDoublePatterns(
 	cs []market.Candle,
 	lookback, pivotWidth, minSep, recency int,

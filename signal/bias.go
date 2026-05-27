@@ -1,8 +1,8 @@
 package signal
 
 import (
-	"myFirstGo/trading/indicator"
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/market"
 )
 
 // Bias returns the directional bias implied by the MACD(12,26,9) histogram
@@ -29,7 +29,7 @@ func Bias(candles []market.Candle) Side {
 }
 
 // DefaultBiasTF picks a sensible higher timeframe for MTF filtering given
-// the base trading timeframe.
+// the base trading-bot timeframe.
 func DefaultBiasTF(base market.Timeframe) market.Timeframe {
 	switch base {
 	case market.TF1m:

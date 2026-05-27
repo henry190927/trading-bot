@@ -3,7 +3,7 @@ package analyzer
 import (
 	"math"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 type SweepSide int

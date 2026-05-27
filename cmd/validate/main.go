@@ -2,7 +2,7 @@
 // and HVN structure. Use when you want to know "should I take this entry?"
 // rather than waiting for the engine to fire its own signal.
 //
-// Scoring lives in trading/validator (shared with the /validate web form);
+// Scoring lives in trading-bot/validator (shared with the /validate web form);
 // this binary only handles CLI args and terminal rendering.
 package main
 
@@ -15,13 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading/analyzer"
-	"myFirstGo/trading/ansi"
-	"myFirstGo/trading/bingx"
-	"myFirstGo/trading/config"
-	"myFirstGo/trading/market"
-	"myFirstGo/trading/signal"
-	"myFirstGo/trading/validator"
+	"myFirstGo/trading-bot/analyzer"
+	"myFirstGo/trading-bot/ansi"
+	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/signal"
+	"myFirstGo/trading-bot/validator"
 )
 
 func main() {
@@ -257,4 +257,3 @@ func resolveSymbol(s string) (market.Symbol, error) {
 	}
 	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG)", s)
 }
-

@@ -9,17 +9,17 @@ import (
 	"sync"
 	"time"
 
-	"myFirstGo/trading/ansi"
-	"myFirstGo/trading/bingx"
-	"myFirstGo/trading/config"
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/ansi"
+	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/market"
 )
 
 type row struct {
-	short  string
-	price  float64
-	prev   float64
-	err    string
+	short string
+	price float64
+	prev  float64
+	err   string
 }
 
 func main() {

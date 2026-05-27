@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // FundingInfo carries the funding context for a perpetual symbol.

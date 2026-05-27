@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading/signal"
+	"myFirstGo/trading-bot/signal"
 )
 
 // Ntfy pushes alerts via ntfy.sh — free, no account, topic-based.
@@ -16,9 +16,9 @@ import (
 // Setup:
 //  1. Install ntfy iOS / Android app (or any client).
 //  2. Pick a hard-to-guess topic name (e.g. a UUID). Anyone with the topic
-//     can read your alerts, so don't use "trading" or your username.
+//     can read your alerts, so don't use "trading-bot" or your username.
 //  3. Subscribe to that topic in the app.
-//  4. Set NTFY_TOPIC in trading/.env to the same value.
+//  4. Set NTFY_TOPIC in trading-bot/.env to the same value.
 //
 // Optional NTFY_SERVER overrides the default https://ntfy.sh (use if you
 // self-host your own ntfy server).

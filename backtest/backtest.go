@@ -5,10 +5,10 @@ import (
 	"math"
 	"time"
 
-	"myFirstGo/trading/indicator"
-	"myFirstGo/trading/market"
-	"myFirstGo/trading/dxy"
-	"myFirstGo/trading/signal"
+	"myFirstGo/trading-bot/dxy"
+	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/signal"
 )
 
 // Options configures a backtest run. Zero values mean "no fees, no filter".

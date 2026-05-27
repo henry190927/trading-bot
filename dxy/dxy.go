@@ -17,7 +17,7 @@ import (
 	"net/http"
 	"time"
 
-	"myFirstGo/trading/market"
+	"myFirstGo/trading-bot/market"
 )
 
 // Yahoo symbol for the ICE U.S. Dollar Index. NYICDX is the cash index;
@@ -55,7 +55,7 @@ func Fetch(ctx context.Context, interval, rng string) ([]market.Candle, error) {
 		return nil, err
 	}
 	// Yahoo refuses requests with the default Go user-agent.
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; trading-bot/1.0)")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; trading-bot-bot/1.0)")
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
