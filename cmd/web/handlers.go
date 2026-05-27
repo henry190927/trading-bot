@@ -131,22 +131,34 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 		v.HVNValues = append(v.HVNValues, fmt.Sprintf("%.4f", h))
 	}
 
-	// Diagnose now: run validator at market for whichever side the engine
-	// favors. If engine is Flat, score both sides and surface the higher
-	// (still useful — tells the trader "if you tried to long here anyway,
-	// here's what the validator thinks").
+	// Diagnose now: score the engine's actual plan against the live market.
+	//
+	// When the engine has a plan (Side != Flat), the diagnostic evaluates
+	// THAT plan's entry — so the score on the dashboard answers "is the
+	// plan as displayed still good?" and chase math correctly fires when
+	// market has moved past the plan entry. When Flat (no plan), we score
+	// "if you tried to trade at the mark right now" for both sides and
+	// surface the higher one.
 	const dashboardFeeBps = 6.0
-	price := v.Signal.Price // live mark price (or closed-bar close fallback)
+	mark := v.Signal.Price // live mark, or closed-bar close fallback
 	switch v.Signal.Side {
 	case signal.Long:
-		r := validator.Validate(sym, tf, signal.Long, price, dashboardFeeBps, candles)
+		entry := mark
+		if v.Signal.Plan.Entry > 0 {
+			entry = v.Signal.Plan.Entry
+		}
+		r := validator.Validate(sym, tf, signal.Long, entry, dashboardFeeBps, candles, mark)
 		v.Diagnose = &r
 	case signal.Short:
-		r := validator.Validate(sym, tf, signal.Short, price, dashboardFeeBps, candles)
+		entry := mark
+		if v.Signal.Plan.Entry > 0 {
+			entry = v.Signal.Plan.Entry
+		}
+		r := validator.Validate(sym, tf, signal.Short, entry, dashboardFeeBps, candles, mark)
 		v.Diagnose = &r
-	default: // Flat — show whichever side scores higher
-		long := validator.Validate(sym, tf, signal.Long, price, dashboardFeeBps, candles)
-		short := validator.Validate(sym, tf, signal.Short, price, dashboardFeeBps, candles)
+	default: // Flat — score both sides at the mark, pick higher
+		long := validator.Validate(sym, tf, signal.Long, mark, dashboardFeeBps, candles, mark)
+		short := validator.Validate(sym, tf, signal.Short, mark, dashboardFeeBps, candles, mark)
 		if short.Total > long.Total {
 			v.Diagnose = &short
 		} else {

@@ -69,11 +69,25 @@ type Result struct {
 
 // Validate runs the engine + structural checks against a proposed entry
 // and returns a scored result. Requires at least 60 candles.
-func Validate(sym market.Symbol, tf market.Timeframe, side signal.Side, entry, feeBps float64, candles []market.Candle) Result {
+//
+// liveMarketPrice (optional, variadic) overrides the "current market"
+// reference used for chase computation and Result.Price display. When
+// 0 or omitted, the closed-bar close (the engine's reference) is used.
+// Pass the BingX mark price in live contexts (dashboard diagnose, web
+// /validate form) so chase math reflects where the user would actually
+// fill right now. Backtest replay should leave this 0.
+func Validate(sym market.Symbol, tf market.Timeframe, side signal.Side, entry, feeBps float64, candles []market.Candle, liveMarketPrice ...float64) Result {
 	closes := market.Closes(candles)
 	price := closes[len(closes)-1]
 
 	sig := signal.Evaluate(signal.Inputs{Symbol: sym, Timeframe: tf, Candles: candles})
+
+	// Override comparison price with live mark if caller provided one.
+	// Note: only `price` (chase reference + r.Price display) is overridden;
+	// engine math above already consumed closes-based price and is unchanged.
+	if len(liveMarketPrice) > 0 && liveMarketPrice[0] > 0 {
+		price = liveMarketPrice[0]
+	}
 
 	atr := indicator.ATR(candles, 14)
 	a := atr[len(atr)-1]
