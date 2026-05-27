@@ -66,7 +66,13 @@ func main() {
 		log.Fatalf("only %d candles, need 60+", len(candles))
 	}
 
-	res := validator.Validate(sym, tf, side, *entryFlag, *feeFlag, candles)
+	// Live mark for engine's plan-validity check + validator's chase math.
+	var markPrice float64
+	if fr, err := client.FundingRate(ctx, sym); err == nil {
+		markPrice = fr.MarkPrice
+	}
+
+	res := validator.Validate(sym, tf, side, *entryFlag, *feeFlag, candles, markPrice)
 	print(res)
 }
 

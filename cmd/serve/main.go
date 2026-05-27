@@ -140,14 +140,17 @@ func scan(ctx context.Context, client *bingx.Client, tf, biasTF market.Timeframe
 				}
 			}
 			sigCtx := sig.Context{}
+			var markPrice float64
 			if fr, err := client.FundingRate(ctx, sym); err == nil {
 				sigCtx.FundingRate = fr.Rate
+				markPrice = fr.MarkPrice
 			}
 			if oi, err := client.OpenInterest(ctx, sym); err == nil {
 				sigCtx.OpenInterest = oi
 			}
 			s := sig.Evaluate(sig.Inputs{
 				Symbol: sym, Timeframe: tf, Candles: candles, Ctx: sigCtx, Bias: bias,
+				LiveMarkPrice: markPrice,
 			})
 			r.Side = s.Side
 			r.Score = s.Score

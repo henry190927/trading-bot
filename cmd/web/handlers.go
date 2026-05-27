@@ -35,6 +35,12 @@ type symbolView struct {
 	HVNValues []string // formatted top-5 HVNs for display
 	Err       string   // non-empty if scan failed for this symbol
 
+	// ClosedClose is the close of the most recently CLOSED bar — the
+	// reference the engine evaluates against. Displayed alongside the
+	// live mark price (Signal.Price) so the trader can see both at a
+	// glance: "live = where you'd fill now; close = what the engine sees."
+	ClosedClose float64
+
 	// Diagnose is the validator's full scoring of "long now at market" or
 	// "short now at market", whichever scores higher. Surfaces the
 	// falling-knife / chase / HVN-wall flags directly on the dashboard so
@@ -122,8 +128,10 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 	}
 	v.Signal = signal.Evaluate(signal.Inputs{
 		Symbol: sym, Timeframe: tf, Candles: candles, Ctx: sigCtx,
+		LiveMarkPrice: markPrice, // engine uses for plan-validity suppression
 	})
 	v.Context = sigCtx
+	v.ClosedClose = candles[len(candles)-1].Close // closed-bar reference (engine sees this)
 	if markPrice > 0 {
 		v.Signal.Price = markPrice // override for display only; engine math unchanged
 	}
@@ -969,7 +977,15 @@ func (s *server) handleValidatePost(c *gin.Context) {
 		return
 	}
 
-	res := validator.Validate(sym, tf, side, entry, feeBps, candles)
+	// Fetch live mark price so the validator's "current market" reference
+	// matches what the dashboard shows. Best-effort: on failure, validator
+	// falls back to closed-bar close internally.
+	var markPrice float64
+	if fr, err := s.client.FundingRate(ctx, sym); err == nil {
+		markPrice = fr.MarkPrice
+	}
+
+	res := validator.Validate(sym, tf, side, entry, feeBps, candles, markPrice)
 	c.HTML(http.StatusOK, "validate_result.html", gin.H{
 		"R":     res,
 		"TF":    tfStr,

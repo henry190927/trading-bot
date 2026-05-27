@@ -69,6 +69,26 @@ type Inputs struct {
 	// macro flow. Compute with dxy.Classify(dxyCandles). Empty/Flat = no
 	// veto applied. Other symbols (BTC/ETH) ignore this field.
 	DXYTrend dxy.Trend
+
+	// LiveMarkPrice is the BingX continuously-updated mark price (or any
+	// equivalent live mid-market reference). When > 0, the engine's
+	// post-BuildPlan check refuses to emit plans whose entry is on the
+	// wrong side of live market — i.e., a LONG plan whose entry is above
+	// mark, or a SHORT plan whose entry is below mark. These plans would
+	// fill at market on submission rather than wait for the structural
+	// pullback the engine anticipated, so the original thesis is dead.
+	//
+	// The check is strict directional (not percentage-based) — percentage
+	// thresholds don't translate across symbols where prices span orders
+	// of magnitude (BTC $75000 vs XAG $75). Symbol-agnostic strict
+	// comparison matches the trader's intuitive rule: "LONG entry must
+	// not be higher than market; SHORT must not be lower."
+	//
+	// Backtest passes 0 (no live mark concept), so the check is a no-op
+	// there — preserving backtest/live consistency for signal generation
+	// while still preventing operationally-stale plans from being shown
+	// to the trader or pushed via ntfy.
+	LiveMarkPrice float64
 }
 
 // Thresholds applied by the engine.
@@ -292,6 +312,35 @@ func Evaluate(in Inputs) Signal {
 	applyContextFilters(&sig, in.Ctx)
 	if sig.Side != Flat {
 		sig.Plan = BuildPlan(sig, in.Candles, sweeps)
+	}
+
+	// Live-mark plan validity check. Refuse to emit plans where market has
+	// already moved past the planned entry in the chase direction — those
+	// would fill at market rather than wait for the structural anchor.
+	// Strict directional comparison (no percentage threshold): symbol-
+	// agnostic, matches the trader's stated rule directly.
+	// Backtest passes LiveMarkPrice=0, so this is a no-op there.
+	if in.LiveMarkPrice > 0 && sig.Plan.Entry > 0 && sig.Side != Flat {
+		var wrongSide bool
+		switch sig.Side {
+		case Long:
+			wrongSide = sig.Plan.Entry > in.LiveMarkPrice
+		case Short:
+			wrongSide = sig.Plan.Entry < in.LiveMarkPrice
+		}
+		if wrongSide {
+			diff := sig.Plan.Entry - in.LiveMarkPrice
+			if sig.Side == Short {
+				diff = -diff
+			}
+			pct := diff / in.LiveMarkPrice * 100
+			sig.Warnings = append(sig.Warnings,
+				fmt.Sprintf("Plan entry %.4f vs live mark %.4f — wrong side by %.4f (%.2f%%), plan suppressed",
+					sig.Plan.Entry, in.LiveMarkPrice, diff, pct))
+			sig.Side = Flat
+			sig.Score = 0
+			sig.Plan = Plan{}
+		}
 	}
 	return sig
 }

@@ -54,14 +54,17 @@ func main() {
 			}
 		}
 		sigCtx := signal.Context{}
+		var markPrice float64
 		if fr, err := client.FundingRate(ctx, sym); err == nil {
 			sigCtx.FundingRate = fr.Rate
+			markPrice = fr.MarkPrice
 		}
 		if oi, err := client.OpenInterest(ctx, sym); err == nil {
 			sigCtx.OpenInterest = oi
 		}
 		s := signal.Evaluate(signal.Inputs{
 			Symbol: sym, Timeframe: timeframe, Candles: candles, Ctx: sigCtx, Bias: bias,
+			LiveMarkPrice: markPrice,
 		})
 		results = append(results, symbolResult{s, sigCtx, bias})
 		printDetails(s, sigCtx, bias)

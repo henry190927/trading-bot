@@ -1168,6 +1168,21 @@ footer {
     border: 1px solid var(--yellow);
 }
 
+/* close-bar reference next to live mark price */
+.close-ref {
+    margin-left: 0.4rem;
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    font-style: italic;
+    white-space: nowrap;
+}
+.close-ref .copy-btn {
+    font-style: normal;
+    font-size: 0.78rem;
+    padding: 0.05rem 0.3rem;
+    margin-left: 0.15rem;
+}
+
 /* --- Ops control panel (Phase 2C) --- */
 
 .ops-status-card {

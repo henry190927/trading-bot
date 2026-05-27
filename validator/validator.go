@@ -80,13 +80,24 @@ func Validate(sym market.Symbol, tf market.Timeframe, side signal.Side, entry, f
 	closes := market.Closes(candles)
 	price := closes[len(closes)-1]
 
-	sig := signal.Evaluate(signal.Inputs{Symbol: sym, Timeframe: tf, Candles: candles})
+	// Pull the optional live-market override up front so we can feed it
+	// into the engine's plan-validity check too (it will suppress plans
+	// already exceeded by mark) and use it as the chase-reference below.
+	var liveMark float64
+	if len(liveMarketPrice) > 0 && liveMarketPrice[0] > 0 {
+		liveMark = liveMarketPrice[0]
+	}
+
+	sig := signal.Evaluate(signal.Inputs{
+		Symbol: sym, Timeframe: tf, Candles: candles,
+		LiveMarkPrice: liveMark,
+	})
 
 	// Override comparison price with live mark if caller provided one.
 	// Note: only `price` (chase reference + r.Price display) is overridden;
 	// engine math above already consumed closes-based price and is unchanged.
-	if len(liveMarketPrice) > 0 && liveMarketPrice[0] > 0 {
-		price = liveMarketPrice[0]
+	if liveMark > 0 {
+		price = liveMark
 	}
 
 	atr := indicator.ATR(candles, 14)

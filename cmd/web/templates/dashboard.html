@@ -40,6 +40,11 @@
       <span class="sym">{{.Short}}</span>
       <span class="price-wrap">
         @ <button class="copy-btn price" data-copy="{{fmtPrice .Signal.Price}}">{{fmtPrice .Signal.Price}}</button>
+        {{if .ClosedClose}}
+          <span class="close-ref" title="last closed-bar close — what the engine evaluates against">
+            close <button class="copy-btn small" data-copy="{{fmtPrice .ClosedClose}}">{{fmtPrice .ClosedClose}}</button>
+          </span>
+        {{end}}
       </span>
       <span class="{{sideClass .Signal.Side}} side-badge">{{sideText .Signal.Side}}</span>
       <span class="score {{scoreClass .Signal.Score $.MinTradeable}}">score {{.Signal.Score}}</span>
