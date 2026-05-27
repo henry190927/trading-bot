@@ -60,6 +60,13 @@ func main() {
 	r.POST("/journal/:id/delete", srv.handleJournalDelete)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
+	r.GET("/ops", srv.handleOpsPage)
+	r.GET("/ops/status", srv.handleOpsStatus)
+	r.GET("/ops/logs", srv.handleOpsLogs)
+	r.POST("/ops/start", srv.handleOpsStart)
+	r.POST("/ops/stop", srv.handleOpsStop)
+	r.POST("/ops/restart", srv.handleOpsRestart)
+	r.POST("/ops/config", srv.handleOpsConfig)
 	r.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok %s\n", time.Now().Format(time.RFC3339))
 	})

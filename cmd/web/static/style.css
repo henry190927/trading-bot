@@ -1167,3 +1167,193 @@ footer {
     color: var(--yellow);
     border: 1px solid var(--yellow);
 }
+
+/* --- Ops control panel (Phase 2C) --- */
+
+.ops-status-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 0.8rem;
+}
+.ops-status-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+.ops-state-flex { flex: 1; }
+
+.ops-state-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.ops-state-dot.on  {
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+.ops-state-dot.off {
+    background: var(--text-dim);
+}
+.ops-state-label {
+    font-weight: 700;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+}
+
+.ops-config-pill {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    background: var(--surface-2);
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+}
+.ops-config-pill strong {
+    color: var(--text);
+    margin-left: 0.25rem;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+}
+
+.ops-warn {
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+    border-radius: 5px;
+    font-size: 0.82rem;
+}
+
+.ops-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.btn-ops {
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0.8rem 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    min-height: 52px;
+}
+.btn-ops:disabled { opacity: 0.5; cursor: default; }
+.btn-ops.btn-start {
+    color: var(--green);
+    border-color: var(--green);
+}
+.btn-ops.btn-stop {
+    color: var(--red);
+    border-color: var(--red);
+}
+.btn-ops.btn-restart {
+    color: var(--yellow);
+    border-color: var(--yellow);
+}
+.btn-ops:active { opacity: 0.7; }
+
+.ops-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.8rem;
+}
+.ops-block h2 {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 0.6rem 0;
+    font-weight: 600;
+}
+.ops-block h2 .hint {
+    color: var(--text-dim);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-style: italic;
+    font-size: 0.75rem;
+    margin-left: 0.3rem;
+}
+
+.ops-log-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+}
+.ops-checkbox {
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+}
+.ops-checkbox input {
+    accent-color: var(--blue);
+}
+
+.ops-log-status {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+}
+.ops-log-status.ok  { color: var(--green); }
+.ops-log-status.err { color: var(--red); }
+
+.ops-log {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.5rem;
+    height: 55vh;
+    overflow-y: auto;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+    -webkit-overflow-scrolling: touch;
+}
+.ops-log-line {
+    padding: 1px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+}
+.ops-log-line.log-fired { color: var(--green); }
+.ops-log-line.log-skip  { color: var(--text-dim); opacity: 0.7; }
+.ops-log-line.log-err   { color: var(--red); }
+.ops-log-line.log-warn  { color: var(--yellow); }
+.ops-log-line.log-info  { color: var(--blue); }
+
+.ops-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    z-index: 10;
+    max-width: 90vw;
+    text-align: center;
+}
+.ops-toast.ok  { border-color: var(--green); color: var(--green); }
+.ops-toast.err { border-color: var(--red);   color: var(--red); }
+.ops-toast.hidden { display: none; }

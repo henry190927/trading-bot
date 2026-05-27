@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>ops · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal">Journal</a>
+    <a href="/validate">Validate</a>
+    <a href="/ops" class="active">Ops</a>
+  </nav>
+</header>
+
+<main>
+
+<h1 class="page-title">Daemon control</h1>
+
+<section class="ops-status-card">
+  <div class="ops-status-row">
+    <span id="ops-state-dot" class="ops-state-dot {{if .Status.Active}}on{{else}}off{{end}}"></span>
+    <span id="ops-state-label" class="ops-state-label">{{if .Status.Active}}ACTIVE{{else}}{{if .Status.State}}{{.Status.State | printf "%s"}}{{else}}unknown{{end}}{{end}}</span>
+    <span class="ops-state-flex"></span>
+    <span class="ops-config-pill">TF <strong id="ops-tf-label">{{or .Status.TF "—"}}</strong></span>
+    <span class="ops-config-pill">min-score <strong id="ops-score-label">{{if .Status.MinScore}}{{.Status.MinScore}}{{else}}—{{end}}</strong></span>
+  </div>
+  {{if not .Status.EnvOK}}
+    <div class="ops-warn">⚠ .env not readable at <code>/opt/trading/.env</code> — config edits disabled.</div>
+  {{end}}
+</section>
+
+<section class="ops-actions">
+  <button type="button" class="btn-ops btn-start" data-action="start">▶ Start</button>
+  <button type="button" class="btn-ops btn-stop" data-action="stop">■ Stop</button>
+  <button type="button" class="btn-ops btn-restart" data-action="restart">↻ Restart</button>
+</section>
+
+<section class="ops-block">
+  <h2>Config <span class="hint">(restarts daemon if running)</span></h2>
+  <form id="ops-config-form" class="trade-form" onsubmit="return false;">
+    <div class="field-row">
+      <div class="field">
+        <label for="ops-tf">Timeframe</label>
+        <select name="tf" id="ops-tf">
+          <option value="">— keep current —</option>
+          {{$cur := .Status.TF}}
+          {{range .ValidTFs}}
+            <option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="field">
+        <label for="ops-min-score">min-score</label>
+        <input type="number" min="1" max="8" step="1" name="min_score" id="ops-min-score" value="{{if .Status.MinScore}}{{.Status.MinScore}}{{end}}" placeholder="—">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-primary" id="ops-apply-config">Apply config</button>
+    </div>
+  </form>
+</section>
+
+<section class="ops-block">
+  <h2>Live log <span class="hint">(tailing <code>journalctl -u trading-bot -f</code>)</span></h2>
+  <div class="ops-log-controls">
+    <label class="ops-checkbox"><input type="checkbox" id="ops-autoscroll" checked> auto-scroll</label>
+    <button type="button" class="btn-secondary" id="ops-clear-log">clear</button>
+    <span id="ops-log-status" class="ops-log-status">connecting…</span>
+  </div>
+  <div id="ops-log" class="ops-log" aria-live="polite" aria-atomic="false"></div>
+</section>
+
+<div id="ops-toast" class="ops-toast hidden" role="status"></div>
+
+</main>
+
+<footer>
+  <span>Tailscale-only · daemon binary at <code>/opt/trading/trading-serve</code></span>
+</footer>
+
+<script>
+(function () {
+    // ─── Toast ────────────────────────────────────────────────────────
+    var toast = document.getElementById('ops-toast');
+    var toastTimer = null;
+    function showToast(msg, kind) {
+        toast.textContent = msg;
+        toast.className = 'ops-toast ' + (kind || 'info');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+            toast.classList.add('hidden');
+        }, 3500);
+    }
+
+    // ─── Status refresh ───────────────────────────────────────────────
+    var stateDot = document.getElementById('ops-state-dot');
+    var stateLabel = document.getElementById('ops-state-label');
+    var tfLabel = document.getElementById('ops-tf-label');
+    var scoreLabel = document.getElementById('ops-score-label');
+
+    function applyStatus(s) {
+        if (!s) return;
+        stateDot.className = 'ops-state-dot ' + (s.active ? 'on' : 'off');
+        stateLabel.textContent = (s.state || 'unknown').toUpperCase();
+        tfLabel.textContent = s.tf || '—';
+        scoreLabel.textContent = s.min_score ? String(s.min_score) : '—';
+    }
+
+    function fetchStatus() {
+        fetch('/ops/status').then(function (r) { return r.json(); })
+            .then(applyStatus).catch(function () {});
+    }
+    setInterval(fetchStatus, 5000);
+
+    // ─── Lifecycle buttons ────────────────────────────────────────────
+    document.querySelectorAll('.btn-ops').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var action = btn.getAttribute('data-action');
+            btn.disabled = true;
+            var origText = btn.textContent;
+            btn.textContent = '…';
+            fetch('/ops/' + action, { method: 'POST' })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                .then(function (res) {
+                    if (res.ok) {
+                        applyStatus(res.body);
+                        showToast(action + ' ok', 'ok');
+                    } else {
+                        showToast(action + ' failed: ' + (res.body.error || 'unknown'), 'err');
+                    }
+                })
+                .catch(function (e) { showToast(action + ' failed: ' + e, 'err'); })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                });
+        });
+    });
+
+    // ─── Config apply ─────────────────────────────────────────────────
+    document.getElementById('ops-apply-config').addEventListener('click', function (e) {
+        var tf = document.getElementById('ops-tf').value;
+        var score = document.getElementById('ops-min-score').value;
+        var form = new URLSearchParams();
+        if (tf) form.set('tf', tf);
+        if (score) form.set('min_score', score);
+        if (!form.toString()) {
+            showToast('nothing to change', 'err');
+            return;
+        }
+        e.target.disabled = true;
+        fetch('/ops/config', { method: 'POST', body: form, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (res.ok) {
+                    applyStatus(res.body);
+                    showToast('config applied' + (res.body.active ? ' + restarted' : ''), 'ok');
+                } else {
+                    showToast('config failed: ' + (res.body.error || 'unknown'), 'err');
+                }
+            })
+            .catch(function (err) { showToast('config error: ' + err, 'err'); })
+            .finally(function () { e.target.disabled = false; });
+    });
+
+    // ─── SSE live log ─────────────────────────────────────────────────
+    var logEl = document.getElementById('ops-log');
+    var logStatus = document.getElementById('ops-log-status');
+    var autoscroll = document.getElementById('ops-autoscroll');
+
+    document.getElementById('ops-clear-log').addEventListener('click', function () {
+        logEl.innerHTML = '';
+    });
+
+    var es = null;
+    function connectLogs() {
+        if (es) es.close();
+        logStatus.textContent = 'connecting…';
+        es = new EventSource('/ops/logs');
+        es.onopen = function () { logStatus.textContent = 'streaming'; logStatus.className = 'ops-log-status ok'; };
+        es.onerror = function () {
+            logStatus.textContent = 'disconnected · retry 10s';
+            logStatus.className = 'ops-log-status err';
+            es.close();
+            es = null;
+            setTimeout(connectLogs, 10000);
+        };
+        es.onmessage = function (ev) {
+            var line = document.createElement('div');
+            line.className = 'ops-log-line ' + classifyLine(ev.data);
+            line.textContent = ev.data;
+            logEl.appendChild(line);
+            // Trim to most recent 500 lines to keep the DOM small.
+            while (logEl.childElementCount > 500) logEl.removeChild(logEl.firstChild);
+            if (autoscroll.checked) {
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+        };
+    }
+
+    function classifyLine(s) {
+        // Heuristic colouring for journalctl output.
+        if (/FIRED|✓|score \d+ \[FIRED/.test(s)) return 'log-fired';
+        if (/skipped:|skip\b/.test(s))           return 'log-skip';
+        if (/ERROR|FAIL|panic|failed/i.test(s))  return 'log-err';
+        if (/shutting down|Stopped|Deactivat/i.test(s)) return 'log-warn';
+        if (/Started|listening on/i.test(s))     return 'log-info';
+        return '';
+    }
+
+    connectLogs();
+})();
+</script>
+</body>
+</html>
