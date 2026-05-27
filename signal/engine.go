@@ -190,13 +190,17 @@ func Evaluate(in Inputs) Signal {
 		sig.Reasons = append(sig.Reasons, "CVD bearish divergence")
 	}
 
-	// Range expansion + volume confirmation. Re-promoted from display-only
-	// Notes to actual votes after a 2026-05-27 XAG case where the engine
-	// gave LONG score 3 *while* a 3-ATR bearish range-expansion bar was
-	// printing (and was being detected, but ignored by scoring). Voting
-	// symmetrically: bullish bar votes long, bearish bar votes short.
-	// Backtest A/B will decide whether this stays or needs further tuning.
-	if last >= 20 {
+	// Range expansion + volume confirmation. Voting symmetric: bullish bar
+	// votes long, bearish bar votes short — BUT only when RSI is in the
+	// neutral band. At RSI extremes, mean-rev oscillators already drive the
+	// decision and a counter-trend range bar would tie/cancel the score
+	// (e.g. RSI<30 votes long, simultaneous bearish range bar votes short →
+	// Flat, even though one side was right). Gated on neutral RSI per the
+	// 2026-05-28 review (Patch 2). A/B over 60/90/120d on all 4 symbols
+	// passed the doc's decision rule: +3.86 / +9.71 / +6.91R total deltas,
+	// no symbol regressed by >10R, ≥3 of 4 symbols flat-or-positive in
+	// every window. ETH was the biggest beneficiary (+4-6R per window).
+	if last >= 20 && rsi[last] >= 30 && rsi[last] <= 70 {
 		bar := in.Candles[last]
 		barRange := bar.High - bar.Low
 		atrSeries := indicator.ATR(in.Candles, 14)
@@ -307,13 +311,18 @@ func applyContextFilters(sig *Signal, ctx Context) {
 	}
 	if ctx.PrevOpenInterest > 0 && ctx.OpenInterest > 0 {
 		oiDelta := (ctx.OpenInterest - ctx.PrevOpenInterest) / ctx.PrevOpenInterest
+		// Corrected OI semantics (2026-05-28 review): a "squeeze" needs
+		// fresh positions piling in on the wrong side. OI falling on a
+		// down-move = longs unwinding = confirms a short trade. OI rising
+		// = new positions, and on the side opposite the move = squeeze risk
+		// for that direction.
 		if sig.Side == Long && oiDelta < -0.02 {
 			sig.Warnings = append(sig.Warnings,
-				fmt.Sprintf("OI down %.2f%% — long-side squeeze, not new flow", oiDelta*100))
+				fmt.Sprintf("OI down %.2f%% — long unwind driving the move, not new buying", oiDelta*100))
 		}
-		if sig.Side == Short && oiDelta < -0.02 {
+		if sig.Side == Short && oiDelta > 0.02 {
 			sig.Warnings = append(sig.Warnings,
-				fmt.Sprintf("OI down %.2f%% — short-side squeeze, not new flow", oiDelta*100))
+				fmt.Sprintf("OI up %.2f%% — shorts crowding, squeeze risk", oiDelta*100))
 		}
 	}
 }

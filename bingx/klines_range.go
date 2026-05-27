@@ -65,6 +65,9 @@ func (c *Client) KlinesRange(ctx context.Context, sym market.Symbol, tf market.T
 		out = append(out, c)
 		prev = ts
 	}
+	// Defensive: nearly always a no-op for historical ranges (end is in the
+	// past), but trims a forming bar if the caller set end >= time.Now().
+	out = dropForming(out, time.Now())
 	return out, nil
 }
 

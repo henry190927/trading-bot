@@ -100,6 +100,7 @@ func (c *Client) Klines(ctx context.Context, sym market.Symbol, tf market.Timefr
 			out[i], out[j] = out[j], out[i]
 		}
 	}
+	out = dropForming(out, time.Now())
 	return out, nil
 }
 
