@@ -21,6 +21,11 @@ GO       := go
 SERVE_BIN := /tmp/trading-serve
 LOG      := $(HOME)/trading.log
 
+# buildvcs=false: this Go module lives in a subdirectory of a parent
+# (/myFirstGo) that is not itself a git repo. Without this flag, Go 1.24
+# errors trying to read VCS metadata from the module root.
+export GOFLAGS := -buildvcs=false
+
 # VPS deployment target. Three ways to set, in priority order:
 #   1. `Makefile.local` in this directory (gitignored) — see Makefile.local.example
 #   2. `ORACLE_HOST=1.2.3.4 make deploy` on the command line

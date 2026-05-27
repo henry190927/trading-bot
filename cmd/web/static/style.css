@@ -1091,3 +1091,79 @@ footer {
 }
 .validate-footer-actions .btn-primary,
 .validate-footer-actions .btn-cancel { flex: 1; }
+
+/* --- Diagnose-now row on dashboard cards --- */
+
+.diagnose-row {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    margin: 0.5rem 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+.diagnose-row.verdict-strong  { border-left-color: var(--green); }
+.diagnose-row.verdict-take    { border-left-color: var(--green); }
+.diagnose-row.verdict-neutral { border-left-color: var(--yellow); }
+.diagnose-row.verdict-weak    { border-left-color: var(--yellow); }
+.diagnose-row.verdict-avoid   { border-left-color: var(--red); }
+
+.diag-label {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.diag-side {
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 0.75rem;
+}
+.diag-score {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.diagnose-row.verdict-strong  .diag-score,
+.diagnose-row.verdict-take    .diag-score { color: var(--green); }
+.diagnose-row.verdict-neutral .diag-score,
+.diagnose-row.verdict-weak    .diag-score { color: var(--yellow); }
+.diagnose-row.verdict-avoid   .diag-score { color: var(--red); }
+
+.diag-verdict {
+    color: var(--text);
+    font-weight: 600;
+}
+.diag-link {
+    margin-left: auto;
+    color: var(--blue);
+    text-decoration: none;
+    font-size: 1rem;
+    padding: 0 0.3rem;
+}
+.diag-link:active { opacity: 0.7; }
+
+.diag-flag {
+    flex-basis: 100%;
+    margin-top: 0.2rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.diag-flag.knife {
+    background: rgba(248, 113, 113, 0.15);
+    color: var(--red);
+    border: 1px solid var(--red);
+}
+.diag-flag.squeeze {
+    background: rgba(251, 191, 36, 0.15);
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+}

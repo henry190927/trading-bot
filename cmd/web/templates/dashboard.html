@@ -65,6 +65,18 @@
       </div>
     {{end}}
 
+    {{if .Diagnose}}
+    <div class="diagnose-row {{verdictClass .Diagnose.Total}}">
+      <span class="diag-label">trade now?</span>
+      <span class="diag-side {{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
+      <span class="diag-score">{{printf "%.1f" .Diagnose.Total}}/10</span>
+      <span class="diag-verdict">{{verdictShort .Diagnose.Verdict}}</span>
+      <a class="diag-link" href="{{diagnoseHref . $.TF}}" title="full validator breakdown">↗</a>
+      {{if .Diagnose.RecentFlashBarBearish}}<span class="diag-flag knife">⚠ falling knife ({{.Diagnose.RecentFlashBarAge}} bar ago)</span>{{end}}
+      {{if .Diagnose.RecentFlashBarBullish}}<span class="diag-flag squeeze">⚠ blow-off risk ({{.Diagnose.RecentFlashBarAge}} bar ago)</span>{{end}}
+    </div>
+    {{end}}
+
     {{range .Signal.Reasons}}<div class="reason vote">+ {{.}}</div>{{end}}
     {{range .Signal.Notes}}<div class="reason note">· {{.}}</div>{{end}}
     {{range .Signal.Warnings}}<div class="reason warn">⚠ {{.}}</div>{{end}}

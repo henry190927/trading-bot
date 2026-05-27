@@ -34,6 +34,13 @@ type symbolView struct {
 	Context   signal.Context
 	HVNValues []string // formatted top-5 HVNs for display
 	Err       string   // non-empty if scan failed for this symbol
+
+	// Diagnose is the validator's full scoring of "long now at market" or
+	// "short now at market", whichever scores higher. Surfaces the
+	// falling-knife / chase / HVN-wall flags directly on the dashboard so
+	// the user can tell a swing-low from a falling knife at a glance
+	// without typing into /validate manually.
+	Diagnose *validator.Result
 }
 
 func shortSymbol(s market.Symbol) string {
@@ -106,6 +113,29 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 	v.Context = sigCtx
 	for _, h := range v.Signal.VP.HVN {
 		v.HVNValues = append(v.HVNValues, fmt.Sprintf("%.4f", h))
+	}
+
+	// Diagnose now: run validator at market for whichever side the engine
+	// favors. If engine is Flat, score both sides and surface the higher
+	// (still useful — tells the trader "if you tried to long here anyway,
+	// here's what the validator thinks").
+	const dashboardFeeBps = 6.0
+	price := candles[len(candles)-1].Close
+	switch v.Signal.Side {
+	case signal.Long:
+		r := validator.Validate(sym, tf, signal.Long, price, dashboardFeeBps, candles)
+		v.Diagnose = &r
+	case signal.Short:
+		r := validator.Validate(sym, tf, signal.Short, price, dashboardFeeBps, candles)
+		v.Diagnose = &r
+	default: // Flat — show whichever side scores higher
+		long := validator.Validate(sym, tf, signal.Long, price, dashboardFeeBps, candles)
+		short := validator.Validate(sym, tf, signal.Short, price, dashboardFeeBps, candles)
+		if short.Total > long.Total {
+			v.Diagnose = &short
+		} else {
+			v.Diagnose = &long
+		}
 	}
 	return v
 }
@@ -734,6 +764,24 @@ func templateFuncs() template.FuncMap {
 				return "low"
 			}
 			return "high"
+		},
+		"verdictShort": func(v string) string {
+			// "STRONG TAKE — full size" → "STRONG TAKE"
+			if i := strings.Index(v, " — "); i > 0 {
+				return v[:i]
+			}
+			return v
+		},
+		"diagnoseHref": func(v symbolView, tf string) template.URL {
+			if v.Diagnose == nil {
+				return template.URL("/validate")
+			}
+			q := url.Values{}
+			q.Set("symbol", v.Short)
+			q.Set("side", strings.ToLower(v.Diagnose.Side.String()))
+			q.Set("entry", fmt.Sprintf("%.4f", v.Diagnose.Entry))
+			q.Set("tf", tf)
+			return template.URL("/validate?" + q.Encode())
 		},
 		"verdictClass": func(score float64) string {
 			switch {

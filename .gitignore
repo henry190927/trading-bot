@@ -23,6 +23,16 @@ trading-price
 trading-journal
 trading-web
 
+# Bare `go build ./cmd/<name>` (without -o) drops the binary into cwd named
+# after the package. Guard against accidents.
+/serve
+/analyze
+/validate
+/backtest
+/price
+/journal
+/web
+
 # IDE
 .idea/
 .vscode/
