@@ -83,6 +83,12 @@ func (s *server) handleDashboard(c *gin.Context) {
 		return order[views[i].Symbol] < order[views[j].Symbol]
 	})
 
+	// Disable client-side caching so the meta-refresh reload actually fetches
+	// fresh data (iOS Safari otherwise serves the page from cache on the
+	// next 60s tick if no Cache-Control is set).
+	c.Header("Cache-Control", "no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"TF":           tf,
 		"Symbols":      views,
@@ -101,8 +107,15 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 		return v
 	}
 	sigCtx := signal.Context{}
+	// Mark price is the live perp price BingX continuously updates — what the
+	// BingX app shows. After Patch 1 trims the forming bar, the closed-candle
+	// close is up to one TF-bar stale, so we use mark price for the displayed
+	// "current price" while signal evaluation continues to use closed bars
+	// only (no lookahead). Falls back to candle close if funding fetch fails.
+	var markPrice float64
 	if fr, err := s.client.FundingRate(ctx, sym); err == nil {
 		sigCtx.FundingRate = fr.Rate
+		markPrice = fr.MarkPrice
 	}
 	if oi, err := s.client.OpenInterest(ctx, sym); err == nil {
 		sigCtx.OpenInterest = oi
@@ -111,6 +124,9 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 		Symbol: sym, Timeframe: tf, Candles: candles, Ctx: sigCtx,
 	})
 	v.Context = sigCtx
+	if markPrice > 0 {
+		v.Signal.Price = markPrice // override for display only; engine math unchanged
+	}
 	for _, h := range v.Signal.VP.HVN {
 		v.HVNValues = append(v.HVNValues, fmt.Sprintf("%.4f", h))
 	}
@@ -120,7 +136,7 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 	// (still useful — tells the trader "if you tried to long here anyway,
 	// here's what the validator thinks").
 	const dashboardFeeBps = 6.0
-	price := candles[len(candles)-1].Close
+	price := v.Signal.Price // live mark price (or closed-bar close fallback)
 	switch v.Signal.Side {
 	case signal.Long:
 		r := validator.Validate(sym, tf, signal.Long, price, dashboardFeeBps, candles)
