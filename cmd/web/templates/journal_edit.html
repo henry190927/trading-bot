@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>edit trade · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal" class="active">Journal</a>
+    <a href="/validate">Validate</a>
+  </nav>
+</header>
+
+<main>
+
+<h1 class="page-title">Edit trade #{{.Trade.ID}}</h1>
+
+{{if .Error}}
+  <div class="form-error">⚠ {{.Error}}</div>
+{{end}}
+
+{{if .Trade.ID}}
+
+<form method="POST" action="/journal/{{.Trade.ID}}/edit" class="trade-form">
+
+  <h2 class="form-section">Identity</h2>
+
+  <div class="field">
+    <label for="symbol">Symbol</label>
+    <select name="symbol" id="symbol" required>
+      {{$cur := .Trade.Symbol}}
+      {{range .Symbols}}
+        <option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Side</label>
+    <div class="radio-row">
+      <label class="radio">
+        <input type="radio" name="side" value="long" {{if eq .Trade.Side "long"}}checked{{end}} required>
+        <span class="side-long">LONG</span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="side" value="short" {{if eq .Trade.Side "short"}}checked{{end}}>
+        <span class="side-short">SHORT</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tf">TF</label>
+      <input type="text" name="tf" id="tf" value="{{.Trade.TF}}">
+    </div>
+    <div class="field">
+      <label for="score">Score</label>
+      <input type="text" name="score" id="score" value="{{.Trade.Score}}">
+    </div>
+  </div>
+
+  <h2 class="form-section">Plan</h2>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="entry">Entry</label>
+      <input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required>
+    </div>
+    <div class="field">
+      <label for="stop">Stop</label>
+      <input type="number" step="any" inputmode="decimal" name="stop" id="stop" value="{{.Stop}}" required>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tp1">TP1</label>
+      <input type="number" step="any" inputmode="decimal" name="tp1" id="tp1" value="{{.TP1}}" required>
+    </div>
+    <div class="field">
+      <label for="tp2">TP2</label>
+      <input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}" required>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="anchor">Anchor</label>
+    <input type="text" name="anchor" id="anchor" list="anchor-suggestions" value="{{.Trade.Anchor}}" autocomplete="off">
+    <datalist id="anchor-suggestions">
+      {{range .Anchors}}<option value="{{.}}">{{end}}
+    </datalist>
+  </div>
+
+  <h2 class="form-section">Times <span class="hint">(local)</span></h2>
+
+  <div class="field">
+    <label for="analyzed_at">Analyzed at</label>
+    <input type="datetime-local" name="analyzed_at" id="analyzed_at" value="{{.AnalyzedAt}}">
+  </div>
+
+  <div class="field">
+    <label for="opened_at">Opened at</label>
+    <input type="datetime-local" name="opened_at" id="opened_at" value="{{.OpenedAt}}" required>
+  </div>
+
+  <div class="field">
+    <label for="closed_at">Closed at <span class="hint">(blank = still open)</span></label>
+    <input type="datetime-local" name="closed_at" id="closed_at" value="{{.ClosedAt}}">
+  </div>
+
+  <h2 class="form-section">Outcome <span class="hint">(required iff closed)</span></h2>
+
+  <details class="partials-helper">
+    <summary>Partials calculator <span class="hint">(optional — for multi-leg exits)</span></summary>
+    <div id="partials-rows">
+      <div class="partial-row">
+        <input type="number" step="any" min="0" max="100" class="partial-weight" placeholder="% size" inputmode="decimal">
+        <input type="number" step="any" min="0" class="partial-price" placeholder="exit price" inputmode="decimal">
+        <button type="button" class="btn-remove-partial" aria-label="remove leg">×</button>
+      </div>
+    </div>
+    <button type="button" id="add-partial" class="btn-secondary">+ add leg</button>
+    <div id="partials-summary" class="partials-summary"></div>
+  </details>
+
+  <div class="field">
+    <label for="outcome">Outcome</label>
+    <select name="outcome" id="outcome">
+      {{$o := .Trade.Outcome}}
+      <option value="" {{if eq $o ""}}selected{{end}}>—</option>
+      <option value="tp1" {{if eq $o "tp1"}}selected{{end}}>TP1 (+1R)</option>
+      <option value="tp2" {{if eq $o "tp2"}}selected{{end}}>TP2 (+2R)</option>
+      <option value="stop" {{if eq $o "stop"}}selected{{end}}>Stop (−1R)</option>
+      <option value="manual" {{if eq $o "manual"}}selected{{end}}>Manual</option>
+      <option value="timeout" {{if eq $o "timeout"}}selected{{end}}>Timeout</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="exit_price">Exit price</label>
+    <input type="number" step="any" inputmode="decimal" name="exit_price" id="exit_price" value="{{.ExitPrice}}">
+  </div>
+
+  <h2 class="form-section">Notes</h2>
+
+  <div class="field">
+    <label for="open_notes">Open notes</label>
+    <textarea name="open_notes" id="open_notes" rows="2">{{.Trade.OpenNotes}}</textarea>
+  </div>
+
+  <div class="field">
+    <label for="close_notes">Close notes</label>
+    <textarea name="close_notes" id="close_notes" rows="2">{{.Trade.CloseNotes}}</textarea>
+  </div>
+
+  <div class="form-actions">
+    <a href="/journal" class="btn-cancel">Cancel</a>
+    <button type="submit" class="btn-primary">Save changes</button>
+  </div>
+
+</form>
+
+<form method="POST" action="/journal/{{.Trade.ID}}/delete" class="danger-form"
+      onsubmit="return confirm('Delete trade #{{.Trade.ID}} ({{.Trade.Symbol}})? This cannot be undone.');">
+  <button type="submit" class="btn-danger">Delete trade #{{.Trade.ID}}</button>
+</form>
+
+{{end}}{{/* if .Trade.ID */}}
+
+</main>
+
+<footer>
+  <span>R-realized is auto-recomputed when entry / stop / exit change</span>
+</footer>
+
+<script src="/static/partials.js"></script>
+</body>
+</html>

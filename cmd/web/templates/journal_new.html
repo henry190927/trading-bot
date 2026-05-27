@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>new trade · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal" class="active">Journal</a>
+    <a href="/validate">Validate</a>
+  </nav>
+</header>
+
+<main>
+
+<h1 class="page-title">Record a trade</h1>
+
+{{if .Error}}
+  <div class="form-error">⚠ {{.Error}}</div>
+{{end}}
+
+<form method="POST" action="/journal/open" class="trade-form">
+
+  <div class="field">
+    <label for="symbol">Symbol</label>
+    <select name="symbol" id="symbol" required>
+      <option value="">— choose —</option>
+      {{$cur := .Symbol}}
+      {{range .Symbols}}
+        <option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Side</label>
+    <div class="radio-row">
+      <label class="radio">
+        <input type="radio" name="side" value="long" {{if eq .Side "long"}}checked{{end}} required>
+        <span class="side-long">LONG</span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="side" value="short" {{if eq .Side "short"}}checked{{end}}>
+        <span class="side-short">SHORT</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="entry">Entry</label>
+      <input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required>
+    </div>
+    <div class="field">
+      <label for="stop">Stop</label>
+      <input type="number" step="any" inputmode="decimal" name="stop" id="stop" value="{{.Stop}}" required>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tp1">TP1</label>
+      <input type="number" step="any" inputmode="decimal" name="tp1" id="tp1" value="{{.TP1}}" required>
+    </div>
+    <div class="field">
+      <label for="tp2">TP2</label>
+      <input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}" required>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="anchor">Anchor <span class="hint">(tap for canonical labels)</span></label>
+    <input type="text" name="anchor" id="anchor" list="anchor-suggestions" value="{{.Anchor}}" autocomplete="off">
+    <datalist id="anchor-suggestions">
+      {{range .Anchors}}<option value="{{.}}">{{end}}
+    </datalist>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tf">TF <span class="hint">(or "15m,1h")</span></label>
+      <input type="text" name="tf" id="tf" value="{{.TF}}" placeholder="1h">
+    </div>
+    <div class="field">
+      <label for="score">Score <span class="hint">(e.g. 3, v7.5)</span></label>
+      <input type="text" name="score" id="score" value="{{.Score}}" placeholder="3">
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="analyzed_at">Analyzed at <span class="hint">(local time)</span></label>
+    <input type="datetime-local" name="analyzed_at" id="analyzed_at" value="{{.AnalyzedAt}}">
+  </div>
+
+  <div class="field">
+    <label for="notes">Notes <span class="hint">(optional)</span></label>
+    <textarea name="notes" id="notes" rows="3" placeholder="why you took this trade…">{{.Notes}}</textarea>
+  </div>
+
+  <div class="form-actions">
+    <a href="/journal" class="btn-cancel">Cancel</a>
+    <button type="submit" class="btn-primary">Record trade</button>
+  </div>
+
+</form>
+
+</main>
+
+<footer>
+  <span>analyzed_at, opened_at, closed_at all in Asia/Taipei</span>
+</footer>
+
+</body>
+</html>

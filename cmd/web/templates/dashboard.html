@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta http-equiv="refresh" content="60">
+<title>trading-web · {{.TF}}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/" class="active">Dashboard</a>
+    <a href="/journal">Journal</a>
+    <a href="/validate">Validate</a>
+  </nav>
+</header>
+
+<header class="topbar tf-bar">
+  <nav class="tf-picker">
+    {{range .TFOptions}}
+      {{if eq . $.TF}}
+        <span class="tf-active">{{.}}</span>
+      {{else}}
+        <a href="/?tf={{.}}">{{.}}</a>
+      {{end}}
+    {{end}}
+  </nav>
+  <div class="updated">{{.Now}}</div>
+</header>
+
+<main>
+{{range .Symbols}}
+  <section class="symbol-card {{if hasPlan .Signal}}has-plan{{end}}">
+    <div class="card-head">
+      <span class="sym">{{.Short}}</span>
+      <span class="price-wrap">
+        @ <button class="copy-btn price" data-copy="{{fmtPrice .Signal.Price}}">{{fmtPrice .Signal.Price}}</button>
+      </span>
+      <span class="{{sideClass .Signal.Side}} side-badge">{{sideText .Signal.Side}}</span>
+      <span class="score {{scoreClass .Signal.Score $.MinTradeable}}">score {{.Signal.Score}}</span>
+    </div>
+
+    {{if .Err}}
+      <p class="err">⚠ {{.Err}}</p>
+    {{else}}
+
+    <div class="meta">
+      <span>funding {{fmtPct .Context.FundingRate}}</span>
+      <span>OI {{fmtOI .Context.OpenInterest}}</span>
+      {{if .Signal.VP.POC}}
+        <span>POC <button class="copy-btn small" data-copy="{{fmtPrice .Signal.VP.POC}}">{{fmtPrice .Signal.VP.POC}}</button></span>
+      {{end}}
+    </div>
+
+    {{if .HVNValues}}
+      <div class="hvn-row">
+        <span class="label">HVN</span>
+        {{range .HVNValues}}
+          <button class="copy-btn small" data-copy="{{.}}">{{.}}</button>
+        {{end}}
+      </div>
+    {{end}}
+
+    {{range .Signal.Reasons}}<div class="reason vote">+ {{.}}</div>{{end}}
+    {{range .Signal.Notes}}<div class="reason note">· {{.}}</div>{{end}}
+    {{range .Signal.Warnings}}<div class="reason warn">⚠ {{.}}</div>{{end}}
+
+    {{if hasPlan .Signal}}
+      <div class="plan {{if isSweepAnchor .Signal.Plan.Anchor}}sweep{{end}}">
+        <div class="plan-head">
+          <span class="ord">{{.Signal.Plan.OrderType}}</span>
+          <span class="{{sideClass .Signal.Side}}">{{sideText .Signal.Side}}</span>
+          <span class="anchor">{{.Signal.Plan.Anchor}}</span>
+          <a class="record-btn" href="{{recordHref . $.TF}}">+ record</a>
+        </div>
+        <div class="plan-grid">
+          <span class="lbl">entry</span>
+          <button class="copy-btn big" data-copy="{{fmtPrice .Signal.Plan.Entry}}">{{fmtPrice .Signal.Plan.Entry}}</button>
+
+          <span class="lbl">stop</span>
+          <button class="copy-btn stop" data-copy="{{fmtPrice .Signal.Plan.StopLoss}}">{{fmtPrice .Signal.Plan.StopLoss}}</button>
+
+          {{if ge (len .Signal.Plan.TakeProfit) 1}}
+          <span class="lbl">TP1 (1R)</span>
+          <button class="copy-btn tp" data-copy="{{fmtPrice (index .Signal.Plan.TakeProfit 0)}}">{{fmtPrice (index .Signal.Plan.TakeProfit 0)}}</button>
+          {{end}}
+
+          {{if ge (len .Signal.Plan.TakeProfit) 2}}
+          <span class="lbl">TP2 (2R)</span>
+          <button class="copy-btn tp" data-copy="{{fmtPrice (index .Signal.Plan.TakeProfit 1)}}">{{fmtPrice (index .Signal.Plan.TakeProfit 1)}}</button>
+          {{end}}
+        </div>
+        {{if .Signal.Plan.Note}}<div class="plan-note">{{.Signal.Plan.Note}}</div>{{end}}
+      </div>
+    {{end}}
+
+    {{end}}{{/* if .Err */}}
+  </section>
+{{end}}
+</main>
+
+<footer>
+  <span>auto-refresh every 60s · tap any price to copy</span>
+</footer>
+
+<script src="/static/copy.js"></script>
+</body>
+</html>

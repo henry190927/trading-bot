@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>journal · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal" class="active">Journal</a>
+    <a href="/validate">Validate</a>
+  </nav>
+</header>
+
+<main>
+
+{{if .Error}}
+  <p class="err">⚠ {{.Error}}</p>
+{{else}}
+
+<div class="page-actions">
+  <a href="/journal/new" class="btn-primary">+ new trade</a>
+</div>
+
+<section class="stats-card">
+  <h2>Stats</h2>
+  <div class="stats-grid">
+    <div><span class="lbl">Open</span><span class="val">{{.OpenCount}}</span></div>
+    <div><span class="lbl">Closed</span><span class="val">{{.ClosedCount}}</span></div>
+    <div><span class="lbl">WR</span><span class="val">{{printf "%.1f%%" .WR}}</span></div>
+    <div><span class="lbl">avgR</span><span class="val {{rClass .AvgR}}">{{fmtR .AvgR}}</span></div>
+    <div><span class="lbl">totalR</span><span class="val {{rClass .TotalR}}">{{fmtR .TotalR}}</span></div>
+    <div><span class="lbl">best</span><span class="val r-pos">{{fmtR .BestR}}</span></div>
+    <div><span class="lbl">worst</span><span class="val r-neg">{{fmtR .WorstR}}</span></div>
+  </div>
+</section>
+
+{{if not .Trades}}
+  <p class="empty">No trades recorded yet. Tap <strong>+ new trade</strong> to record one.</p>
+{{else}}
+
+{{range .Trades}}
+  <article class="trade-card {{outcomeClass .}}">
+    <div class="trade-head">
+      <span class="trade-id">#{{.ID}}</span>
+      <span class="sym">{{.Symbol}}</span>
+      <span class="{{sideClassStr .Side}} side-badge">{{sideStr .Side}}</span>
+      <span class="tf">{{or .TF "—"}}</span>
+      {{if .Score}}<span class="score-tag">score {{.Score}}</span>{{end}}
+      <span class="trade-status">{{outcomeText .}}</span>
+      {{if not .IsOpen}}
+        <span class="trade-r {{rClass .RRealized}}">{{fmtR .RRealized}}R</span>
+      {{end}}
+    </div>
+
+    <div class="trade-prices">
+      <span><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice .Entry}}">{{fmtPrice .Entry}}</button></span>
+      <span><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice .Stop}}">{{fmtPrice .Stop}}</button></span>
+      <span><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP1}}">{{fmtPrice .TP1}}</button></span>
+      <span><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP2}}">{{fmtPrice .TP2}}</button></span>
+      {{if not .IsOpen}}
+        <span><span class="lbl">exit</span> <button class="copy-btn" data-copy="{{fmtPrice .ExitPrice}}">{{fmtPrice .ExitPrice}}</button></span>
+      {{end}}
+    </div>
+
+    <div class="trade-times">
+      <span class="lbl">analyzed</span> {{fmtTime .AnalyzedAt}}
+      &nbsp;·&nbsp; <span class="lbl">opened</span> {{fmtTime .OpenedAt}}
+      {{if not .IsOpen}}&nbsp;·&nbsp; <span class="lbl">closed</span> {{fmtTime .ClosedAt}}{{end}}
+    </div>
+
+    {{if .Anchor}}<div class="trade-anchor">anchor: <span>{{.Anchor}}</span></div>{{end}}
+    {{if .OpenNotes}}<div class="trade-note">{{.OpenNotes}}</div>{{end}}
+    {{if .CloseNotes}}<div class="trade-note close">{{.CloseNotes}}</div>{{end}}
+
+    <div class="trade-actions">
+      {{if .IsOpen}}
+        <a href="/journal/{{.ID}}/close" class="btn-close-trade">Close trade</a>
+      {{end}}
+      <a href="/journal/{{.ID}}/edit" class="btn-edit">Edit</a>
+    </div>
+  </article>
+{{end}}
+
+{{end}}{{/* if .Trades */}}
+
+{{end}}{{/* if .Error */}}
+
+</main>
+
+<footer>
+  <span>tap a price to copy · tap a card's <em>Edit</em> for full controls</span>
+</footer>
+
+<script src="/static/copy.js"></script>
+</body>
+</html>

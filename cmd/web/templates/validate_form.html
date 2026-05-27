@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>validate · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal">Journal</a>
+    <a href="/validate" class="active">Validate</a>
+  </nav>
+</header>
+
+<main>
+
+<h1 class="page-title">Validate a proposed entry</h1>
+
+{{if .Error}}
+  <div class="form-error">⚠ {{.Error}}</div>
+{{end}}
+
+<form method="POST" action="/validate" class="trade-form">
+
+  <div class="field">
+    <label for="symbol">Symbol</label>
+    <select name="symbol" id="symbol" required>
+      <option value="">— pick —</option>
+      {{$cur := .Symbol}}
+      {{range .Symbols}}
+        <option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Side</label>
+    <div class="radio-row">
+      <label class="radio">
+        <input type="radio" name="side" value="long" {{if eq .Side "long"}}checked{{end}} required>
+        <span class="side-long">LONG</span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="side" value="short" {{if eq .Side "short"}}checked{{end}}>
+        <span class="side-short">SHORT</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="entry">Entry price</label>
+    <input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tf">Timeframe</label>
+      <input type="text" name="tf" id="tf" value="{{.TF}}" placeholder="1h">
+    </div>
+    <div class="field">
+      <label for="fee_bps">Fee (bps RT)</label>
+      <input type="number" step="any" inputmode="decimal" name="fee_bps" id="fee_bps" value="{{.FeeBps}}">
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/" class="btn-cancel">Cancel</a>
+    <button type="submit" class="btn-primary">Score it →</button>
+  </div>
+
+</form>
+
+</main>
+
+<footer>
+  <span>scores entry confluence vs. engine + sweep / fib / BOLL / HVN context</span>
+</footer>
+
+</body>
+</html>

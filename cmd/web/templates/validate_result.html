@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>validate · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal">Journal</a>
+    <a href="/validate" class="active">Validate</a>
+  </nav>
+</header>
+
+<main>
+
+{{$r := .R}}
+
+<section class="validate-header">
+  <div class="validate-head-row">
+    <span class="sym">{{.Short}}</span>
+    <span class="{{sideClassStr (sideStr $r.Side.String)}} side-badge">{{sideStr $r.Side.String}}</span>
+    <span class="tf">{{$r.Timeframe}}</span>
+    <span class="entry-tag">entry <button class="copy-btn" data-copy="{{fmtPrice $r.Entry}}">{{fmtPrice $r.Entry}}</button></span>
+  </div>
+  <div class="market-row">
+    <span class="lbl">market</span> <button class="copy-btn" data-copy="{{fmtPrice $r.Price}}">{{fmtPrice $r.Price}}</button>
+    <span class="market-diff">your entry {{pctDiff $r.Entry $r.Price}} vs market</span>
+  </div>
+</section>
+
+<section class="score-card {{verdictClass $r.Total}}">
+  <div class="score-num">{{printf "%.1f" $r.Total}}<span class="score-out">/10</span></div>
+  <div class="verdict-text">{{$r.Verdict}}</div>
+</section>
+
+<a href="{{validateRecordHref $r .Short}}" class="btn-primary btn-record-trade">+ record this trade</a>
+
+<section class="validate-block">
+  <h2>Engine state</h2>
+  <div class="kv-row">
+    <span class="lbl">side</span>
+    <span class="{{sideClassStr (sideStr $r.EngineSide.String)}} side-badge">{{sideStr $r.EngineSide.String}}</span>
+    <span class="lbl">score</span>
+    <span class="score-tag">{{$r.EngineScore}}</span>
+  </div>
+  {{if $r.Reasons}}
+  <ul class="reasons">
+    {{range $r.Reasons}}<li class="reason-plus">{{.}}</li>{{end}}
+  </ul>
+  {{end}}
+  {{if $r.Notes}}
+  <ul class="reasons">
+    {{range $r.Notes}}<li class="reason-note">{{.}}</li>{{end}}
+  </ul>
+  {{end}}
+</section>
+
+{{if $r.EnginePlan.Entry}}
+<section class="validate-block">
+  <h2>Engine's own plan <span class="hint">(compare with yours)</span></h2>
+  <div class="plan-grid">
+    <div><span class="lbl">side</span> <span class="{{sideClassStr (sideStr $r.EngineSide.String)}} side-badge">{{sideStr $r.EngineSide.String}}</span></div>
+    <div><span class="lbl">anchor</span> <span>{{$r.EnginePlan.Anchor}}</span></div>
+    <div><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice $r.EnginePlan.Entry}}">{{fmtPrice $r.EnginePlan.Entry}}</button>
+      <span class="diff-small">{{pctDiff $r.Entry $r.EnginePlan.Entry}} vs yours</span></div>
+    <div><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice $r.EnginePlan.StopLoss}}">{{fmtPrice $r.EnginePlan.StopLoss}}</button></div>
+    {{if ge (len $r.EnginePlan.TakeProfit) 1}}
+      <div><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice (index $r.EnginePlan.TakeProfit 0)}}">{{fmtPrice (index $r.EnginePlan.TakeProfit 0)}}</button></div>
+    {{end}}
+    {{if ge (len $r.EnginePlan.TakeProfit) 2}}
+      <div><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice (index $r.EnginePlan.TakeProfit 1)}}">{{fmtPrice (index $r.EnginePlan.TakeProfit 1)}}</button></div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+<section class="validate-block">
+  <h2>Suggested levels <span class="hint">(1.5×ATR risk)</span></h2>
+  <div class="plan-grid">
+    <div><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice $r.SuggStop}}">{{fmtPrice $r.SuggStop}}</button></div>
+    <div><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice $r.SuggTP1}}">{{fmtPrice $r.SuggTP1}}</button></div>
+    <div><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice $r.SuggTP2}}">{{fmtPrice $r.SuggTP2}}</button></div>
+    <div><span class="lbl">risk</span> <span class="mono">{{printf "%.4f" $r.Risk}}</span></div>
+    <div><span class="lbl">fee_R</span> <span class="mono">{{printf "%.2fR" $r.FeeR}}</span></div>
+  </div>
+</section>
+
+<section class="validate-block">
+  <h2>Entry-level proximity</h2>
+  <ul class="proximity">
+    {{if $r.NearestSweep}}
+      <li>nearest sweep: <strong>{{sweepStr $r.NearestSweep.Side}}</strong> @ {{fmtPrice $r.NearestSweep.Level}}
+        <span class="diff-small">{{pctDiff $r.NearestSweep.Level $r.Entry}}</span></li>
+    {{else}}
+      <li class="dim">no recent sweeps detected</li>
+    {{end}}
+    {{if $r.NearestFib}}
+      <li>nearest fib {{printf "%.3f" $r.NearestFib.Ratio}}: {{fmtPrice $r.NearestFib.Price}}
+        <span class="diff-small">{{pctDiff $r.NearestFib.Price $r.Entry}}</span></li>
+    {{end}}
+    {{if $r.BollLower}}
+      <li>BOLL lower: {{fmtPrice $r.BollLower}} <span class="diff-small">{{pctDiff $r.BollLower $r.Entry}}</span>
+          &nbsp;·&nbsp; upper: {{fmtPrice $r.BollUpper}} <span class="diff-small">{{pctDiff $r.BollUpper $r.Entry}}</span></li>
+    {{end}}
+  </ul>
+</section>
+
+{{if $r.VP.POC}}
+<section class="validate-block">
+  <h2>HVN context</h2>
+  <ul class="proximity">
+    <li>POC @ <strong>{{fmtPrice $r.VP.POC}}</strong> <span class="diff-small">{{pctDiff $r.VP.POC $r.Entry}}</span></li>
+    {{if $r.VP.HVN}}
+      <li>top HVNs:
+        {{range $i, $h := $r.VP.HVN}}{{if $i}}, {{end}}{{fmtPrice $h}}{{end}}
+      </li>
+    {{end}}
+    <li>HVNs above entry: <strong>{{$r.HVNsAbove}}</strong> · below: <strong>{{$r.HVNsBelow}}</strong></li>
+  </ul>
+</section>
+{{end}}
+
+<section class="validate-block">
+  <h2>Factors <span class="hint">(sum = total score)</span></h2>
+  <ul class="factors">
+    {{range $r.Factors}}
+      <li class="{{factorClass .Points}}">
+        <span class="factor-pts">{{factorSign .Points}}{{printf "%.1f" .Points}}</span>
+        <span class="factor-name">{{.Name}}</span>
+        <span class="factor-detail">— {{.Detail}}</span>
+      </li>
+    {{end}}
+  </ul>
+</section>
+
+<div class="validate-footer-actions">
+  <a href="/validate?symbol={{.Short}}&side={{sideStr $r.Side.String}}&entry={{fmtPrice $r.Entry}}&tf={{$r.Timeframe}}" class="btn-cancel">Tweak inputs</a>
+  <a href="{{validateRecordHref $r .Short}}" class="btn-primary">+ record this trade</a>
+</div>
+
+</main>
+
+<footer>
+  <span>scoring lives in <code>trading/validator</code> — shared with the CLI</span>
+</footer>
+
+<script src="/static/copy.js"></script>
+</body>
+</html>

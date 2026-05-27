@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>close trade · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal" class="active">Journal</a>
+    <a href="/validate">Validate</a>
+  </nav>
+</header>
+
+<main>
+
+<h1 class="page-title">Close trade {{if .Trade.ID}}#{{.Trade.ID}}{{end}}</h1>
+
+{{if .Error}}
+  <div class="form-error">⚠ {{.Error}}</div>
+{{end}}
+
+{{if .Trade.ID}}
+<section class="trade-summary">
+  <div class="row">
+    <span class="sym">{{.Trade.Symbol}}</span>
+    <span class="{{sideClassStr .Trade.Side}} side-badge">{{sideStr .Trade.Side}}</span>
+    <span class="tf">{{or .Trade.TF "—"}}</span>
+    {{if .Trade.Score}}<span class="score-tag">score {{.Trade.Score}}</span>{{end}}
+  </div>
+  <div class="row prices">
+    <span><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice .Trade.Entry}}">{{fmtPrice .Trade.Entry}}</button></span>
+    <span><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice .Trade.Stop}}">{{fmtPrice .Trade.Stop}}</button></span>
+    <span><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice .Trade.TP1}}">{{fmtPrice .Trade.TP1}}</button></span>
+    <span><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice .Trade.TP2}}">{{fmtPrice .Trade.TP2}}</button></span>
+  </div>
+  <div class="row times">
+    <span class="lbl">opened</span> {{fmtTime .Trade.OpenedAt}}
+  </div>
+</section>
+
+{{if .Trade.IsOpen}}
+<form method="POST" action="/journal/{{.Trade.ID}}/close" class="trade-form">
+
+  <details class="partials-helper">
+    <summary>Partials calculator <span class="hint">(optional — for multi-leg exits)</span></summary>
+    <div id="partials-rows">
+      <div class="partial-row">
+        <input type="number" step="any" min="0" max="100" class="partial-weight" placeholder="% size" inputmode="decimal">
+        <input type="number" step="any" min="0" class="partial-price" placeholder="exit price" inputmode="decimal">
+        <button type="button" class="btn-remove-partial" aria-label="remove leg">×</button>
+      </div>
+    </div>
+    <button type="button" id="add-partial" class="btn-secondary">+ add leg</button>
+    <div id="partials-summary" class="partials-summary"></div>
+  </details>
+
+  <div class="field">
+    <label for="outcome">Outcome</label>
+    <select name="outcome" id="outcome" required onchange="prefillExit(this.value)">
+      <option value="">— choose —</option>
+      <option value="tp1" {{if eq .Outcome "tp1"}}selected{{end}}>TP1 hit (+1R)</option>
+      <option value="tp2" {{if eq .Outcome "tp2"}}selected{{end}}>TP2 hit (+2R)</option>
+      <option value="stop" {{if eq .Outcome "stop"}}selected{{end}}>Stopped out (−1R)</option>
+      <option value="manual" {{if eq .Outcome "manual"}}selected{{end}}>Closed manually</option>
+      <option value="timeout" {{if eq .Outcome "timeout"}}selected{{end}}>Timed out / cancelled</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="exit_price">Exit price</label>
+    <input type="number" step="any" inputmode="decimal"
+           name="exit_price" id="exit_price" value="{{.ExitPrice}}"
+           data-tp1="{{fmtPrice .Trade.TP1}}"
+           data-tp2="{{fmtPrice .Trade.TP2}}"
+           data-stop="{{fmtPrice .Trade.Stop}}"
+           required>
+  </div>
+
+  <div class="field">
+    <label for="closed_at">Closed at <span class="hint">(blank = now)</span></label>
+    <input type="datetime-local" name="closed_at" id="closed_at" value="{{.ClosedAt}}">
+  </div>
+
+  <div class="field">
+    <label for="notes">Close notes <span class="hint">(optional)</span></label>
+    <textarea name="notes" id="close_notes" rows="3" placeholder="how did it play out…">{{.Notes}}</textarea>
+  </div>
+
+  <div class="form-actions">
+    <a href="/journal" class="btn-cancel">Cancel</a>
+    <button type="submit" class="btn-primary">Close trade</button>
+  </div>
+
+</form>
+
+<script>
+function prefillExit(outcome) {
+    var input = document.getElementById('exit_price');
+    if (!input || input.value) return;
+    var v = '';
+    if (outcome === 'tp1') v = input.dataset.tp1;
+    else if (outcome === 'tp2') v = input.dataset.tp2;
+    else if (outcome === 'stop') v = input.dataset.stop;
+    if (v) input.value = v;
+}
+</script>
+{{end}}{{/* if .Trade.IsOpen */}}
+
+{{end}}{{/* if .Trade.ID */}}
+
+</main>
+
+<footer>
+  <span>R is auto-computed from entry, stop, and exit price</span>
+</footer>
+
+<script src="/static/copy.js"></script>
+<script src="/static/partials.js"></script>
+</body>
+</html>

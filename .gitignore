@@ -1,0 +1,35 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Optional local Makefile overrides (set ORACLE_HOST, ORACLE_KEY, etc. here
+# instead of in your shell rc). Loaded automatically if it exists.
+Makefile.local
+
+# User trade journal — personal data, lives on the VPS
+journal.csv
+
+# Build artifacts
+/tmp/
+*.exe
+*.test
+*.out
+trading-serve
+trading-analyze
+trading-validate
+trading-backtest
+trading-price
+trading-journal
+trading-web
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Go
+vendor/
+go.work
+go.work.sum

@@ -1,0 +1,17 @@
+# Copy to Makefile.local (gitignored). Sets your real VPS values without
+# polluting the tracked Makefile.
+#
+#   cp Makefile.local.example Makefile.local
+#   $EDITOR Makefile.local
+#
+# Loaded automatically by Makefile via `-include Makefile.local`.
+
+# Your VPS public IP (e.g. Oracle Cloud, Hetzner, DigitalOcean).
+ORACLE_HOST = 1.2.3.4
+
+# SSH user on the VPS.
+ORACLE_USER = ubuntu
+
+# Path to your SSH private key for the VPS. Generate with `ssh-keygen -t ed25519`
+# then add the .pub to the VPS via `ssh-copy-id`.
+ORACLE_KEY = $(HOME)/.ssh/your-vps-key
