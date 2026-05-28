@@ -33,6 +33,11 @@ trading-web
 /journal
 /web
 
+# But `journal/` and similar names are also Go package directories at root
+# (journal/journal.go etc.). Re-include those so the build-artifact rule
+# above doesn't silently swallow new package files.
+!/journal/
+
 # IDE
 .idea/
 .vscode/
