@@ -54,6 +54,7 @@
       <span class="{{sideClassStr .Side}} side-badge">{{sideStr .Side}}</span>
       <span class="tf">{{or .TF "—"}}</span>
       {{if .Score}}<span class="score-tag">score {{.Score}}</span>{{end}}
+      {{if .Leverage}}<span class="lev-tag">{{.Leverage}}×</span>{{end}}
       <span class="trade-status">{{outcomeText .}}</span>
       {{if not .IsOpen}}
         <span class="trade-r {{rClass .RRealized}}">{{fmtR .RRealized}}R</span>

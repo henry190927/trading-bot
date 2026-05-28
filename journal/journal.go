@@ -20,12 +20,14 @@ import (
 //
 //	v1 = 16 cols (legacy: no analyzed_at, no score)
 //	v2 = 17 cols (adds analyzed_at after opened_at)
-//	v3 = 18 cols (adds score after tf) — current
+//	v3 = 18 cols (adds score after tf)
+//	v4 = 19 cols (adds leverage at end) — current
 var Header = []string{
 	"id", "opened_at", "analyzed_at", "closed_at", "symbol", "side", "tf", "score",
 	"entry", "stop", "tp1", "tp2",
 	"anchor", "open_notes",
 	"exit_price", "outcome", "r_realized", "close_notes",
+	"leverage",
 }
 
 // Trade is one journal row.
@@ -48,6 +50,11 @@ type Trade struct {
 	Outcome    string // "tp1", "tp2", "stop", "manual", "timeout", "" if open
 	RRealized  float64
 	CloseNotes string
+	// Leverage is the position multiplier used on the perp exchange. Optional
+	// (0 = not recorded). Used to translate R-multiples into actual % return:
+	// a 1R win on 100x leverage gross-returns about 100× the price-move %.
+	// Doesn't affect R computation — R is leverage-independent by definition.
+	Leverage int
 }
 
 // IsOpen reports whether the trade is still open (no close time set).
@@ -248,6 +255,19 @@ func ApplyUpdate(t *Trade, field, value string) error {
 		t.Outcome = v
 	case "close_notes", "close-notes":
 		t.CloseNotes = value
+	case "leverage", "lev":
+		if value == "" {
+			t.Leverage = 0
+			break
+		}
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("leverage: %w", err)
+		}
+		if n < 0 || n > 500 {
+			return fmt.Errorf("leverage must be 0-500, got %d", n)
+		}
+		t.Leverage = n
 	default:
 		return fmt.Errorf("unknown field %q", field)
 	}
@@ -306,8 +326,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV2(row), nil
 	case 18:
 		return parseRowV3(row), nil
+	case 19:
+		return parseRowV4(row), nil
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -403,6 +425,15 @@ func parseRowV3(row []string) Trade {
 	}
 }
 
+// parseRowV4 is v3 + a trailing `leverage` column (index 18).
+func parseRowV4(row []string) Trade {
+	t := parseRowV3(row[:18]) // first 18 cols are identical to v3
+	if row[18] != "" {
+		t.Leverage, _ = strconv.Atoi(row[18])
+	}
+	return t
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -418,6 +449,10 @@ func rowFromTrade(t Trade) []string {
 	}
 	if !t.ClosedAt.IsZero() {
 		rR = strconv.FormatFloat(t.RRealized, 'f', 4, 64)
+	}
+	lev := ""
+	if t.Leverage > 0 {
+		lev = strconv.Itoa(t.Leverage)
 	}
 	return []string{
 		strconv.Itoa(t.ID),
@@ -438,6 +473,7 @@ func rowFromTrade(t Trade) []string {
 		t.Outcome,
 		rR,
 		t.CloseNotes,
+		lev,
 	}
 }
 

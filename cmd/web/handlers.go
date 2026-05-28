@@ -227,15 +227,17 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	score := strings.TrimSpace(c.PostForm("score"))
 	notes := strings.TrimSpace(c.PostForm("notes"))
 	analyzedAtStr := strings.TrimSpace(c.PostForm("analyzed_at"))
+	leverageStr := strings.TrimSpace(c.PostForm("leverage"))
 
 	rerender := func(errMsg string) {
 		c.HTML(http.StatusOK, "journal_new.html", gin.H{
 			"Symbol": symbol, "Side": side, "Entry": entryStr, "Stop": stopStr,
 			"TP1": tp1Str, "TP2": tp2Str, "Anchor": anchor, "TF": tf,
 			"Score": score, "Notes": notes, "AnalyzedAt": analyzedAtStr,
-			"Symbols": []string{"BTC", "ETH", "XAU", "XAG"},
-			"Anchors": recommendedAnchors,
-			"Error":   errMsg,
+			"Leverage": leverageStr,
+			"Symbols":  []string{"BTC", "ETH", "XAU", "XAG"},
+			"Anchors":  recommendedAnchors,
+			"Error":    errMsg,
 		})
 	}
 
@@ -286,6 +288,16 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		rerender("read journal: " + err.Error())
 		return
 	}
+	var leverage int
+	if leverageStr != "" {
+		n, err := strconv.Atoi(leverageStr)
+		if err != nil || n < 0 || n > 500 {
+			rerender("leverage must be an integer 0-500")
+			return
+		}
+		leverage = n
+	}
+
 	t := journal.Trade{
 		ID:         journal.NextID(trades),
 		OpenedAt:   now,
@@ -300,6 +312,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		TP2:        tp2,
 		Anchor:     anchor,
 		OpenNotes:  notes,
+		Leverage:   leverage,
 	}
 	trades = append(trades, t)
 	if err := journal.WriteAll("", trades); err != nil {
@@ -518,6 +531,17 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		exitPrice = 0
 	}
 
+	// Leverage (optional, 0 = "not recorded").
+	var leverage int
+	if levStr := strings.TrimSpace(c.PostForm("leverage")); levStr != "" {
+		n, err := strconv.Atoi(levStr)
+		if err != nil || n < 0 || n > 500 {
+			rerender("leverage must be an integer 0-500")
+			return
+		}
+		leverage = n
+	}
+
 	// Apply mutations
 	trades[idx].Symbol = sym
 	trades[idx].Side = side
@@ -526,6 +550,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	trades[idx].Anchor = strings.TrimSpace(c.PostForm("anchor"))
 	trades[idx].OpenNotes = strings.TrimSpace(c.PostForm("open_notes"))
 	trades[idx].CloseNotes = strings.TrimSpace(c.PostForm("close_notes"))
+	trades[idx].Leverage = leverage
 	trades[idx].Entry = entry
 	trades[idx].Stop = stop
 	trades[idx].TP1 = tp1

@@ -95,9 +95,15 @@
     </div>
   </div>
 
-  <div class="field">
-    <label for="analyzed_at">Analyzed at <span class="hint">(local time)</span></label>
-    <input type="datetime-local" name="analyzed_at" id="analyzed_at" value="{{.AnalyzedAt}}">
+  <div class="field-row">
+    <div class="field">
+      <label for="leverage">Leverage <span class="hint">(× — XAU 200, XAG 100 default)</span></label>
+      <input type="number" min="1" max="500" step="1" name="leverage" id="leverage" value="{{.Leverage}}" placeholder="0">
+    </div>
+    <div class="field">
+      <label for="analyzed_at">Analyzed at <span class="hint">(local)</span></label>
+      <input type="datetime-local" name="analyzed_at" id="analyzed_at" value="{{.AnalyzedAt}}">
+    </div>
   </div>
 
   <div class="field">
@@ -118,5 +124,22 @@
   <span>analyzed_at, opened_at, closed_at all in Asia/Taipei</span>
 </footer>
 
+<script>
+// Pre-fill leverage with per-symbol defaults the user runs (XAU=200, XAG=100).
+// Only fills when blank, so an explicit user value is never clobbered.
+(function () {
+    var defaults = { XAU: 200, XAG: 100 };
+    var sym = document.getElementById('symbol');
+    var lev = document.getElementById('leverage');
+    if (!sym || !lev) return;
+    function maybeFill() {
+        if (lev.value && lev.value !== '0') return;
+        var d = defaults[sym.value];
+        if (d) lev.value = d;
+    }
+    sym.addEventListener('change', maybeFill);
+    maybeFill();
+})();
+</script>
 </body>
 </html>

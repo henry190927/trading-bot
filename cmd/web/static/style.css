@@ -1183,6 +1183,18 @@ footer {
     margin-left: 0.15rem;
 }
 
+/* Leverage tag on journal trade cards */
+.lev-tag {
+    background: rgba(88, 166, 255, 0.12);
+    color: var(--blue);
+    border: 1px solid rgba(88, 166, 255, 0.5);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
 /* --- Ops control panel (Phase 2C) --- */
 
 .ops-status-card {

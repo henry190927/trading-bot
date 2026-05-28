@@ -100,6 +100,11 @@
     </datalist>
   </div>
 
+  <div class="field">
+    <label for="leverage">Leverage <span class="hint">(× — 0 = not recorded)</span></label>
+    <input type="number" min="0" max="500" step="1" name="leverage" id="leverage" value="{{if .Trade.Leverage}}{{.Trade.Leverage}}{{end}}" placeholder="0">
+  </div>
+
   <h2 class="form-section">Times <span class="hint">(local)</span></h2>
 
   <div class="field">
