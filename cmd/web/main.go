@@ -21,7 +21,7 @@ import (
 	"myFirstGo/trading-bot/config"
 )
 
-//go:embed templates/*.html static/*
+//go:embed templates/*.html static
 var assets embed.FS
 
 func main() {

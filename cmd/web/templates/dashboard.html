@@ -7,6 +7,7 @@
 <meta http-equiv="refresh" content="30">
 <title>trading-web · {{.TF}}</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/uplot/uPlot.min.css">
 </head>
 <body>
 
@@ -116,6 +117,12 @@
       <p class="err">⚠ {{.Err}}</p>
     {{else}}
 
+    {{if .ChartJSON}}
+      <div class="mini-chart"
+           data-sym="{{.Short}}"
+           data-chart='{{.ChartJSON}}'></div>
+    {{end}}
+
     <div class="meta">
       <span>funding {{fmtPct .Context.FundingRate}}</span>
       <span>OI {{fmtOI .Context.OpenInterest}}</span>
@@ -189,5 +196,7 @@
 </footer>
 
 <script src="/static/copy.js"></script>
+<script src="/static/uplot/uPlot.iife.min.js"></script>
+<script src="/static/mini-chart.js"></script>
 </body>
 </html>

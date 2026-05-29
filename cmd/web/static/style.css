@@ -1170,6 +1170,22 @@ footer {
     border: 1px solid var(--yellow);
 }
 
+/* Mini-chart container on dashboard symbol cards */
+.mini-chart {
+    width: 100%;
+    height: 80px;
+    margin: 0.5rem 0 0.4rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+.mini-chart .uplot {
+    /* uPlot's own background-color shouldn't fight our card surface */
+    background: transparent !important;
+}
+
 /* close-bar reference next to live mark price */
 .close-ref {
     margin-left: 0.4rem;

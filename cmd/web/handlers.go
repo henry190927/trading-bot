@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -44,6 +45,10 @@ type symbolView struct {
 	// separately from Signal.Price (which is overridden to the same value
 	// for display) so the open-trade re-validation can pass it through.
 	MarkPrice float64
+	// ChartJSON is the pre-encoded payload the mini-chart JS reads on the
+	// dashboard. Closes + timestamps + optional plan markers, ready to be
+	// inlined inside a <script type="application/json"> block.
+	ChartJSON template.JS
 
 	// ClosedClose is the close of the most recently CLOSED bar — the
 	// reference the engine evaluates against. Displayed alongside the
@@ -262,6 +267,65 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 	return cards
 }
 
+// buildChartJSON packs the last ~60 closed candles + plan markers into a
+// compact JSON object the mini-chart JS unmarshals into uPlot data. We
+// inline this in the dashboard HTML (no separate /api endpoint) — 4 symbols
+// × 60 points × ~12 bytes/point ≈ 3KB per refresh, well under the meta-
+// refresh's existing 100KB budget.
+func buildChartJSON(v symbolView) template.JS {
+	const N = 60
+	if len(v.Candles) == 0 {
+		return template.JS(`null`)
+	}
+	start := len(v.Candles) - N
+	if start < 0 {
+		start = 0
+	}
+	cs := v.Candles[start:]
+	// Two parallel arrays: t (unix seconds), c (close prices). uPlot's
+	// expected x-y data shape — saves repeated key lookups in JS.
+	type payload struct {
+		T     []int64    `json:"t"`     // unix seconds, x-axis
+		C     []float64  `json:"c"`     // closes, y-axis
+		Side  string     `json:"side"`  // "long" / "short" / ""
+		Entry float64    `json:"entry"` // plan entry, 0 if no plan
+		Stop  float64    `json:"stop"`
+		TP1   float64    `json:"tp1"`
+		TP2   float64    `json:"tp2"`
+		Mark  float64    `json:"mark"`  // live mark price
+	}
+	p := payload{
+		T: make([]int64, len(cs)),
+		C: make([]float64, len(cs)),
+		Mark: v.MarkPrice,
+	}
+	for i, c := range cs {
+		p.T[i] = c.CloseTime.Unix()
+		p.C[i] = c.Close
+	}
+	if v.Signal.Plan.Entry > 0 {
+		p.Entry = v.Signal.Plan.Entry
+		p.Stop = v.Signal.Plan.StopLoss
+		if len(v.Signal.Plan.TakeProfit) >= 1 {
+			p.TP1 = v.Signal.Plan.TakeProfit[0]
+		}
+		if len(v.Signal.Plan.TakeProfit) >= 2 {
+			p.TP2 = v.Signal.Plan.TakeProfit[1]
+		}
+		switch v.Signal.Side {
+		case signal.Long:
+			p.Side = "long"
+		case signal.Short:
+			p.Side = "short"
+		}
+	}
+	b, err := json.Marshal(p)
+	if err != nil {
+		return template.JS(`null`)
+	}
+	return template.JS(b)
+}
+
 func clampPct(v float64) float64 {
 	if v < 0 {
 		return 0
@@ -305,6 +369,7 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 	if markPrice > 0 {
 		v.Signal.Price = markPrice // override for display only; engine math unchanged
 	}
+	v.ChartJSON = buildChartJSON(v)
 	for _, h := range v.Signal.VP.HVN {
 		v.HVNValues = append(v.HVNValues, fmt.Sprintf("%.4f", h))
 	}
