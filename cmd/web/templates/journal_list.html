@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>journal · trading-web</title>
+<title>portfolio · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
   <div class="brand">Trading</div>
   <nav class="topnav">
     <a href="/">Dashboard</a>
-    <a href="/journal" class="active">Journal</a>
+    <a href="/journal" class="active">Portfolio</a>
     <a href="/validate">Validate</a>
     <a href="/ops">Ops</a>
   </nav>
@@ -25,26 +25,105 @@
   <p class="err">⚠ {{.Error}}</p>
 {{else}}
 
-<div class="page-actions">
-  <a href="/journal/new" class="btn-primary">+ new trade</a>
-</div>
-
-<section class="stats-card">
-  <h2>Stats</h2>
-  <div class="stats-grid">
-    <div><span class="lbl">Open</span><span class="val">{{.OpenCount}}</span></div>
-    <div><span class="lbl">Closed</span><span class="val">{{.ClosedCount}}</span></div>
-    <div><span class="lbl">WR</span><span class="val">{{printf "%.1f%%" .WR}}</span></div>
-    <div><span class="lbl">avgR</span><span class="val {{rClass .AvgR}}">{{fmtR .AvgR}}</span></div>
-    <div><span class="lbl">totalR</span><span class="val {{rClass .TotalR}}">{{fmtR .TotalR}}</span></div>
-    <div><span class="lbl">best</span><span class="val r-pos">{{fmtR .BestR}}</span></div>
-    <div><span class="lbl">worst</span><span class="val r-neg">{{fmtR .WorstR}}</span></div>
+{{/* ============================================================ */}}
+{{/* HERO — total realized R, headline metrics                     */}}
+{{/* ============================================================ */}}
+<section class="pf-hero">
+  <div class="pf-hero-label">Total realized R</div>
+  <div class="pf-hero-r {{rClass .TotalR}}">{{fmtR .TotalR}}<span class="pf-hero-unit">R</span></div>
+  <div class="pf-hero-meta">
+    <span class="pf-hero-pill"><span class="lbl">WR</span><strong>{{printf "%.0f%%" .WR}}</strong></span>
+    <span class="pf-hero-pill"><span class="lbl">avgR</span><strong class="{{rClass .AvgR}}">{{fmtR .AvgR}}</strong></span>
+    <span class="pf-hero-pill"><span class="lbl">closed</span><strong>{{.ClosedCount}}</strong></span>
+    <span class="pf-hero-pill"><span class="lbl">open</span><strong>{{.OpenCount}}</strong></span>
+    <span class="pf-hero-pill"><span class="lbl">best</span><strong class="r-pos">{{fmtR .BestR}}</strong></span>
+    <span class="pf-hero-pill"><span class="lbl">worst</span><strong class="r-neg">{{fmtR .WorstR}}</strong></span>
   </div>
 </section>
 
+{{/* ============================================================ */}}
+{{/* PERIOD STATS — today / week / month / all-time                */}}
+{{/* ============================================================ */}}
 {{if gt .ClosedCount 0}}
-<section class="stats-card">
-  <h2>R distribution <span class="hint">({{.ClosedCount}} closed)</span></h2>
+<section class="pf-periods">
+  <div class="pf-period">
+    <div class="pf-period-label">Today</div>
+    <div class="pf-period-r {{rClass .Periods.TodayR}}">{{fmtR .Periods.TodayR}}R</div>
+    <div class="pf-period-n">{{.Periods.TodayN}} trade{{if ne .Periods.TodayN 1}}s{{end}}</div>
+  </div>
+  <div class="pf-period">
+    <div class="pf-period-label">This week</div>
+    <div class="pf-period-r {{rClass .Periods.WeekR}}">{{fmtR .Periods.WeekR}}R</div>
+    <div class="pf-period-n">{{.Periods.WeekN}} trade{{if ne .Periods.WeekN 1}}s{{end}}</div>
+  </div>
+  <div class="pf-period">
+    <div class="pf-period-label">This month</div>
+    <div class="pf-period-r {{rClass .Periods.MonthR}}">{{fmtR .Periods.MonthR}}R</div>
+    <div class="pf-period-n">{{.Periods.MonthN}} trade{{if ne .Periods.MonthN 1}}s{{end}}</div>
+  </div>
+  <div class="pf-period">
+    <div class="pf-period-label">All time</div>
+    <div class="pf-period-r {{rClass .Periods.AllTimeR}}">{{fmtR .Periods.AllTimeR}}R</div>
+    <div class="pf-period-n">{{.Periods.AllTimeN}} trade{{if ne .Periods.AllTimeN 1}}s{{end}}</div>
+  </div>
+</section>
+
+{{/* ============================================================ */}}
+{{/* DAILY R CALENDAR — improved with weekday header               */}}
+{{/* ============================================================ */}}
+<section class="pf-section">
+  <h2 class="pf-section-title">
+    <span class="pf-section-dot calendar"></span>
+    Daily R
+    <span class="pf-section-meta">last 6 weeks</span>
+  </h2>
+  <div class="cal2">
+    <div class="cal2-weekdays">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>
+    <div class="cal2-body">
+      {{range .Calendar}}
+        <div class="cal2-week">
+          {{range .}}
+            {{if .IsZero}}
+              <div class="cal2-cell empty {{if .IsToday}}today{{end}}" title="{{if .Day}}{{.Date.Format "Mon, Jan 2"}}{{end}} — no trades closed">
+                <span class="cal2-day">{{if .Day}}{{.Day}}{{end}}</span>
+              </div>
+            {{else}}
+              <div class="cal2-cell {{if .IsPos}}pos{{else}}neg{{end}} {{if .IsToday}}today{{end}}"
+                   style="--intensity: {{printf "%.0f" .Intensity}}%"
+                   title="{{.Date.Format "Mon, Jan 2"}} — {{.Count}} trade{{if ne .Count 1}}s{{end}}, {{fmtR .TotalR}}R">
+                <span class="cal2-day">{{.Day}}</span>
+                <span class="cal2-r">{{fmtR .TotalR}}</span>
+              </div>
+            {{end}}
+          {{end}}
+        </div>
+      {{end}}
+    </div>
+    <div class="cal2-legend">
+      <span class="cal2-legend-end">−2R</span>
+      <span class="cal2-legend-swatch neg" style="--intensity: 100%"></span>
+      <span class="cal2-legend-swatch neg" style="--intensity: 60%"></span>
+      <span class="cal2-legend-swatch neg" style="--intensity: 30%"></span>
+      <span class="cal2-legend-swatch empty"></span>
+      <span class="cal2-legend-swatch pos" style="--intensity: 30%"></span>
+      <span class="cal2-legend-swatch pos" style="--intensity: 60%"></span>
+      <span class="cal2-legend-swatch pos" style="--intensity: 100%"></span>
+      <span class="cal2-legend-end">+2R</span>
+    </div>
+  </div>
+</section>
+
+{{/* ============================================================ */}}
+{{/* R DISTRIBUTION HISTOGRAM                                       */}}
+{{/* ============================================================ */}}
+<section class="pf-section">
+  <h2 class="pf-section-title">
+    <span class="pf-section-dot histo"></span>
+    R distribution
+    <span class="pf-section-meta">{{.ClosedCount}} closed</span>
+  </h2>
   <div class="hist-grid">
     {{range .Histogram}}
       <div class="hist-col" title="{{.Label}}R: {{.Count}} trade{{if ne .Count 1}}s{{end}}">
@@ -57,92 +136,69 @@
     {{end}}
   </div>
 </section>
+{{end}}{{/* if ClosedCount > 0 */}}
 
-<section class="stats-card">
-  <h2>Daily R <span class="hint">(last 6 weeks, Mon–Sun)</span></h2>
-  <div class="cal-grid">
-    {{range .Calendar}}
-      <div class="cal-week">
-        {{range .}}
-          {{if .IsZero}}
-            <div class="cal-cell empty" title="{{.Date.Format "Mon Jan 2"}} — no trades closed">
-              <span class="cal-day">{{if .Day}}{{.Day}}{{end}}</span>
-            </div>
-          {{else}}
-            <div class="cal-cell {{if .IsPos}}pos{{else}}neg{{end}} {{if .IsToday}}today{{end}}"
-                 style="--intensity: {{printf "%.0f" .Intensity}}%"
-                 title="{{.Date.Format "Mon Jan 2"}} — {{.Count}} trade{{if ne .Count 1}}s{{end}}, {{fmtR .TotalR}}R">
-              <span class="cal-day">{{.Day}}</span>
-              <span class="cal-r">{{fmtR .TotalR}}</span>
-            </div>
-          {{end}}
+{{/* ============================================================ */}}
+{{/* JOURNAL — full trade history list                             */}}
+{{/* ============================================================ */}}
+<section class="pf-section pf-journal">
+  <h2 class="pf-section-title">
+    <span class="pf-section-dot journal"></span>
+    Journal
+    <span class="pf-section-meta">{{len .Trades}} trade{{if ne (len .Trades) 1}}s{{end}}</span>
+    <a href="/journal/new" class="pf-section-action">+ new trade</a>
+  </h2>
+
+  {{if not .Trades}}
+    <p class="empty">No trades recorded yet. Tap <strong>+ new trade</strong> to record one.</p>
+  {{else}}
+
+  {{range .Trades}}
+    <article class="trade-card {{outcomeClass .}}">
+      <div class="trade-head">
+        <span class="trade-id">#{{.ID}}</span>
+        <span class="sym">{{.Symbol}}</span>
+        <span class="{{sideClassStr .Side}} side-badge">{{sideStr .Side}}</span>
+        <span class="tf">{{or .TF "—"}}</span>
+        {{if .Score}}<span class="score-tag">score {{.Score}}</span>{{end}}
+        {{if .Leverage}}<span class="lev-tag">{{.Leverage}}×</span>{{end}}
+        <span class="trade-status">{{outcomeText .}}</span>
+        {{if not .IsOpen}}
+          <span class="trade-r {{rClass .RRealized}}">{{fmtR .RRealized}}R</span>
         {{end}}
       </div>
-    {{end}}
-  </div>
-  <div class="cal-legend">
-    <span>−</span>
-    <span class="legend-swatch neg" style="--intensity: 30%"></span>
-    <span class="legend-swatch neg" style="--intensity: 70%"></span>
-    <span class="legend-swatch neg" style="--intensity: 100%"></span>
-    <span class="legend-swatch empty"></span>
-    <span class="legend-swatch pos" style="--intensity: 30%"></span>
-    <span class="legend-swatch pos" style="--intensity: 70%"></span>
-    <span class="legend-swatch pos" style="--intensity: 100%"></span>
-    <span>+</span>
-  </div>
+
+      <div class="trade-prices">
+        <span><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice .Entry}}">{{fmtPrice .Entry}}</button></span>
+        <span><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice .Stop}}">{{fmtPrice .Stop}}</button></span>
+        <span><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP1}}">{{fmtPrice .TP1}}</button></span>
+        <span><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP2}}">{{fmtPrice .TP2}}</button></span>
+        {{if not .IsOpen}}
+          <span><span class="lbl">exit</span> <button class="copy-btn" data-copy="{{fmtPrice .ExitPrice}}">{{fmtPrice .ExitPrice}}</button></span>
+        {{end}}
+      </div>
+
+      <div class="trade-times">
+        <span class="lbl">analyzed</span> {{fmtTime .AnalyzedAt}}
+        &nbsp;·&nbsp; <span class="lbl">opened</span> {{fmtTime .OpenedAt}}
+        {{if not .IsOpen}}&nbsp;·&nbsp; <span class="lbl">closed</span> {{fmtTime .ClosedAt}}{{end}}
+      </div>
+
+      {{if .Anchor}}<div class="trade-anchor">anchor: <span>{{.Anchor}}</span></div>{{end}}
+      {{if .OpenNotes}}<div class="trade-note">{{.OpenNotes}}</div>{{end}}
+      {{if .CloseNotes}}<div class="trade-note close">{{.CloseNotes}}</div>{{end}}
+
+      <div class="trade-actions">
+        {{if .IsOpen}}
+          <a href="/journal/{{.ID}}/close" class="btn-close-trade">Close trade</a>
+        {{end}}
+        <a href="/journal/{{.ID}}/edit" class="btn-edit">Edit</a>
+      </div>
+    </article>
+  {{end}}
+
+  {{end}}{{/* if .Trades */}}
 </section>
-{{end}}
-
-{{if not .Trades}}
-  <p class="empty">No trades recorded yet. Tap <strong>+ new trade</strong> to record one.</p>
-{{else}}
-
-{{range .Trades}}
-  <article class="trade-card {{outcomeClass .}}">
-    <div class="trade-head">
-      <span class="trade-id">#{{.ID}}</span>
-      <span class="sym">{{.Symbol}}</span>
-      <span class="{{sideClassStr .Side}} side-badge">{{sideStr .Side}}</span>
-      <span class="tf">{{or .TF "—"}}</span>
-      {{if .Score}}<span class="score-tag">score {{.Score}}</span>{{end}}
-      {{if .Leverage}}<span class="lev-tag">{{.Leverage}}×</span>{{end}}
-      <span class="trade-status">{{outcomeText .}}</span>
-      {{if not .IsOpen}}
-        <span class="trade-r {{rClass .RRealized}}">{{fmtR .RRealized}}R</span>
-      {{end}}
-    </div>
-
-    <div class="trade-prices">
-      <span><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice .Entry}}">{{fmtPrice .Entry}}</button></span>
-      <span><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice .Stop}}">{{fmtPrice .Stop}}</button></span>
-      <span><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP1}}">{{fmtPrice .TP1}}</button></span>
-      <span><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP2}}">{{fmtPrice .TP2}}</button></span>
-      {{if not .IsOpen}}
-        <span><span class="lbl">exit</span> <button class="copy-btn" data-copy="{{fmtPrice .ExitPrice}}">{{fmtPrice .ExitPrice}}</button></span>
-      {{end}}
-    </div>
-
-    <div class="trade-times">
-      <span class="lbl">analyzed</span> {{fmtTime .AnalyzedAt}}
-      &nbsp;·&nbsp; <span class="lbl">opened</span> {{fmtTime .OpenedAt}}
-      {{if not .IsOpen}}&nbsp;·&nbsp; <span class="lbl">closed</span> {{fmtTime .ClosedAt}}{{end}}
-    </div>
-
-    {{if .Anchor}}<div class="trade-anchor">anchor: <span>{{.Anchor}}</span></div>{{end}}
-    {{if .OpenNotes}}<div class="trade-note">{{.OpenNotes}}</div>{{end}}
-    {{if .CloseNotes}}<div class="trade-note close">{{.CloseNotes}}</div>{{end}}
-
-    <div class="trade-actions">
-      {{if .IsOpen}}
-        <a href="/journal/{{.ID}}/close" class="btn-close-trade">Close trade</a>
-      {{end}}
-      <a href="/journal/{{.ID}}/edit" class="btn-edit">Edit</a>
-    </div>
-  </article>
-{{end}}
-
-{{end}}{{/* if .Trades */}}
 
 {{end}}{{/* if .Error */}}
 

@@ -873,6 +873,7 @@ func (s *server) handleJournalList(c *gin.Context) {
 
 	histogram := buildRHistogram(trades)
 	calendar := buildDailyCalendar(trades, 42) // 6 weeks
+	periods := buildPeriodStats(trades)
 
 	c.HTML(http.StatusOK, "journal_list.html", gin.H{
 		"Trades":      trades,
@@ -885,7 +886,56 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"WorstR":      worstR,
 		"Histogram":   histogram,
 		"Calendar":    calendar,
+		"Periods":     periods,
 	})
+}
+
+// periodStats holds R + trade counts across rolling time windows for the
+// portfolio hero. Mirrors the "today / week / month / all-time" rows that
+// every major exchange portfolio screen surfaces at the top.
+type periodStats struct {
+	TodayR     float64
+	TodayN     int
+	WeekR      float64 // since Monday 00:00 local
+	WeekN      int
+	MonthR     float64 // since 1st of this month 00:00 local
+	MonthN     int
+	AllTimeR   float64
+	AllTimeN   int
+}
+
+func buildPeriodStats(trades []journal.Trade) periodStats {
+	now := time.Now().Local()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	// Week starts Monday in this project's convention (matches calendar).
+	weekStart := todayStart
+	for weekStart.Weekday() != time.Monday {
+		weekStart = weekStart.AddDate(0, 0, -1)
+	}
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+
+	var p periodStats
+	for _, t := range trades {
+		if t.IsOpen() || t.ClosedAt.IsZero() {
+			continue
+		}
+		closedLocal := t.ClosedAt.Local()
+		p.AllTimeR += t.RRealized
+		p.AllTimeN++
+		if !closedLocal.Before(monthStart) {
+			p.MonthR += t.RRealized
+			p.MonthN++
+		}
+		if !closedLocal.Before(weekStart) {
+			p.WeekR += t.RRealized
+			p.WeekN++
+		}
+		if !closedLocal.Before(todayStart) {
+			p.TodayR += t.RRealized
+			p.TodayN++
+		}
+	}
+	return p
 }
 
 // rBucket is one column in the R-distribution histogram.

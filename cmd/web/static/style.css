@@ -1185,6 +1185,281 @@ footer {
     margin-left: 0.15rem;
 }
 
+/* ============================================================ */
+/* Portfolio page — hero, period stats, polished calendar, sections */
+/* ============================================================ */
+
+.pf-hero {
+    background: linear-gradient(140deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.1rem 1.1rem;
+    margin-bottom: 0.9rem;
+    position: relative;
+    overflow: hidden;
+}
+.pf-hero::before {
+    content: "";
+    position: absolute;
+    top: -40%;
+    right: -10%;
+    width: 60%;
+    height: 180%;
+    background: radial-gradient(ellipse at center, rgba(88, 166, 255, 0.10), transparent 65%);
+    pointer-events: none;
+}
+.pf-hero-label {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+}
+.pf-hero-r {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 2.6rem;
+    font-weight: 700;
+    line-height: 1.05;
+    margin: 0.2rem 0 0.6rem;
+    font-variant-numeric: tabular-nums;
+}
+.pf-hero-r.r-pos  { color: var(--green); }
+.pf-hero-r.r-neg  { color: var(--red); }
+.pf-hero-r.r-zero { color: var(--text); }
+.pf-hero-unit {
+    font-size: 1.1rem;
+    color: var(--text-dim);
+    margin-left: 0.25rem;
+    font-weight: 600;
+}
+.pf-hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.pf-hero-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.pf-hero-pill .lbl {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.pf-hero-pill strong {
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Period strip — today / week / month / all */
+
+.pf-periods {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.9rem;
+}
+@media (min-width: 480px) {
+    .pf-periods { grid-template-columns: repeat(4, 1fr); }
+}
+.pf-period {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 0.7rem;
+}
+.pf-period-label {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+.pf-period-r {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0.15rem 0;
+    font-variant-numeric: tabular-nums;
+}
+.pf-period-r.r-pos  { color: var(--green); }
+.pf-period-r.r-neg  { color: var(--red); }
+.pf-period-r.r-zero { color: var(--text-dim); }
+.pf-period-n {
+    color: var(--text-dim);
+    font-size: 0.72rem;
+}
+
+/* Portfolio sections — visual containers */
+
+.pf-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem 1rem;
+    margin-bottom: 0.9rem;
+}
+.pf-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 0.7rem 0;
+    letter-spacing: 0.02em;
+}
+.pf-section-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.pf-section-dot.calendar { background: var(--blue); }
+.pf-section-dot.histo    { background: #c084fc; } /* soft purple */
+.pf-section-dot.journal  { background: var(--cyan); }
+.pf-section-meta {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    margin-left: 0.3rem;
+}
+.pf-section-action {
+    margin-left: auto;
+    background: var(--blue);
+    color: white;
+    padding: 0.3rem 0.7rem;
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.pf-section-action:active { opacity: 0.8; }
+
+/* Improved calendar (cal2-*) */
+
+.cal2 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.cal2-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: center;
+    font-weight: 600;
+    padding: 0 2px;
+}
+.cal2-body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.cal2-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+.cal2-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    border: 1px solid transparent;
+    min-height: 42px;
+    line-height: 1.15;
+    transition: transform 0.12s ease;
+    cursor: default;
+}
+.cal2-cell:active { transform: scale(0.95); }
+.cal2-cell.empty {
+    background: var(--bg);
+    border-color: rgba(255, 255, 255, 0.04);
+}
+.cal2-cell.empty .cal2-day {
+    color: var(--text-dim);
+    opacity: 0.45;
+    font-size: 0.7rem;
+}
+.cal2-cell.pos {
+    background: color-mix(in srgb, var(--green) var(--intensity, 0%), var(--surface-2));
+    border-color: color-mix(in srgb, var(--green) 35%, transparent);
+    box-shadow: 0 1px 3px rgba(74, 222, 128, 0.08);
+}
+.cal2-cell.neg {
+    background: color-mix(in srgb, var(--red) var(--intensity, 0%), var(--surface-2));
+    border-color: color-mix(in srgb, var(--red) 35%, transparent);
+    box-shadow: 0 1px 3px rgba(248, 113, 113, 0.08);
+}
+.cal2-cell.today {
+    outline: 2px solid var(--blue);
+    outline-offset: -1px;
+}
+.cal2-day {
+    font-size: 0.7rem;
+    color: var(--text);
+    opacity: 0.78;
+    font-weight: 500;
+}
+.cal2-r {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text);
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+    margin-top: 1px;
+}
+
+.cal2-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 0.55rem;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+.cal2-legend-end {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    margin: 0 0.3rem;
+}
+.cal2-legend-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+.cal2-legend-swatch.empty { background: var(--bg); }
+.cal2-legend-swatch.pos {
+    background: color-mix(in srgb, var(--green) var(--intensity), var(--surface-2));
+    border-color: color-mix(in srgb, var(--green) 35%, transparent);
+}
+.cal2-legend-swatch.neg {
+    background: color-mix(in srgb, var(--red) var(--intensity), var(--surface-2));
+    border-color: color-mix(in srgb, var(--red) 35%, transparent);
+}
+
+/* The pf-journal trade-card list shouldn't have its own extra padding — the
+   pf-section wrapper already gives padding. Reset any external margins on
+   the trade cards inside the journal section. */
+.pf-journal .trade-card:last-child { margin-bottom: 0; }
+
 /* --- R distribution histogram + daily-R calendar (journal page) --- */
 
 .stats-card .hint {
@@ -1514,6 +1789,11 @@ footer {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     font-variant-numeric: tabular-nums;
 }
+.ot-diagnose.verdict-strong  strong,
+.ot-diagnose.verdict-take    strong { color: var(--green); }
+.ot-diagnose.verdict-neutral strong,
+.ot-diagnose.verdict-weak    strong { color: var(--yellow); }
+.ot-diagnose.verdict-avoid   strong { color: var(--red); }
 
 .ot-flag {
     margin-left: 0.4rem;
