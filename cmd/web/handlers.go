@@ -874,6 +874,7 @@ func (s *server) handleJournalList(c *gin.Context) {
 	histogram := buildRHistogram(trades)
 	calendar := buildDailyCalendar(trades, 42) // 6 weeks
 	periods := buildPeriodStats(trades)
+	equity := buildEquityCurve(trades)
 
 	c.HTML(http.StatusOK, "journal_list.html", gin.H{
 		"Trades":      trades,
@@ -887,7 +888,151 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"Histogram":   histogram,
 		"Calendar":    calendar,
 		"Periods":     periods,
+		"Equity":      equity,
 	})
+}
+
+// equityPoint is one node on the cumulative R curve — one per closed trade,
+// plus a (0, 0) origin so the line starts at zero R.
+type equityPoint struct {
+	Index int       // trade ordinal; 0 = origin
+	R     float64   // cumulative R after this trade
+	Date  time.Time // close time (zero on origin)
+	X, Y  float64   // SVG coordinates (0-100 viewBox)
+}
+
+// equityCurve packages the cumulative-R series into the values the template
+// needs to render an SVG: a line path, a closed-area path (for the gradient
+// fill), key reference numbers (peak / current / drawdown), and trend color.
+// All viewBox math is done server-side so the template is dumb rendering.
+type equityCurve struct {
+	HasData      bool
+	Points       []equityPoint
+	LinePath     string  // SVG `d` for the line itself
+	AreaPath     string  // SVG `d` for the filled area below the line
+	ZeroY        float64 // Y coordinate of the 0R reference line in viewBox
+	PeakR        float64
+	PeakIdx      int
+	CurrentR     float64
+	Drawdown     float64 // distance from peak to current (positive number)
+	MinR, MaxR   float64
+	Trend        string // "up" | "down" | "flat" — controls line color
+	FirstClose   time.Time
+	LastClose    time.Time
+	ViewBoxW     int
+	ViewBoxH     int
+}
+
+// buildEquityCurve builds the cumulative-R series sorted by close time,
+// then maps it into a 100×40 viewBox for SVG rendering. Origin (0, 0R) is
+// always the leftmost point so the line visually starts at the baseline.
+func buildEquityCurve(trades []journal.Trade) equityCurve {
+	// Closed trades sorted by ClosedAt ascending.
+	var closed []journal.Trade
+	for _, t := range trades {
+		if !t.IsOpen() && !t.ClosedAt.IsZero() {
+			closed = append(closed, t)
+		}
+	}
+	if len(closed) == 0 {
+		return equityCurve{}
+	}
+	sort.Slice(closed, func(i, j int) bool { return closed[i].ClosedAt.Before(closed[j].ClosedAt) })
+
+	// Build points: origin + one per trade.
+	pts := []equityPoint{{Index: 0, R: 0}}
+	cum := 0.0
+	peak := 0.0
+	peakIdx := 0
+	for i, t := range closed {
+		cum += t.RRealized
+		if cum > peak {
+			peak = cum
+			peakIdx = i + 1
+		}
+		pts = append(pts, equityPoint{
+			Index: i + 1,
+			R:     cum,
+			Date:  t.ClosedAt.Local(),
+		})
+	}
+
+	// Find Y bounds with a small headroom so the line doesn't touch the edge.
+	minR, maxR := 0.0, 0.0
+	for _, p := range pts {
+		if p.R < minR {
+			minR = p.R
+		}
+		if p.R > maxR {
+			maxR = p.R
+		}
+	}
+	// Pad bounds by 10% of range (or 0.5R floor) so the chart breathes.
+	pad := (maxR - minR) * 0.10
+	if pad < 0.5 {
+		pad = 0.5
+	}
+	yLo, yHi := minR-pad, maxR+pad
+
+	const vbW, vbH = 100.0, 40.0
+	xStep := vbW / float64(len(pts)-1)
+	if len(pts) == 1 {
+		xStep = vbW
+	}
+	yScale := vbH / (yHi - yLo)
+
+	// Compute screen coords for each point (Y is inverted in SVG — origin top).
+	for i := range pts {
+		pts[i].X = float64(i) * xStep
+		pts[i].Y = vbH - (pts[i].R-yLo)*yScale
+	}
+	zeroY := vbH - (0-yLo)*yScale
+
+	// Build line path: "M x,y L x,y L x,y ..."
+	var line, area strings.Builder
+	for i, p := range pts {
+		cmd := "L"
+		if i == 0 {
+			cmd = "M"
+		}
+		fmt.Fprintf(&line, "%s %.2f %.2f ", cmd, p.X, p.Y)
+	}
+	// Build area path: line + close to bottom-right + bottom-left, back to start.
+	area.WriteString(line.String())
+	fmt.Fprintf(&area, "L %.2f %.2f L %.2f %.2f Z", vbW, vbH, 0.0, vbH)
+
+	currentR := pts[len(pts)-1].R
+	trend := "flat"
+	switch {
+	case currentR > 0.01:
+		trend = "up"
+	case currentR < -0.01:
+		trend = "down"
+	}
+
+	drawdown := peak - currentR
+	if drawdown < 0 {
+		drawdown = 0
+	}
+
+	return equityCurve{
+		HasData:    true,
+		Points:     pts,
+		LinePath:   strings.TrimSpace(line.String()),
+		AreaPath:   strings.TrimSpace(area.String()),
+		ZeroY:      zeroY,
+		PeakR:      peak,
+		PeakIdx:    peakIdx,
+		CurrentR:   currentR,
+		Drawdown:   drawdown,
+		MinR:       minR,
+		MaxR:       maxR,
+		Trend:      trend,
+		FirstClose: closed[0].ClosedAt.Local(),
+		LastClose:  closed[len(closed)-1].ClosedAt.Local(),
+		ViewBoxW:   int(vbW),
+		ViewBoxH:   int(vbH),
+	}
 }
 
 // periodStats holds R + trade counts across rolling time windows for the

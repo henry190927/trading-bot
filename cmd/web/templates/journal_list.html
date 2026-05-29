@@ -69,9 +69,73 @@
 </section>
 
 {{/* ============================================================ */}}
-{{/* DAILY R CALENDAR — improved with weekday header               */}}
+{{/* PERFORMANCE GROUP — tabbed visualizations                     */}}
+{{/* (outer `if gt .ClosedCount 0` from period section still gates) */}}
 {{/* ============================================================ */}}
-<section class="pf-section">
+<div class="pf-group">
+  <h2 class="pf-group-title">Performance</h2>
+  <div class="pf-tabs" role="tablist">
+    <button type="button" class="pf-tab active" data-tab="equity">Equity</button>
+    <button type="button" class="pf-tab" data-tab="calendar">Calendar</button>
+    <button type="button" class="pf-tab" data-tab="distribution">Distribution</button>
+  </div>
+
+{{/* --- TAB: Equity --- */}}
+{{if .Equity.HasData}}
+<section class="pf-section pf-equity pf-tab-panel active" data-panel="equity">
+  <h2 class="pf-section-title">
+    <span class="pf-section-dot equity"></span>
+    Equity curve
+    <span class="pf-section-meta">{{len .Equity.Points}}{{if gt (len .Equity.Points) 1}} points{{end}}</span>
+  </h2>
+
+  <div class="pf-equity-stats">
+    <div class="pf-equity-stat">
+      <span class="lbl">current</span>
+      <strong class="{{rClass .Equity.CurrentR}}">{{fmtR .Equity.CurrentR}}R</strong>
+    </div>
+    <div class="pf-equity-stat">
+      <span class="lbl">peak</span>
+      <strong class="r-pos">{{fmtR .Equity.PeakR}}R</strong>
+    </div>
+    <div class="pf-equity-stat">
+      <span class="lbl">drawdown</span>
+      <strong class="{{if gt .Equity.Drawdown 0.0}}r-neg{{else}}r-zero{{end}}">−{{fmtR .Equity.Drawdown}}R</strong>
+    </div>
+  </div>
+
+  <div class="pf-equity-chart-wrap eq-{{.Equity.Trend}}">
+    <svg class="pf-equity-svg" viewBox="0 0 {{.Equity.ViewBoxW}} {{.Equity.ViewBoxH}}" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="eq-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="currentColor" stop-opacity="0.30"/>
+          <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- Zero reference line -->
+      <line x1="0" y1="{{printf "%.2f" .Equity.ZeroY}}" x2="{{.Equity.ViewBoxW}}" y2="{{printf "%.2f" .Equity.ZeroY}}"
+            stroke="rgba(139,148,158,0.4)" stroke-width="0.18" stroke-dasharray="0.8 0.8"/>
+      <!-- Filled area below the line -->
+      <path d="{{.Equity.AreaPath}}" fill="url(#eq-grad)" />
+      <!-- The line itself -->
+      <path d="{{.Equity.LinePath}}" fill="none" stroke="currentColor" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Trade dots -->
+      {{range .Equity.Points}}
+        {{if gt .Index 0}}
+          <circle cx="{{printf "%.2f" .X}}" cy="{{printf "%.2f" .Y}}" r="0.7" fill="currentColor"/>
+        {{end}}
+      {{end}}
+    </svg>
+    <div class="pf-equity-axis">
+      <span>{{.Equity.FirstClose.Format "Jan 2"}}</span>
+      <span>{{.Equity.LastClose.Format "Jan 2"}}</span>
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{/* --- TAB: Calendar --- */}}
+<section class="pf-section pf-tab-panel" data-panel="calendar">
   <h2 class="pf-section-title">
     <span class="pf-section-dot calendar"></span>
     Daily R
@@ -115,10 +179,8 @@
   </div>
 </section>
 
-{{/* ============================================================ */}}
-{{/* R DISTRIBUTION HISTOGRAM                                       */}}
-{{/* ============================================================ */}}
-<section class="pf-section">
+{{/* --- TAB: Distribution --- */}}
+<section class="pf-section pf-tab-panel" data-panel="distribution">
   <h2 class="pf-section-title">
     <span class="pf-section-dot histo"></span>
     R distribution
@@ -136,16 +198,19 @@
     {{end}}
   </div>
 </section>
-{{end}}{{/* if ClosedCount > 0 */}}
+</div>{{/* /pf-group performance */}}
+{{end}}{{/* if gt .ClosedCount 0 */}}
 
 {{/* ============================================================ */}}
-{{/* JOURNAL — full trade history list                             */}}
+{{/* JOURNAL GROUP — trade history                                 */}}
 {{/* ============================================================ */}}
+<div class="pf-group">
+  <h2 class="pf-group-title">Journal</h2>
 <section class="pf-section pf-journal">
   <h2 class="pf-section-title">
     <span class="pf-section-dot journal"></span>
-    Journal
-    <span class="pf-section-meta">{{len .Trades}} trade{{if ne (len .Trades) 1}}s{{end}}</span>
+    Trades
+    <span class="pf-section-meta">{{len .Trades}} total</span>
     <a href="/journal/new" class="pf-section-action">+ new trade</a>
   </h2>
 
@@ -199,6 +264,7 @@
 
   {{end}}{{/* if .Trades */}}
 </section>
+</div>{{/* /pf-group journal */}}
 
 {{end}}{{/* if .Error */}}
 
@@ -209,5 +275,38 @@
 </footer>
 
 <script src="/static/copy.js"></script>
+<script>
+// Performance-group tab switcher. Each tab data-tab="X" maps to a panel
+// data-panel="X" in the same .pf-group. Remembers last selection across
+// page reloads via localStorage so the meta-refresh doesn't reset focus.
+(function () {
+    var group = document.querySelector('.pf-group');
+    if (!group) return;
+    var tabs = group.querySelectorAll('.pf-tab');
+    var panels = group.querySelectorAll('.pf-tab-panel');
+    if (!tabs.length) return;
+
+    function activate(name) {
+        tabs.forEach(function (t) {
+            t.classList.toggle('active', t.dataset.tab === name);
+        });
+        panels.forEach(function (p) {
+            p.classList.toggle('active', p.dataset.panel === name);
+        });
+        try { localStorage.setItem('pf-tab', name); } catch (e) {}
+    }
+
+    tabs.forEach(function (t) {
+        t.addEventListener('click', function () { activate(t.dataset.tab); });
+    });
+
+    // Restore previously-selected tab.
+    var saved = null;
+    try { saved = localStorage.getItem('pf-tab'); } catch (e) {}
+    if (saved && Array.from(tabs).some(function (t) { return t.dataset.tab === saved; })) {
+        activate(saved);
+    }
+})();
+</script>
 </body>
 </html>

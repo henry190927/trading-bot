@@ -1326,6 +1326,7 @@ footer {
 .pf-section-dot.calendar { background: var(--blue); }
 .pf-section-dot.histo    { background: #c084fc; } /* soft purple */
 .pf-section-dot.journal  { background: var(--cyan); }
+.pf-section-dot.equity   { background: var(--green); }
 .pf-section-meta {
     color: var(--text-dim);
     font-size: 0.75rem;
@@ -1344,6 +1345,134 @@ footer {
     font-weight: 600;
 }
 .pf-section-action:active { opacity: 0.8; }
+
+/* Portfolio groups + tabs (narrative grouping under "Performance" / "Journal") */
+
+.pf-group {
+    margin-bottom: 1.2rem;
+}
+.pf-group-title {
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    margin: 0 0 0.55rem 0.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.pf-group-title::before {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+    margin-right: 0.4rem;
+}
+.pf-group-title::after {
+    content: "";
+    flex: 8;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border) 0%, var(--border) 30%, transparent);
+}
+
+.pf-tabs {
+    display: flex;
+    gap: 0.3rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.25rem;
+    margin-bottom: 0.6rem;
+}
+.pf-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5rem 0.6rem;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    min-height: 36px;
+}
+.pf-tab:active { opacity: 0.7; }
+.pf-tab.active {
+    background: var(--surface-2);
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
+.pf-tab-panel {
+    display: none;
+}
+.pf-tab-panel.active {
+    display: block;
+}
+
+/* Equity curve */
+
+.pf-equity-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+.pf-equity-stat {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.pf-equity-stat .lbl {
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+.pf-equity-stat strong {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.1rem;
+}
+.pf-equity-stat strong.r-pos  { color: var(--green); }
+.pf-equity-stat strong.r-neg  { color: var(--red); }
+.pf-equity-stat strong.r-zero { color: var(--text-dim); }
+
+.pf-equity-chart-wrap {
+    /* Trend-driven color drives the SVG via `currentColor` */
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.6rem 0.3rem;
+    color: var(--text-dim);
+}
+.pf-equity-chart-wrap.eq-up   { color: var(--green); }
+.pf-equity-chart-wrap.eq-down { color: var(--red); }
+.pf-equity-chart-wrap.eq-flat { color: var(--text-dim); }
+
+.pf-equity-svg {
+    display: block;
+    width: 100%;
+    height: 120px;
+    overflow: visible;
+}
+.pf-equity-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.3rem;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+}
 
 /* Improved calendar (cal2-*) */
 
