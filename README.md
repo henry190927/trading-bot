@@ -1358,25 +1358,37 @@ trading/
 | 2B.3 | `/journal/:id/close` form with outcome → exit auto-fill |
 | 2B.4 | `/journal/:id/edit` (full edit, open↔closed transitions) + delete |
 | 2B.5 | `/validate` form + scored result page, validator package shared with CLI |
+| 2C | Live logs SSE stream on web + ops panel (start/stop/tconfig buttons in `/ops`) — mobile daemon control without SSH |
 | — | Partials calculator widget (multi-leg exits with weighted-avg, restored on re-open) |
 | — | Sweep close-confirmed invalidation (engine) |
-| — | Range-expansion + volume bar promoted to votes (engine) |
-| — | Falling-knife penalty in validator |
-| — | Entry-chase penalty in validator |
-| — | Backtest A/B validated: 1h netR +10.91R → +19.97R (+83%) |
+| — | Range-expansion + volume bar promoted to votes (engine), RSI-neutral gated |
+| — | OI delta sign correction (engine) |
+| — | Drop-forming-candle helper (live/backtest consistency) |
+| — | Falling-knife + entry-chase penalties in validator |
+| — | Engine plan-validity suppression when live mark is wrong-side of plan entry |
+| — | Diagnose-now badges on dashboard + side-specific diagnose on open-trade card |
+| — | Open-trades section on dashboard with live R, time elapsed, progress bar, engine drift signal |
+| — | Journal schema v4 — leverage column (with per-symbol defaults on new-trade form) |
+| — | 30m + 2h timeframes added (CLIs, daemon cadence, dashboard, bias filter, backtest) |
+| — | Trade-card border color follows realized R (not outcome label) |
+| — | Backtest A/B validated 1h: netR +10.91R → +19.97R (+83%) with sweep + range-expansion fixes |
+| — | Cross-TF backtest matrix (15m/30m/1h/2h/4h × 60/90/120d) documented |
 
 ### Open
 
 | Phase | Scope | Value |
 |---|---|---|
-| 2C | Live logs SSE stream + ops panel (start/stop/tconfig buttons in web UI) | Mobile daemon control without SSH |
-| 2D | uPlot mini-charts on dashboard + R-distribution histogram on journal | Visual edge tracking |
-| Open | Per-symbol score thresholds | Currently global `TRADING_MIN_SCORE` — let XAG run tighter than ETH |
+| 2D | uPlot price mini-charts on dashboard symbol cards (last ~50 bars + sweeps/fib annotations) | Visual structure at a glance |
+| 2D | R-distribution histogram + daily-R calendar on `/journal` | Visual edge tracking + day-pattern recognition |
+| 2D | Equity curve on `/journal` (cumulative R over time) | Visual P&L trajectory |
+| 2D | Per-trade chart on close/edit form with entry/stop/TP lines | Trade-by-trade post-mortem |
+| Open | Per-symbol score thresholds | Backtested; XAG=3 helps (+11-15R/window across 60/90/120d); held pending live confirmation |
 | Open | Per-symbol notification routing | Quiet hours / per-symbol topics |
 | Open | Backtest report in web UI | View the A/B numbers without leaving the phone |
-| Open | Position-size + leverage tracker | `position_size = account_risk / risk_price` |
+| Open | Position-size tracker | Leverage column shipped; full sizer math `position_size = account_risk / risk_price` not yet |
 | Open | Coinglass / external liquidation heatmap provider | Stop refinement uses real liq clusters instead of just HVN |
 | Open | WebSocket streams | Sub-second reaction vs. TF-boundary polling |
+| Open | JSON poll endpoint for sub-30s price refresh | Lighter bandwidth alternative to full meta-refresh |
 
 ### Earlier strategy ideas still on the table
 

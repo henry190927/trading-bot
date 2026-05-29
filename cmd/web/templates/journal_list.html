@@ -42,6 +42,58 @@
   </div>
 </section>
 
+{{if gt .ClosedCount 0}}
+<section class="stats-card">
+  <h2>R distribution <span class="hint">({{.ClosedCount}} closed)</span></h2>
+  <div class="hist-grid">
+    {{range .Histogram}}
+      <div class="hist-col" title="{{.Label}}R: {{.Count}} trade{{if ne .Count 1}}s{{end}}">
+        <div class="hist-count">{{if .Count}}{{.Count}}{{end}}</div>
+        <div class="hist-bar-wrap">
+          <div class="hist-bar {{if .IsPos}}pos{{else}}neg{{end}}" style="height: {{printf "%.0f" .PctHeight}}%"></div>
+        </div>
+        <div class="hist-label">{{.Label}}</div>
+      </div>
+    {{end}}
+  </div>
+</section>
+
+<section class="stats-card">
+  <h2>Daily R <span class="hint">(last 6 weeks, Mon–Sun)</span></h2>
+  <div class="cal-grid">
+    {{range .Calendar}}
+      <div class="cal-week">
+        {{range .}}
+          {{if .IsZero}}
+            <div class="cal-cell empty" title="{{.Date.Format "Mon Jan 2"}} — no trades closed">
+              <span class="cal-day">{{if .Day}}{{.Day}}{{end}}</span>
+            </div>
+          {{else}}
+            <div class="cal-cell {{if .IsPos}}pos{{else}}neg{{end}} {{if .IsToday}}today{{end}}"
+                 style="--intensity: {{printf "%.0f" .Intensity}}%"
+                 title="{{.Date.Format "Mon Jan 2"}} — {{.Count}} trade{{if ne .Count 1}}s{{end}}, {{fmtR .TotalR}}R">
+              <span class="cal-day">{{.Day}}</span>
+              <span class="cal-r">{{fmtR .TotalR}}</span>
+            </div>
+          {{end}}
+        {{end}}
+      </div>
+    {{end}}
+  </div>
+  <div class="cal-legend">
+    <span>−</span>
+    <span class="legend-swatch neg" style="--intensity: 30%"></span>
+    <span class="legend-swatch neg" style="--intensity: 70%"></span>
+    <span class="legend-swatch neg" style="--intensity: 100%"></span>
+    <span class="legend-swatch empty"></span>
+    <span class="legend-swatch pos" style="--intensity: 30%"></span>
+    <span class="legend-swatch pos" style="--intensity: 70%"></span>
+    <span class="legend-swatch pos" style="--intensity: 100%"></span>
+    <span>+</span>
+  </div>
+</section>
+{{end}}
+
 {{if not .Trades}}
   <p class="empty">No trades recorded yet. Tap <strong>+ new trade</strong> to record one.</p>
 {{else}}

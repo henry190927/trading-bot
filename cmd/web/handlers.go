@@ -871,6 +871,9 @@ func (s *server) handleJournalList(c *gin.Context) {
 		avgR = totalR / float64(closedCount)
 	}
 
+	histogram := buildRHistogram(trades)
+	calendar := buildDailyCalendar(trades, 42) // 6 weeks
+
 	c.HTML(http.StatusOK, "journal_list.html", gin.H{
 		"Trades":      trades,
 		"OpenCount":   len(trades) - closedCount,
@@ -880,7 +883,168 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"TotalR":      totalR,
 		"BestR":       bestR,
 		"WorstR":      worstR,
+		"Histogram":   histogram,
+		"Calendar":    calendar,
 	})
+}
+
+// rBucket is one column in the R-distribution histogram.
+type rBucket struct {
+	Label     string  // e.g. "-1R", "+1R", "+2R"
+	Lo, Hi    float64 // bucket bounds (inclusive low, exclusive high)
+	Count     int
+	PctHeight float64 // 0-100, scaled to tallest bucket
+	IsPos     bool    // green vs red bar color
+}
+
+// buildRHistogram bucks closed trades' realized R into fixed-width bins
+// from -3R to +3R in 0.5R steps. Anything beyond the edges is clamped
+// into the outermost bucket (rare; signal stop is -1R by design).
+func buildRHistogram(trades []journal.Trade) []rBucket {
+	// Bucket boundaries: -3, -2.5, -2, ... +2.5, +3 → 12 buckets.
+	bounds := []float64{-3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3}
+	labels := []string{"≤-2.5", "-2", "-1.5", "-1", "-0.5", "-0+", "0+", "+0.5", "+1", "+1.5", "+2", "+2.5+"}
+	buckets := make([]rBucket, len(labels))
+	for i := range buckets {
+		buckets[i] = rBucket{
+			Label: labels[i],
+			Lo:    bounds[i],
+			Hi:    bounds[i+1],
+			IsPos: bounds[i] >= 0,
+		}
+	}
+	maxCount := 0
+	for _, t := range trades {
+		if t.IsOpen() {
+			continue
+		}
+		r := t.RRealized
+		// Find the bucket — clamp to ends if out of range.
+		idx := len(buckets) - 1
+		if r < bounds[0] {
+			idx = 0
+		} else if r < bounds[len(bounds)-1] {
+			for i := 0; i < len(buckets); i++ {
+				if r >= bounds[i] && r < bounds[i+1] {
+					idx = i
+					break
+				}
+			}
+		}
+		buckets[idx].Count++
+		if buckets[idx].Count > maxCount {
+			maxCount = buckets[idx].Count
+		}
+	}
+	if maxCount > 0 {
+		for i := range buckets {
+			buckets[i].PctHeight = float64(buckets[i].Count) / float64(maxCount) * 100
+		}
+	}
+	return buckets
+}
+
+// dailyCell is one square in the daily-R calendar (one day).
+type dailyCell struct {
+	Date    time.Time // local date midnight
+	Day     int       // day-of-month for display
+	IsToday bool
+	Count   int     // trades closed that day
+	TotalR  float64 // sum of R for that day
+	// Intensity is the absolute R normalized to 0-100 for color saturation,
+	// capped to a sensible max so a +5R day doesn't make every other day
+	// invisible.
+	Intensity float64
+	IsPos     bool
+	IsZero    bool // no trades closed that day
+}
+
+// buildDailyCalendar builds a weeks-tall grid of the last `days` days
+// (default 42 = 6 weeks). Each cell shows the day's net R from closed
+// trades. Renders Mon-Sun rows, with the most recent week at the bottom
+// (GitHub-style).
+func buildDailyCalendar(trades []journal.Trade, days int) [][]dailyCell {
+	// Aggregate closed R by local date.
+	type agg struct {
+		count int
+		r     float64
+	}
+	byDate := map[string]*agg{}
+	for _, t := range trades {
+		if t.IsOpen() || t.ClosedAt.IsZero() {
+			continue
+		}
+		key := t.ClosedAt.Local().Format("2006-01-02")
+		a, ok := byDate[key]
+		if !ok {
+			a = &agg{}
+			byDate[key] = a
+		}
+		a.count++
+		a.r += t.RRealized
+	}
+
+	// Find max absolute daily R for color scaling.
+	var maxAbs float64 = 1.0 // floor so a single +0.5R day isn't max intensity
+	for _, a := range byDate {
+		if abs := a.r; abs < 0 {
+			abs = -abs
+		}
+		if absR := a.r; absR < 0 {
+			absR = -absR
+			if absR > maxAbs {
+				maxAbs = absR
+			}
+		} else if absR > maxAbs {
+			maxAbs = absR
+		}
+	}
+
+	// Walk from `days-1` ago up to today; align grid so Monday starts each row.
+	now := time.Now().Local()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	start := today.AddDate(0, 0, -(days - 1))
+	// Back up `start` so its weekday is Monday — leading cells will be empty.
+	for start.Weekday() != time.Monday {
+		start = start.AddDate(0, 0, -1)
+	}
+
+	var grid [][]dailyCell
+	var row []dailyCell
+	d := start
+	end := today.AddDate(0, 0, 1) // exclusive
+	for d.Before(end) {
+		cell := dailyCell{Date: d, Day: d.Day(), IsToday: d.Equal(today)}
+		key := d.Format("2006-01-02")
+		if a, ok := byDate[key]; ok {
+			cell.Count = a.count
+			cell.TotalR = a.r
+			cell.IsPos = a.r >= 0
+			abs := a.r
+			if abs < 0 {
+				abs = -abs
+			}
+			cell.Intensity = abs / maxAbs * 100
+		} else if d.Before(today.AddDate(0, 0, -(days - 1))) {
+			cell.IsZero = true // padding before the requested window
+		} else {
+			cell.IsZero = true // window day with no trades
+		}
+		row = append(row, cell)
+		if d.Weekday() == time.Sunday {
+			grid = append(grid, row)
+			row = nil
+		}
+		d = d.AddDate(0, 0, 1)
+	}
+	if len(row) > 0 {
+		// Pad last row to 7 cells.
+		for len(row) < 7 {
+			row = append(row, dailyCell{IsZero: true})
+		}
+		grid = append(grid, row)
+	}
+	return grid
 }
 
 // templateFuncs exposes formatting helpers to the templates.

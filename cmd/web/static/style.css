@@ -1185,6 +1185,148 @@ footer {
     margin-left: 0.15rem;
 }
 
+/* --- R distribution histogram + daily-R calendar (journal page) --- */
+
+.stats-card .hint {
+    color: var(--text-dim);
+    font-style: italic;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.75rem;
+    margin-left: 0.4rem;
+}
+
+.hist-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+    align-items: end;
+    margin-top: 0.4rem;
+}
+.hist-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+}
+.hist-count {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    line-height: 1;
+    margin-bottom: 2px;
+    min-height: 0.7rem; /* reserve space so bars align even when count blank */
+}
+.hist-bar-wrap {
+    height: 80px;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.hist-bar {
+    width: 100%;
+    border-radius: 2px 2px 0 0;
+    min-height: 0;
+    transition: height 0.3s ease;
+}
+.hist-bar.pos { background: var(--green); }
+.hist-bar.neg { background: var(--red); }
+.hist-label {
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    margin-top: 2px;
+    transform: rotate(-30deg);
+    transform-origin: top left;
+    white-space: nowrap;
+}
+
+/* Calendar — GitHub-style daily R grid */
+
+.cal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 0.4rem;
+}
+.cal-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+.cal-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    border: 1px solid transparent;
+    min-height: 32px;
+    line-height: 1.1;
+    overflow: hidden;
+}
+.cal-cell.empty {
+    background: var(--bg);
+    border-color: var(--border);
+}
+.cal-cell.empty .cal-day {
+    color: var(--text-dim);
+    opacity: 0.5;
+    font-size: 0.65rem;
+}
+.cal-cell.pos {
+    background: color-mix(in srgb, var(--green) var(--intensity, 0%), var(--bg));
+    border-color: rgba(74, 222, 128, 0.4);
+}
+.cal-cell.neg {
+    background: color-mix(in srgb, var(--red) var(--intensity, 0%), var(--bg));
+    border-color: rgba(248, 113, 113, 0.4);
+}
+.cal-cell.today {
+    border-color: var(--blue);
+    border-width: 2px;
+}
+.cal-day {
+    font-size: 0.65rem;
+    color: var(--text);
+    opacity: 0.85;
+}
+.cal-r {
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.cal-cell.pos .cal-r,
+.cal-cell.neg .cal-r {
+    color: var(--text);
+    text-shadow: 0 0 2px rgba(0,0,0,0.4);
+}
+
+.cal-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 0.6rem;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    justify-content: center;
+}
+.legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+.legend-swatch.empty { background: var(--bg); }
+.legend-swatch.pos { background: color-mix(in srgb, var(--green) var(--intensity), var(--bg)); }
+.legend-swatch.neg { background: color-mix(in srgb, var(--red) var(--intensity), var(--bg)); }
+
 /* --- Dashboard section split (open trades vs symbol scan) --- */
 
 .dashboard-section {
