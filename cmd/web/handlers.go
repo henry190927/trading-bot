@@ -785,16 +785,20 @@ func templateFuncs() template.FuncMap {
 			return "r-zero"
 		},
 		"outcomeClass": func(t journal.Trade) string {
+			// Classify by realized R, not by outcome label. A "manual" exit
+			// can be a winning trade (e.g. partial close above breakeven),
+			// and labeling it red just because it isn't a clean TP would
+			// mislead at a glance.
 			if t.IsOpen() {
 				return "status-open"
 			}
-			switch t.Outcome {
-			case "tp1", "tp2":
+			switch {
+			case t.RRealized > 0:
 				return "status-win"
-			case "stop", "manual":
+			case t.RRealized < 0:
 				return "status-loss"
 			}
-			return "status-other"
+			return "status-flat"
 		},
 		"outcomeText": func(t journal.Trade) string {
 			if t.IsOpen() {

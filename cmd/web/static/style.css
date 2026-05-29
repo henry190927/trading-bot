@@ -343,6 +343,7 @@ footer {
 .trade-card.status-win { border-left-color: var(--green); }
 .trade-card.status-loss { border-left-color: var(--red); }
 .trade-card.status-open { border-left-color: var(--yellow); }
+.trade-card.status-flat { border-left-color: var(--text-dim); }
 .trade-card.status-other { border-left-color: var(--text-dim); }
 
 .trade-head {
@@ -390,6 +391,7 @@ footer {
 .status-win .trade-status { background: var(--green-bg); color: var(--green); }
 .status-loss .trade-status { background: var(--red-bg); color: var(--red); }
 .status-open .trade-status { color: var(--yellow); }
+.status-flat .trade-status { color: var(--text-dim); }
 
 .trade-r {
     font-family: ui-monospace, "SF Mono", monospace;
