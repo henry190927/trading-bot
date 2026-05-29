@@ -25,6 +25,9 @@
   <p class="err">⚠ {{.Error}}</p>
 {{else}}
 
+<div class="pf-layout">
+<div class="pf-main">
+
 {{/* ============================================================ */}}
 {{/* HERO — total realized R, headline metrics                     */}}
 {{/* ============================================================ */}}
@@ -201,8 +204,13 @@
 </div>{{/* /pf-group performance */}}
 {{end}}{{/* if gt .ClosedCount 0 */}}
 
+{{/* ──────────────── end left column (pf-main) ─────────────────── */}}
+</div>{{/* /pf-main */}}
+
+<aside class="pf-aside">
+
 {{/* ============================================================ */}}
-{{/* JOURNAL GROUP — trade history                                 */}}
+{{/* JOURNAL GROUP — trade history (right column on desktop)       */}}
 {{/* ============================================================ */}}
 <div class="pf-group">
   <h2 class="pf-group-title">Journal</h2>
@@ -265,6 +273,9 @@
   {{end}}{{/* if .Trades */}}
 </section>
 </div>{{/* /pf-group journal */}}
+
+</aside>{{/* /pf-aside */}}
+</div>{{/* /pf-layout */}}
 
 {{end}}{{/* if .Error */}}
 

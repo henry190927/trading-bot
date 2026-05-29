@@ -1346,6 +1346,29 @@ footer {
 }
 .pf-section-action:active { opacity: 0.8; }
 
+/* Portfolio responsive layout — single column on mobile, 2-column on desktop
+   (main = hero + periods + Performance; aside = Journal trade list).
+   Breakpoint chosen so journal cards still have enough room (~360px+) to
+   render comfortably without the trade-head wrapping awkwardly. */
+.pf-layout {
+    display: block;
+}
+@media (min-width: 960px) {
+    .pf-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(360px, 1fr);
+        gap: 1.2rem;
+        align-items: start;
+    }
+    .pf-aside {
+        position: sticky;
+        top: 1rem;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+}
+
 /* Portfolio groups + tabs (narrative grouping under "Performance" / "Journal") */
 
 .pf-group {
