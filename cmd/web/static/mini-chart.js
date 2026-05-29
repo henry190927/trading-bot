@@ -170,6 +170,17 @@
         try { data = JSON.parse(raw); } catch (e) { return; }
         if (!data || !data.t || !data.c || data.t.length < 2) return;
 
+        // Skip uPlot init entirely when the card is collapsed — saves a
+        // bunch of canvas work on every 30s refresh.
+        var sym = node.getAttribute('data-sym') || '';
+        if (sym && isHidden(sym)) {
+            if (node._uplot) {
+                try { node._uplot.destroy(); } catch (e) {}
+                node._uplot = null;
+            }
+            return;
+        }
+
         if (node._uplot) {
             try { node._uplot.destroy(); } catch (e) {}
             node._uplot = null;
@@ -187,18 +198,19 @@
     function renderAll() { document.querySelectorAll('.mini-chart').forEach(render); }
 
     // ─── Per-card collapse toggle ──────────────────────────────────────
-    // Each symbol card gets a tiny chevron next to the score. Click to
-    // hide/show its mini-chart. State persists per symbol in localStorage
-    // so refreshes (every 30s) don't keep popping the chart back open.
-    function hiddenKey(sym) { return 'mini-chart-hidden:' + sym; }
+    // Each symbol card gets a tiny chevron next to the score. Charts are
+    // collapsed by default to keep the dashboard dense; click to expand.
+    // The "shown" key holds '1' iff the user has opted to keep this
+    // chart open across the 30s meta-refresh.
+    function shownKey(sym) { return 'mini-chart-shown:' + sym; }
     function isHidden(sym) {
-        try { return localStorage.getItem(hiddenKey(sym)) === '1'; }
-        catch (e) { return false; }
+        try { return localStorage.getItem(shownKey(sym)) !== '1'; }
+        catch (e) { return true; }
     }
     function setHidden(sym, v) {
         try {
-            if (v) localStorage.setItem(hiddenKey(sym), '1');
-            else   localStorage.removeItem(hiddenKey(sym));
+            if (v) localStorage.removeItem(shownKey(sym));
+            else   localStorage.setItem(shownKey(sym), '1');
         } catch (e) {}
     }
 
@@ -228,8 +240,10 @@
             btn.type = 'button';
             btn.className = 'chart-toggle';
             btn.addEventListener('click', function () {
-                setHidden(sym, !isHidden(sym));
+                var nowHidden = !isHidden(sym);
+                setHidden(sym, nowHidden);
                 applyHiddenState(card, sym);
+                if (!nowHidden) render(chart); // lazy-render on expand
             });
             head.appendChild(btn);
             applyHiddenState(card, sym);
