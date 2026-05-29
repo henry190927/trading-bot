@@ -89,6 +89,11 @@ func (s *server) handleDashboard(c *gin.Context) {
 		return order[views[i].Symbol] < order[views[j].Symbol]
 	})
 
+	// Build open-trade cards (live status of journal entries that haven't
+	// been closed yet). Independent of the requested TF — we always show
+	// open trades regardless of which TF the dashboard is rendering.
+	openTrades := buildOpenTradeCards(views)
+
 	// Disable client-side caching so the meta-refresh reload actually fetches
 	// fresh data (iOS Safari otherwise serves the page from cache on the
 	// next 60s tick if no Cache-Control is set).
@@ -98,10 +103,88 @@ func (s *server) handleDashboard(c *gin.Context) {
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"TF":           tf,
 		"Symbols":      views,
+		"OpenTrades":   openTrades,
 		"Now":          time.Now().Format("2006-01-02 15:04:05"),
 		"TFOptions":    []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 		"MinTradeable": 3, // for verdict coloring
 	})
+}
+
+// openTradeCard is the live status of an open journal entry, computed against
+// the dashboard's current mark prices. Pure decision-support — the system
+// can't move stops on BingX itself, but the trader can see at a glance how
+// much of each trade's risk envelope has been consumed.
+type openTradeCard struct {
+	Trade       journal.Trade
+	MarkPrice   float64       // live mark for the symbol (closed-bar close fallback)
+	CurrentR    float64       // signed R: positive = in profit, negative = drawdown
+	PctToStop   float64       // 0-100% of the way from entry to stop
+	PctToTP1    float64       // 0-100% of the way from entry to TP1
+	PctToTP2    float64       // 0-100% of the way from entry to TP2
+	TimeElapsed time.Duration // since OpenedAt
+	Diagnose    *validator.Result
+}
+
+func buildOpenTradeCards(views []symbolView) []openTradeCard {
+	trades, err := journal.ReadAll("")
+	if err != nil {
+		return nil
+	}
+	var cards []openTradeCard
+	for _, t := range trades {
+		if !t.IsOpen() {
+			continue
+		}
+		card := openTradeCard{Trade: t, TimeElapsed: time.Since(t.OpenedAt)}
+
+		// Find matching symbolView for live mark + diagnose.
+		for _, v := range views {
+			if v.Short != t.Symbol {
+				continue
+			}
+			card.MarkPrice = v.Signal.Price
+			// Only attach diagnose when TF matches — diagnose is TF-specific.
+			if string(v.Signal.Timeframe) == t.TF && v.Diagnose != nil {
+				card.Diagnose = v.Diagnose
+			}
+			break
+		}
+
+		// Compute R progress against the trade's own entry/stop/TPs.
+		// Risk magnitude is |stop - entry|; signed direction depends on side.
+		if card.MarkPrice > 0 && t.Stop != t.Entry {
+			risk := t.Stop - t.Entry
+			if risk < 0 {
+				risk = -risk
+			}
+			var moved float64
+			if t.Side == "long" {
+				moved = card.MarkPrice - t.Entry
+			} else {
+				moved = t.Entry - card.MarkPrice
+			}
+			card.CurrentR = moved / risk
+			card.PctToStop = clampPct(-moved / risk * 100)
+			if t.TP1 != 0 {
+				card.PctToTP1 = clampPct(moved / risk * 100) // TP1 is at +1R, so mover/risk * 100 = % progress
+			}
+			if t.TP2 != 0 {
+				card.PctToTP2 = clampPct(moved / risk / 2 * 100) // TP2 at +2R, so /2 to normalize
+			}
+		}
+		cards = append(cards, card)
+	}
+	return cards
+}
+
+func clampPct(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
 }
 
 func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timeframe) symbolView {
@@ -823,6 +906,20 @@ func templateFuncs() template.FuncMap {
 				return b
 			}
 			return a
+		},
+		"fmtElapsed": func(d time.Duration) string {
+			if d < time.Minute {
+				return "just now"
+			}
+			h := int(d.Hours())
+			m := int(d.Minutes()) % 60
+			switch {
+			case h >= 24:
+				return fmt.Sprintf("%dd %dh", h/24, h%24)
+			case h > 0:
+				return fmt.Sprintf("%dh %dm", h, m)
+			}
+			return fmt.Sprintf("%dm", m)
 		},
 		"sweepStr": func(side analyzer.SweepSide) string {
 			if side == analyzer.SweepLow {

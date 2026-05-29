@@ -34,6 +34,57 @@
 </header>
 
 <main>
+
+{{if .OpenTrades}}
+<section class="open-trades">
+  <div class="open-trades-head">Open trades ({{len .OpenTrades}})</div>
+  {{range .OpenTrades}}
+    <article class="open-trade-card {{rClass .CurrentR}}">
+      <div class="ot-head">
+        <span class="ot-id">#{{.Trade.ID}}</span>
+        <span class="sym">{{.Trade.Symbol}}</span>
+        <span class="{{sideClassStr .Trade.Side}} side-badge">{{sideStr .Trade.Side}}</span>
+        {{if .Trade.Leverage}}<span class="lev-tag">{{.Trade.Leverage}}×</span>{{end}}
+        <span class="ot-tf">{{or .Trade.TF "—"}}</span>
+        <span class="ot-elapsed">{{fmtElapsed .TimeElapsed}}</span>
+        <span class="ot-r {{rClass .CurrentR}}">{{fmtR .CurrentR}}R</span>
+      </div>
+      <div class="ot-bar-wrap" title="position between stop (left, red) and TP2 (right, green)">
+        <div class="ot-bar">
+          <div class="ot-bar-fill {{if gt .CurrentR 0.0}}positive{{else}}negative{{end}}" style="width: {{if gt .CurrentR 0.0}}{{printf "%.0f" .PctToTP2}}{{else}}{{printf "%.0f" .PctToStop}}{{end}}%"></div>
+          <div class="ot-bar-center"></div>
+        </div>
+        <div class="ot-bar-labels">
+          <span class="ot-bar-stop">stop {{fmtPrice .Trade.Stop}}</span>
+          <span class="ot-bar-entry">entry {{fmtPrice .Trade.Entry}}</span>
+          <span class="ot-bar-tp">TP2 {{fmtPrice .Trade.TP2}}</span>
+        </div>
+      </div>
+      <div class="ot-prices">
+        <span class="ot-mark">mark <button class="copy-btn small" data-copy="{{fmtPrice .MarkPrice}}">{{fmtPrice .MarkPrice}}</button></span>
+        <span>TP1 <button class="copy-btn small tp" data-copy="{{fmtPrice .Trade.TP1}}">{{fmtPrice .Trade.TP1}}</button></span>
+        <span>TP2 <button class="copy-btn small tp" data-copy="{{fmtPrice .Trade.TP2}}">{{fmtPrice .Trade.TP2}}</button></span>
+        <span>stop <button class="copy-btn small stop" data-copy="{{fmtPrice .Trade.Stop}}">{{fmtPrice .Trade.Stop}}</button></span>
+      </div>
+      {{if .Diagnose}}
+        <div class="ot-diagnose {{verdictClass .Diagnose.Total}}">
+          live diagnose:
+          <span class="{{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
+          <strong>{{printf "%.1f" .Diagnose.Total}}/10</strong>
+          {{verdictShort .Diagnose.Verdict}}
+          {{if .Diagnose.RecentFlashBarBearish}}<span class="ot-flag knife">⚠ falling knife</span>{{end}}
+          {{if .Diagnose.RecentFlashBarBullish}}<span class="ot-flag squeeze">⚠ blow-off risk</span>{{end}}
+        </div>
+      {{end}}
+      <div class="ot-actions">
+        <a href="/journal/{{.Trade.ID}}/close" class="btn-close-trade">Close trade</a>
+        <a href="/journal/{{.Trade.ID}}/edit" class="btn-edit">Edit</a>
+      </div>
+    </article>
+  {{end}}
+</section>
+{{end}}
+
 {{range .Symbols}}
   <section class="symbol-card {{if hasPlan .Signal}}has-plan{{end}}">
     <div class="card-head">

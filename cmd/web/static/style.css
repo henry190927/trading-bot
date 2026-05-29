@@ -1185,6 +1185,178 @@ footer {
     margin-left: 0.15rem;
 }
 
+/* --- Open-trades card section on dashboard --- */
+
+.open-trades {
+    margin-bottom: 1rem;
+}
+.open-trades-head {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+.open-trade-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--text-dim);
+    border-radius: 8px;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 0.6rem;
+}
+.open-trade-card.r-pos  { border-left-color: var(--green); }
+.open-trade-card.r-neg  { border-left-color: var(--red); }
+.open-trade-card.r-zero { border-left-color: var(--text-dim); }
+
+.ot-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+    margin-bottom: 0.5rem;
+}
+.ot-id {
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.82rem;
+}
+.ot-tf {
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+}
+.ot-elapsed {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    font-style: italic;
+}
+.ot-r {
+    margin-left: auto;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+}
+.ot-r.r-pos  { color: var(--green); }
+.ot-r.r-neg  { color: var(--red); }
+.ot-r.r-zero { color: var(--text-dim); }
+
+.ot-bar-wrap {
+    margin: 0.5rem 0;
+}
+.ot-bar {
+    position: relative;
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+.ot-bar-fill {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    transition: width 0.3s ease;
+}
+.ot-bar-fill.positive {
+    left: 50%;
+    background: var(--green);
+}
+.ot-bar-fill.negative {
+    right: 50%;
+    background: var(--red);
+}
+.ot-bar-center {
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: var(--text-dim);
+    opacity: 0.5;
+}
+.ot-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+}
+.ot-bar-stop  { color: var(--red); }
+.ot-bar-entry { color: var(--text); }
+.ot-bar-tp    { color: var(--green); }
+
+.ot-prices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.8rem;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin: 0.4rem 0;
+}
+.ot-prices .copy-btn.small {
+    font-size: 0.78rem;
+    padding: 0.05rem 0.35rem;
+    margin-left: 0.15rem;
+}
+.ot-mark .copy-btn { color: var(--blue); border-color: var(--blue); }
+
+.ot-diagnose {
+    background: var(--surface-2);
+    padding: 0.35rem 0.6rem;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    margin: 0.4rem 0;
+    border-left: 3px solid var(--border);
+}
+.ot-diagnose.verdict-strong  { border-left-color: var(--green); }
+.ot-diagnose.verdict-take    { border-left-color: var(--green); }
+.ot-diagnose.verdict-neutral { border-left-color: var(--yellow); }
+.ot-diagnose.verdict-weak    { border-left-color: var(--yellow); }
+.ot-diagnose.verdict-avoid   { border-left-color: var(--red); }
+.ot-diagnose strong {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.ot-flag {
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+.ot-flag.knife {
+    background: rgba(248, 113, 113, 0.15);
+    color: var(--red);
+    border: 1px solid var(--red);
+}
+.ot-flag.squeeze {
+    background: rgba(251, 191, 36, 0.15);
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+}
+
+.ot-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+.ot-actions .btn-close-trade,
+.ot-actions .btn-edit {
+    flex: 1;
+    text-align: center;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+    min-height: 32px;
+}
+
 /* Leverage tag on journal trade cards */
 .lev-tag {
     background: rgba(88, 166, 255, 0.12);
