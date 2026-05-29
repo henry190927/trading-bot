@@ -99,7 +99,7 @@ func (s *server) handleDashboard(c *gin.Context) {
 		"TF":           tf,
 		"Symbols":      views,
 		"Now":          time.Now().Format("2006-01-02 15:04:05"),
-		"TFOptions":    []string{"5m", "15m", "1h", "4h", "1d"},
+		"TFOptions":    []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 		"MinTradeable": 3, // for verdict coloring
 	})
 }

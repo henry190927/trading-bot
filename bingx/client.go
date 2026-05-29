@@ -244,8 +244,12 @@ func tfDuration(tf market.Timeframe) time.Duration {
 		return 5 * time.Minute
 	case market.TF15m:
 		return 15 * time.Minute
+	case market.TF30m:
+		return 30 * time.Minute
 	case market.TF1h:
 		return time.Hour
+	case market.TF2h:
+		return 2 * time.Hour
 	case market.TF4h:
 		return 4 * time.Hour
 	case market.TF1d:

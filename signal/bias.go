@@ -36,8 +36,12 @@ func DefaultBiasTF(base market.Timeframe) market.Timeframe {
 		return market.TF5m
 	case market.TF5m, market.TF15m:
 		return market.TF1h
+	case market.TF30m:
+		return market.TF4h
 	case market.TF1h:
 		return market.TF4h
+	case market.TF2h:
+		return market.TF1d
 	case market.TF4h:
 		return market.TF1d
 	}

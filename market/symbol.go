@@ -27,7 +27,9 @@ const (
 	TF1m  Timeframe = "1m"
 	TF5m  Timeframe = "5m"
 	TF15m Timeframe = "15m"
+	TF30m Timeframe = "30m"
 	TF1h  Timeframe = "1h"
+	TF2h  Timeframe = "2h"
 	TF4h  Timeframe = "4h"
 	TF1d  Timeframe = "1d"
 )
