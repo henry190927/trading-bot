@@ -137,12 +137,18 @@ main {
 
 .meta {
     display: flex;
+    align-items: center;
     gap: 1rem;
     flex-wrap: wrap;
     color: var(--text-dim);
     font-size: 0.85rem;
     margin: 0.5rem 0;
     font-variant-numeric: tabular-nums;
+}
+.meta > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 .meta .copy-btn.small {
     margin-left: 0.25rem;
@@ -154,6 +160,10 @@ main {
     gap: 0.4rem;
     flex-wrap: wrap;
     margin: 0.5rem 0;
+}
+.hvn-row .label {
+    color: var(--text-dim);
+    font-size: 0.85rem;
 }
 .hvn-row .label {
     font-size: 0.8rem;

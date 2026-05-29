@@ -254,12 +254,16 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 				moved = t.Entry - card.MarkPrice
 			}
 			card.CurrentR = moved / risk
-			card.PctToStop = clampPct(-moved / risk * 100)
+			// Each fill (.ot-bar-fill.negative/.positive) is anchored at the
+			// bar's center (50%), so its CSS width is the % of *half* the bar.
+			// Negative side: full at -1R → 50% width covers entry→stop.
+			// Positive side: full at +2R (TP2) → 50% width covers entry→TP2.
+			card.PctToStop = clampPct(-moved / risk * 50)
 			if t.TP1 != 0 {
-				card.PctToTP1 = clampPct(moved / risk * 100) // TP1 is at +1R, so mover/risk * 100 = % progress
+				card.PctToTP1 = clampPct(moved / risk * 50)
 			}
 			if t.TP2 != 0 {
-				card.PctToTP2 = clampPct(moved / risk / 2 * 100) // TP2 at +2R, so /2 to normalize
+				card.PctToTP2 = clampPct(moved / risk / 2 * 50)
 			}
 		}
 		cards = append(cards, card)
