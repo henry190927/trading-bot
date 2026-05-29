@@ -1173,8 +1173,8 @@ footer {
 /* Mini-chart container on dashboard symbol cards */
 .mini-chart {
     width: 100%;
-    height: 80px;
-    margin: 0.5rem 0 0.4rem;
+    height: 130px;
+    margin: 0.55rem 0 0.45rem;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -1182,8 +1182,35 @@ footer {
     position: relative;
 }
 .mini-chart .uplot {
-    /* uPlot's own background-color shouldn't fight our card surface */
     background: transparent !important;
+}
+
+/* Chart-style toggle (Line / Candles) sitting in the tf-bar */
+.chart-style-toggle {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px;
+    margin-left: 0.4rem;
+}
+.cs-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    min-height: 28px;
+}
+.cs-btn:active { opacity: 0.7; }
+.cs-btn.active {
+    background: var(--surface-2);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
 
 /* close-bar reference next to live mark price */

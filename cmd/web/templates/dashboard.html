@@ -31,6 +31,10 @@
       {{end}}
     {{end}}
   </nav>
+  <div class="chart-style-toggle" role="group" aria-label="chart style">
+    <button type="button" class="cs-btn" data-mode="line" aria-pressed="false">Line</button>
+    <button type="button" class="cs-btn active" data-mode="candle" aria-pressed="true">Candles</button>
+  </div>
   <div class="updated">{{.Now}}</div>
 </header>
 

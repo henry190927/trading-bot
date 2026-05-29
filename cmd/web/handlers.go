@@ -285,22 +285,31 @@ func buildChartJSON(v symbolView) template.JS {
 	// Two parallel arrays: t (unix seconds), c (close prices). uPlot's
 	// expected x-y data shape — saves repeated key lookups in JS.
 	type payload struct {
-		T     []int64    `json:"t"`     // unix seconds, x-axis
-		C     []float64  `json:"c"`     // closes, y-axis
-		Side  string     `json:"side"`  // "long" / "short" / ""
-		Entry float64    `json:"entry"` // plan entry, 0 if no plan
-		Stop  float64    `json:"stop"`
-		TP1   float64    `json:"tp1"`
-		TP2   float64    `json:"tp2"`
-		Mark  float64    `json:"mark"`  // live mark price
+		T     []int64   `json:"t"`     // unix seconds, x-axis
+		O     []float64 `json:"o"`     // opens (for candle mode)
+		H     []float64 `json:"h"`     // highs
+		L     []float64 `json:"l"`     // lows
+		C     []float64 `json:"c"`     // closes (also used for line mode)
+		Side  string    `json:"side"`  // "long" / "short" / ""
+		Entry float64   `json:"entry"` // plan entry, 0 if no plan
+		Stop  float64   `json:"stop"`
+		TP1   float64   `json:"tp1"`
+		TP2   float64   `json:"tp2"`
+		Mark  float64   `json:"mark"` // live mark price
 	}
 	p := payload{
-		T: make([]int64, len(cs)),
-		C: make([]float64, len(cs)),
+		T:    make([]int64, len(cs)),
+		O:    make([]float64, len(cs)),
+		H:    make([]float64, len(cs)),
+		L:    make([]float64, len(cs)),
+		C:    make([]float64, len(cs)),
 		Mark: v.MarkPrice,
 	}
 	for i, c := range cs {
 		p.T[i] = c.CloseTime.Unix()
+		p.O[i] = c.Open
+		p.H[i] = c.High
+		p.L[i] = c.Low
 		p.C[i] = c.Close
 	}
 	if v.Signal.Plan.Entry > 0 {
