@@ -941,19 +941,49 @@ func (s *server) handleJournalList(c *gin.Context) {
 	periods := buildPeriodStats(trades)
 	equity := buildEquityCurve(trades)
 
+	// Pagination — 10 per page, ?page=N (1-indexed). All stats above are
+	// computed over the FULL trade set; pagination only chunks the list
+	// rendered in the Journal section.
+	const perPage = 10
+	totalTrades := len(trades)
+	totalPages := (totalTrades + perPage - 1) / perPage
+	if totalPages == 0 {
+		totalPages = 1
+	}
+	page := 1
+	if p, err := strconv.Atoi(c.Query("page")); err == nil && p >= 1 && p <= totalPages {
+		page = p
+	}
+	pageStart := (page - 1) * perPage
+	pageEnd := pageStart + perPage
+	if pageEnd > totalTrades {
+		pageEnd = totalTrades
+	}
+	pageTrades := trades[pageStart:pageEnd]
+	// Build a list of page numbers for the pager (1..totalPages). Small
+	// enough to show all; if it ever blows past ~30 we'd add ellipsis logic.
+	pageNums := make([]int, 0, totalPages)
+	for i := 1; i <= totalPages; i++ {
+		pageNums = append(pageNums, i)
+	}
+
 	c.HTML(http.StatusOK, "journal_list.html", gin.H{
-		"Trades":      trades,
-		"OpenCount":   len(trades) - closedCount,
-		"ClosedCount": closedCount,
-		"WR":          wr,
-		"AvgR":        avgR,
-		"TotalR":      totalR,
-		"BestR":       bestR,
-		"WorstR":      worstR,
-		"Histogram":   histogram,
-		"Calendar":    calendar,
-		"Periods":     periods,
-		"Equity":      equity,
+		"Trades":       pageTrades,
+		"TotalTrades":  totalTrades,
+		"Page":         page,
+		"TotalPages":   totalPages,
+		"PageNums":     pageNums,
+		"OpenCount":    len(trades) - closedCount,
+		"ClosedCount":  closedCount,
+		"WR":           wr,
+		"AvgR":         avgR,
+		"TotalR":       totalR,
+		"BestR":        bestR,
+		"WorstR":       worstR,
+		"Histogram":    histogram,
+		"Calendar":     calendar,
+		"Periods":      periods,
+		"Equity":       equity,
 	})
 }
 
@@ -1418,6 +1448,8 @@ func templateFuncs() template.FuncMap {
 			}
 			return a
 		},
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
 		"fmtElapsed": func(d time.Duration) string {
 			if d < time.Minute {
 				return "just now"

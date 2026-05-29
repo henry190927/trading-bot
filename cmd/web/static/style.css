@@ -1362,27 +1362,13 @@ footer {
 }
 .pf-section-action:active { opacity: 0.8; }
 
-/* Portfolio responsive layout — single column on mobile, 2-column on desktop
-   (main = hero + periods + Performance; aside = Journal trade list).
-   Breakpoint chosen so journal cards still have enough room (~360px+) to
-   render comfortably without the trade-head wrapping awkwardly. */
+/* Portfolio layout — single column on all screen sizes.
+   The pf-main / pf-aside markup is still in place so we can re-enable a
+   responsive 2-column variant later, but the default render is now a
+   straight cascade (was 2-col @960px+ — felt off on desktop, reverted
+   pending a proper layout rethink). */
 .pf-layout {
     display: block;
-}
-@media (min-width: 960px) {
-    .pf-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1.4fr) minmax(360px, 1fr);
-        gap: 1.2rem;
-        align-items: start;
-    }
-    .pf-aside {
-        position: sticky;
-        top: 1rem;
-        max-height: calc(100vh - 2rem);
-        overflow-y: auto;
-        scrollbar-width: thin;
-    }
 }
 
 /* Portfolio groups + tabs (narrative grouping under "Performance" / "Journal") */
@@ -1627,6 +1613,45 @@ footer {
    pf-section wrapper already gives padding. Reset any external margins on
    the trade cards inside the journal section. */
 .pf-journal .trade-card:last-child { margin-bottom: 0; }
+
+/* Pager (journal pagination) */
+.pf-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    margin-top: 0.8rem;
+    flex-wrap: wrap;
+}
+.pf-page-num, .pf-page-arrow {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    text-decoration: none;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.pf-page-num:hover, .pf-page-arrow:not(.disabled):hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+.pf-page-num.active {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+}
+.pf-page-arrow.disabled {
+    opacity: 0.3;
+    cursor: default;
+}
 
 /* --- R distribution histogram + daily-R calendar (journal page) --- */
 

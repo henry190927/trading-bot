@@ -218,7 +218,7 @@
   <h2 class="pf-section-title">
     <span class="pf-section-dot journal"></span>
     Trades
-    <span class="pf-section-meta">{{len .Trades}} total</span>
+    <span class="pf-section-meta">{{.TotalTrades}} total{{if gt .TotalPages 1}} · page {{.Page}}/{{.TotalPages}}{{end}}</span>
     <a href="/journal/new" class="pf-section-action">+ new trade</a>
   </h2>
 
@@ -271,6 +271,28 @@
   {{end}}
 
   {{end}}{{/* if .Trades */}}
+
+  {{if gt .TotalPages 1}}
+    <nav class="pf-pager" aria-label="journal pagination">
+      {{if gt .Page 1}}
+        <a class="pf-page-arrow" href="?page={{sub .Page 1}}" aria-label="previous page">‹</a>
+      {{else}}
+        <span class="pf-page-arrow disabled">‹</span>
+      {{end}}
+      {{range .PageNums}}
+        {{if eq . $.Page}}
+          <span class="pf-page-num active">{{.}}</span>
+        {{else}}
+          <a class="pf-page-num" href="?page={{.}}">{{.}}</a>
+        {{end}}
+      {{end}}
+      {{if lt .Page .TotalPages}}
+        <a class="pf-page-arrow" href="?page={{add .Page 1}}" aria-label="next page">›</a>
+      {{else}}
+        <span class="pf-page-arrow disabled">›</span>
+      {{end}}
+    </nav>
+  {{end}}
 </section>
 </div>{{/* /pf-group journal */}}
 
