@@ -35,6 +35,16 @@ type symbolView struct {
 	HVNValues []string // formatted top-5 HVNs for display
 	Err       string   // non-empty if scan failed for this symbol
 
+	// Candles is the raw candle series this scan ran on. Retained so the
+	// open-trades card can re-run validator.Validate against the open
+	// trade's specific side (not just the engine's preferred direction),
+	// without a second Klines fetch. Not used by the symbol-card template.
+	Candles []market.Candle
+	// MarkPrice is the live mark fetched alongside FundingRate. Carried
+	// separately from Signal.Price (which is overridden to the same value
+	// for display) so the open-trade re-validation can pass it through.
+	MarkPrice float64
+
 	// ClosedClose is the close of the most recently CLOSED bar — the
 	// reference the engine evaluates against. Displayed alongside the
 	// live mark price (Signal.Price) so the trader can see both at a
@@ -90,9 +100,11 @@ func (s *server) handleDashboard(c *gin.Context) {
 	})
 
 	// Build open-trade cards (live status of journal entries that haven't
-	// been closed yet). Independent of the requested TF — we always show
-	// open trades regardless of which TF the dashboard is rendering.
-	openTrades := buildOpenTradeCards(views)
+	// been closed yet). Each open trade's diagnose is computed on its OWN
+	// TF (not the dashboard's selected TF) — so a 1h trade keeps showing
+	// its 1h-context diagnose even when the user switches the dashboard
+	// to 15m or 4h.
+	openTrades := s.buildOpenTradeCards(ctx, views)
 
 	// Disable client-side caching so the meta-refresh reload actually fetches
 	// fresh data (iOS Safari otherwise serves the page from cache on the
@@ -125,11 +137,64 @@ type openTradeCard struct {
 	Diagnose    *validator.Result
 }
 
-func buildOpenTradeCards(views []symbolView) []openTradeCard {
+func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView) []openTradeCard {
 	trades, err := journal.ReadAll("")
 	if err != nil {
 		return nil
 	}
+
+	// Cache (Symbol, TF) -> symbolView so we don't double-scan when the
+	// open trade happens to be on the same TF the dashboard is rendering.
+	// Pre-populate with the dashboard's already-computed views.
+	cache := map[string]symbolView{}
+	for _, v := range dashViews {
+		cache[string(v.Symbol)+"@"+string(v.Signal.Timeframe)] = v
+	}
+
+	// Collect distinct (Symbol, TF) pairs that the dashboard scan didn't
+	// cover but open trades need. Fetch them in parallel.
+	type pair struct {
+		sym market.Symbol
+		tf  market.Timeframe
+	}
+	needed := map[string]pair{}
+	for _, t := range trades {
+		if !t.IsOpen() || t.TF == "" {
+			continue
+		}
+		sym, err := resolveWebSymbol(t.Symbol)
+		if err != nil {
+			continue
+		}
+		// t.TF can be a comma-separated list (e.g. "15m,1h"); take the first
+		// concrete TF for the diagnose lookup. Open-trade scanning a freeform
+		// composite TF would be ambiguous.
+		tfStr := t.TF
+		if i := strings.Index(tfStr, ","); i >= 0 {
+			tfStr = strings.TrimSpace(tfStr[:i])
+		}
+		key := string(sym) + "@" + tfStr
+		if _, ok := cache[key]; ok {
+			continue
+		}
+		needed[key] = pair{sym: sym, tf: market.Timeframe(tfStr)}
+	}
+	if len(needed) > 0 {
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		for k, p := range needed {
+			wg.Add(1)
+			go func(k string, p pair) {
+				defer wg.Done()
+				v := s.scanOne(ctx, p.sym, p.tf)
+				mu.Lock()
+				cache[k] = v
+				mu.Unlock()
+			}(k, p)
+		}
+		wg.Wait()
+	}
+
 	var cards []openTradeCard
 	for _, t := range trades {
 		if !t.IsOpen() {
@@ -137,17 +202,37 @@ func buildOpenTradeCards(views []symbolView) []openTradeCard {
 		}
 		card := openTradeCard{Trade: t, TimeElapsed: time.Since(t.OpenedAt)}
 
-		// Find matching symbolView for live mark + diagnose.
-		for _, v := range views {
-			if v.Short != t.Symbol {
-				continue
+		// Resolve the trade's own scan from the cache (its TF, not the
+		// dashboard's). Mark price + diagnose both come from there.
+		tfStr := t.TF
+		if i := strings.Index(tfStr, ","); i >= 0 {
+			tfStr = strings.TrimSpace(tfStr[:i])
+		}
+		if sym, err := resolveWebSymbol(t.Symbol); err == nil && tfStr != "" {
+			if v, ok := cache[string(sym)+"@"+tfStr]; ok && v.Err == "" {
+				card.MarkPrice = v.MarkPrice
+				if card.MarkPrice == 0 {
+					card.MarkPrice = v.Signal.Price
+				}
+				// Re-run validator at the TRADE's own side (not the engine's
+				// preferred side) with the trade's planned entry. This way
+				// the diagnose row answers "is MY trade still good?", not
+				// "what's the best trade on this symbol right now?".
+				if len(v.Candles) >= 60 && (t.Side == "long" || t.Side == "short") {
+					var side signal.Side
+					if t.Side == "long" {
+						side = signal.Long
+					} else {
+						side = signal.Short
+					}
+					entry := t.Entry
+					if entry == 0 {
+						entry = card.MarkPrice
+					}
+					r := validator.Validate(sym, market.Timeframe(tfStr), side, entry, 6.0, v.Candles, card.MarkPrice)
+					card.Diagnose = &r
+				}
 			}
-			card.MarkPrice = v.Signal.Price
-			// Only attach diagnose when TF matches — diagnose is TF-specific.
-			if string(v.Signal.Timeframe) == t.TF && v.Diagnose != nil {
-				card.Diagnose = v.Diagnose
-			}
-			break
 		}
 
 		// Compute R progress against the trade's own entry/stop/TPs.
@@ -214,6 +299,8 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 		LiveMarkPrice: markPrice, // engine uses for plan-validity suppression
 	})
 	v.Context = sigCtx
+	v.Candles = candles                           // retain for open-trade re-validation
+	v.MarkPrice = markPrice                       // separate from Signal.Price for downstream
 	v.ClosedClose = candles[len(candles)-1].Close // closed-bar reference (engine sees this)
 	if markPrice > 0 {
 		v.Signal.Price = markPrice // override for display only; engine math unchanged
