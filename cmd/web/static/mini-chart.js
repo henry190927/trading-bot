@@ -186,6 +186,56 @@
 
     function renderAll() { document.querySelectorAll('.mini-chart').forEach(render); }
 
+    // ─── Per-card collapse toggle ──────────────────────────────────────
+    // Each symbol card gets a tiny chevron next to the score. Click to
+    // hide/show its mini-chart. State persists per symbol in localStorage
+    // so refreshes (every 30s) don't keep popping the chart back open.
+    function hiddenKey(sym) { return 'mini-chart-hidden:' + sym; }
+    function isHidden(sym) {
+        try { return localStorage.getItem(hiddenKey(sym)) === '1'; }
+        catch (e) { return false; }
+    }
+    function setHidden(sym, v) {
+        try {
+            if (v) localStorage.setItem(hiddenKey(sym), '1');
+            else   localStorage.removeItem(hiddenKey(sym));
+        } catch (e) {}
+    }
+
+    function applyHiddenState(card, sym) {
+        var chart = card.querySelector('.mini-chart');
+        var btn   = card.querySelector('.chart-toggle');
+        if (!btn) return;
+        var hidden = isHidden(sym);
+        if (chart) chart.style.display = hidden ? 'none' : '';
+        btn.textContent = hidden ? '▸' : '▾';
+        btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+        btn.setAttribute('title', hidden ? 'show chart' : 'hide chart');
+    }
+
+    function installToggles() {
+        document.querySelectorAll('.symbol-card').forEach(function (card) {
+            var chart = card.querySelector('.mini-chart');
+            if (!chart) return;
+            var sym = chart.getAttribute('data-sym') || '';
+            var head = card.querySelector('.card-head');
+            if (!head) return;
+            if (card.querySelector('.chart-toggle')) {
+                applyHiddenState(card, sym);
+                return;
+            }
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'chart-toggle';
+            btn.addEventListener('click', function () {
+                setHidden(sym, !isHidden(sym));
+                applyHiddenState(card, sym);
+            });
+            head.appendChild(btn);
+            applyHiddenState(card, sym);
+        });
+    }
+
     function syncToggle() {
         var mode = getMode();
         document.querySelectorAll('.cs-btn').forEach(function (b) {
@@ -203,6 +253,7 @@
     });
 
     syncToggle();
+    installToggles();
     renderAll();
 
     var resizeTimer = null;
