@@ -26,7 +26,7 @@ make backtest                       # 60d 1h replay with fee model
 make backtest 30 15m                # 30d at 15m
 ```
 
-> Supported timeframes: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`. Avoid `5m` and below for real trading — backtest shows fees dominate the edge at very tight stops.
+> Supported timeframes: `1m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `1d`. Best edge per the cross-TF backtest below: **1h** (highest 60d gain) and **4h** (only TF positive on all 3 windows). Avoid `15m` and `30m` for live trading — backtest shows fee drag dominates the edge at those scales.
 
 If you prefer raw `go run`, the underlying commands are documented below.
 
@@ -581,11 +581,32 @@ After the 2026-05-27 sweep-invalidation + range-expansion-voting fixes:
 - Gold is no longer the disaster it was — sweep invalidation rehabilitated it on 1h.
 - Aggregate **+83% improvement in net R** with one fewer trade in the sample.
 
-Other timeframes (with fixes):
-- **4h, 120d**: BTC −2.79R, ETH +9.95R, XAU −1.74R, XAG +3.38R → +8.80R total. Lower signal count, lower drawdown.
-- **15m, 30d**: total −99.91R (was −115.07R baseline). 15m is too noisy for this confluence approach regardless of fixes.
+### Cross-timeframe comparison (2026-05-29 re-run)
 
-**Recommended daemon config:** 1h, min-score=2, sweep-only.
+All windows: 4 symbols, sweep-only, min-score=2, fee=6bp, ending 2026-05-29.
+
+| TF | 60d | 90d | 120d | Trades / 60d | Verdict |
+|---|---|---|---|---|---|
+| 15m (30d only) | **−99.91R** | — | — | ~570 | **Don't trade.** Fee drag + noise crush the edge regardless of fixes. |
+| 30m | −29.99 | −88.05 | −69.22 | ~590 | Net negative on every window. XAG-only research possible; XAU is a money fire. |
+| **1h** | **+20.77** | −13.31 | −1.45 | ~287 | Highest 60d gain. Degrades on longer windows but stays near break-even. |
+| 2h | +4.28 | −7.25 | −10.68 | ~130 | Near-zero edge across windows. |
+| **4h** | +9.16 | **+8.21** | **+5.20** | ~53 | **Only TF positive on all 3 windows.** Lower trade count, lower DD, slower edge accumulation. |
+
+**Two strategic choices for the daemon:**
+
+- **1h** — highest absolute return on the 60d window. Trade-count rich (good for accumulating live samples). Use this if you want more signals.
+- **4h** — robust positive across all three measurement windows. Slower (one trade per symbol per ~4 days). Use this if you want the strategy to "always be working" rather than oscillating between profitable and breakeven months.
+
+Default in this repo is **1h** because of the 60d edge and signal volume — but 4h is a defensible alternative for a less attention-hungry deployment.
+
+Per-symbol cross-TF pattern (60d):
+- **BTC**: positive only on 1h and 4h
+- **ETH**: strong on 1h (+14.98), weak elsewhere
+- **XAU**: strong on 1h (+5.41) and 4h (+4.23), bleeds heavily on 30m
+- **XAG**: positive on **every TF tested** — the most TF-robust symbol
+
+**Recommended daemon config:** `TRADING_TF=1h`, `TRADING_MIN_SCORE=2`, `sweep-only`. Consider `TRADING_TF=4h` if you want fewer alerts and more robust cross-window performance.
 
 ---
 
