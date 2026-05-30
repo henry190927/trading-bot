@@ -142,7 +142,7 @@
       {{end}}
       {{if .Signal.POCMig.POCShort}}
         <span class="poc-drift trend-{{.Signal.POCMig.Trend}}{{if .Signal.POCMig.Stacked}} stacked{{end}}"
-              title="POC50 {{fmtPrice .Signal.POCMig.POCShort}} · POC100 {{fmtPrice .Signal.POCMig.POCMed}} · POC200 {{fmtPrice .Signal.POCMig.POCLong}}{{if .Signal.POCMig.Stacked}} (stacked){{end}}">
+              title="POC migration — where the volume-weighted &#34;fair price&#34; has moved.&#10;POC50  {{fmtPrice .Signal.POCMig.POCShort}}&#10;POC100 {{fmtPrice .Signal.POCMig.POCMed}}&#10;POC200 {{fmtPrice .Signal.POCMig.POCLong}}&#10;drift = (POC50 − POC200) / POC200{{if .Signal.POCMig.Stacked}}&#10;Stacked: POC50 &gt; POC100 &gt; POC200 — strong regime confirmation{{end}}">
           drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}
         </span>
       {{end}}

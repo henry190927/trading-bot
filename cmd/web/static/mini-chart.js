@@ -36,7 +36,7 @@
     }
     function setMode(m) { try { localStorage.setItem(STORE_KEY, m); } catch (e) {} }
 
-    function drawHLine(u, y, color, dashed) {
+    function drawHLine(u, y, color, dashed, label) {
         if (!isFinite(y) || y <= 0) return;
         var yPx = u.valToPos(y, 'y', true);
         if (yPx < 0 || yPx > u.bbox.height + u.bbox.top) return;
@@ -49,6 +49,22 @@
         ctx.moveTo(u.bbox.left, yPx);
         ctx.lineTo(u.bbox.left + u.bbox.width, yPx);
         ctx.stroke();
+        // Italic label near the right edge — only emitted when the
+        // caller supplies one (i.e. the expanded modal). Small chip
+        // background so it stays readable over candles.
+        if (label) {
+            ctx.setLineDash([]);
+            ctx.font = 'italic 11px ui-monospace, monospace';
+            var padX = 5, padY = 2;
+            var tw = ctx.measureText(label).width;
+            var x = u.bbox.left + u.bbox.width - tw - padX * 2 - 4;
+            var y0 = yPx - 7 - padY;
+            ctx.fillStyle = 'rgba(13, 17, 23, 0.78)';
+            ctx.fillRect(x, y0, tw + padX * 2, 14 + padY);
+            ctx.fillStyle = color;
+            ctx.textBaseline = 'top';
+            ctx.fillText(label, x + padX, y0 + padY);
+        }
         ctx.restore();
     }
 
@@ -118,7 +134,7 @@
         ctx.restore();
     }
 
-    function buildOpts(data, mode, width, height) {
+    function buildOpts(data, mode, width, height, withLabels) {
         // Y-axis label format auto-adjusts to magnitude so big prices
         // (BTC ~100k) and small (XAG ~50) both fit cleanly.
         function fmtPrice(v) {
@@ -138,18 +154,21 @@
                 values: function (u, splits) { return splits.map(fmtPrice); },
             }
         ];
+        // Labels only in the expanded modal so the small dashboard chart
+        // stays uncluttered.
+        var lbl = withLabels ? function (s) { return s; } : function () { return null; };
         var hookDraw = function (u) {
             // VA band first so plan/mark lines render on top.
             drawVABand(u, data.val, data.vah);
-            drawHLine(u, data.val, COLORS.va, true);
-            drawHLine(u, data.vah, COLORS.va, true);
-            drawHLine(u, data.poc, COLORS.poc, false);
-            drawHLine(u, data.mark, COLORS.mark, true);
+            drawHLine(u, data.val,  COLORS.va,    true,  lbl('VAL'));
+            drawHLine(u, data.vah,  COLORS.va,    true,  lbl('VAH'));
+            drawHLine(u, data.poc,  COLORS.poc,   false, lbl('POC'));
+            drawHLine(u, data.mark, COLORS.mark,  true,  lbl('mark'));
             if (data.entry > 0) {
-                drawHLine(u, data.entry, COLORS.entry, false);
-                drawHLine(u, data.stop,  COLORS.stop,  false);
-                if (data.tp1 > 0) drawHLine(u, data.tp1, COLORS.tp, false);
-                if (data.tp2 > 0) drawHLine(u, data.tp2, COLORS.tp, false);
+                drawHLine(u, data.entry, COLORS.entry, false, lbl('entry'));
+                drawHLine(u, data.stop,  COLORS.stop,  false, lbl('stop'));
+                if (data.tp1 > 0) drawHLine(u, data.tp1, COLORS.tp, false, lbl('TP1'));
+                if (data.tp2 > 0) drawHLine(u, data.tp2, COLORS.tp, false, lbl('TP2'));
             }
         };
         var cursor = {
@@ -298,7 +317,7 @@
         }
         var width  = host.clientWidth  || Math.min(window.innerWidth - 60, 1140);
         var height = host.clientHeight || Math.min(Math.round(window.innerHeight * 0.86), 940);
-        var opts = buildOpts(data, mode, width, height);
+        var opts = buildOpts(data, mode, width, height, true /* labels */);
         modalChart = new uPlot(opts, dataArrFor(data, mode), host);
     }
 

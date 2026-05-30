@@ -78,6 +78,16 @@ body {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
+/* In the tf-bar, the timestamp is absolute-positioned so the tf-picker
+   centers within the FULL bar width instead of being pushed left by
+   the timestamp on the right. */
+.tf-bar { position: relative; }
+.tf-bar .updated {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
 
 main {
     max-width: 720px;
