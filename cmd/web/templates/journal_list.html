@@ -154,14 +154,18 @@
           {{range .}}
             {{if .IsZero}}
               <div class="cal2-cell empty {{if .IsToday}}today{{end}}" title="{{if .Day}}{{.Date.Format "Mon, Jan 2"}}{{end}} — no trades closed">
-                <span class="cal2-day">{{if .Day}}{{.Day}}{{end}}</span>
+                <div class="cal2-inner">
+                  <span class="cal2-day">{{if .Day}}{{.Day}}{{end}}</span>
+                </div>
               </div>
             {{else}}
               <div class="cal2-cell {{if .IsPos}}pos{{else}}neg{{end}} {{if .IsToday}}today{{end}}"
                    style="--intensity: {{printf "%.0f" .Intensity}}%"
                    title="{{.Date.Format "Mon, Jan 2"}} — {{.Count}} trade{{if ne .Count 1}}s{{end}}, {{fmtR .TotalR}}R">
-                <span class="cal2-day">{{.Day}}</span>
-                <span class="cal2-r">{{fmtR .TotalR}}</span>
+                <div class="cal2-inner">
+                  <span class="cal2-day">{{.Day}}</span>
+                  <span class="cal2-r">{{fmtR .TotalR}}</span>
+                </div>
               </div>
             {{end}}
           {{end}}
