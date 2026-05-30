@@ -77,6 +77,13 @@
           <span class="{{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
           <strong>{{printf "%.1f" .Diagnose.Total}}/10</strong>
           {{verdictShort .Diagnose.Verdict}}
+          {{if .Diagnose.AtVAH}}<span class="ot-flag va">at VAH</span>
+          {{else if .Diagnose.AtVAL}}<span class="ot-flag va">at VAL</span>
+          {{else if .Diagnose.OutsideVAUp}}<span class="ot-flag va-out">above VA</span>
+          {{else if .Diagnose.OutsideVADn}}<span class="ot-flag va-out">below VA</span>
+          {{else if .Diagnose.InsideVA}}<span class="ot-flag va-in">inside VA</span>{{end}}
+          {{if isPOCRising .Diagnose.POCMig.Trend}}<span class="ot-flag poc-rising">POC ↗</span>
+          {{else if isPOCFalling .Diagnose.POCMig.Trend}}<span class="ot-flag poc-falling">POC ↘</span>{{end}}
           {{if .Diagnose.RecentFlashBarBearish}}<span class="ot-flag knife">⚠ falling knife</span>{{end}}
           {{if .Diagnose.RecentFlashBarBullish}}<span class="ot-flag squeeze">⚠ blow-off risk</span>{{end}}
         </div>
@@ -133,7 +140,22 @@
       {{if .Signal.VP.POC}}
         <span>POC <button class="copy-btn small" data-copy="{{fmtPrice .Signal.VP.POC}}">{{fmtPrice .Signal.VP.POC}}</button></span>
       {{end}}
+      {{if .Signal.POCMig.POCShort}}
+        <span class="poc-drift trend-{{.Signal.POCMig.Trend}}{{if .Signal.POCMig.Stacked}} stacked{{end}}"
+              title="POC50 {{fmtPrice .Signal.POCMig.POCShort}} · POC100 {{fmtPrice .Signal.POCMig.POCMed}} · POC200 {{fmtPrice .Signal.POCMig.POCLong}}{{if .Signal.POCMig.Stacked}} (stacked){{end}}">
+          drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}
+        </span>
+      {{end}}
     </div>
+
+    {{if and .Signal.VP.VAL .Signal.VP.VAH}}
+      <div class="va-row" title="Value Area: {{printf "%.0f" (mulPct .Signal.VP.VAPercent)}}% of volume between VAL and VAH">
+        <span class="label">VA</span>
+        <button class="copy-btn small va-edge" data-copy="{{fmtPrice .Signal.VP.VAL}}">{{fmtPrice .Signal.VP.VAL}}</button>
+        <span class="va-sep">↔</span>
+        <button class="copy-btn small va-edge" data-copy="{{fmtPrice .Signal.VP.VAH}}">{{fmtPrice .Signal.VP.VAH}}</button>
+      </div>
+    {{end}}
 
     {{if .HVNValues}}
       <div class="hvn-row">
@@ -151,6 +173,13 @@
       <span class="diag-score">{{printf "%.1f" .Diagnose.Total}}/10</span>
       <span class="diag-verdict">{{verdictShort .Diagnose.Verdict}}</span>
       <a class="diag-link" href="{{diagnoseHref . $.TF}}" title="full validator breakdown">↗</a>
+      {{if .Diagnose.AtVAH}}<span class="diag-flag va">at VAH</span>
+      {{else if .Diagnose.AtVAL}}<span class="diag-flag va">at VAL</span>
+      {{else if .Diagnose.OutsideVAUp}}<span class="diag-flag va-out">above VA</span>
+      {{else if .Diagnose.OutsideVADn}}<span class="diag-flag va-out">below VA</span>
+      {{else if .Diagnose.InsideVA}}<span class="diag-flag va-in">inside VA</span>{{end}}
+      {{if isPOCRising .Diagnose.POCMig.Trend}}<span class="diag-flag poc-rising">POC ↗</span>
+      {{else if isPOCFalling .Diagnose.POCMig.Trend}}<span class="diag-flag poc-falling">POC ↘</span>{{end}}
       {{if .Diagnose.RecentFlashBarBearish}}<span class="diag-flag knife">⚠ falling knife ({{.Diagnose.RecentFlashBarAge}} bar ago)</span>{{end}}
       {{if .Diagnose.RecentFlashBarBullish}}<span class="diag-flag squeeze">⚠ blow-off risk ({{.Diagnose.RecentFlashBarAge}} bar ago)</span>{{end}}
     </div>

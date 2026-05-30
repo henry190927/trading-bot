@@ -21,6 +21,9 @@
         stop:   '#f87171',
         tp:     '#4ade80',
         mark:   '#fbbf24',
+        poc:    'rgba(192, 132, 252, 0.75)',  // soft purple — POC
+        va:     'rgba(192, 132, 252, 0.35)',  // faint purple — VAH/VAL edges
+        vaFill: 'rgba(192, 132, 252, 0.06)',  // very faint purple band fill
         grid:   'rgba(139, 148, 158, 0.10)',
         axis:   '#8b949e',
     };
@@ -90,7 +93,8 @@
                 if (data.l[i] < lo) lo = data.l[i];
                 if (data.h[i] > hi) hi = data.h[i];
             }
-            [data.entry, data.stop, data.tp1, data.tp2, data.mark].forEach(function (v) {
+            [data.entry, data.stop, data.tp1, data.tp2, data.mark,
+             data.poc, data.vah, data.val].forEach(function (v) {
                 if (isFinite(v) && v > 0) {
                     if (v < lo) lo = v;
                     if (v > hi) hi = v;
@@ -99,6 +103,19 @@
             var pad = (hi - lo) * 0.05 || 1;
             return [lo - pad, hi + pad];
         };
+    }
+
+    // Faint horizontal band fill between VAH and VAL.
+    function drawVABand(u, val, vah) {
+        if (!(val > 0 && vah > 0 && vah > val)) return;
+        var yTop = u.valToPos(vah, 'y', true);
+        var yBot = u.valToPos(val, 'y', true);
+        if (yTop > yBot) { var t = yTop; yTop = yBot; yBot = t; }
+        var ctx = u.ctx;
+        ctx.save();
+        ctx.fillStyle = COLORS.vaFill;
+        ctx.fillRect(u.bbox.left, yTop, u.bbox.width, yBot - yTop);
+        ctx.restore();
     }
 
     function buildOpts(data, mode, width, height) {
@@ -113,6 +130,11 @@
             }
         ];
         var hookDraw = function (u) {
+            // VA band first so plan/mark lines render on top.
+            drawVABand(u, data.val, data.vah);
+            drawHLine(u, data.val, COLORS.va, true);
+            drawHLine(u, data.vah, COLORS.va, true);
+            drawHLine(u, data.poc, COLORS.poc, false);
             drawHLine(u, data.mark, COLORS.mark, true);
             if (data.entry > 0) {
                 drawHLine(u, data.entry, COLORS.entry, false);

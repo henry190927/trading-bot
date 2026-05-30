@@ -39,6 +39,7 @@ type Signal struct {
 	Price     float64
 	Fib       indicator.FibRetracement
 	VP        indicator.VolumeProfile // chip-concentration map (籌碼密集區)
+	POCMig    indicator.POCMigration  // POC drift across 50/100/200 windows (display + validator only)
 	Opens     Opens                   // daily / weekly / monthly opening prices (display-only)
 	Plan      Plan                    // execution plan (entry/stop/TP)
 }
@@ -116,6 +117,7 @@ func Evaluate(in Inputs) Signal {
 		vpStart = 0
 	}
 	vp := indicator.BuildVolumeProfile(in.Candles[vpStart:], 80, 5)
+	pocMig := indicator.ComputePOCMigration(in.Candles, 50, 100, 200)
 	opens := ComputeOpens(in.Candles, in.Candles[len(in.Candles)-1].OpenTime)
 
 	var cvdDiv analyzer.Divergence
@@ -124,7 +126,7 @@ func Evaluate(in Inputs) Signal {
 		cvdDiv = analyzer.Detect(closes, cvd, 60, 2)
 	}
 
-	sig := Signal{Symbol: in.Symbol, Timeframe: in.Timeframe, Price: price, Fib: fib, VP: vp, Opens: opens}
+	sig := Signal{Symbol: in.Symbol, Timeframe: in.Timeframe, Price: price, Fib: fib, VP: vp, POCMig: pocMig, Opens: opens}
 	bullVotes, bearVotes := 0, 0
 
 	if rsi[last] < 30 {

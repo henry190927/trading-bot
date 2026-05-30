@@ -27,13 +27,20 @@ type VolumeBin struct {
 // VolumeProfile is the chip-concentration map (籌碼密集區) — accumulated traded
 // volume binned by price level over a lookback window. The POC is the single
 // price with the most volume; HVNs are the top-N volume bins, treated as
-// strong S/R levels.
+// strong S/R levels. VAH/VAL bracket the "value area" — the contiguous span
+// around POC containing VAPercent of total volume (default 70%). Price
+// behavior differs systematically inside vs outside VA: inside = mean-rev
+// to POC, at edges = high-probability reversal candidates, outside =
+// acceptance / trend mode.
 type VolumeProfile struct {
-	Bins     []VolumeBin
-	POC      float64   // price of point of control
-	HVN      []float64 // top-N HVN price midpoints, sorted by volume desc
-	PriceMin float64
-	PriceMax float64
+	Bins      []VolumeBin
+	POC       float64   // price of point of control
+	HVN       []float64 // top-N HVN price midpoints, sorted by volume desc
+	VAH       float64   // value area high (upper edge of 70% volume zone)
+	VAL       float64   // value area low (lower edge of 70% volume zone)
+	VAPercent float64   // fraction of volume captured by [VAL, VAH], e.g. 0.70
+	PriceMin  float64
+	PriceMax  float64
 }
 
 // BuildVolumeProfile distributes each candle's volume uniformly across its
@@ -164,6 +171,45 @@ func BuildVolumeProfile(candles []market.Candle, bins, topN int) VolumeProfile {
 	}
 	vp.POC = vp.Bins[pocIdx].PriceMid
 
+	// Value Area: contiguous range around POC capturing ~70% of total volume.
+	// Standard algo (Steidlmayer market profile): start at POC, expand by
+	// adding whichever neighbor side has more volume each step, until the
+	// running sum crosses the target. VAL = low edge of leftmost included
+	// bin, VAH = high edge of rightmost included bin.
+	const vaTargetFrac = 0.70
+	var totalVol float64
+	for _, v := range binVol {
+		totalVol += v
+	}
+	if totalVol > 0 {
+		target := totalVol * vaTargetFrac
+		left, right := pocIdx, pocIdx
+		covered := binVol[pocIdx]
+		for covered < target && (left > 0 || right < bins-1) {
+			var lv, rv float64
+			if left > 0 {
+				lv = binVol[left-1]
+			}
+			if right < bins-1 {
+				rv = binVol[right+1]
+			}
+			// Tie-breaker: prefer expanding upward (right) — slight bias
+			// matches how acceptance forms in trending markets.
+			if rv >= lv && right < bins-1 {
+				right++
+				covered += rv
+			} else if left > 0 {
+				left--
+				covered += lv
+			} else {
+				break
+			}
+		}
+		vp.VAL = vp.Bins[left].PriceLow
+		vp.VAH = vp.Bins[right].PriceHigh
+		vp.VAPercent = covered / totalVol
+	}
+
 	// Pick top-N HVNs, but require non-adjacent (skip neighbours of already-
 	// selected bins) to avoid clustering all picks around one peak.
 	type bv struct {
@@ -188,6 +234,87 @@ func BuildVolumeProfile(candles []market.Candle, bins, topN int) VolumeProfile {
 		taken[x.i] = true
 	}
 	return vp
+}
+
+// POCTrend classifies whether volume-weighted equilibrium is migrating
+// upward, downward, or flat across nested lookback windows.
+type POCTrend int
+
+const (
+	POCFlat POCTrend = iota
+	POCRising
+	POCFalling
+)
+
+func (t POCTrend) String() string {
+	switch t {
+	case POCRising:
+		return "rising"
+	case POCFalling:
+		return "falling"
+	default:
+		return "flat"
+	}
+}
+
+// POCMigration tracks POC across short / medium / long windows so the
+// validator can read regime — trending vs ranging — from a volume-weighted
+// reference rather than a price-only filter (SMA, ADX). The drift fraction
+// is (POC_short − POC_long) / POC_long; magnitude < ~0.005 → flat.
+type POCMigration struct {
+	POCShort  float64 // typically last 50 bars
+	POCMed    float64 // last 100 bars
+	POCLong   float64 // last 200 bars
+	DriftPct  float64 // (POCShort - POCLong) / POCLong; sign = direction
+	Trend     POCTrend
+	Stacked   bool // strict POCShort > POCMed > POCLong (or reverse for falling)
+}
+
+// ComputePOCMigration runs three nested BuildVolumeProfile passes and
+// classifies the stack. Requires at least `long` candles; if fewer are
+// available it uses what it can and degrades gracefully (zero values).
+//
+// Threshold for "flat" is 0.5% drift across the full window — enough to
+// shrug off micro-noise on 1h+ TFs without missing genuine regime shifts.
+func ComputePOCMigration(candles []market.Candle, short, med, long int) POCMigration {
+	var m POCMigration
+	if len(candles) < short || short <= 0 || med <= 0 || long <= 0 {
+		return m
+	}
+	pocFor := func(n int) float64 {
+		if len(candles) < n {
+			return 0
+		}
+		vp := BuildVolumeProfile(candles[len(candles)-n:], 80, 1)
+		return vp.POC
+	}
+	m.POCShort = pocFor(short)
+	m.POCMed = pocFor(med)
+	m.POCLong = pocFor(long)
+	if m.POCLong == 0 || m.POCShort == 0 {
+		return m
+	}
+	m.DriftPct = (m.POCShort - m.POCLong) / m.POCLong
+	const flatBand = 0.005
+	switch {
+	case m.DriftPct > flatBand:
+		m.Trend = POCRising
+	case m.DriftPct < -flatBand:
+		m.Trend = POCFalling
+	default:
+		m.Trend = POCFlat
+	}
+	// Strict stack adds confirmation strength; some validators may want
+	// it as a separate confidence dial.
+	if m.POCMed > 0 {
+		switch m.Trend {
+		case POCRising:
+			m.Stacked = m.POCShort > m.POCMed && m.POCMed > m.POCLong
+		case POCFalling:
+			m.Stacked = m.POCShort < m.POCMed && m.POCMed < m.POCLong
+		}
+	}
+	return m
 }
 
 // NearestHVN returns the HVN closest to `price` along with its index in HVN.

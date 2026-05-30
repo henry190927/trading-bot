@@ -17,6 +17,7 @@ import (
 
 	"myFirstGo/trading-bot/analyzer"
 	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/journal"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/signal"
@@ -300,6 +301,9 @@ func buildChartJSON(v symbolView) template.JS {
 		TP1   float64   `json:"tp1"`
 		TP2   float64   `json:"tp2"`
 		Mark  float64   `json:"mark"` // live mark price
+		POC   float64   `json:"poc"`
+		VAH   float64   `json:"vah"`
+		VAL   float64   `json:"val"`
 	}
 	p := payload{
 		T:    make([]int64, len(cs)),
@@ -308,6 +312,9 @@ func buildChartJSON(v symbolView) template.JS {
 		L:    make([]float64, len(cs)),
 		C:    make([]float64, len(cs)),
 		Mark: v.MarkPrice,
+		POC:  v.Signal.VP.POC,
+		VAH:  v.Signal.VP.VAH,
+		VAL:  v.Signal.VP.VAL,
 	}
 	for i, c := range cs {
 		p.T[i] = c.CloseTime.Unix()
@@ -1362,6 +1369,19 @@ func templateFuncs() template.FuncMap {
 		"fmtPct": func(v float64) string {
 			return fmt.Sprintf("%+.4f%%", v*100)
 		},
+		"mulPct": func(v float64) float64 { return v * 100 },
+		"driftArrow": func(t indicator.POCTrend) string {
+			switch t {
+			case indicator.POCRising:
+				return "↗"
+			case indicator.POCFalling:
+				return "↘"
+			default:
+				return "→"
+			}
+		},
+		"isPOCRising":  func(t indicator.POCTrend) bool { return t == indicator.POCRising },
+		"isPOCFalling": func(t indicator.POCTrend) bool { return t == indicator.POCFalling },
 		"fmtOI": func(v float64) string {
 			if v >= 1e9 {
 				return fmt.Sprintf("%.2fB", v/1e9)

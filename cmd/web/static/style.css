@@ -154,16 +154,24 @@ main {
     margin-left: 0.25rem;
 }
 
-.hvn-row {
+.hvn-row, .va-row {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
     margin: 0.5rem 0;
 }
-.hvn-row .label {
+.hvn-row .label, .va-row .label {
     color: var(--text-dim);
     font-size: 0.85rem;
+}
+.va-row .va-sep {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+.va-row .va-edge {
+    border-color: rgba(192, 132, 252, 0.5);  /* match chart VA color */
+    color: #c084fc;
 }
 .hvn-row .label {
     font-size: 0.8rem;
@@ -2078,6 +2086,47 @@ footer {
     color: var(--yellow);
     border: 1px solid var(--yellow);
 }
+.ot-flag.va, .diag-flag.va {
+    background: rgba(192, 132, 252, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(192, 132, 252, 0.55);
+}
+.ot-flag.va-in, .diag-flag.va-in {
+    background: rgba(139, 148, 158, 0.12);
+    color: var(--text-dim);
+    border: 1px solid rgba(139, 148, 158, 0.35);
+}
+.ot-flag.va-out, .diag-flag.va-out {
+    background: rgba(192, 132, 252, 0.08);
+    color: #c084fc;
+    border: 1px dashed rgba(192, 132, 252, 0.55);
+}
+.ot-flag.poc-rising, .diag-flag.poc-rising {
+    background: rgba(74, 222, 128, 0.12);
+    color: var(--green);
+    border: 1px solid rgba(74, 222, 128, 0.55);
+}
+.ot-flag.poc-falling, .diag-flag.poc-falling {
+    background: rgba(248, 113, 113, 0.12);
+    color: var(--red);
+    border: 1px solid rgba(248, 113, 113, 0.55);
+}
+
+/* POC-drift chip in the symbol-card meta row. Color follows trend
+   direction; bolder border when stacked (POC50>POC100>POC200). */
+.poc-drift {
+    font-size: 0.78rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.poc-drift.trend-rising  { color: var(--green); border-color: rgba(74, 222, 128, 0.4); }
+.poc-drift.trend-falling { color: var(--red);   border-color: rgba(248, 113, 113, 0.4); }
+.poc-drift.stacked       { font-weight: 700; }
 
 .ot-actions {
     display: flex;

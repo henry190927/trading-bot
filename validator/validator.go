@@ -48,6 +48,19 @@ type Result struct {
 	HVNsAbove      int
 	HVNsBelow      int
 
+	// Value-area position. Stage A surfaces these for the diagnose row
+	// but keeps weights modest — no engine vote yet.
+	VAH         float64 // value area high
+	VAL         float64 // value area low
+	InsideVA    bool    // entry within [VAL, VAH]
+	AtVAH       bool    // entry within 0.3% of VAH
+	AtVAL       bool    // entry within 0.3% of VAL
+	OutsideVAUp bool    // entry > VAH (above value)
+	OutsideVADn bool    // entry < VAL (below value)
+
+	// POC migration across nested windows — regime classifier. Stage A.
+	POCMig indicator.POCMigration
+
 	SuggStop float64
 	SuggTP1  float64
 	SuggTP2  float64
@@ -118,6 +131,7 @@ func Validate(sym market.Symbol, tf market.Timeframe, side signal.Side, entry, f
 		Reasons:     sig.Reasons,
 		Notes:       sig.Notes,
 		VP:          sig.VP,
+		POCMig:      sig.POCMig,
 		ATR:         a,
 		BollLower:   b.Lower,
 		BollUpper:   b.Upper,
@@ -161,6 +175,23 @@ func Validate(sym market.Symbol, tf market.Timeframe, side signal.Side, entry, f
 			} else if h < entry {
 				r.HVNsBelow++
 			}
+		}
+	}
+
+	// Value area position. 0.3% tolerance for "at edge" is roughly half an
+	// ATR for liquid crypto pairs / a few ticks for XAU/XAG.
+	if r.VP.VAH > 0 && r.VP.VAL > 0 {
+		r.VAH = r.VP.VAH
+		r.VAL = r.VP.VAL
+		const edgeTol = 0.003
+		if entry > 0 {
+			distVAH := math.Abs(entry-r.VAH) / entry
+			distVAL := math.Abs(entry-r.VAL) / entry
+			r.AtVAH = distVAH <= edgeTol
+			r.AtVAL = distVAL <= edgeTol
+			r.InsideVA = entry >= r.VAL && entry <= r.VAH
+			r.OutsideVAUp = entry > r.VAH
+			r.OutsideVADn = entry < r.VAL
 		}
 	}
 
@@ -327,6 +358,104 @@ func scoreFactors(r *Result) []Factor {
 				-0.5,
 				fmt.Sprintf("POC %.4f is %.2f%% %s entry — %s is pushing away from gravity",
 					r.VP.POC, absDist, sideOf(r.VP.POC, r.Entry), r.Side)})
+		}
+	}
+
+	// Value-area position. Stage A weights are intentionally modest
+	// (±0.5 range) — display-leaning, not yet a strong directional vote.
+	// Engine-level vote on these is Stage B and requires a backtest A/B.
+	if r.VAH > 0 && r.VAL > 0 {
+		switch {
+		case r.AtVAL && r.Side == signal.Long:
+			fs = append(fs, Factor{"entry at VAL — mean-rev long",
+				+0.5,
+				fmt.Sprintf("VAL %.4f acts as value-area floor; POC %.4f is the natural target", r.VAL, r.VP.POC)})
+		case r.AtVAH && r.Side == signal.Short:
+			fs = append(fs, Factor{"entry at VAH — mean-rev short",
+				+0.5,
+				fmt.Sprintf("VAH %.4f acts as value-area ceiling; POC %.4f is the natural target", r.VAH, r.VP.POC)})
+		case r.AtVAL && r.Side == signal.Short:
+			fs = append(fs, Factor{"entry at VAL fighting value-area floor",
+				-0.5,
+				fmt.Sprintf("VAL %.4f is buyers' value edge — shorting into it is low-edge", r.VAL)})
+		case r.AtVAH && r.Side == signal.Long:
+			fs = append(fs, Factor{"entry at VAH fighting value-area ceiling",
+				-0.5,
+				fmt.Sprintf("VAH %.4f is sellers' value edge — longing into it is low-edge", r.VAH)})
+		case r.OutsideVAUp:
+			// Above value: trend mode (acceptance) candidate or fade-the-extension.
+			if r.Side == signal.Short {
+				fs = append(fs, Factor{"entry above VAH — extension short",
+					+0.3,
+					fmt.Sprintf("entry %.4f > VAH %.4f — price has rejected value; reversion candidate", r.Entry, r.VAH)})
+			} else {
+				fs = append(fs, Factor{"entry above VAH — chasing trend",
+					-0.3,
+					fmt.Sprintf("entry %.4f > VAH %.4f — late long into extension", r.Entry, r.VAH)})
+			}
+		case r.OutsideVADn:
+			if r.Side == signal.Long {
+				fs = append(fs, Factor{"entry below VAL — extension long",
+					+0.3,
+					fmt.Sprintf("entry %.4f < VAL %.4f — price has rejected value; reversion candidate", r.Entry, r.VAL)})
+			} else {
+				fs = append(fs, Factor{"entry below VAL — chasing trend",
+					-0.3,
+					fmt.Sprintf("entry %.4f < VAL %.4f — late short into extension", r.Entry, r.VAL)})
+			}
+		case r.InsideVA:
+			// Inside VA without being at an edge = chop / equilibrium.
+			fs = append(fs, Factor{"entry inside VA — chop zone",
+				-0.3,
+				fmt.Sprintf("entry %.4f within [VAL %.4f, VAH %.4f] — limited edge, mean-rev to POC", r.Entry, r.VAL, r.VAH)})
+		}
+	}
+
+	// POC migration regime factor. Four-state matrix based on (price vs
+	// POC_short) × (drift direction). Weights bumped slightly for the
+	// "best mean-rev" setup (pullback to POC in a confirmed regime).
+	if r.POCMig.Trend != indicator.POCFlat && r.POCMig.POCShort > 0 {
+		driftPct := r.POCMig.DriftPct * 100
+		priceAbovePOC := r.Entry > r.POCMig.POCShort
+		switch r.POCMig.Trend {
+		case indicator.POCRising:
+			switch {
+			case r.Side == signal.Long && !priceAbovePOC:
+				fs = append(fs, Factor{"pullback long in rising POC regime",
+					+0.7,
+					fmt.Sprintf("POC drift %+.2f%% (rising), entry below POC %.4f — classic mean-rev long", driftPct, r.POCMig.POCShort)})
+			case r.Side == signal.Long && priceAbovePOC:
+				fs = append(fs, Factor{"trend-follow long with rising POC",
+					+0.5,
+					fmt.Sprintf("POC drift %+.2f%%, entry above POC %.4f — trend-aligned", driftPct, r.POCMig.POCShort)})
+			case r.Side == signal.Short && priceAbovePOC:
+				fs = append(fs, Factor{"short fighting rising POC regime",
+					-0.5,
+					fmt.Sprintf("POC drift %+.2f%% (rising), entry above POC — counter-trend short", driftPct)})
+			case r.Side == signal.Short && !priceAbovePOC:
+				fs = append(fs, Factor{"short below POC in rising regime",
+					-0.7,
+					fmt.Sprintf("POC drift %+.2f%% (rising), entry below POC %.4f — catching a falling knife in an uptrend", driftPct, r.POCMig.POCShort)})
+			}
+		case indicator.POCFalling:
+			switch {
+			case r.Side == signal.Short && priceAbovePOC:
+				fs = append(fs, Factor{"bounce short in falling POC regime",
+					+0.7,
+					fmt.Sprintf("POC drift %+.2f%% (falling), entry above POC %.4f — classic mean-rev short", driftPct, r.POCMig.POCShort)})
+			case r.Side == signal.Short && !priceAbovePOC:
+				fs = append(fs, Factor{"trend-follow short with falling POC",
+					+0.5,
+					fmt.Sprintf("POC drift %+.2f%%, entry below POC %.4f — trend-aligned", driftPct, r.POCMig.POCShort)})
+			case r.Side == signal.Long && !priceAbovePOC:
+				fs = append(fs, Factor{"long fighting falling POC regime",
+					-0.5,
+					fmt.Sprintf("POC drift %+.2f%% (falling), entry below POC — counter-trend long", driftPct)})
+			case r.Side == signal.Long && priceAbovePOC:
+				fs = append(fs, Factor{"long above POC in falling regime",
+					-0.7,
+					fmt.Sprintf("POC drift %+.2f%% (falling), entry above POC %.4f — chasing a bounce in a downtrend", driftPct, r.POCMig.POCShort)})
+			}
 		}
 	}
 
