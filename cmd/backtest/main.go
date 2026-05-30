@@ -12,6 +12,7 @@ import (
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/dxy"
+	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/signal"
 )
@@ -28,12 +29,14 @@ func main() {
 	sweepOnly := flag.Bool("sweep-only", false, "skip trades whose entry isn't anchored to a liquidity sweep")
 	stopRefine := flag.Bool("stop-refine", false, "enable widening stops past obstacles (HVN/equal levels). default off — backtest shows it hurts net R within 24-bar hold")
 	useDXY := flag.Bool("dxy", false, "enable DXY macro veto on XAU/XAG signals. Default OFF — 2026-05-27 backtest showed it hurt by ~46R (vetoed trades were the best ones; mean-reversion thrives on macro-divergent dips)")
+	bodyWeight := flag.Float64("body-weight", 0, "POC/HVN body-weighted distribution: fraction (0,1) of each candle's volume routed to its body range. Default 0 = legacy uniform-over-HL. Try 0.7 to damp wick-hunt distortion during whipsaw.")
 	verbose := flag.Bool("v", false, "print every trade")
 	flag.Parse()
 
 	if *stopRefine {
 		signal.StopRefineEnabled = true
 	}
+	indicator.BodyWeight = *bodyWeight
 
 	timeframe := market.Timeframe(*tf)
 	biasTF := signal.DefaultBiasTF(timeframe)

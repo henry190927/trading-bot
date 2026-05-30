@@ -8,6 +8,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
@@ -19,6 +20,7 @@ import (
 
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/indicator"
 )
 
 //go:embed templates/*.html static
@@ -30,6 +32,19 @@ func main() {
 	bind := os.Getenv("WEB_BIND")
 	if bind == "" {
 		bind = ":8080"
+	}
+
+	// VOL_PROFILE_BODY_WEIGHT (e.g. "0.7") routes that fraction of each
+	// candle's volume into its body range when building POC/HVN. Default
+	// empty/0 = legacy uniform-over-HL. Surfaced as env var for live A/B
+	// since the backtest can't measure it (POC/HVN don't drive trade
+	// decisions, only the dashboard's diagnose row).
+	if v := os.Getenv("VOL_PROFILE_BODY_WEIGHT"); v != "" {
+		var bw float64
+		if _, err := fmt.Sscanf(v, "%f", &bw); err == nil && bw > 0 && bw < 1 {
+			indicator.BodyWeight = bw
+			log.Printf("volume profile body-weighting enabled: %.2f", bw)
+		}
 	}
 
 	gin.SetMode(gin.ReleaseMode)

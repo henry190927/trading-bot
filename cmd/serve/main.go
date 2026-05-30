@@ -14,6 +14,7 @@ import (
 
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/notify"
 	sig "myFirstGo/trading-bot/signal"
@@ -36,6 +37,15 @@ func main() {
 
 	if *stopRefine {
 		sig.StopRefineEnabled = true
+	}
+
+	// VOL_PROFILE_BODY_WEIGHT (e.g. "0.7") — see cmd/web/main.go.
+	if v := os.Getenv("VOL_PROFILE_BODY_WEIGHT"); v != "" {
+		var bw float64
+		if _, err := fmt.Sscanf(v, "%f", &bw); err == nil && bw > 0 && bw < 1 {
+			indicator.BodyWeight = bw
+			log.Printf("volume profile body-weighting enabled: %.2f", bw)
+		}
 	}
 
 	timeframe := market.Timeframe(*tf)

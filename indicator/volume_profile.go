@@ -6,6 +6,16 @@ import (
 	"myFirstGo/trading-bot/market"
 )
 
+// BodyWeight, if in (0,1), routes that fraction of each candle's volume into
+// its body range [min(O,C), max(O,C)] and the remainder across the wicks
+// proportional to wick length. Default 0 = legacy uniform-over-HL.
+//
+// Set by callers (e.g. the backtest CLI's --body-weight flag) before running
+// Evaluate. The variable is package-level rather than a parameter because the
+// volume profile is rebuilt deep inside signal.Evaluate and threading the
+// option through every call site would be noisy for a prototype.
+var BodyWeight float64
+
 // VolumeBin is one slice of the volume profile.
 type VolumeBin struct {
 	PriceLow  float64
@@ -50,25 +60,85 @@ func BuildVolumeProfile(candles []market.Candle, bins, topN int) VolumeProfile {
 	binWidth := (maxP - minP) / float64(bins)
 	binVol := make([]float64, bins)
 
+	addToBins := func(lo, hi, vol float64) {
+		if vol <= 0 {
+			return
+		}
+		sb := int((lo - minP) / binWidth)
+		eb := int((hi - minP) / binWidth)
+		if sb < 0 {
+			sb = 0
+		}
+		if eb >= bins {
+			eb = bins - 1
+		}
+		if eb < sb {
+			eb = sb
+		}
+		n := eb - sb + 1
+		perBin := vol / float64(n)
+		for i := sb; i <= eb; i++ {
+			binVol[i] += perBin
+		}
+	}
+
+	bw := BodyWeight
+	if bw < 0 || bw >= 1 {
+		bw = 0 // out-of-range → legacy uniform path
+	}
+
 	for _, c := range candles {
 		if c.Volume <= 0 || c.High <= c.Low {
 			continue
 		}
-		startBin := int((c.Low - minP) / binWidth)
-		endBin := int((c.High - minP) / binWidth)
-		if startBin < 0 {
-			startBin = 0
+		if bw == 0 {
+			addToBins(c.Low, c.High, c.Volume)
+			continue
 		}
-		if endBin >= bins {
-			endBin = bins - 1
+		// Body-weighted: bw of volume goes to [bodyLo, bodyHi]; the rest
+		// is split between the upper and lower wicks proportional to
+		// wick length. Damps wick-hunt distortion of POC/HVN.
+		bodyLo, bodyHi := c.Open, c.Close
+		if bodyHi < bodyLo {
+			bodyLo, bodyHi = bodyHi, bodyLo
 		}
-		nBins := endBin - startBin + 1
-		if nBins < 1 {
-			nBins = 1
+		bodyVol := c.Volume * bw
+		wickVol := c.Volume * (1 - bw)
+		if bodyHi > bodyLo {
+			addToBins(bodyLo, bodyHi, bodyVol)
+		} else {
+			// doji body — collapse to single bin at that price
+			b := int((bodyLo - minP) / binWidth)
+			if b < 0 {
+				b = 0
+			}
+			if b >= bins {
+				b = bins - 1
+			}
+			binVol[b] += bodyVol
 		}
-		perBin := c.Volume / float64(nBins)
-		for i := startBin; i <= endBin; i++ {
-			binVol[i] += perBin
+		upper := c.High - bodyHi
+		lower := bodyLo - c.Low
+		totalWick := upper + lower
+		if totalWick > 0 {
+			if upper > 0 {
+				addToBins(bodyHi, c.High, wickVol*(upper/totalWick))
+			}
+			if lower > 0 {
+				addToBins(c.Low, bodyLo, wickVol*(lower/totalWick))
+			}
+		} else if bodyHi > bodyLo {
+			// No wicks at all (rare): fold wickVol into body uniformly.
+			addToBins(bodyLo, bodyHi, wickVol)
+		} else {
+			b := int((bodyLo - minP) / binWidth)
+			if b < 0 {
+				b = 0
+			}
+			if b >= bins {
+				b = bins - 1
+			}
+			binVol[b] += wickVol
 		}
 	}
 
