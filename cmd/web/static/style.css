@@ -1644,12 +1644,19 @@ footer {
     font-size: 0.7rem;
 }
 .cal2-cell.pos {
-    background: color-mix(in srgb, var(--green) var(--intensity, 0%), var(--surface-2));
+    /* Solid rgba fallback first; Safari < 16.4 ignores the color-mix line
+       below (no support) and keeps the rgba. Modern browsers use the
+       color-mix that follows for variable intensity. */
+    background: rgba(74, 222, 128, 0.55);
+    background: color-mix(in srgb, var(--green) var(--intensity, 60%), var(--surface-2));
+    border-color: rgba(74, 222, 128, 0.4);
     border-color: color-mix(in srgb, var(--green) 35%, transparent);
     box-shadow: 0 1px 3px rgba(74, 222, 128, 0.08);
 }
 .cal2-cell.neg {
-    background: color-mix(in srgb, var(--red) var(--intensity, 0%), var(--surface-2));
+    background: rgba(248, 113, 113, 0.55);
+    background: color-mix(in srgb, var(--red) var(--intensity, 60%), var(--surface-2));
+    border-color: rgba(248, 113, 113, 0.4);
     border-color: color-mix(in srgb, var(--red) 35%, transparent);
     box-shadow: 0 1px 3px rgba(248, 113, 113, 0.08);
 }
@@ -2204,7 +2211,7 @@ footer {
     color: var(--text);
     font-weight: 700;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.95rem;
+    font-size: 1.1rem;
     margin-right: auto;
 }
 .chart-modal-close {

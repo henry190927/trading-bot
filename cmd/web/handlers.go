@@ -1334,7 +1334,17 @@ func buildDailyCalendar(trades []journal.Trade, days int) [][]dailyCell {
 			if abs < 0 {
 				abs = -abs
 			}
-			cell.Intensity = abs / maxAbs * 100
+			// Linear scaling alone makes small-R days nearly invisible when
+			// any single big-R day pushes maxAbs high. Floor at 40 so a
+			// quiet day still reads as colored, not black; ceiling at 100.
+			scaled := abs / maxAbs * 100
+			if scaled < 40 {
+				scaled = 40
+			}
+			if scaled > 100 {
+				scaled = 100
+			}
+			cell.Intensity = scaled
 		} else if d.Before(today.AddDate(0, 0, -(days - 1))) {
 			cell.IsZero = true // padding before the requested window
 		} else {

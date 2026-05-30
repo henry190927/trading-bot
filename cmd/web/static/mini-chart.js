@@ -50,20 +50,21 @@
         ctx.lineTo(u.bbox.left + u.bbox.width, yPx);
         ctx.stroke();
         // Italic label near the right edge — only emitted when the
-        // caller supplies one (i.e. the expanded modal). Small chip
-        // background so it stays readable over candles.
+        // caller supplies one (i.e. the expanded modal). Dark outline
+        // around the glyph keeps it readable over candles without an
+        // ugly opaque chip behind it.
         if (label) {
             ctx.setLineDash([]);
-            ctx.font = 'italic 11px ui-monospace, monospace';
-            var padX = 5, padY = 2;
+            ctx.font = 'italic bold 19px ui-monospace, monospace';
+            ctx.textBaseline = 'middle';
             var tw = ctx.measureText(label).width;
-            var x = u.bbox.left + u.bbox.width - tw - padX * 2 - 4;
-            var y0 = yPx - 7 - padY;
-            ctx.fillStyle = 'rgba(13, 17, 23, 0.78)';
-            ctx.fillRect(x, y0, tw + padX * 2, 14 + padY);
+            var x = u.bbox.left + u.bbox.width - tw - 10;
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'rgba(13, 17, 23, 0.95)';
+            ctx.strokeText(label, x, yPx);
             ctx.fillStyle = color;
-            ctx.textBaseline = 'top';
-            ctx.fillText(label, x + padX, y0 + padY);
+            ctx.fillText(label, x, yPx);
         }
         ctx.restore();
     }
@@ -144,13 +145,15 @@
             if (a >= 10)    return v.toFixed(2);
             return v.toFixed(3);
         }
+        var axisSize = withLabels ? 96 : 64;
+        var axisFont = withLabels ? '16px ui-monospace, monospace' : '11px ui-monospace, monospace';
         var commonAxes = [
             { show: false },
             {
                 show: true, stroke: COLORS.axis,
                 grid: { show: true, stroke: COLORS.grid, width: 1 },
-                ticks: { show: false }, size: 64,
-                font: '11px ui-monospace, monospace',
+                ticks: { show: false }, size: axisSize,
+                font: axisFont,
                 values: function (u, splits) { return splits.map(fmtPrice); },
             }
         ];
