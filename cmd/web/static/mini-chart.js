@@ -119,14 +119,23 @@
     }
 
     function buildOpts(data, mode, width, height) {
+        // Y-axis label format auto-adjusts to magnitude so big prices
+        // (BTC ~100k) and small (XAG ~50) both fit cleanly.
+        function fmtPrice(v) {
+            var a = Math.abs(v);
+            if (a >= 10000) return v.toFixed(0);
+            if (a >= 100)   return v.toFixed(1);
+            if (a >= 10)    return v.toFixed(2);
+            return v.toFixed(3);
+        }
         var commonAxes = [
             { show: false },
             {
                 show: true, stroke: COLORS.axis,
                 grid: { show: true, stroke: COLORS.grid, width: 1 },
-                ticks: { show: false }, size: 32,
-                font: '9px ui-monospace, monospace',
-                values: function (u, splits) { return splits.map(function (v) { return v.toFixed(1); }); },
+                ticks: { show: false }, size: 64,
+                font: '11px ui-monospace, monospace',
+                values: function (u, splits) { return splits.map(fmtPrice); },
             }
         ];
         var hookDraw = function (u) {
@@ -200,6 +209,9 @@
                 try { node._uplot.destroy(); } catch (e) {}
                 node._uplot = null;
             }
+            // Keep the expand button intact even when collapsed-hidden so
+            // re-expanding the chart doesn't drop it; but here the parent
+            // is display:none so the button is hidden anyway.
             return;
         }
 
@@ -207,7 +219,8 @@
             try { node._uplot.destroy(); } catch (e) {}
             node._uplot = null;
         }
-        node.innerHTML = '';
+        // Preserve the expand button on re-renders — only wipe canvases.
+        node.querySelectorAll('.uplot').forEach(function (el) { el.remove(); });
 
         var mode = getMode();
         var width = node.clientWidth || 320;
@@ -215,6 +228,95 @@
         var opts = buildOpts(data, mode, width, height);
 
         node._uplot = new uPlot(opts, dataArrFor(data, mode), node);
+
+        ensureExpandIcon(node);
+    }
+
+    // ─── Expand to modal ───────────────────────────────────────────────
+    // Click the ⤢ icon to open a fixed-size larger view with the same
+    // reference lines (POC, VA band, plan, mark). No drag/pinch zoom —
+    // just a bigger render for visual inspection.
+
+    function ensureExpandIcon(node) {
+        if (node.querySelector('.mini-chart-expand')) return;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mini-chart-expand';
+        btn.setAttribute('aria-label', 'expand chart');
+        btn.title = 'expand';
+        btn.textContent = '⤢';
+        btn.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            openFullscreen(node);
+        });
+        node.appendChild(btn);
+    }
+
+    var modal = null, modalChart = null, modalSym = '';
+
+    function buildModal() {
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.className = 'chart-modal hidden';
+        modal.innerHTML =
+            '<div class="chart-modal-backdrop"></div>' +
+            '<div class="chart-modal-card">' +
+            '  <div class="chart-modal-head">' +
+            '    <span class="chart-modal-title"></span>' +
+            '    <button type="button" class="chart-modal-close" aria-label="close">×</button>' +
+            '  </div>' +
+            '  <div class="chart-modal-body"></div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        modal.querySelector('.chart-modal-close').addEventListener('click', closeFullscreen);
+        modal.querySelector('.chart-modal-backdrop').addEventListener('click', closeFullscreen);
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeFullscreen();
+        });
+        return modal;
+    }
+
+    function openFullscreen(node) {
+        var raw = node.getAttribute('data-chart');
+        if (!raw) return;
+        var data;
+        try { data = JSON.parse(raw); } catch (e) { return; }
+        modalSym = node.getAttribute('data-sym') || '';
+
+        buildModal();
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        var mode = getMode();
+        modal.querySelector('.chart-modal-title').textContent = modalSym + ' · ' + mode;
+
+        var host = modal.querySelector('.chart-modal-body');
+        host.innerHTML = '';
+        if (modalChart) {
+            try { modalChart.destroy(); } catch (e) {}
+            modalChart = null;
+        }
+        var width  = host.clientWidth  || Math.min(window.innerWidth - 60, 1140);
+        var height = host.clientHeight || Math.min(Math.round(window.innerHeight * 0.86), 940);
+        var opts = buildOpts(data, mode, width, height);
+        modalChart = new uPlot(opts, dataArrFor(data, mode), host);
+    }
+
+    function closeFullscreen() {
+        if (!modal) return;
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        if (modalChart) {
+            try { modalChart.destroy(); } catch (e) {}
+            modalChart = null;
+        }
+        modalSym = '';
+    }
+
+    function reopenModalIfMode() {
+        if (!modal || modal.classList.contains('hidden') || !modalSym) return;
+        var src = document.querySelector('.mini-chart[data-sym="' + modalSym + '"]');
+        if (src) openFullscreen(src);
     }
 
     function renderAll() { document.querySelectorAll('.mini-chart').forEach(render); }
@@ -285,6 +387,7 @@
             setMode(b.dataset.mode);
             syncToggle();
             renderAll();
+            reopenModalIfMode();
         });
     });
 

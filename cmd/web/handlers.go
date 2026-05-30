@@ -278,7 +278,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 // × 60 points × ~12 bytes/point ≈ 3KB per refresh, well under the meta-
 // refresh's existing 100KB budget.
 func buildChartJSON(v symbolView) template.JS {
-	const N = 60
+	const N = 120
 	if len(v.Candles) == 0 {
 		return template.JS(`null`)
 	}

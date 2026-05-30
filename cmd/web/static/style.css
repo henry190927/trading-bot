@@ -2128,6 +2128,100 @@ footer {
 .poc-drift.trend-falling { color: var(--red);   border-color: rgba(248, 113, 113, 0.4); }
 .poc-drift.stacked       { font-weight: 700; }
 
+/* Expand icon on each mini-chart (top-right). Click opens a fixed-size
+   modal with the same data + reference lines for closer inspection. */
+.mini-chart { position: relative; }
+.mini-chart-expand {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: rgba(13, 17, 23, 0.85);
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    backdrop-filter: blur(4px);
+}
+.mini-chart-expand:hover { color: var(--text); background: var(--surface); }
+.mini-chart-expand:active { transform: scale(0.93); }
+
+/* Fullscreen-ish chart modal. Fixed size (90vw × 65vh capped). */
+.chart-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.chart-modal.hidden { display: none; }
+.chart-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(3px);
+}
+.chart-modal-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.55rem 0.7rem 0.6rem;
+    width: 92vw;
+    max-width: 1200px;
+    max-height: 96vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+}
+.chart-modal-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.45rem;
+}
+.chart-modal-title {
+    color: var(--text);
+    font-weight: 700;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.95rem;
+    margin-right: auto;
+}
+.chart-modal-close {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 0.25rem 0.55rem;
+    font-family: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    min-height: 32px;
+    min-width: 32px;
+}
+.chart-modal-close:active { opacity: 0.7; }
+.chart-modal-body {
+    flex: 1;
+    width: 100%;
+    height: 86vh;
+    min-height: 480px;
+    overflow: hidden;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
 .ot-actions {
     display: flex;
     gap: 0.4rem;
