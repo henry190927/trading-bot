@@ -290,31 +290,35 @@ func buildChartJSON(v symbolView) template.JS {
 	// Two parallel arrays: t (unix seconds), c (close prices). uPlot's
 	// expected x-y data shape — saves repeated key lookups in JS.
 	type payload struct {
-		T     []int64   `json:"t"`     // unix seconds, x-axis
-		O     []float64 `json:"o"`     // opens (for candle mode)
-		H     []float64 `json:"h"`     // highs
-		L     []float64 `json:"l"`     // lows
-		C     []float64 `json:"c"`     // closes (also used for line mode)
-		Side  string    `json:"side"`  // "long" / "short" / ""
-		Entry float64   `json:"entry"` // plan entry, 0 if no plan
-		Stop  float64   `json:"stop"`
-		TP1   float64   `json:"tp1"`
-		TP2   float64   `json:"tp2"`
-		Mark  float64   `json:"mark"` // live mark price
-		POC   float64   `json:"poc"`
-		VAH   float64   `json:"vah"`
-		VAL   float64   `json:"val"`
+		T      []int64   `json:"t"`     // unix seconds, x-axis
+		O      []float64 `json:"o"`     // opens (for candle mode)
+		H      []float64 `json:"h"`     // highs
+		L      []float64 `json:"l"`     // lows
+		C      []float64 `json:"c"`     // closes (also used for line mode)
+		Side   string    `json:"side"`  // "long" / "short" / ""
+		Entry  float64   `json:"entry"` // plan entry, 0 if no plan
+		Stop   float64   `json:"stop"`
+		TP1    float64   `json:"tp1"`
+		TP2    float64   `json:"tp2"`
+		Mark   float64   `json:"mark"` // live mark price
+		POC    float64   `json:"poc"`  // primary POC (200-bar)
+		POC50  float64   `json:"poc50"`
+		POC100 float64   `json:"poc100"`
+		VAH    float64   `json:"vah"`
+		VAL    float64   `json:"val"`
 	}
 	p := payload{
-		T:    make([]int64, len(cs)),
-		O:    make([]float64, len(cs)),
-		H:    make([]float64, len(cs)),
-		L:    make([]float64, len(cs)),
-		C:    make([]float64, len(cs)),
-		Mark: v.MarkPrice,
-		POC:  v.Signal.VP.POC,
-		VAH:  v.Signal.VP.VAH,
-		VAL:  v.Signal.VP.VAL,
+		T:      make([]int64, len(cs)),
+		O:      make([]float64, len(cs)),
+		H:      make([]float64, len(cs)),
+		L:      make([]float64, len(cs)),
+		C:      make([]float64, len(cs)),
+		Mark:   v.MarkPrice,
+		POC:    v.Signal.VP.POC,
+		POC50:  v.Signal.POCMig.POCShort,
+		POC100: v.Signal.POCMig.POCMed,
+		VAH:    v.Signal.VP.VAH,
+		VAL:    v.Signal.VP.VAL,
 	}
 	for i, c := range cs {
 		p.T[i] = c.CloseTime.Unix()

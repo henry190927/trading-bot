@@ -21,7 +21,9 @@
         stop:   '#f87171',
         tp:     '#4ade80',
         mark:   '#fbbf24',
-        poc:    'rgba(192, 132, 252, 0.75)',  // soft purple — POC
+        poc:    'rgba(192, 132, 252, 0.85)',  // strong purple — POC200 (primary)
+        poc100: 'rgba(192, 132, 252, 0.55)',  // medium purple — POC100
+        poc50:  'rgba(192, 132, 252, 0.35)',  // light purple — POC50 (most recent)
         va:     'rgba(192, 132, 252, 0.35)',  // faint purple — VAH/VAL edges
         vaFill: 'rgba(192, 132, 252, 0.06)',  // very faint purple band fill
         grid:   'rgba(139, 148, 158, 0.10)',
@@ -111,7 +113,7 @@
                 if (data.h[i] > hi) hi = data.h[i];
             }
             [data.entry, data.stop, data.tp1, data.tp2, data.mark,
-             data.poc, data.vah, data.val].forEach(function (v) {
+             data.poc, data.poc50, data.poc100, data.vah, data.val].forEach(function (v) {
                 if (isFinite(v) && v > 0) {
                     if (v < lo) lo = v;
                     if (v > hi) hi = v;
@@ -163,10 +165,14 @@
         var hookDraw = function (u) {
             // VA band first so plan/mark lines render on top.
             drawVABand(u, data.val, data.vah);
-            drawHLine(u, data.val,  COLORS.va,    true,  lbl('VAL'));
-            drawHLine(u, data.vah,  COLORS.va,    true,  lbl('VAH'));
-            drawHLine(u, data.poc,  COLORS.poc,   false, lbl('POC'));
-            drawHLine(u, data.mark, COLORS.mark,  true,  lbl('mark'));
+            drawHLine(u, data.val,    COLORS.va,     true,  lbl('VAL'));
+            drawHLine(u, data.vah,    COLORS.va,     true,  lbl('VAH'));
+            // Three nested POCs — shorter horizon = lighter shade so the
+            // primary POC200 dominates the eye.
+            drawHLine(u, data.poc50,  COLORS.poc50,  true,  lbl('POC50'));
+            drawHLine(u, data.poc100, COLORS.poc100, true,  lbl('POC100'));
+            drawHLine(u, data.poc,    COLORS.poc,    false, lbl('POC200'));
+            drawHLine(u, data.mark,   COLORS.mark,   true,  lbl('mark'));
             if (data.entry > 0) {
                 drawHLine(u, data.entry, COLORS.entry, false, lbl('entry'));
                 drawHLine(u, data.stop,  COLORS.stop,  false, lbl('stop'));
