@@ -264,6 +264,13 @@
         <li><span class="lg-swatch lg-squeeze"></span><b>⚠ blow-off risk</b> — same but bullish; risky for shorts.</li>
       </ul>
 
+      <h3>Two scores explained</h3>
+      <ul class="legend-list">
+        <li><b>score N</b> (meta row, integer 0–8) — count of independent confluence votes that fired in the engine: RSI extreme, MACD cross, BOLL touch, fib 0.618, sweep, RSI/CVD divergence, range expansion. <b>3</b> is the minimum tradeable threshold. It's a "did anything agree at all?" gate.</li>
+        <li><b>X.X/10</b> (diagnose row, float 0–10) — validator's <i>structural fit</i> for a specific entry at the current price. Weighted sum of ~20 factors: engine alignment (+2), sweep / fib / HVN proximity (+1.5–2), VA edge (+0.5), POC drift alignment (+0.5–0.7), minus penalties for entry chase, falling knife, counter-regime, inside-VA chop, etc.</li>
+        <li>They don't have to match. A confluent setup (high <b>score</b>) can still be structurally weak (low <b>/10</b>) if it fights regime or is far from value. The <b>/10</b> is the better single number to act on — it integrates more context.</li>
+      </ul>
+
       <h3>Verdict colors</h3>
       <ul class="legend-list">
         <li><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b> — score ≥ 7.5, take it.</li>
