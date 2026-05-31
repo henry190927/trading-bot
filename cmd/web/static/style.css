@@ -2145,6 +2145,144 @@ footer {
 .poc-drift.trend-falling { color: var(--red);   border-color: rgba(248, 113, 113, 0.4); }
 .poc-drift.stacked       { font-weight: 700; }
 
+/* Info icon ('i') in section title → opens legend modal */
+.info-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-family: ui-serif, Georgia, serif;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+.info-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.info-btn:active { transform: scale(0.92); }
+
+/* Legend modal — same backdrop pattern as the chart modal but
+   scrollable static-text content. */
+.legend-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.legend-modal.hidden { display: none; }
+.legend-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(3px);
+}
+.legend-modal-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.7rem 0.9rem 1rem;
+    width: 92vw;
+    max-width: 720px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.65);
+}
+.legend-modal-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--border);
+}
+.legend-modal-title {
+    color: var(--text);
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-right: auto;
+}
+.legend-modal-close {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 0.25rem 0.55rem;
+    font-family: inherit;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    min-height: 32px;
+    min-width: 32px;
+}
+.legend-modal-close:active { opacity: 0.7; }
+.legend-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    color: var(--text);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+.legend-modal-body h3 {
+    color: var(--cyan);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 1rem 0 0.4rem;
+}
+.legend-modal-body h3:first-child { margin-top: 0.2rem; }
+.legend-modal-body ul.legend-list { list-style: none; padding: 0; margin: 0; }
+.legend-modal-body ul.legend-list li {
+    margin: 0.35rem 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+.legend-modal-body ul.legend-list li b { color: var(--text); }
+.legend-modal-body ul.legend-list li code {
+    background: var(--surface-2);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.82rem;
+}
+
+.lg-swatch {
+    display: inline-block;
+    width: 22px;
+    height: 12px;
+    border-radius: 3px;
+    flex: 0 0 auto;
+    margin-top: 5px;
+}
+.lg-poc200  { background: rgba(192, 132, 252, 0.85); }
+.lg-poc100  { background: rgba(192, 132, 252, 0.55); }
+.lg-poc50   { background: rgba(192, 132, 252, 0.35); }
+.lg-va      { background: rgba(192, 132, 252, 0.18); border: 1px dashed rgba(192, 132, 252, 0.55); }
+.lg-mark    { background: #fbbf24; }
+.lg-entry   { background: #58a6ff; }
+.lg-stop    { background: #f87171; }
+.lg-tp      { background: #4ade80; }
+.lg-knife   { background: rgba(248, 113, 113, 0.15); border: 1px solid var(--red); }
+.lg-squeeze { background: rgba(251, 191, 36, 0.15); border: 1px solid var(--yellow); }
+.lg-verdict-strong  { background: var(--green); }
+.lg-verdict-take    { background: rgba(74, 222, 128, 0.6); }
+.lg-verdict-neutral { background: var(--yellow); }
+.lg-verdict-avoid   { background: var(--red); }
+.lg-rpos { background: var(--green); }
+.lg-rneg { background: var(--red); }
+
 /* Expand icon on each mini-chart (top-right). Click opens a fixed-size
    modal with the same data + reference lines for closer inspection. */
 .mini-chart { position: relative; }

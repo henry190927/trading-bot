@@ -101,6 +101,7 @@
   <h2 class="section-title">
     <span class="section-dot scan"></span>
     Symbol scan
+    <button type="button" class="info-btn" aria-label="legend" title="What do these chips and lines mean?">i</button>
     <span class="section-meta">{{.TF}}</span>
     <div class="chart-style-toggle" role="group" aria-label="chart style">
       <button type="button" class="cs-btn" data-mode="line" aria-pressed="false">Line</button>
@@ -224,6 +225,64 @@
 </section>{{/* /symbols-section */}}
 </main>
 
+<div class="legend-modal hidden" id="legend-modal">
+  <div class="legend-modal-backdrop"></div>
+  <div class="legend-modal-card">
+    <div class="legend-modal-head">
+      <span class="legend-modal-title">Dashboard legend</span>
+      <button type="button" class="legend-modal-close" aria-label="close">×</button>
+    </div>
+    <div class="legend-modal-body">
+
+      <h3>Chart lines</h3>
+      <ul class="legend-list">
+        <li><span class="lg-swatch lg-poc200"></span><b>POC200</b> (solid strong purple) — long-term Point of Control, ~8 days on 1h. The single price where most volume traded over the lookback.</li>
+        <li><span class="lg-swatch lg-poc100"></span><b>POC100</b> (medium dashed purple) — ~4-day POC.</li>
+        <li><span class="lg-swatch lg-poc50"></span><b>POC50</b> (light dashed purple) — recent ~2-day POC; closest to current price.</li>
+        <li><span class="lg-swatch lg-va"></span><b>VAH / VAL</b> (dashed purple edges + faint purple band) — Value Area High/Low; the band holding 70% of volume.</li>
+        <li><span class="lg-swatch lg-mark"></span><b>mark</b> (dashed yellow) — live BingX mark price.</li>
+        <li><span class="lg-swatch lg-entry"></span><b>entry</b> (solid blue) — engine's planned entry level.</li>
+        <li><span class="lg-swatch lg-stop"></span><b>stop</b> (solid red) — engine's stop level.</li>
+        <li><span class="lg-swatch lg-tp"></span><b>TP1 / TP2</b> (solid green) — 1R / 2R targets.</li>
+      </ul>
+
+      <h3>Meta-row chips</h3>
+      <ul class="legend-list">
+        <li><b>POC</b> — primary 200-bar POC price; tap to copy.</li>
+        <li><b>VA</b> — VAL ↔ VAH copy buttons (the 70% volume zone edges).</li>
+        <li><b>HVN</b> — top-5 secondary chip zones (high-volume nodes) inside the 200-bar profile.</li>
+        <li><b>drift ↗ / ↘ / →</b> — POC migration across 50/100/200-bar windows. <code>(POC50 − POC200) / POC200</code> as %. <i>Rising</i> = bullish regime, <i>falling</i> = bearish, <i>flat</i> = chop. Bold border = stacked (POC50 &gt; POC100 &gt; POC200) = strong confirmation.</li>
+      </ul>
+
+      <h3>Diagnose chips</h3>
+      <ul class="legend-list">
+        <li><b>at VAH / at VAL</b> — entry within 0.3% of the value-area edge. Best mean-rev rotation setups (target = POC).</li>
+        <li><b>inside VA</b> — entry inside [VAL, VAH] but not at an edge. Chop / equilibrium; weak edge either side.</li>
+        <li><b>above VA / below VA</b> — entry outside the value area. Either acceptance (new regime forming) or extension (reversion candidate).</li>
+        <li><b>POC ↗ / ↘</b> — current regime per POC migration.</li>
+        <li><span class="lg-swatch lg-knife"></span><b>⚠ falling knife</b> — a big bearish range-expansion bar fired in the last 3 candles. Fighting fresh downward momentum is risky for longs.</li>
+        <li><span class="lg-swatch lg-squeeze"></span><b>⚠ blow-off risk</b> — same but bullish; risky for shorts.</li>
+      </ul>
+
+      <h3>Verdict colors</h3>
+      <ul class="legend-list">
+        <li><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b> — score ≥ 7.5, take it.</li>
+        <li><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b> — score 5.5–7.5, good setup.</li>
+        <li><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b> — score 3.5–5.5, marginal.</li>
+        <li><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b> — score &lt; 3.5, skip.</li>
+      </ul>
+
+      <h3>Open-trade card</h3>
+      <ul class="legend-list">
+        <li>Card border color tracks the trade's current R: <span class="lg-swatch lg-rpos"></span>green if &gt; 0, <span class="lg-swatch lg-rneg"></span>red if &lt; 0.</li>
+        <li>The horizontal bar shows position between stop (left, red), entry (center), and TP2 (right, green).</li>
+        <li><b>Live diagnose</b> re-runs the validator at the trade's <i>own</i> side, not the engine's preferred side — answers "is MY trade still good?", not "what's the best trade now?".</li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
 <footer>
   <span>auto-refresh every 30s · tap any price to copy</span>
 </footer>
@@ -231,5 +290,20 @@
 <script src="/static/copy.js"></script>
 <script src="/static/uplot/uPlot.iife.min.js"></script>
 <script src="/static/mini-chart.js"></script>
+<script>
+(function () {
+    var modal = document.getElementById('legend-modal');
+    var btn = document.querySelector('.info-btn');
+    if (!modal || !btn) return;
+    function open()  { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+    function close() { modal.classList.add('hidden');    document.body.style.overflow = ''; }
+    btn.addEventListener('click', open);
+    modal.querySelector('.legend-modal-close').addEventListener('click', close);
+    modal.querySelector('.legend-modal-backdrop').addEventListener('click', close);
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && !modal.classList.contains('hidden')) close();
+    });
+})();
+</script>
 </body>
 </html>
