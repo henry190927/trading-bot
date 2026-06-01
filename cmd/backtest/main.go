@@ -31,6 +31,10 @@ func main() {
 	useDXY := flag.Bool("dxy", false, "enable DXY macro veto on XAU/XAG signals. Default OFF — 2026-05-27 backtest showed it hurt by ~46R (vetoed trades were the best ones; mean-reversion thrives on macro-divergent dips)")
 	bodyWeight := flag.Float64("body-weight", 0, "POC/HVN body-weighted distribution: fraction (0,1) of each candle's volume routed to its body range. Default 0 = legacy uniform-over-HL. Try 0.7 to damp wick-hunt distortion during whipsaw.")
 	verbose := flag.Bool("v", false, "print every trade")
+	stopHunt := flag.Bool("stop-hunt", false, "diagnostic: per-symbol report on stop-hits that reclaimed entry within 6 bars + wick-depth distribution. Helps decide whether buffered-stop A/B is worth running.")
+	stopHuntVerbose := flag.Bool("stop-hunt-v", false, "as --stop-hunt but also dump each individual swept-then-reverted trade")
+	stopBufferR := flag.Float64("stop-buffer-r", 0, "STRATEGY VARIANT 1: widen the stop by this fraction of R (e.g. 0.3 = stop 0.3R further from entry). Risk per trade grows; TPs re-derived from new R. Goal: survive stop hunts without changing entry.")
+	slideOffsetPct := flag.Float64("slide-offset-pct", 0, "STRATEGY VARIANT 2: slide BOTH entry and stop in the side's away direction by this fraction of entry (e.g. 0.002 = 0.2%). Risk distance unchanged. Goal: let the typical sweep play out, then fill past it with stop past the cluster.")
 	flag.Parse()
 
 	if *stopRefine {
@@ -54,6 +58,8 @@ func main() {
 	opts := backtest.Options{
 		FeeBpsRoundTrip: *feeBps,
 		SweepOnly:       *sweepOnly,
+		StopBufferR:     *stopBufferR,
+		SlideOffsetPct:  *slideOffsetPct,
 	}
 
 	// DXY macro veto — only useful for XAU/XAG; the engine ignores it for
@@ -92,6 +98,19 @@ func main() {
 		}
 		res := backtest.Run(sym, timeframe, candles, biasCandles, *threshold, *maxHold, opts)
 		fmt.Println(res.Summary())
+		if *stopHunt || *stopHuntVerbose {
+			fmt.Println(res.StopHuntSummary())
+		}
+		if *stopHuntVerbose {
+			for _, t := range res.Trades {
+				if t.Outcome != "stop" || !t.Reclaimed {
+					continue
+				}
+				fmt.Printf("    swept-then-reverted: %s %s entry=%.4f stop=%.4f wickPastStop=%.4f (%.3fR) reclaimedIn=%d bars\n",
+					t.SignaledAt.Format("2006-01-02 15:04"), t.Side,
+					t.Entry, t.Stop, t.WickPastStop, t.WickPastStopR, t.ReclaimBars)
+			}
+		}
 		if *verbose {
 			for _, t := range res.Trades {
 				fmt.Printf("  %s %s sc=%d entry=%.4f exit=%.4f gross=%+.2f fee=%.2f net=%+.2f (%s, %s)\n",

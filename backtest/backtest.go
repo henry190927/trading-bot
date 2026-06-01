@@ -3,6 +3,7 @@ package backtest
 import (
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"myFirstGo/trading-bot/dxy"
@@ -29,6 +30,20 @@ type Options struct {
 	// strengthening dollar, short into weakening dollar). Pass nil to
 	// disable the macro veto (e.g. for crypto-only backtests).
 	DXYCandles []market.Candle
+
+	// StopBufferR widens the stop by this fraction of the original
+	// risk distance. E.g. 0.3 = stop moves 0.3R further from entry.
+	// Entry unchanged → R risk per trade grows; TPs at 1R/2R from
+	// entry are re-derived against the NEW (wider) risk. Default 0.
+	StopBufferR float64
+
+	// SlideOffsetPct slides BOTH entry and stop in the side's
+	// "away" direction by this fraction of entry. Risk distance
+	// unchanged (same R). Lets the typical stop-hunt wick play out
+	// before filling, so the stop sits past the cluster instead of
+	// at it. Default 0. E.g. 0.002 = 0.2% slide. For LONG entry/
+	// stop move DOWN; for SHORT they move UP.
+	SlideOffsetPct float64
 }
 
 type Trade struct {
@@ -45,7 +60,24 @@ type Trade struct {
 	R          float64 // RGross - FeeR
 	Outcome    string  // "stop" | "tp2" | "timeout" | "no-fill"
 	Anchor     string
+
+	// Stop-hunt diagnostics (populated only when Outcome == "stop").
+	// WickPastStop = how far the stop-out bar wicked past the stop in
+	// price units (positive). WickPastStopR = same in R units (e.g.
+	// 0.15 means price went 15% of one R past the stop). Reclaimed =
+	// did price come back through entry within ReclaimWindow bars?
+	// ReclaimBars = bars to reclaim (1-N) or 0 if never within window.
+	WickPastStop   float64
+	WickPastStopR  float64
+	Reclaimed      bool
+	ReclaimBars    int
 }
+
+// ReclaimWindow defines how many bars after a stop-out we look for the
+// price to come back through the entry. 6 bars on 1h = 6 hours — long
+// enough to catch a "swept then reverted" pattern, short enough to
+// rule out coincidental retraces hours later.
+const ReclaimWindow = 6
 
 type Result struct {
 	Symbol     market.Symbol
@@ -62,6 +94,18 @@ type Result struct {
 	MaxDDR     float64
 	BestR      float64
 	WorstR     float64
+
+	// Stop-hunt diagnostics: how often does price stop us out and
+	// then reverse through entry within ReclaimWindow bars?
+	StopHits         int     // total trades that hit stop
+	StopHitsReclaim  int     // of those, how many later reclaimed entry
+	StopReclaimPct   float64 // 100 * StopHitsReclaim / StopHits
+	MedWickR         float64 // median wick depth past stop (in R units)
+	WickBucket005    int     // 0    – 0.05R past stop
+	WickBucket010    int     // 0.05 – 0.10R
+	WickBucket025    int     // 0.10 – 0.25R
+	WickBucket050    int     // 0.25 – 0.50R
+	WickBucketBig    int     // > 0.50R
 }
 
 // Run replays Signal.Evaluate over candles and simulates every score>=threshold
@@ -104,6 +148,13 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 		}
 		if opts.SweepOnly && !sig.Plan.IsSweepAnchored() {
 			continue
+		}
+		// Apply stop / entry transforms BEFORE simulate so fill checks
+		// and stop checks use the new levels. Order matters: slide
+		// first (moves entry+stop together, keeping R), then buffer
+		// (widens stop relative to whatever entry we ended up with).
+		if opts.SlideOffsetPct > 0 || opts.StopBufferR > 0 {
+			applyStopVariants(&sig, opts)
 		}
 		res.NumSignals++
 		end := i + 1 + maxHoldBars
@@ -175,6 +226,54 @@ func precomputeDXYTrends(base, dxyCandles []market.Candle) []dxy.Trend {
 	return out
 }
 
+// applyStopVariants mutates sig.Plan in place to implement the buffered-
+// stop and/or sliding-entry experiments. Slide is applied first (moves
+// entry and stop together, keeping R); buffer then widens the stop
+// further from the (possibly slid) entry, expanding R per trade.
+// TakeProfit levels are re-derived from the final (entry, risk) so the
+// 1R / 2R ratios are preserved in the new geometry.
+func applyStopVariants(sig *signal.Signal, opts Options) {
+	plan := &sig.Plan
+	if opts.SlideOffsetPct > 0 {
+		delta := plan.Entry * opts.SlideOffsetPct
+		switch sig.Side {
+		case signal.Long:
+			plan.Entry -= delta
+			plan.StopLoss -= delta
+		case signal.Short:
+			plan.Entry += delta
+			plan.StopLoss += delta
+		}
+	}
+	if opts.StopBufferR > 0 {
+		risk := plan.StopLoss - plan.Entry
+		if risk < 0 {
+			risk = -risk
+		}
+		extra := risk * opts.StopBufferR
+		switch sig.Side {
+		case signal.Long:
+			plan.StopLoss -= extra
+		case signal.Short:
+			plan.StopLoss += extra
+		}
+	}
+	// Re-derive TPs at 1R / 2R from the final entry, since either
+	// transform may have changed entry and/or risk.
+	risk := plan.StopLoss - plan.Entry
+	if risk < 0 {
+		risk = -risk
+	}
+	if risk > 0 {
+		switch sig.Side {
+		case signal.Long:
+			plan.TakeProfit = []float64{plan.Entry + risk, plan.Entry + 2*risk}
+		case signal.Short:
+			plan.TakeProfit = []float64{plan.Entry - risk, plan.Entry - 2*risk}
+		}
+	}
+}
+
 func simulate(sym market.Symbol, sig signal.Signal, future []market.Candle, feeBps float64) (*Trade, int) {
 	plan := sig.Plan
 	risk := plan.Risk()
@@ -210,14 +309,40 @@ func simulate(sym market.Symbol, sig signal.Signal, future []market.Candle, feeB
 		}
 		if sig.Side == signal.Long {
 			if c.Low <= plan.StopLoss {
-				return mkTrade(-1, plan.StopLoss, c.CloseTime, "stop"), i
+				t := mkTrade(-1, plan.StopLoss, c.CloseTime, "stop")
+				t.WickPastStop = plan.StopLoss - c.Low
+				if risk > 0 {
+					t.WickPastStopR = t.WickPastStop / risk
+				}
+				// Look ahead within ReclaimWindow for price to climb
+				// back through the entry — "swept then reverted."
+				for j := i + 1; j < len(future) && j-i <= ReclaimWindow; j++ {
+					if future[j].High >= plan.Entry {
+						t.Reclaimed = true
+						t.ReclaimBars = j - i
+						break
+					}
+				}
+				return t, i
 			}
 			if c.High >= tp {
 				return mkTrade(2, tp, c.CloseTime, "tp2"), i
 			}
 		} else {
 			if c.High >= plan.StopLoss {
-				return mkTrade(-1, plan.StopLoss, c.CloseTime, "stop"), i
+				t := mkTrade(-1, plan.StopLoss, c.CloseTime, "stop")
+				t.WickPastStop = c.High - plan.StopLoss
+				if risk > 0 {
+					t.WickPastStopR = t.WickPastStop / risk
+				}
+				for j := i + 1; j < len(future) && j-i <= ReclaimWindow; j++ {
+					if future[j].Low <= plan.Entry {
+						t.Reclaimed = true
+						t.ReclaimBars = j - i
+						break
+					}
+				}
+				return t, i
 			}
 			if c.Low <= tp {
 				return mkTrade(2, tp, c.CloseTime, "tp2"), i
@@ -282,6 +407,43 @@ func computeStats(res *Result) {
 	res.AvgR = res.TotalR / float64(filledN)
 	res.AvgRGross = res.TotalGross / float64(filledN)
 	res.MaxDDR = dd
+
+	// Stop-hunt diagnostics — aggregate over only the "stop" trades.
+	var wicks []float64
+	for _, t := range res.Trades {
+		if t.Outcome != "stop" {
+			continue
+		}
+		res.StopHits++
+		if t.Reclaimed {
+			res.StopHitsReclaim++
+		}
+		wicks = append(wicks, t.WickPastStopR)
+		switch {
+		case t.WickPastStopR < 0.05:
+			res.WickBucket005++
+		case t.WickPastStopR < 0.10:
+			res.WickBucket010++
+		case t.WickPastStopR < 0.25:
+			res.WickBucket025++
+		case t.WickPastStopR < 0.50:
+			res.WickBucket050++
+		default:
+			res.WickBucketBig++
+		}
+	}
+	if res.StopHits > 0 {
+		res.StopReclaimPct = 100 * float64(res.StopHitsReclaim) / float64(res.StopHits)
+		// median wick depth
+		sortedWicks := append([]float64(nil), wicks...)
+		sort.Float64s(sortedWicks)
+		mid := len(sortedWicks) / 2
+		if len(sortedWicks)%2 == 0 {
+			res.MedWickR = (sortedWicks[mid-1] + sortedWicks[mid]) / 2
+		} else {
+			res.MedWickR = sortedWicks[mid]
+		}
+	}
 }
 
 func (r Result) Summary() string {
@@ -293,4 +455,18 @@ func (r Result) Summary() string {
 		r.Symbol, r.Timeframe, filter, r.Opts.FeeBpsRoundTrip,
 		r.NumSignals, len(r.Trades),
 		r.WinRate*100, r.TotalGross, r.TotalR, r.AvgR, r.MaxDDR, r.BestR, r.WorstR)
+}
+
+// StopHuntSummary describes how often stops were swept and reverted —
+// the diagnostic the user asked for after observing trade #8 wick past
+// the stop then pull back. A reclaim rate above ~25% strongly suggests
+// a buffered-stop A/B is worth running.
+func (r Result) StopHuntSummary() string {
+	if r.StopHits == 0 {
+		return fmt.Sprintf("%s %s | stop-hunt: no stop-outs to analyze", r.Symbol, r.Timeframe)
+	}
+	return fmt.Sprintf("%s %s | stop-hunt: %d stops, %d reclaimed entry within %d bars (%.1f%%) · median wick past stop %.2fR · wick buckets <0.05R=%d <0.10R=%d <0.25R=%d <0.50R=%d ≥0.50R=%d",
+		r.Symbol, r.Timeframe, r.StopHits, r.StopHitsReclaim, ReclaimWindow,
+		r.StopReclaimPct, r.MedWickR,
+		r.WickBucket005, r.WickBucket010, r.WickBucket025, r.WickBucket050, r.WickBucketBig)
 }
