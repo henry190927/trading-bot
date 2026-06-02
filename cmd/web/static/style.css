@@ -465,6 +465,12 @@ footer {
     letter-spacing: 0.03em;
     font-size: 0.75rem;
 }
+.trade-times .lbl.pending { color: var(--yellow); }
+.trade-times .time-pending {
+    color: var(--yellow);
+    font-style: italic;
+    font-weight: 600;
+}
 
 .trade-anchor {
     color: var(--text-dim);
@@ -819,11 +825,18 @@ footer {
 
 .partial-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 40px;
+    /* minmax(0, 1fr) lets the input shrink below its intrinsic
+       content size — without this, mobile Safari's default input
+       min-width forces the % and price tracks wider than 1fr, and
+       the whole row overflows the dashed parent box. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
     gap: 0.4rem;
     margin-bottom: 0.4rem;
 }
 .partial-row input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);

@@ -259,6 +259,11 @@
       <div class="trade-times">
         <span class="lbl">analyzed</span> {{fmtTime .AnalyzedAt}}
         &nbsp;·&nbsp; <span class="lbl">opened</span> {{fmtTime .OpenedAt}}
+        {{if .FilledAt.IsZero}}
+          &nbsp;·&nbsp; <span class="lbl pending">filled</span> <span class="time-pending">pending</span>
+        {{else}}
+          &nbsp;·&nbsp; <span class="lbl">filled</span> {{fmtTime .FilledAt}}
+        {{end}}
         {{if not .IsOpen}}&nbsp;·&nbsp; <span class="lbl">closed</span> {{fmtTime .ClosedAt}}{{end}}
       </div>
 
