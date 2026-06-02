@@ -2136,6 +2136,45 @@ footer {
     border: 1px solid rgba(248, 113, 113, 0.55);
 }
 
+/* Pending open-trade card (recorded but entry hasn't filled yet) */
+.open-trade-card.status-pending {
+    border-left-color: var(--yellow);
+    background: linear-gradient(to right,
+        color-mix(in srgb, var(--yellow) 8%, var(--surface)),
+        var(--surface) 30%);
+    /* Safari-safe fallback handled by the base .open-trade-card bg */
+}
+.ot-pending-badge {
+    background: rgba(251, 191, 36, 0.18);
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    animation: pulse-pending 1.6s ease-in-out infinite;
+}
+@keyframes pulse-pending {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+}
+.ot-pending-strip {
+    margin: 0.5rem 0 0.3rem;
+    padding: 0.4rem 0.55rem;
+    background: var(--surface-2);
+    border: 1px dashed rgba(251, 191, 36, 0.4);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+.ot-pending-strip .copy-btn { color: var(--text); }
+.ot-pending-strip .dist-to-entry {
+    color: var(--yellow);
+    font-weight: 600;
+}
+
 /* POC-drift chip in the symbol-card meta row. Color follows trend
    direction; bolder border when stacked (POC50>POC100>POC200). */
 .poc-drift {

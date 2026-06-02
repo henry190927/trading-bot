@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -139,8 +140,12 @@ type openTradeCard struct {
 	PctToStop   float64       // 0-100% of the way from entry to stop
 	PctToTP1    float64       // 0-100% of the way from entry to TP1
 	PctToTP2    float64       // 0-100% of the way from entry to TP2
-	TimeElapsed time.Duration // since OpenedAt
+	TimeElapsed time.Duration // since the trade became "live" (FilledAt if set, else OpenedAt)
 	Diagnose    *validator.Result
+
+	// Pending-state fields (populated when Trade.IsPending()).
+	DistToEntryPct float64 // |mark - entry| / entry * 100, signed for direction
+	PendingSince   time.Duration
 }
 
 func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView) []openTradeCard {
@@ -201,12 +206,75 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		wg.Wait()
 	}
 
+	// Pass 1: auto-detect entry fills. For each pending trade, scan the
+	// candles already fetched for its symbol/TF; if any bar since the
+	// trade was recorded touched the entry level, mark it filled. Persist
+	// any changes to the journal in one write at the end.
+	tradesChanged := false
+	for i := range trades {
+		t := &trades[i]
+		if !t.IsPending() {
+			continue
+		}
+		tfStr := t.TF
+		if j := strings.Index(tfStr, ","); j >= 0 {
+			tfStr = strings.TrimSpace(tfStr[:j])
+		}
+		sym, errSym := resolveWebSymbol(t.Symbol)
+		if errSym != nil || tfStr == "" {
+			continue
+		}
+		v, ok := cache[string(sym)+"@"+tfStr]
+		if !ok || v.Err != "" || len(v.Candles) == 0 {
+			continue
+		}
+		// Scan from when the plan was first known forward — use
+		// analyzed_at (engine timestamp) when set, else opened_at.
+		// This catches "I recorded late but the entry actually filled
+		// earlier" without being so loose it back-fills ancient bars.
+		floor := t.OpenedAt
+		if !t.AnalyzedAt.IsZero() && t.AnalyzedAt.Before(floor) {
+			floor = t.AnalyzedAt
+		}
+		for _, c := range v.Candles {
+			if c.CloseTime.Before(floor) {
+				continue
+			}
+			var hit bool
+			switch t.Side {
+			case "long":
+				hit = c.Low <= t.Entry
+			case "short":
+				hit = c.High >= t.Entry
+			}
+			if hit {
+				t.FilledAt = c.CloseTime
+				tradesChanged = true
+				break
+			}
+		}
+	}
+	if tradesChanged {
+		if err := journal.WriteAll("", trades); err != nil {
+			// Soft-fail: log only, dashboard still renders w/ in-memory state.
+			log.Printf("auto-fill journal write failed: %v", err)
+		}
+	}
+
 	var cards []openTradeCard
 	for _, t := range trades {
 		if !t.IsOpen() {
 			continue
 		}
-		card := openTradeCard{Trade: t, TimeElapsed: time.Since(t.OpenedAt)}
+		// "Live" reference time: FilledAt for active trades, OpenedAt for pending.
+		liveSince := t.OpenedAt
+		if !t.FilledAt.IsZero() {
+			liveSince = t.FilledAt
+		}
+		card := openTradeCard{Trade: t, TimeElapsed: time.Since(liveSince)}
+		if t.IsPending() {
+			card.PendingSince = time.Since(t.OpenedAt)
+		}
 
 		// Resolve the trade's own scan from the cache (its TF, not the
 		// dashboard's). Mark price + diagnose both come from there.
@@ -241,9 +309,20 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 			}
 		}
 
-		// Compute R progress against the trade's own entry/stop/TPs.
-		// Risk magnitude is |stop - entry|; signed direction depends on side.
-		if card.MarkPrice > 0 && t.Stop != t.Entry {
+		// R-progress only makes sense for ACTIVE (filled) trades. Pending
+		// trades show distance-to-entry instead.
+		if t.IsPending() {
+			if card.MarkPrice > 0 && t.Entry > 0 {
+				// Signed % from mark TO entry, in the direction needed to fill.
+				// Long needs mark to fall to entry (mark > entry currently),
+				// short needs mark to rise to entry (mark < entry currently).
+				if t.Side == "long" {
+					card.DistToEntryPct = (card.MarkPrice - t.Entry) / t.Entry * 100
+				} else {
+					card.DistToEntryPct = (t.Entry - card.MarkPrice) / t.Entry * 100
+				}
+			}
+		} else if card.MarkPrice > 0 && t.Stop != t.Entry {
 			risk := t.Stop - t.Entry
 			if risk < 0 {
 				risk = -risk
@@ -450,8 +529,13 @@ var recommendedAnchors = []string{
 // handleJournalNew renders the new-trade form, pre-filled from query params
 // when invoked from a dashboard "Record this trade" button.
 func (s *server) handleJournalNew(c *gin.Context) {
-	// Default analyzed_at to current local time, formatted for <input type="datetime-local">.
-	now := time.Now().Local().Format("2006-01-02T15:04")
+	// analyzed_at — prefer the URL query (set by the dashboard's recordHref
+	// to the last closed bar's CloseTime, so fill-detection has a precise
+	// floor). Fall back to "now" for /validate-style flows or direct visits.
+	analyzedAt := c.Query("analyzed_at")
+	if analyzedAt == "" {
+		analyzedAt = time.Now().Local().Format("2006-01-02T15:04")
+	}
 	c.HTML(http.StatusOK, "journal_new.html", gin.H{
 		"Symbol":     c.Query("symbol"),
 		"Side":       c.Query("side"),
@@ -463,7 +547,7 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		"TF":         c.Query("tf"),
 		"Score":      c.Query("score"),
 		"Notes":      "",
-		"AnalyzedAt": now,
+		"AnalyzedAt": analyzedAt,
 		"Symbols":    []string{"BTC", "ETH", "XAU", "XAG"},
 		"Anchors":    recommendedAnchors,
 		"Error":      "",
@@ -1633,6 +1717,12 @@ func templateFuncs() template.FuncMap {
 			q.Set("anchor", v.Signal.Plan.Anchor)
 			q.Set("tf", tf)
 			q.Set("score", fmt.Sprintf("%d", v.Signal.Score))
+			// analyzed_at = close time of the last closed bar the engine
+			// used to compute this signal. Improves fill-detection
+			// accuracy on the resulting trade.
+			if len(v.Candles) > 0 {
+				q.Set("analyzed_at", v.Candles[len(v.Candles)-1].CloseTime.Local().Format("2006-01-02T15:04"))
+			}
 			return template.URL("/journal/new?" + q.Encode())
 		},
 	}

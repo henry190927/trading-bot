@@ -21,13 +21,15 @@ import (
 //	v1 = 16 cols (legacy: no analyzed_at, no score)
 //	v2 = 17 cols (adds analyzed_at after opened_at)
 //	v3 = 18 cols (adds score after tf)
-//	v4 = 19 cols (adds leverage at end) — current
+//	v4 = 19 cols (adds leverage at end)
+//	v5 = 20 cols (adds filled_at at end) — current
 var Header = []string{
 	"id", "opened_at", "analyzed_at", "closed_at", "symbol", "side", "tf", "score",
 	"entry", "stop", "tp1", "tp2",
 	"anchor", "open_notes",
 	"exit_price", "outcome", "r_realized", "close_notes",
 	"leverage",
+	"filled_at",
 }
 
 // Trade is one journal row.
@@ -50,6 +52,10 @@ type Trade struct {
 	Outcome    string // "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "" if open
 	RRealized  float64
 	CloseNotes string
+	// FilledAt is the time the entry price was first reached after the
+	// trade was recorded. Zero = still pending (entry not yet triggered).
+	// Set by the dashboard's fill-detection sweep on each refresh.
+	FilledAt time.Time
 	// Leverage is the position multiplier used on the perp exchange. Optional
 	// (0 = not recorded). Used to translate R-multiples into actual % return:
 	// a 1R win on 100x leverage gross-returns about 100× the price-move %.
@@ -64,6 +70,17 @@ func (t Trade) IsOpen() bool { return t.ClosedAt.IsZero() }
 // discipline tracking (signal-to-fill ratio) without affecting WR/R
 // stats. R should be exactly 0 for no-fills.
 func (t Trade) IsNoFill() bool { return t.Outcome == "no-fill" }
+
+// IsPending reports whether the trade has been recorded but its entry
+// price hasn't been touched yet — i.e. position never opened on the
+// exchange. Distinct from IsOpen (still in the not-yet-closed bucket).
+// A trade goes Pending → Active (filled, position live) → Closed.
+func (t Trade) IsPending() bool { return t.IsOpen() && t.FilledAt.IsZero() && !t.IsNoFill() }
+
+// IsActive reports whether the entry has filled but the position
+// hasn't been closed yet — i.e. the trade is currently live in the
+// market and progress against stop/TP is meaningful.
+func (t Trade) IsActive() bool { return t.IsOpen() && !t.FilledAt.IsZero() }
 
 // DefaultPath returns $JOURNAL_PATH or ./journal.csv.
 func DefaultPath() string {
@@ -333,8 +350,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV3(row), nil
 	case 19:
 		return parseRowV4(row), nil
+	case 20:
+		return parseRowV5(row), nil
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18/19 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19/20 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -439,6 +458,17 @@ func parseRowV4(row []string) Trade {
 	return t
 }
 
+// parseRowV5 is v4 + a trailing `filled_at` column (index 19).
+func parseRowV5(row []string) Trade {
+	t := parseRowV4(row[:19])
+	if row[19] != "" {
+		if at, err := time.Parse(time.RFC3339, row[19]); err == nil {
+			t.FilledAt = at
+		}
+	}
+	return t
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -458,6 +488,10 @@ func rowFromTrade(t Trade) []string {
 	lev := ""
 	if t.Leverage > 0 {
 		lev = strconv.Itoa(t.Leverage)
+	}
+	filledAt := ""
+	if !t.FilledAt.IsZero() {
+		filledAt = t.FilledAt.Local().Format(time.RFC3339)
 	}
 	return []string{
 		strconv.Itoa(t.ID),
@@ -479,6 +513,7 @@ func rowFromTrade(t Trade) []string {
 		rR,
 		t.CloseNotes,
 		lev,
+		filledAt,
 	}
 }
 

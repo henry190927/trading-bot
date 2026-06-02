@@ -44,16 +44,28 @@
     <span class="section-count">{{len .OpenTrades}}</span>
   </h2>
   {{range .OpenTrades}}
-    <article class="open-trade-card {{rClass .CurrentR}}">
+    <article class="open-trade-card {{if .Trade.IsPending}}status-pending{{else}}{{rClass .CurrentR}}{{end}}">
       <div class="ot-head">
         <span class="ot-id">#{{.Trade.ID}}</span>
         <span class="sym">{{.Trade.Symbol}}</span>
         <span class="{{sideClassStr .Trade.Side}} side-badge">{{sideStr .Trade.Side}}</span>
         {{if .Trade.Leverage}}<span class="lev-tag">{{.Trade.Leverage}}×</span>{{end}}
         <span class="ot-tf">{{or .Trade.TF "—"}}</span>
-        <span class="ot-elapsed">{{fmtElapsed .TimeElapsed}}</span>
-        <span class="ot-r {{rClass .CurrentR}}">{{fmtR .CurrentR}}R</span>
+        {{if .Trade.IsPending}}
+          <span class="ot-pending-badge">PENDING</span>
+          <span class="ot-elapsed" title="time since the plan was recorded">⏳ {{fmtElapsed .PendingSince}}</span>
+        {{else}}
+          <span class="ot-elapsed" title="time since fill">{{fmtElapsed .TimeElapsed}}</span>
+          <span class="ot-r {{rClass .CurrentR}}">{{fmtR .CurrentR}}R</span>
+        {{end}}
       </div>
+      {{if .Trade.IsPending}}
+      <div class="ot-pending-strip" title="entry hasn't filled yet — auto-detected on each refresh">
+        waiting for entry @ <button class="copy-btn small" data-copy="{{fmtPrice .Trade.Entry}}">{{fmtPrice .Trade.Entry}}</button>
+        · mark {{fmtPrice .MarkPrice}}
+        · <span class="dist-to-entry">{{printf "%+.2f%%" .DistToEntryPct}} to entry</span>
+      </div>
+      {{else}}
       <div class="ot-bar-wrap" title="position between stop (left, red) and TP2 (right, green)">
         <div class="ot-bar">
           <div class="ot-bar-fill {{if gt .CurrentR 0.0}}positive{{else}}negative{{end}}" style="width: {{if gt .CurrentR 0.0}}{{printf "%.0f" .PctToTP2}}{{else}}{{printf "%.0f" .PctToStop}}{{end}}%"></div>
@@ -65,6 +77,7 @@
           <span class="ot-bar-tp">TP2 {{fmtPrice .Trade.TP2}}</span>
         </div>
       </div>
+      {{end}}
       <div class="ot-prices">
         <span class="ot-mark">mark <button class="copy-btn small" data-copy="{{fmtPrice .MarkPrice}}">{{fmtPrice .MarkPrice}}</button></span>
         <span>TP1 <button class="copy-btn small tp" data-copy="{{fmtPrice .Trade.TP1}}">{{fmtPrice .Trade.TP1}}</button></span>
