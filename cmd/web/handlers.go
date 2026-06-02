@@ -228,16 +228,17 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		if !ok || v.Err != "" || len(v.Candles) == 0 {
 			continue
 		}
-		// Scan from when the plan was first known forward — use
-		// analyzed_at (engine timestamp) when set, else opened_at.
-		// This catches "I recorded late but the entry actually filled
-		// earlier" without being so loose it back-fills ancient bars.
+		// Floor = opened_at strictly. Only bars closing AFTER the user
+		// clicked +record count as potential fills — mirrors how a
+		// real limit order behaves on an exchange (the order doesn't
+		// exist until placed). Using analyzed_at as a wider floor
+		// caused false positives because the bar containing the click
+		// often has Low/High that touched entry before the click.
+		// If the user records too late and misses a real fill, they
+		// can manually set filled_at via the edit form.
 		floor := t.OpenedAt
-		if !t.AnalyzedAt.IsZero() && t.AnalyzedAt.Before(floor) {
-			floor = t.AnalyzedAt
-		}
 		for _, c := range v.Candles {
-			if c.CloseTime.Before(floor) {
+			if !c.CloseTime.After(floor) {
 				continue
 			}
 			var hit bool
