@@ -88,6 +88,20 @@ body {
     top: 50%;
     transform: translateY(-50%);
 }
+/* On narrow viewports, drop the absolute positioning and let the
+   timestamp wrap to its own centered row below the tf-picker. */
+@media (max-width: 600px) {
+    .tf-bar {
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
+    }
+    .tf-bar .updated {
+        position: static;
+        transform: none;
+        flex-basis: 100%;
+        text-align: center;
+    }
+}
 
 main {
     max-width: 720px;
