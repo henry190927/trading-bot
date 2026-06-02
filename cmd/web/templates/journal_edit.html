@@ -113,8 +113,13 @@
   </div>
 
   <div class="field">
-    <label for="opened_at">Opened at</label>
+    <label for="opened_at">Opened at <span class="hint">(when you recorded the plan)</span></label>
     <input type="datetime-local" name="opened_at" id="opened_at" value="{{.OpenedAt}}" required>
+  </div>
+
+  <div class="field">
+    <label for="filled_at">Filled at <span class="hint">(when entry triggered — blank = still pending)</span></label>
+    <input type="datetime-local" name="filled_at" id="filled_at" value="{{.FilledAt}}">
   </div>
 
   <div class="field">
@@ -147,6 +152,7 @@
       <option value="stop" {{if eq $o "stop"}}selected{{end}}>Stop (−1R)</option>
       <option value="manual" {{if eq $o "manual"}}selected{{end}}>Manual</option>
       <option value="timeout" {{if eq $o "timeout"}}selected{{end}}>Timeout</option>
+      <option value="no-fill" {{if eq $o "no-fill"}}selected{{end}}>No-fill (0R)</option>
     </select>
   </div>
 

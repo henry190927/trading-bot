@@ -852,6 +852,17 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		return
 	}
 
+	// filled_at: blank → still pending; non-blank → entry was triggered.
+	filledAtStr := strings.TrimSpace(c.PostForm("filled_at"))
+	var filledAt time.Time
+	if filledAtStr != "" {
+		filledAt, err = journal.ParseTimeSpec(filledAtStr, time.Now().UTC())
+		if err != nil {
+			rerender("filled_at: " + err.Error())
+			return
+		}
+	}
+
 	// closed_at: blank → trade is open; non-blank → trade is closed.
 	closedAtStr := strings.TrimSpace(c.PostForm("closed_at"))
 	var closedAt time.Time
@@ -869,15 +880,19 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	exitStr := strings.TrimSpace(c.PostForm("exit_price"))
 	if !closedAt.IsZero() {
 		switch outcome {
-		case "tp1", "tp2", "stop", "manual", "timeout":
+		case "tp1", "tp2", "stop", "manual", "timeout", "no-fill":
 		default:
 			rerender("outcome required when closed_at is set")
 			return
 		}
-		exitPrice, err = parseFloatPositive(exitStr, "exit price")
-		if err != nil {
-			rerender(err.Error())
-			return
+		if outcome == "no-fill" {
+			exitPrice = 0
+		} else {
+			exitPrice, err = parseFloatPositive(exitStr, "exit price")
+			if err != nil {
+				rerender(err.Error())
+				return
+			}
 		}
 	} else {
 		// Re-opening: clear close-only fields.
@@ -911,13 +926,17 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	trades[idx].TP2 = tp2
 	trades[idx].OpenedAt = openedAt
 	trades[idx].AnalyzedAt = analyzedAt
+	trades[idx].FilledAt = filledAt
 	trades[idx].ClosedAt = closedAt
 	trades[idx].Outcome = outcome
 	trades[idx].ExitPrice = exitPrice
-	if !closedAt.IsZero() {
-		trades[idx].RRealized = journal.RealizedR(trades[idx], exitPrice)
-	} else {
+	switch {
+	case closedAt.IsZero():
 		trades[idx].RRealized = 0
+	case outcome == "no-fill":
+		trades[idx].RRealized = 0
+	default:
+		trades[idx].RRealized = journal.RealizedR(trades[idx], exitPrice)
 	}
 
 	if err := journal.WriteAll("", trades); err != nil {
@@ -967,6 +986,7 @@ func editFormData(t journal.Trade, errMsg string) gin.H {
 		"Trade":      t,
 		"OpenedAt":   asLocalInput(t.OpenedAt),
 		"AnalyzedAt": asLocalInput(t.AnalyzedAt),
+		"FilledAt":   asLocalInput(t.FilledAt),
 		"ClosedAt":   asLocalInput(t.ClosedAt),
 		"Entry":      fmt.Sprintf("%.4f", t.Entry),
 		"Stop":       fmt.Sprintf("%.4f", t.Stop),
