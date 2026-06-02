@@ -1051,17 +1051,26 @@ func (s *server) handleJournalList(c *gin.Context) {
 
 	// Compute summary stats over closed trades. No-fills are tracked
 	// separately and excluded from WR/R aggregates — they're plan
-	// records, not trades.
+	// records, not trades. Open trades are split into pending (entry
+	// not yet filled) and active (filled, not yet closed) for the
+	// hero pills.
 	var totalR, bestR, worstR float64
 	wins, closedCount, noFillCount := 0, 0, 0
+	pendingCount, activeCount := 0, 0
 	for _, t := range trades {
-		if t.IsOpen() {
+		if t.IsPending() {
+			pendingCount++
+			continue
+		}
+		if t.IsActive() {
+			activeCount++
 			continue
 		}
 		if t.IsNoFill() {
 			noFillCount++
 			continue
 		}
+		// Anything that reaches here is a closed (non-no-fill) trade.
 		closedCount++
 		totalR += t.RRealized
 		if t.RRealized > 0 {
@@ -1118,7 +1127,9 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"Page":         page,
 		"TotalPages":   totalPages,
 		"PageNums":     pageNums,
-		"OpenCount":    len(trades) - closedCount - noFillCount,
+		"OpenCount":    pendingCount + activeCount, // legacy alias — total still-open
+		"PendingCount": pendingCount,
+		"ActiveCount":  activeCount,
 		"ClosedCount":  closedCount,
 		"NoFillCount":  noFillCount,
 		"WR":           wr,
@@ -1584,8 +1595,11 @@ func templateFuncs() template.FuncMap {
 			// can be a winning trade (e.g. partial close above breakeven),
 			// and labeling it red just because it isn't a clean TP would
 			// mislead at a glance.
+			if t.IsPending() {
+				return "status-pending"
+			}
 			if t.IsOpen() {
-				return "status-open"
+				return "status-open" // = active (filled, not closed)
 			}
 			if t.IsNoFill() {
 				return "status-skip" // distinct from "flat" (0R but no trade actually taken)
@@ -1599,8 +1613,11 @@ func templateFuncs() template.FuncMap {
 			return "status-flat"
 		},
 		"outcomeText": func(t journal.Trade) string {
+			if t.IsPending() {
+				return "pending"
+			}
 			if t.IsOpen() {
-				return "open"
+				return "active"
 			}
 			return t.Outcome
 		},

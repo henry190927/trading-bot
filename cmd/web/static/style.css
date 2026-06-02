@@ -394,6 +394,28 @@ footer {
 .status-skip .trade-status::before {
     content: "↛ ";
 }
+.trade-card.status-pending {
+    border-left-color: var(--yellow);
+}
+.status-pending .trade-status {
+    background: rgba(251, 191, 36, 0.18);
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    animation: pulse-pending 1.6s ease-in-out infinite;
+}
+
+/* Hero "pending" pill in the Portfolio header. */
+.pf-hero-pill.pf-pill-pending {
+    border-color: rgba(251, 191, 36, 0.55);
+    background: rgba(251, 191, 36, 0.08);
+}
+.pf-hero-pill.pf-pill-pending strong { color: var(--yellow); }
 
 .trade-head {
     display: flex;
