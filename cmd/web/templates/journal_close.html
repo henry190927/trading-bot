@@ -64,24 +64,24 @@
 
   <div class="field">
     <label for="outcome">Outcome</label>
-    <select name="outcome" id="outcome" required onchange="prefillExit(this.value)">
+    <select name="outcome" id="outcome" required onchange="onOutcomeChange(this.value)">
       <option value="">— choose —</option>
       <option value="tp1" {{if eq .Outcome "tp1"}}selected{{end}}>TP1 hit (+1R)</option>
       <option value="tp2" {{if eq .Outcome "tp2"}}selected{{end}}>TP2 hit (+2R)</option>
       <option value="stop" {{if eq .Outcome "stop"}}selected{{end}}>Stopped out (−1R)</option>
       <option value="manual" {{if eq .Outcome "manual"}}selected{{end}}>Closed manually</option>
       <option value="timeout" {{if eq .Outcome "timeout"}}selected{{end}}>Timed out / cancelled</option>
+      <option value="no-fill" {{if eq .Outcome "no-fill"}}selected{{end}}>No-fill (entry not triggered, 0R)</option>
     </select>
   </div>
 
-  <div class="field">
+  <div class="field" id="exit-field">
     <label for="exit_price">Exit price</label>
     <input type="number" step="any" inputmode="decimal"
            name="exit_price" id="exit_price" value="{{.ExitPrice}}"
            data-tp1="{{fmtPrice .Trade.TP1}}"
            data-tp2="{{fmtPrice .Trade.TP2}}"
-           data-stop="{{fmtPrice .Trade.Stop}}"
-           required>
+           data-stop="{{fmtPrice .Trade.Stop}}">
   </div>
 
   <div class="field">
@@ -102,15 +102,28 @@
 </form>
 
 <script>
-function prefillExit(outcome) {
+function onOutcomeChange(outcome) {
     var input = document.getElementById('exit_price');
-    if (!input || input.value) return;
+    var field = document.getElementById('exit-field');
+    if (!input || !field) return;
+    // no-fill: hide exit price + clear it. R is always 0 in this branch.
+    if (outcome === 'no-fill') {
+        input.value = '';
+        input.removeAttribute('required');
+        field.style.display = 'none';
+        return;
+    }
+    field.style.display = '';
+    input.setAttribute('required', 'required');
+    if (input.value) return;
     var v = '';
     if (outcome === 'tp1') v = input.dataset.tp1;
     else if (outcome === 'tp2') v = input.dataset.tp2;
     else if (outcome === 'stop') v = input.dataset.stop;
     if (v) input.value = v;
 }
+// Apply state on first paint in case form is re-rendered with no-fill pre-selected.
+onOutcomeChange(document.getElementById('outcome').value);
 </script>
 {{end}}{{/* if .Trade.IsOpen */}}
 

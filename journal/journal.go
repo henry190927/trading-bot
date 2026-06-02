@@ -47,7 +47,7 @@ type Trade struct {
 	Anchor     string
 	OpenNotes  string
 	ExitPrice  float64
-	Outcome    string // "tp1", "tp2", "stop", "manual", "timeout", "" if open
+	Outcome    string // "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "" if open
 	RRealized  float64
 	CloseNotes string
 	// Leverage is the position multiplier used on the perp exchange. Optional
@@ -59,6 +59,11 @@ type Trade struct {
 
 // IsOpen reports whether the trade is still open (no close time set).
 func (t Trade) IsOpen() bool { return t.ClosedAt.IsZero() }
+
+// IsNoFill reports whether the plan never filled — recorded for
+// discipline tracking (signal-to-fill ratio) without affecting WR/R
+// stats. R should be exactly 0 for no-fills.
+func (t Trade) IsNoFill() bool { return t.Outcome == "no-fill" }
 
 // DefaultPath returns $JOURNAL_PATH or ./journal.csv.
 func DefaultPath() string {

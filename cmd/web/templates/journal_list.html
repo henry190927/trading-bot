@@ -39,6 +39,7 @@
     <span class="pf-hero-pill"><span class="lbl">avgR</span><strong class="{{rClass .AvgR}}">{{fmtR .AvgR}}</strong></span>
     <span class="pf-hero-pill"><span class="lbl">closed</span><strong>{{.ClosedCount}}</strong></span>
     <span class="pf-hero-pill"><span class="lbl">open</span><strong>{{.OpenCount}}</strong></span>
+    {{if .NoFillCount}}<span class="pf-hero-pill" title="setups where the entry never triggered — discipline log only, excluded from WR / R math"><span class="lbl">no-fill</span><strong>{{.NoFillCount}}</strong></span>{{end}}
     <span class="pf-hero-pill"><span class="lbl">best</span><strong class="r-pos">{{fmtR .BestR}}</strong></span>
     <span class="pf-hero-pill"><span class="lbl">worst</span><strong class="r-neg">{{fmtR .WorstR}}</strong></span>
   </div>

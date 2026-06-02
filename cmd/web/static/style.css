@@ -373,6 +373,13 @@ footer {
 .trade-card.status-open { border-left-color: var(--yellow); }
 .trade-card.status-flat { border-left-color: var(--text-dim); }
 .trade-card.status-other { border-left-color: var(--text-dim); }
+.trade-card.status-skip {
+    border-left-color: var(--text-dim);
+    opacity: 0.72;
+}
+.status-skip .trade-status::before {
+    content: "↛ ";
+}
 
 .trade-head {
     display: flex;

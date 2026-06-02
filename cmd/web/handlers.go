@@ -643,15 +643,22 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 	}
 
 	switch outcome {
-	case "tp1", "tp2", "stop", "manual", "timeout":
+	case "tp1", "tp2", "stop", "manual", "timeout", "no-fill":
 	default:
-		rerender("outcome must be tp1, tp2, stop, manual, or timeout")
+		rerender("outcome must be tp1, tp2, stop, manual, timeout, or no-fill")
 		return
 	}
-	exit, err := parseFloatPositive(exitStr, "exit price")
-	if err != nil {
-		rerender(err.Error())
-		return
+	// no-fill: plan never triggered, so exit_price is irrelevant and R is
+	// always 0. Just record the close time + notes for the discipline log.
+	var exit float64
+	if outcome == "no-fill" {
+		exit = 0
+	} else {
+		exit, err = parseFloatPositive(exitStr, "exit price")
+		if err != nil {
+			rerender(err.Error())
+			return
+		}
 	}
 	closedAt := time.Now().UTC()
 	if closedAtStr != "" {
@@ -667,7 +674,11 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 	trades[idx].ExitPrice = exit
 	trades[idx].Outcome = outcome
 	trades[idx].CloseNotes = notes
-	trades[idx].RRealized = journal.RealizedR(trades[idx], exit)
+	if outcome == "no-fill" {
+		trades[idx].RRealized = 0
+	} else {
+		trades[idx].RRealized = journal.RealizedR(trades[idx], exit)
+	}
 
 	if err := journal.WriteAll("", trades); err != nil {
 		rerender("write journal: " + err.Error())
@@ -934,11 +945,17 @@ func (s *server) handleJournalList(c *gin.Context) {
 	}
 	journal.SortByOpenedDesc(trades)
 
-	// Compute summary stats over closed trades.
+	// Compute summary stats over closed trades. No-fills are tracked
+	// separately and excluded from WR/R aggregates — they're plan
+	// records, not trades.
 	var totalR, bestR, worstR float64
-	wins, closedCount := 0, 0
+	wins, closedCount, noFillCount := 0, 0, 0
 	for _, t := range trades {
 		if t.IsOpen() {
+			continue
+		}
+		if t.IsNoFill() {
+			noFillCount++
 			continue
 		}
 		closedCount++
@@ -997,8 +1014,9 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"Page":         page,
 		"TotalPages":   totalPages,
 		"PageNums":     pageNums,
-		"OpenCount":    len(trades) - closedCount,
+		"OpenCount":    len(trades) - closedCount - noFillCount,
 		"ClosedCount":  closedCount,
+		"NoFillCount":  noFillCount,
 		"WR":           wr,
 		"AvgR":         avgR,
 		"TotalR":       totalR,
@@ -1046,10 +1064,12 @@ type equityCurve struct {
 // then maps it into a 100×40 viewBox for SVG rendering. Origin (0, 0R) is
 // always the leftmost point so the line visually starts at the baseline.
 func buildEquityCurve(trades []journal.Trade) equityCurve {
-	// Closed trades sorted by ClosedAt ascending.
+	// Closed trades sorted by ClosedAt ascending. No-fills don't move the
+	// equity curve so they're excluded — including them would emit flat
+	// points that misrepresent the R progression.
 	var closed []journal.Trade
 	for _, t := range trades {
-		if !t.IsOpen() && !t.ClosedAt.IsZero() {
+		if !t.IsOpen() && !t.ClosedAt.IsZero() && !t.IsNoFill() {
 			closed = append(closed, t)
 		}
 	}
@@ -1180,8 +1200,8 @@ func buildPeriodStats(trades []journal.Trade) periodStats {
 
 	var p periodStats
 	for _, t := range trades {
-		if t.IsOpen() || t.ClosedAt.IsZero() {
-			continue
+		if t.IsOpen() || t.ClosedAt.IsZero() || t.IsNoFill() {
+			continue // no-fill plans don't count in R / WR aggregates
 		}
 		closedLocal := t.ClosedAt.Local()
 		p.AllTimeR += t.RRealized
@@ -1229,7 +1249,7 @@ func buildRHistogram(trades []journal.Trade) []rBucket {
 	}
 	maxCount := 0
 	for _, t := range trades {
-		if t.IsOpen() {
+		if t.IsOpen() || t.IsNoFill() {
 			continue
 		}
 		r := t.RRealized
@@ -1285,7 +1305,7 @@ func buildDailyCalendar(trades []journal.Trade, days int) [][]dailyCell {
 	}
 	byDate := map[string]*agg{}
 	for _, t := range trades {
-		if t.IsOpen() || t.ClosedAt.IsZero() {
+		if t.IsOpen() || t.ClosedAt.IsZero() || t.IsNoFill() {
 			continue
 		}
 		key := t.ClosedAt.Local().Format("2006-01-02")
@@ -1462,6 +1482,9 @@ func templateFuncs() template.FuncMap {
 			// mislead at a glance.
 			if t.IsOpen() {
 				return "status-open"
+			}
+			if t.IsNoFill() {
+				return "status-skip" // distinct from "flat" (0R but no trade actually taken)
 			}
 			switch {
 			case t.RRealized > 0:
