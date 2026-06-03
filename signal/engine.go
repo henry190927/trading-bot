@@ -314,6 +314,7 @@ func Evaluate(in Inputs) Signal {
 	applyContextFilters(&sig, in.Ctx)
 	if sig.Side != Flat {
 		sig.Plan = BuildPlan(sig, in.Candles, sweeps)
+		applyPerSymbolStopBuffer(&sig.Plan, sig.Side, in.Symbol)
 	}
 
 	// Live-mark plan validity check. Refuse to emit plans where market has

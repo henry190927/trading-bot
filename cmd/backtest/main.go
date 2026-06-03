@@ -35,7 +35,12 @@ func main() {
 	stopHuntVerbose := flag.Bool("stop-hunt-v", false, "as --stop-hunt but also dump each individual swept-then-reverted trade")
 	stopBufferR := flag.Float64("stop-buffer-r", 0, "STRATEGY VARIANT 1: widen the stop by this fraction of R (e.g. 0.3 = stop 0.3R further from entry). Risk per trade grows; TPs re-derived from new R. Goal: survive stop hunts without changing entry.")
 	slideOffsetPct := flag.Float64("slide-offset-pct", 0, "STRATEGY VARIANT 2: slide BOTH entry and stop in the side's away direction by this fraction of entry (e.g. 0.002 = 0.2%). Risk distance unchanged. Goal: let the typical sweep play out, then fill past it with stop past the cluster.")
+	symFlag := flag.String("symbol", "", "override market.All() with a single BingX contract code, e.g. NCCO1OILBRENT2USD-USDT — for pre-flighting new symbols without polluting the live daemon universe.")
+	disablePerSym := flag.Bool("no-per-symbol-buffer", false, "clear signal.PerSymbolStopBuffer for this run — A/B comparison against the pre-2026-06-03 baseline before per-symbol stop buffers shipped.")
 	flag.Parse()
+	if *disablePerSym {
+		signal.PerSymbolStopBuffer = nil
+	}
 
 	if *stopRefine {
 		signal.StopRefineEnabled = true
@@ -78,7 +83,11 @@ func main() {
 		}
 	}
 
-	for _, sym := range market.All() {
+	symbols := market.All()
+	if *symFlag != "" {
+		symbols = []market.Symbol{market.Symbol(*symFlag)}
+	}
+	for _, sym := range symbols {
 		candles, err := client.KlinesRange(ctx, sym, timeframe, start, end)
 		if err != nil {
 			log.Printf("%s: history fetch failed: %v", sym, err)

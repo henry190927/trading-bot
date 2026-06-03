@@ -11,6 +11,10 @@ const (
 	ETHUSDT Symbol = "ETH-USDT"
 	XAUUSDT Symbol = "NCCOGOLD2USD-USDT"
 	XAGUSDT Symbol = "NCCOXAG2USD-USDT"
+	// BRENTUSDT — not in All() yet; pre-flight backtest candidate as of
+	// 2026-06-03. Activate by adding to All() once the 60/90/120d A/B
+	// clears the user's strategy-change gate.
+	BRENTUSDT Symbol = "NCCO1OILBRENT2USD-USDT"
 )
 
 func (s Symbol) IsMetal() bool {
