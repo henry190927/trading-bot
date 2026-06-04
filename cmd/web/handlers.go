@@ -1715,27 +1715,18 @@ func templateFuncs() template.FuncMap {
 			return fmt.Sprintf("%+.2f%%", (target-ref)/ref*100)
 		},
 		"validateRecordHref": func(r validator.Result, short string) template.URL {
+			// /validate page records the USER's entry + the Suggested
+			// levels derived from it (SuggStop/TP1/TP2 = entry ± 1.5×ATR
+			// risk units). Never substitutes the engine's own plan —
+			// that defeats the purpose of validating a custom entry.
 			q := url.Values{}
 			q.Set("symbol", short)
 			q.Set("side", strings.ToLower(r.Side.String()))
 			q.Set("entry", fmt.Sprintf("%.4f", r.Entry))
-			// Prefer engine's own plan if it has a tradeable one and the
-			// direction matches; else fall back to the suggested ATR-based
-			// levels (still useful structure for a discretionary entry).
-			if r.EnginePlan.Entry != 0 && r.EngineSide == r.Side {
-				q.Set("stop", fmt.Sprintf("%.4f", r.EnginePlan.StopLoss))
-				if len(r.EnginePlan.TakeProfit) >= 1 {
-					q.Set("tp1", fmt.Sprintf("%.4f", r.EnginePlan.TakeProfit[0]))
-				}
-				if len(r.EnginePlan.TakeProfit) >= 2 {
-					q.Set("tp2", fmt.Sprintf("%.4f", r.EnginePlan.TakeProfit[1]))
-				}
-				q.Set("anchor", r.EnginePlan.Anchor)
-			} else {
-				q.Set("stop", fmt.Sprintf("%.4f", r.SuggStop))
-				q.Set("tp1", fmt.Sprintf("%.4f", r.SuggTP1))
-				q.Set("tp2", fmt.Sprintf("%.4f", r.SuggTP2))
-			}
+			q.Set("stop", fmt.Sprintf("%.4f", r.SuggStop))
+			q.Set("tp1", fmt.Sprintf("%.4f", r.SuggTP1))
+			q.Set("tp2", fmt.Sprintf("%.4f", r.SuggTP2))
+			q.Set("anchor", "manual")
 			q.Set("tf", string(r.Timeframe))
 			q.Set("score", fmt.Sprintf("v%.1f", r.Total))
 			return template.URL("/journal/new?" + q.Encode())
