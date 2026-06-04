@@ -37,6 +37,7 @@ func main() {
 	slideOffsetPct := flag.Float64("slide-offset-pct", 0, "STRATEGY VARIANT 2: slide BOTH entry and stop in the side's away direction by this fraction of entry (e.g. 0.002 = 0.2%). Risk distance unchanged. Goal: let the typical sweep play out, then fill past it with stop past the cluster.")
 	symFlag := flag.String("symbol", "", "override market.All() with a single BingX contract code, e.g. NCCO1OILBRENT2USD-USDT — for pre-flighting new symbols without polluting the live daemon universe.")
 	disablePerSym := flag.Bool("no-per-symbol-buffer", false, "clear signal.PerSymbolStopBuffer for this run — A/B comparison against the pre-2026-06-03 baseline before per-symbol stop buffers shipped.")
+	replayValidator := flag.Bool("replay-validator", false, "diagnostic: run validator.Validate on each emitted signal; bucket realized R by validator verdict (STRONG/TAKE/NEUTRAL/WEAK/AVOID). Used to A/B whether validator weight changes improve predictive correlation.")
 	flag.Parse()
 	if *disablePerSym {
 		signal.PerSymbolStopBuffer = nil
@@ -65,6 +66,7 @@ func main() {
 		SweepOnly:       *sweepOnly,
 		StopBufferR:     *stopBufferR,
 		SlideOffsetPct:  *slideOffsetPct,
+		ReplayValidator: *replayValidator,
 	}
 
 	// DXY macro veto — only useful for XAU/XAG; the engine ignores it for
@@ -109,6 +111,9 @@ func main() {
 		fmt.Println(res.Summary())
 		if *stopHunt || *stopHuntVerbose {
 			fmt.Println(res.StopHuntSummary())
+		}
+		if *replayValidator {
+			fmt.Println(res.ValidatorReplaySummary())
 		}
 		if *stopHuntVerbose {
 			for _, t := range res.Trades {

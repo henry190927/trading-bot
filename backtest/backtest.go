@@ -10,6 +10,7 @@ import (
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/signal"
+	"myFirstGo/trading-bot/validator"
 )
 
 // Options configures a backtest run. Zero values mean "no fees, no filter".
@@ -44,6 +45,13 @@ type Options struct {
 	// at it. Default 0. E.g. 0.002 = 0.2% slide. For LONG entry/
 	// stop move DOWN; for SHORT they move UP.
 	SlideOffsetPct float64
+
+	// ReplayValidator runs validator.Validate on each emitted signal
+	// and records the resulting Total + Verdict on the Trade. Used
+	// to A/B the predictive-correlation of validator weights: does
+	// "/10 says STRONG TAKE" actually predict winners? Adds ~50ms
+	// per signal but doesn't change strategy.
+	ReplayValidator bool
 }
 
 type Trade struct {
@@ -71,6 +79,13 @@ type Trade struct {
 	WickPastStopR  float64
 	Reclaimed      bool
 	ReclaimBars    int
+
+	// Validator-replay diagnostic (populated only when ReplayValidator
+	// option is on). Records what validator.Validate would have said
+	// about this signal at the moment it fired. Used to A/B whether
+	// validator-weight changes improve predictive correlation with R.
+	ValidatorScore   float64
+	ValidatorVerdict string
 }
 
 // ReclaimWindow defines how many bars after a stop-out we look for the
@@ -166,6 +181,14 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 			continue
 		}
 		tr.SignaledAt = candles[i].CloseTime
+		// Validator-replay diagnostic: re-validate the signal at the
+		// moment it fired (using the same candle slice the engine saw)
+		// so we can later A/B whether validator weights predict outcome.
+		if opts.ReplayValidator {
+			vr := validator.Validate(sym, tf, sig.Side, sig.Plan.Entry, opts.FeeBpsRoundTrip, slice)
+			tr.ValidatorScore = vr.Total
+			tr.ValidatorVerdict = vr.Verdict
+		}
 		res.Trades = append(res.Trades, *tr)
 		openTradeUntil = i + 1 + lastIdx
 	}
@@ -455,6 +478,71 @@ func (r Result) Summary() string {
 		r.Symbol, r.Timeframe, filter, r.Opts.FeeBpsRoundTrip,
 		r.NumSignals, len(r.Trades),
 		r.WinRate*100, r.TotalGross, r.TotalR, r.AvgR, r.MaxDDR, r.BestR, r.WorstR)
+}
+
+// ValidatorReplaySummary buckets the run's trades by validator score
+// band and computes the realized-R within each. A useful weighting
+// scheme should produce monotonic-ish R across bands: STRONG TAKE
+// trades should outperform AVOID trades by a wide margin. If the
+// bands all sit near the global avgR, the validator isn't adding
+// information; if the spread is wide, the weights are predictive.
+func (r Result) ValidatorReplaySummary() string {
+	bands := []struct {
+		label  string
+		lo, hi float64
+	}{
+		{"STRONG (≥8)", 8, 11},
+		{"TAKE (6-8)", 6, 8},
+		{"NEUTRAL (4-6)", 4, 6},
+		{"WEAK (2-4)", 2, 4},
+		{"AVOID (<2)", -1, 2},
+	}
+	type band struct {
+		n     int
+		totR  float64
+		wins  int
+	}
+	stats := make(map[string]*band)
+	any := false
+	for _, t := range r.Trades {
+		if t.Outcome == "no-fill" {
+			continue
+		}
+		if t.ValidatorScore == 0 && t.ValidatorVerdict == "" {
+			continue // replay wasn't enabled or this trade has no score
+		}
+		any = true
+		for _, b := range bands {
+			if t.ValidatorScore >= b.lo && t.ValidatorScore < b.hi {
+				s, ok := stats[b.label]
+				if !ok {
+					s = &band{}
+					stats[b.label] = s
+				}
+				s.n++
+				s.totR += t.R
+				if t.R > 0 {
+					s.wins++
+				}
+				break
+			}
+		}
+	}
+	if !any {
+		return fmt.Sprintf("%s %s | validator-replay: not run (pass --replay-validator)", r.Symbol, r.Timeframe)
+	}
+	parts := fmt.Sprintf("%s %s | validator-replay bands:", r.Symbol, r.Timeframe)
+	for _, b := range bands {
+		s := stats[b.label]
+		if s == nil || s.n == 0 {
+			parts += fmt.Sprintf("\n    %-15s n=0", b.label)
+			continue
+		}
+		wr := 100 * float64(s.wins) / float64(s.n)
+		avg := s.totR / float64(s.n)
+		parts += fmt.Sprintf("\n    %-15s n=%-3d WR=%5.1f%% avgR=%+5.3f totalR=%+6.2f", b.label, s.n, wr, avg, s.totR)
+	}
+	return parts
 }
 
 // StopHuntSummary describes how often stops were swept and reverted —
