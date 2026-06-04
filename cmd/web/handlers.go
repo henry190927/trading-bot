@@ -237,21 +237,47 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		// If the user records too late and misses a real fill, they
 		// can manually set filled_at via the edit form.
 		floor := t.OpenedAt
+		hit := false
 		for _, c := range v.Candles {
 			if !c.CloseTime.After(floor) {
 				continue
 			}
-			var hit bool
+			var barHit bool
 			switch t.Side {
 			case "long":
-				hit = c.Low <= t.Entry
+				barHit = c.Low <= t.Entry
 			case "short":
-				hit = c.High >= t.Entry
+				barHit = c.High >= t.Entry
 			}
-			if hit {
+			if barHit {
 				t.FilledAt = c.CloseTime
 				tradesChanged = true
+				hit = true
 				break
+			}
+		}
+		// Live-mark fallback: closed-bar detection only sees bars after
+		// they close. On 2h/4h TFs that lag is hours. If the current
+		// mark price is already past the entry in the side's direction,
+		// the fill has happened — record it now at wall-clock time
+		// (~30s precision per refresh cycle).
+		if !hit {
+			mark := v.MarkPrice
+			if mark == 0 {
+				mark = v.Signal.Price
+			}
+			if mark > 0 {
+				var liveHit bool
+				switch t.Side {
+				case "long":
+					liveHit = mark <= t.Entry
+				case "short":
+					liveHit = mark >= t.Entry
+				}
+				if liveHit {
+					t.FilledAt = time.Now().UTC()
+					tradesChanged = true
+				}
 			}
 		}
 	}
