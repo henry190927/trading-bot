@@ -2338,19 +2338,74 @@ footer {
     margin: 1rem 0 0.4rem;
 }
 .legend-modal-body h3:first-child { margin-top: 0.2rem; }
-.legend-modal-body ul.legend-list { list-style: none; padding: 0; margin: 0; }
-.legend-modal-body ul.legend-list li {
-    margin: 0.35rem 0;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
+/* ── Legend modal body — two layout patterns ────────────────────────
+   .legend-table  — for sections with consistent name+description rows
+                    (chart lines, verdict colors). Renders as a real
+                    HTML table so the name column hugs its content and
+                    the description wraps cleanly without misaligning
+                    the swatch.
+   .legend-dl     — definition list for sections with variable-length
+                    descriptions (chip dictionaries). Each <dt> is a
+                    bold term row, each <dd> is the explanation under-
+                    neath. Wrapping is per-block, never cross-row.   */
+.legend-modal-body .legend-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
 }
-.legend-modal-body ul.legend-list li b { color: var(--text); }
-.legend-modal-body ul.legend-list li code {
+.legend-modal-body .legend-table td {
+    padding: 0.4rem 0.45rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+.legend-modal-body .legend-table tr:last-child td { border-bottom: none; }
+.legend-modal-body .legend-table .lg-col-name {
+    white-space: nowrap;
+    width: 1%; /* hug content; description fills the rest */
+    color: var(--text);
+}
+.legend-modal-body .legend-table .lg-col-name b { color: var(--text); }
+.legend-modal-body .legend-table .lg-col-name .lg-swatch { margin-right: 0.4rem; }
+.legend-modal-body .legend-table tr td:nth-child(2) { color: var(--text-dim); }
+
+.legend-modal-body .legend-dl {
+    margin: 0;
+    padding: 0;
+}
+.legend-modal-body .legend-dl dt {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 0.7rem;
+    font-size: 0.88rem;
+    line-height: 1.35;
+    flex-wrap: wrap;
+}
+.legend-modal-body .legend-dl dt:first-child { margin-top: 0; }
+.legend-modal-body .legend-dl dd {
+    margin: 0.2rem 0 0 0;
+    padding-left: 0;
+    color: var(--text-dim);
+    font-size: 0.83rem;
+    line-height: 1.55;
+}
+.legend-modal-body .legend-dl dt b,
+.legend-modal-body .legend-dl dd b { color: var(--text); }
+.legend-modal-body .legend-dl code,
+.legend-modal-body .legend-table code {
     background: var(--surface-2);
     padding: 1px 4px;
     border-radius: 3px;
     font-size: 0.82rem;
+}
+.legend-modal-body .lg-meta {
+    font-weight: 400;
+    color: var(--text-dim);
+    font-size: 0.78rem;
 }
 
 .lg-swatch {
@@ -2359,7 +2414,7 @@ footer {
     height: 12px;
     border-radius: 3px;
     flex: 0 0 auto;
-    margin-top: 5px;
+    vertical-align: middle;
 }
 .lg-poc200  { background: rgba(192, 132, 252, 0.85); }
 .lg-poc100  { background: rgba(192, 132, 252, 0.55); }

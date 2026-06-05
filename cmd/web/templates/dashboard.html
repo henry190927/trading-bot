@@ -248,56 +248,76 @@
     <div class="legend-modal-body">
 
       <h3>Chart lines</h3>
-      <ul class="legend-list">
-        <li><span class="lg-swatch lg-poc200"></span><b>POC200</b> (solid strong purple) — long-term Point of Control, ~8 days on 1h. The single price where most volume traded over the lookback.</li>
-        <li><span class="lg-swatch lg-poc100"></span><b>POC100</b> (medium dashed purple) — ~4-day POC.</li>
-        <li><span class="lg-swatch lg-poc50"></span><b>POC50</b> (light dashed purple) — recent ~2-day POC; closest to current price.</li>
-        <li><span class="lg-swatch lg-va"></span><b>VAH / VAL</b> (dashed purple edges + faint purple band) — Value Area High/Low; the band holding 70% of volume.</li>
-        <li><span class="lg-swatch lg-mark"></span><b>mark</b> (dashed yellow) — live BingX mark price.</li>
-        <li><span class="lg-swatch lg-entry"></span><b>entry</b> (solid blue) — engine's planned entry level.</li>
-        <li><span class="lg-swatch lg-stop"></span><b>stop</b> (solid red) — engine's stop level.</li>
-        <li><span class="lg-swatch lg-tp"></span><b>TP1 / TP2</b> (solid green) — 1R / 2R targets.</li>
-      </ul>
+      <table class="legend-table">
+        <tbody>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc200"></span><b>POC200</b></td><td>Long-term Point of Control (~8d on 1h). The price with most accumulated volume.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc100"></span><b>POC100</b></td><td>Medium-window POC (~4d).</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc50"></span><b>POC50</b></td><td>Recent ~2-day POC. Usually closest to current price.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-va"></span><b>VAH / VAL</b></td><td>Value Area High / Low — band holding 70% of volume.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-mark"></span><b>mark</b></td><td>Live BingX mark price.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-entry"></span><b>entry</b></td><td>Engine's planned entry level.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-stop"></span><b>stop</b></td><td>Engine's stop level.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-tp"></span><b>TP1 / TP2</b></td><td>1R / 2R profit targets.</td></tr>
+        </tbody>
+      </table>
 
       <h3>Meta-row chips</h3>
-      <ul class="legend-list">
-        <li><b>POC</b> — primary 200-bar POC price; tap to copy.</li>
-        <li><b>VA</b> — VAL ↔ VAH copy buttons (the 70% volume zone edges).</li>
-        <li><b>HVN</b> — top-5 secondary chip zones (high-volume nodes) inside the 200-bar profile.</li>
-        <li><b>drift ↗ / ↘ / →</b> — POC migration across 50/100/200-bar windows. <code>(POC50 − POC200) / POC200</code> as %. <i>Rising</i> = bullish regime, <i>falling</i> = bearish, <i>flat</i> = chop. Bold border = stacked (POC50 &gt; POC100 &gt; POC200) = strong confirmation.</li>
-      </ul>
+      <dl class="legend-dl">
+        <dt>POC</dt>
+        <dd>Primary 200-bar POC price; tap to copy.</dd>
+        <dt>VA</dt>
+        <dd>VAL ↔ VAH copy buttons (the 70% volume zone edges).</dd>
+        <dt>HVN</dt>
+        <dd>Top-5 secondary chip zones (high-volume nodes) inside the 200-bar profile.</dd>
+        <dt>drift ↗ / ↘ / →</dt>
+        <dd>POC migration across 50/100/200-bar windows. <code>(POC50 − POC200) / POC200</code> as %. <i>Rising</i> = bullish, <i>falling</i> = bearish, <i>flat</i> = chop. <b>Bold border</b> = stacked (POC50 &gt; POC100 &gt; POC200) = strong confirmation.</dd>
+      </dl>
 
       <h3>Diagnose chips</h3>
-      <ul class="legend-list">
-        <li><b>at VAH / at VAL</b> — entry within 0.3% of the value-area edge. Best mean-rev rotation setups (target = POC).</li>
-        <li><b>inside VA</b> — entry inside [VAL, VAH] but not at an edge. Chop / equilibrium; weak edge either side.</li>
-        <li><b>above VA / below VA</b> — entry outside the value area. Either acceptance (new regime forming) or extension (reversion candidate).</li>
-        <li><b>POC ↗ / ↘</b> — current regime per POC migration.</li>
-        <li><span class="lg-swatch lg-knife"></span><b>⚠ falling knife</b> — a big bearish range-expansion bar fired in the last 3 candles. Fighting fresh downward momentum is risky for longs.</li>
-        <li><span class="lg-swatch lg-squeeze"></span><b>⚠ blow-off risk</b> — same but bullish; risky for shorts.</li>
-      </ul>
+      <dl class="legend-dl">
+        <dt>at VAH / at VAL</dt>
+        <dd>Entry within 0.3% of the value-area edge. Best mean-rev rotation setups (target = POC).</dd>
+        <dt>inside VA</dt>
+        <dd>Entry inside [VAL, VAH] but not at an edge. Chop / equilibrium; weak edge either side.</dd>
+        <dt>above VA / below VA</dt>
+        <dd>Entry outside the value area. Either acceptance (new regime forming) or extension (reversion candidate).</dd>
+        <dt>POC ↗ / ↘</dt>
+        <dd>Current regime per POC migration.</dd>
+        <dt><span class="lg-swatch lg-knife"></span>⚠ falling knife</dt>
+        <dd>A big bearish range-expansion bar fired in the last 3 candles. Fighting fresh downward momentum is risky for longs.</dd>
+        <dt><span class="lg-swatch lg-squeeze"></span>⚠ blow-off risk</dt>
+        <dd>Same but bullish; risky for shorts.</dd>
+      </dl>
 
       <h3>Two scores explained</h3>
-      <ul class="legend-list">
-        <li><b>score N</b> (meta row, integer 0–8) — count of independent confluence votes that fired in the engine: RSI extreme, MACD cross, BOLL touch, fib 0.618, sweep, RSI/CVD divergence, range expansion. <b>3</b> is the minimum tradeable threshold. It's a "did anything agree at all?" gate.</li>
-        <li><b>X.X/10</b> (diagnose row, float 0–10) — validator's <i>structural fit</i> for a specific entry at the current price. Weighted sum of ~20 factors: engine alignment (+2), sweep / fib / HVN proximity (+1.5–2), VA edge (+0.5), POC drift alignment (+0.5–0.7), minus penalties for entry chase, falling knife, counter-regime, inside-VA chop, etc.</li>
-        <li>They don't have to match. A confluent setup (high <b>score</b>) can still be structurally weak (low <b>/10</b>) if it fights regime or is far from value. The <b>/10</b> is the better single number to act on — it integrates more context.</li>
-      </ul>
+      <dl class="legend-dl">
+        <dt>score N <span class="lg-meta">(meta row, integer 0–8)</span></dt>
+        <dd>Count of independent confluence votes from the engine: RSI extreme, MACD cross, BOLL touch, fib 0.618, sweep, RSI/CVD divergence, range expansion. <b>3</b> is the minimum tradeable threshold — a "did anything agree at all?" gate.</dd>
+        <dt>X.X/10 <span class="lg-meta">(diagnose row, float 0–10)</span></dt>
+        <dd>Validator's <i>structural fit</i> for a specific entry at the current price. Weighted sum of ~20 factors: engine alignment (+2), sweep / fib / HVN proximity (+1.5–2), VA edge (+0.5), POC drift alignment (+0.5–0.7), minus penalties for entry chase, falling knife, counter-regime, inside-VA chop, etc.</dd>
+        <dt>Why they differ</dt>
+        <dd>A confluent setup (high <b>score</b>) can still be structurally weak (low <b>/10</b>) if it fights regime or is far from value. The <b>/10</b> is the better single number to act on — it integrates more context.</dd>
+      </dl>
 
       <h3>Verdict colors</h3>
-      <ul class="legend-list">
-        <li><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b> — score ≥ 7.5, take it.</li>
-        <li><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b> — score 5.5–7.5, good setup.</li>
-        <li><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b> — score 3.5–5.5, marginal.</li>
-        <li><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b> — score &lt; 3.5, skip.</li>
-      </ul>
+      <table class="legend-table">
+        <tbody>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 7.5/10 — take it.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>5.5 – 7.5 — good setup.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>3.5 – 5.5 — marginal.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 3.5 — skip.</td></tr>
+        </tbody>
+      </table>
 
       <h3>Open-trade card</h3>
-      <ul class="legend-list">
-        <li>Card border color tracks the trade's current R: <span class="lg-swatch lg-rpos"></span>green if &gt; 0, <span class="lg-swatch lg-rneg"></span>red if &lt; 0.</li>
-        <li>The horizontal bar shows position between stop (left, red), entry (center), and TP2 (right, green).</li>
-        <li><b>Live diagnose</b> re-runs the validator at the trade's <i>own</i> side, not the engine's preferred side — answers "is MY trade still good?", not "what's the best trade now?".</li>
-      </ul>
+      <dl class="legend-dl">
+        <dt>Border color</dt>
+        <dd>Tracks current R: <span class="lg-swatch lg-rpos"></span> green if &gt; 0R, <span class="lg-swatch lg-rneg"></span> red if &lt; 0R.</dd>
+        <dt>Progress bar</dt>
+        <dd>Shows position between stop (left, red), entry (center), and TP2 (right, green).</dd>
+        <dt>Live diagnose</dt>
+        <dd>Re-runs the validator at the trade's <i>own</i> side, not the engine's preferred side — answers "is MY trade still good?", not "what's the best trade now?".</dd>
+      </dl>
 
     </div>
   </div>
