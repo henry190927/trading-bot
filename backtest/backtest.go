@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/dxy"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
@@ -31,6 +32,14 @@ type Options struct {
 	// strengthening dollar, short into weakening dollar). Pass nil to
 	// disable the macro veto (e.g. for crypto-only backtests).
 	DXYCandles []market.Candle
+
+	// FundingHistory is optional per-symbol funding-rate history. When
+	// provided, each backtest signal sees Ctx.FundingRate set to the
+	// most-recently-published value at the candle's CloseTime — which
+	// activates applyContextFilters' crowd warnings AND the contrarian
+	// vote in applyFundingContrarianVote. Pass nil to mimic the legacy
+	// behavior where Ctx was empty in backtest.
+	FundingHistory []bingx.FundingPoint
 
 	// StopBufferR widens the stop by this fraction of the original
 	// risk distance. E.g. 0.3 = stop moves 0.3R further from entry.
@@ -151,12 +160,23 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 			continue
 		}
 		slice := candles[:i+1]
+		// Per-bar context: funding rate at the candle's CloseTime, when
+		// the caller provided funding history. Activates applyContextFilters
+		// (crowd warnings) and applyFundingContrarianVote (extreme/contrarian
+		// +1/+2 votes) inside the engine.
+		var sigCtx signal.Context
+		if len(opts.FundingHistory) > 0 {
+			if fr, ok := bingx.FundingAtTime(opts.FundingHistory, candles[i].CloseTime); ok {
+				sigCtx.FundingRate = fr
+			}
+		}
 		sig := signal.Evaluate(signal.Inputs{
 			Symbol:    sym,
 			Timeframe: tf,
 			Candles:   slice,
 			Bias:      biases[i],
 			DXYTrend:  dxyTrends[i],
+			Ctx:       sigCtx,
 		})
 		if sig.Side == signal.Flat || sig.Score < threshold || sig.Plan.Entry == 0 {
 			continue

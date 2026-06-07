@@ -96,6 +96,11 @@ type Inputs struct {
 const (
 	FundingCrowdedLong  = 0.0005  // > 0.05% per interval → longs crowded
 	FundingCrowdedShort = -0.0005 // < -0.05% per interval → shorts crowded
+	// Extreme = 2× crowded. When funding doubles past the "crowded"
+	// threshold, the contrarian side is much more likely to squeeze.
+	// Empirically ≥0.10%/8h ≈ 110% annualized → unsustainable.
+	FundingExtremeLong  = 0.0010  // longs paying extreme; flush risk
+	FundingExtremeShort = -0.0010 // shorts paying extreme; squeeze fuel
 )
 
 func Evaluate(in Inputs) Signal {
@@ -311,7 +316,12 @@ func Evaluate(in Inputs) Signal {
 		}
 	}
 
-	applyContextFilters(&sig, in.Ctx)
+	annotateContextWarnings(&sig, in.Ctx)
+	// NOTE 2026-06-08: applyFundingContrarianVote was added then reverted
+	// after the 60/90/120d A/B showed it earned its complexity only on
+	// XAG, and even there with mixed sign (−2R aggregate). The function
+	// + constants + backtest plumbing remain in case future work wants
+	// to revisit with tighter thresholds or a longer data window.
 	if sig.Side != Flat {
 		sig.Plan = BuildPlan(sig, in.Candles, sweeps)
 		applyPerSymbolStopBuffer(&sig.Plan, sig.Side, in.Symbol)
@@ -348,11 +358,60 @@ func Evaluate(in Inputs) Signal {
 	return sig
 }
 
-// applyContextFilters downgrades signals that fight the perp tape:
-// - Long signal with very positive funding = chasing crowded longs.
-// - Short signal with very negative funding = chasing crowded shorts.
-// - OI dropping against the signal direction = squeeze, not real flow.
-func applyContextFilters(sig *Signal, ctx Context) {
+// FundingContrarianVoteEnabled gates the contrarian-funding vote so
+// backtest A/Bs can flip it off without code changes. Default true =
+// shipped on. Set to false from cmd/backtest via --no-funding-vote
+// to compare to the pre-2026-06-08 baseline.
+var FundingContrarianVoteEnabled = true
+
+// applyFundingContrarianVote adds confluence votes when the trade side
+// is OPPOSITE the crowded side — the side getting paid to hold a
+// position, with squeeze fuel building behind it.
+//
+//   LONG  + funding ≤ FundingExtremeShort (-0.10%/8h):  +2 (extreme squeeze setup)
+//   LONG  + funding ≤ FundingCrowdedShort (-0.05%/8h):  +1 (crowded shorts)
+//   SHORT + funding ≥ FundingExtremeLong  (+0.10%/8h):  +2 (extreme flush setup)
+//   SHORT + funding ≥ FundingCrowdedLong  (+0.05%/8h):  +1 (crowded longs)
+//
+// Same-side crowding is handled by annotateContextWarnings as an
+// advisory warning (display-only; doesn't affect trade selection).
+func applyFundingContrarianVote(sig *Signal, ctx Context) {
+	if !FundingContrarianVoteEnabled || sig.Side == Flat || ctx.FundingRate == 0 {
+		return
+	}
+	fr := ctx.FundingRate
+	switch {
+	case sig.Side == Long && fr <= FundingExtremeShort:
+		sig.Score += 2
+		sig.Reasons = append(sig.Reasons,
+			fmt.Sprintf("Extreme negative funding %+.4f%% — short squeeze fuel", fr*100))
+	case sig.Side == Long && fr <= FundingCrowdedShort:
+		sig.Score += 1
+		sig.Reasons = append(sig.Reasons,
+			fmt.Sprintf("Crowded shorts (funding %+.4f%%) — contrarian long", fr*100))
+	case sig.Side == Short && fr >= FundingExtremeLong:
+		sig.Score += 2
+		sig.Reasons = append(sig.Reasons,
+			fmt.Sprintf("Extreme positive funding %+.4f%% — long flush risk", fr*100))
+	case sig.Side == Short && fr >= FundingCrowdedLong:
+		sig.Score += 1
+		sig.Reasons = append(sig.Reasons,
+			fmt.Sprintf("Crowded longs (funding %+.4f%%) — contrarian short", fr*100))
+	}
+}
+
+// annotateContextWarnings appends advisory Warnings when funding/OI
+// suggest the trade is fighting the crowd. ADVISORY ONLY — Score and
+// Side are never changed. The dashboard shows these to the trader as
+// discretionary context; the engine treats them as informational.
+//   - Long signal with very positive funding = chasing crowded longs.
+//   - Short signal with very negative funding = chasing crowded shorts.
+//   - OI dropping with the signal direction = unwind, not new flow.
+//
+// Renamed from applyContextFilters (2026-06-08) — the original name
+// implied filtering that never happened. Verified by funding-on/off
+// A/B: bit-identical trade sets.
+func annotateContextWarnings(sig *Signal, ctx Context) {
 	if sig.Side == Long && ctx.FundingRate > FundingCrowdedLong {
 		sig.Warnings = append(sig.Warnings,
 			fmt.Sprintf("Crowded longs (funding %.4f%%); size down or wait", ctx.FundingRate*100))

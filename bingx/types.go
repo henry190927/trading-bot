@@ -9,9 +9,10 @@ const (
 	HostWSSwap   = "wss://open-api-swap.bingx.com/swap-market"
 	PathKlines   = "/openApi/swap/v3/quote/klines"
 	PathDepth    = "/openApi/swap/v2/quote/depth"
-	PathFunding  = "/openApi/swap/v2/quote/premiumIndex"
-	PathOpenInt  = "/openApi/swap/v2/quote/openInterest"
-	PathContract = "/openApi/swap/v2/quote/contracts"
+	PathFunding        = "/openApi/swap/v2/quote/premiumIndex"
+	PathFundingHistory = "/openApi/swap/v2/quote/fundingRate"
+	PathOpenInt        = "/openApi/swap/v2/quote/openInterest"
+	PathContract       = "/openApi/swap/v2/quote/contracts"
 )
 
 type RawKline struct {

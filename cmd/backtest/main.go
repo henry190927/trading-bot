@@ -38,7 +38,12 @@ func main() {
 	symFlag := flag.String("symbol", "", "override market.All() with a single BingX contract code, e.g. NCCO1OILBRENT2USD-USDT — for pre-flighting new symbols without polluting the live daemon universe.")
 	disablePerSym := flag.Bool("no-per-symbol-buffer", false, "clear signal.PerSymbolStopBuffer for this run — A/B comparison against the pre-2026-06-03 baseline before per-symbol stop buffers shipped.")
 	replayValidator := flag.Bool("replay-validator", false, "diagnostic: run validator.Validate on each emitted signal; bucket realized R by validator verdict (STRONG/TAKE/NEUTRAL/WEAK/AVOID). Used to A/B whether validator weight changes improve predictive correlation.")
+	useFunding := flag.Bool("funding", true, "fetch per-symbol funding-rate history and pass to engine via Context. Activates applyContextFilters' crowd penalties + applyFundingContrarianVote's contrarian +1/+2 votes. Default ON (matches shipped engine behavior).")
+	noFundingVote := flag.Bool("no-funding-vote", false, "disable signal.FundingContrarianVoteEnabled — the contrarian +1/+2 vote stays off even when --funding is on. A/B switch for the pre-2026-06-08 baseline.")
 	flag.Parse()
+	if *noFundingVote {
+		signal.FundingContrarianVoteEnabled = false
+	}
 	if *disablePerSym {
 		signal.PerSymbolStopBuffer = nil
 	}
@@ -106,6 +111,19 @@ func main() {
 				log.Printf("%s: bias history fetch failed: %v", sym, err)
 				biasCandles = nil
 			}
+		}
+		if *useFunding {
+			// 1000 points × 8h ≈ 333 days, covers any window we'd backtest.
+			if hist, ferr := client.FundingRateHistory(ctx, sym, 1000); ferr == nil && len(hist) > 0 {
+				opts.FundingHistory = hist
+			} else {
+				if ferr != nil {
+					log.Printf("%s: funding history fetch failed (continuing without funding context): %v", sym, ferr)
+				}
+				opts.FundingHistory = nil
+			}
+		} else {
+			opts.FundingHistory = nil
 		}
 		res := backtest.Run(sym, timeframe, candles, biasCandles, *threshold, *maxHold, opts)
 		fmt.Println(res.Summary())
