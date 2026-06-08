@@ -310,9 +310,13 @@
         if (!raw) return;
         var data;
         try { data = JSON.parse(raw); } catch (e) { return; }
+        var wasOpen = modal && !modal.classList.contains('hidden');
         modalSym = node.getAttribute('data-sym') || '';
 
         buildModal();
+        // Only pause refresh on the FIRST open; re-render in the same
+        // modal (e.g. mode toggle) shouldn't stack pauseCount.
+        if (!wasOpen && window.refreshMgr) window.refreshMgr.pause();
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         var mode = getMode();
@@ -332,6 +336,7 @@
 
     function closeFullscreen() {
         if (!modal) return;
+        var wasOpen = !modal.classList.contains('hidden');
         modal.classList.add('hidden');
         document.body.style.overflow = '';
         if (modalChart) {
@@ -339,6 +344,7 @@
             modalChart = null;
         }
         modalSym = '';
+        if (wasOpen && window.refreshMgr) window.refreshMgr.resume();
     }
 
     function reopenModalIfMode() {

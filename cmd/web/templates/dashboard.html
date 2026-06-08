@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<meta http-equiv="refresh" content="30">
+<!-- Auto-refresh moved to JS (see refresh-mgr below) so modals can pause it. -->
+<!-- meta http-equiv="refresh" removed 2026-06-08 -->
+
 <title>trading-web · {{.TF}}</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/uplot/uPlot.min.css">
@@ -324,19 +326,63 @@
 </div>
 
 <footer>
-  <span>auto-refresh every 30s · tap any price to copy</span>
+  <span>auto-refresh every 30s (paused while a popup is open) · tap any price to copy</span>
 </footer>
 
 <script src="/static/copy.js"></script>
 <script src="/static/uplot/uPlot.iife.min.js"></script>
 <script src="/static/mini-chart.js"></script>
 <script>
+// ── Refresh manager ─────────────────────────────────────────────────
+// Replaces the previous meta http-equiv refresh. JS-controlled so
+// modals (legend, chart-expand) can pause it while the user is reading.
+// Exposed on window so mini-chart.js's chart-modal can call into it.
+window.refreshMgr = (function () {
+    var INTERVAL_MS = 30000;
+    var pauseCount = 0;   // counter — multiple modals can stack
+    var timer = null;
+
+    function schedule() {
+        if (timer) return;
+        timer = setTimeout(function () { window.location.reload(); }, INTERVAL_MS);
+    }
+    function cancel() {
+        if (!timer) return;
+        clearTimeout(timer);
+        timer = null;
+    }
+    function pause() {
+        pauseCount++;
+        cancel();
+    }
+    function resume() {
+        if (pauseCount > 0) pauseCount--;
+        if (pauseCount === 0) {
+            // Start a fresh 30s clock; gives the user a predictable
+            // window after closing the modal to interact before reload.
+            schedule();
+        }
+    }
+    schedule();
+    return { pause: pause, resume: resume };
+})();
+
+// ── Legend modal open/close (uses refreshMgr to pause) ──────────────
 (function () {
     var modal = document.getElementById('legend-modal');
     var btn = document.querySelector('.info-btn');
     if (!modal || !btn) return;
-    function open()  { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
-    function close() { modal.classList.add('hidden');    document.body.style.overflow = ''; }
+    function open()  {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        window.refreshMgr.pause();
+    }
+    function close() {
+        if (modal.classList.contains('hidden')) return;
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        window.refreshMgr.resume();
+    }
     btn.addEventListener('click', open);
     modal.querySelector('.legend-modal-close').addEventListener('click', close);
     modal.querySelector('.legend-modal-backdrop').addEventListener('click', close);
