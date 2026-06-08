@@ -515,6 +515,19 @@ footer {
     margin: 0.3rem 0;
 }
 .trade-anchor span { color: var(--cyan); font-style: normal; }
+.trade-ctx {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    margin: 0.2rem 0;
+    word-break: break-all;
+}
+.trade-ctx code {
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text);
+    font-size: 0.78rem;
+}
 .trade-note {
     color: var(--text);
     font-size: 0.9rem;

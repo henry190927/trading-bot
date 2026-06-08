@@ -269,6 +269,7 @@
       </div>
 
       {{if .Anchor}}<div class="trade-anchor">anchor: <span>{{.Anchor}}</span></div>{{end}}
+      {{if .SignalCtx}}<div class="trade-ctx" title="validator + engine snapshot at signal time">ctx: <code>{{.SignalCtx}}</code></div>{{end}}
       {{if .OpenNotes}}<div class="trade-note">{{.OpenNotes}}</div>{{end}}
       {{if .CloseNotes}}<div class="trade-note close">{{.CloseNotes}}</div>{{end}}
 

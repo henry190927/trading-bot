@@ -111,6 +111,8 @@
     <textarea name="notes" id="notes" rows="3" placeholder="why you took this trade…">{{.Notes}}</textarea>
   </div>
 
+  <input type="hidden" name="signal_ctx" value="{{.SignalCtx}}">
+
   <div class="form-actions">
     <a href="/journal" class="btn-cancel">Cancel</a>
     <button type="submit" class="btn-primary">Record trade</button>

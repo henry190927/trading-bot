@@ -22,7 +22,8 @@ import (
 //	v2 = 17 cols (adds analyzed_at after opened_at)
 //	v3 = 18 cols (adds score after tf)
 //	v4 = 19 cols (adds leverage at end)
-//	v5 = 20 cols (adds filled_at at end) — current
+//	v5 = 20 cols (adds filled_at at end)
+//	v6 = 21 cols (adds signal_ctx — analyst snapshot at signal time) — current
 var Header = []string{
 	"id", "opened_at", "analyzed_at", "closed_at", "symbol", "side", "tf", "score",
 	"entry", "stop", "tp1", "tp2",
@@ -30,6 +31,7 @@ var Header = []string{
 	"exit_price", "outcome", "r_realized", "close_notes",
 	"leverage",
 	"filled_at",
+	"signal_ctx",
 }
 
 // Trade is one journal row.
@@ -56,6 +58,23 @@ type Trade struct {
 	// trade was recorded. Zero = still pending (entry not yet triggered).
 	// Set by the dashboard's fill-detection sweep on each refresh.
 	FilledAt time.Time
+	// SignalCtx is a compact key=value snapshot of the validator + engine
+	// context at signal time, captured when the user clicks +record from
+	// the dashboard or /validate. Format: semicolon-delimited pairs, e.g.
+	//   "v=5.5;ver=TAKE;d=up;st=1;va=at_VAL;f=-0.0004"
+	// Keys (all optional):
+	//   v       validator.Result.Total as float
+	//   ver     short verdict: STRONG / TAKE / NEUTRAL / WEAK / AVOID
+	//   d       POC drift direction: up / down / flat
+	//   st      1 if drift is stacked (POC50 > POC100 > POC200 monotonic)
+	//   va      VA position: at_VAH / at_VAL / in / above / below
+	//   f       funding rate as raw fraction (per 8h)
+	//   knife   1 if RecentFlashBarBearish
+	//   squeeze 1 if RecentFlashBarBullish
+	// Purpose: lets us bucket realized trades by validator band post-hoc,
+	// the same way the backtest's --replay-validator does for historical
+	// signals. Free to leave blank for manually-keyed trades.
+	SignalCtx string
 	// Leverage is the position multiplier used on the perp exchange. Optional
 	// (0 = not recorded). Used to translate R-multiples into actual % return:
 	// a 1R win on 100x leverage gross-returns about 100× the price-move %.
@@ -352,8 +371,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV4(row), nil
 	case 20:
 		return parseRowV5(row), nil
+	case 21:
+		return parseRowV6(row), nil
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18/19/20 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -469,6 +490,13 @@ func parseRowV5(row []string) Trade {
 	return t
 }
 
+// parseRowV6 is v5 + a trailing `signal_ctx` column (index 20).
+func parseRowV6(row []string) Trade {
+	t := parseRowV5(row[:20])
+	t.SignalCtx = row[20]
+	return t
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -514,6 +542,7 @@ func rowFromTrade(t Trade) []string {
 		t.CloseNotes,
 		lev,
 		filledAt,
+		t.SignalCtx,
 	}
 }
 

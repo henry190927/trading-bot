@@ -127,6 +127,11 @@
     <input type="datetime-local" name="closed_at" id="closed_at" value="{{.ClosedAt}}">
   </div>
 
+  <div class="field">
+    <label for="signal_ctx">Signal context <span class="hint">(analyst snapshot — auto-filled at +record; leave alone unless you know the format)</span></label>
+    <input type="text" name="signal_ctx" id="signal_ctx" value="{{.Trade.SignalCtx}}" autocomplete="off" placeholder="v=5.5;ver=TAKE;d=up;st=1;va=at_VAL;f=-0.0004">
+  </div>
+
   <h2 class="form-section">Outcome <span class="hint">(required iff closed)</span></h2>
 
   <details class="partials-helper">

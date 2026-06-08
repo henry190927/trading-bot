@@ -575,6 +575,7 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		"Score":      c.Query("score"),
 		"Notes":      "",
 		"AnalyzedAt": analyzedAt,
+		"SignalCtx":  c.Query("ctx"), // verbatim from recordHref / validateRecordHref
 		"Symbols":    []string{"BTC", "ETH", "XAU", "XAG"},
 		"Anchors":    recommendedAnchors,
 		"Error":      "",
@@ -683,6 +684,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		Anchor:     anchor,
 		OpenNotes:  notes,
 		Leverage:   leverage,
+		SignalCtx:  strings.TrimSpace(c.PostForm("signal_ctx")),
 	}
 	trades = append(trades, t)
 	if err := journal.WriteAll("", trades); err != nil {
@@ -957,6 +959,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	trades[idx].ClosedAt = closedAt
 	trades[idx].Outcome = outcome
 	trades[idx].ExitPrice = exitPrice
+	trades[idx].SignalCtx = strings.TrimSpace(c.PostForm("signal_ctx"))
 	switch {
 	case closedAt.IsZero():
 		trades[idx].RRealized = 0
@@ -1533,6 +1536,75 @@ func buildDailyCalendar(trades []journal.Trade, days int) [][]dailyCell {
 	return grid
 }
 
+// buildSignalCtx packs the validator + engine state at signal moment
+// into a compact key=value string for the journal's signal_ctx column.
+// Shape: "v=5.5;ver=TAKE;d=up;st=1;va=at_VAL;f=-0.0004"
+// All fields are optional — emit only what's meaningful.
+func buildSignalCtx(r *validator.Result, fundingRate float64) string {
+	if r == nil {
+		return ""
+	}
+	parts := make([]string, 0, 8)
+	if r.Total > 0 {
+		parts = append(parts, fmt.Sprintf("v=%.1f", r.Total))
+	}
+	if v := shortVerdictTag(r.Verdict); v != "" {
+		parts = append(parts, "ver="+v)
+	}
+	switch r.POCMig.Trend {
+	case indicator.POCRising:
+		parts = append(parts, "d=up")
+	case indicator.POCFalling:
+		parts = append(parts, "d=down")
+	case indicator.POCFlat:
+		// skip — flat drift adds noise without info
+	}
+	if r.POCMig.Stacked {
+		parts = append(parts, "st=1")
+	}
+	switch {
+	case r.AtVAH:
+		parts = append(parts, "va=at_VAH")
+	case r.AtVAL:
+		parts = append(parts, "va=at_VAL")
+	case r.InsideVA:
+		parts = append(parts, "va=in")
+	case r.OutsideVAUp:
+		parts = append(parts, "va=above")
+	case r.OutsideVADn:
+		parts = append(parts, "va=below")
+	}
+	if fundingRate != 0 {
+		parts = append(parts, fmt.Sprintf("f=%.5f", fundingRate))
+	}
+	if r.RecentFlashBarBearish {
+		parts = append(parts, "knife=1")
+	}
+	if r.RecentFlashBarBullish {
+		parts = append(parts, "squeeze=1")
+	}
+	return strings.Join(parts, ";")
+}
+
+// shortVerdictTag returns a compact tag for the journal snapshot.
+// The full Verdict string is e.g. "STRONG TAKE — full size"; we keep
+// just the headline word for parseability.
+func shortVerdictTag(v string) string {
+	switch {
+	case strings.HasPrefix(v, "STRONG"):
+		return "STRONG"
+	case strings.HasPrefix(v, "TAKE"):
+		return "TAKE"
+	case strings.HasPrefix(v, "NEUTRAL"):
+		return "NEUTRAL"
+	case strings.HasPrefix(v, "WEAK"):
+		return "WEAK"
+	case strings.HasPrefix(v, "AVOID"):
+		return "AVOID"
+	}
+	return ""
+}
+
 // templateFuncs exposes formatting helpers to the templates.
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
@@ -1755,6 +1827,11 @@ func templateFuncs() template.FuncMap {
 			q.Set("anchor", "manual")
 			q.Set("tf", string(r.Timeframe))
 			q.Set("score", fmt.Sprintf("v%.1f", r.Total))
+			// Funding rate isn't on validator.Result; /validate doesn't
+			// fetch it. Pass 0 — snapshot will omit the `f` field.
+			if ctx := buildSignalCtx(&r, 0); ctx != "" {
+				q.Set("ctx", ctx)
+			}
 			return template.URL("/journal/new?" + q.Encode())
 		},
 		"recordHref": func(v symbolView, tf string) template.URL {
@@ -1777,6 +1854,12 @@ func templateFuncs() template.FuncMap {
 			// accuracy on the resulting trade.
 			if len(v.Candles) > 0 {
 				q.Set("analyzed_at", v.Candles[len(v.Candles)-1].CloseTime.Local().Format("2006-01-02T15:04"))
+			}
+			// Signal-context snapshot for journal analytics. Captures
+			// validator score + regime chips + funding at click time
+			// so we can bucket realized trades by validator band later.
+			if ctx := buildSignalCtx(v.Diagnose, v.Context.FundingRate); ctx != "" {
+				q.Set("ctx", ctx)
 			}
 			return template.URL("/journal/new?" + q.Encode())
 		},
