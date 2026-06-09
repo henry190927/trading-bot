@@ -46,7 +46,7 @@ SCP         := scp -i $(ORACLE_KEY)
 %:
 	@:
 
-.PHONY: help analyze validate serve serve-bg stop logs backtest build deploy deploy-all deploy-web ssh remote-status remote-logs jopen jclose jlist jstats jupdate jdelete janchors tconfig tstart tstop trestart web-status web-logs web-restart
+.PHONY: help analyze validate serve serve-bg stop logs backtest build deploy deploy-all deploy-web ssh remote-status remote-logs jopen jclose jlist jstats jupdate jdelete janchors tconfig tstart tstop trestart web-status web-logs web-restart deploy-monitor monitor-status monitor-logs monitor-restart
 
 help:
 	@echo "trading — Makefile commands"
@@ -208,6 +208,24 @@ web-logs:
 
 web-restart:
 	@$(SSH) 'sudo systemctl restart trading-web && sudo systemctl status trading-web --no-pager | head -4'
+
+# ---- trading-monitor: multi-TF confluence daemon ----
+deploy-monitor:
+	@echo "▶ building linux/amd64 monitor..."
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -o /tmp/trading-monitor-linux ./cmd/monitor
+	@echo "▶ uploading to $(ORACLE_HOST)..."
+	@$(SCP) /tmp/trading-monitor-linux $(ORACLE_USER)@$(ORACLE_HOST):/tmp/trading-monitor
+	@echo "▶ installing + restarting trading-monitor unit..."
+	@$(SSH) 'sudo mv /tmp/trading-monitor /opt/trading/trading-monitor && sudo chown ubuntu:ubuntu /opt/trading/trading-monitor && sudo chmod +x /opt/trading/trading-monitor && sudo systemctl restart trading-monitor && sleep 1 && sudo systemctl status trading-monitor --no-pager | head -5'
+
+monitor-status:
+	@$(SSH) 'sudo systemctl status trading-monitor --no-pager'
+
+monitor-logs:
+	@$(SSH) 'sudo journalctl -u trading-monitor -n 30 -f'
+
+monitor-restart:
+	@$(SSH) 'sudo systemctl restart trading-monitor && sudo systemctl status trading-monitor --no-pager | head -4'
 
 # ---- journal: positional pass-through to the VPS ----
 # We always run the journal on the VPS so all entries are in one place.
