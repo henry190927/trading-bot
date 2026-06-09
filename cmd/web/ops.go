@@ -188,9 +188,10 @@ func systemctlAction(service, action string) error {
 // each independently to refresh.
 func (s *server) handleOpsPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "ops.html", gin.H{
-		"Primary":  readDaemonStatus("trading-bot"),
-		"Monitor":  readDaemonStatus("trading-monitor"),
-		"ValidTFs": validTFs,
+		"Primary":          readDaemonStatus("trading-bot"),
+		"Monitor":          readDaemonStatus("trading-monitor"),
+		"ValidTFs":         validTFs,
+		"MonitorTFOptions": []string{"15m", "30m", "1h", "2h", "4h"},
 	})
 }
 

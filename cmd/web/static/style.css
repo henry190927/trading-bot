@@ -2700,11 +2700,9 @@ footer {
     color: var(--text);
 }
 
-/* Disabled lifecycle button (mutex blocked) */
-.btn-ops:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
+/* Disabled-button styling lives in the canonical .btn-ops block below
+   (added 2026-06-09). This anchor comment kept so future readers know
+   why this section is sparse. */
 
 /* Log tab switcher (trading-bot ↔ trading-monitor) */
 .ops-log-tabs {
@@ -2803,8 +2801,8 @@ footer {
     border-radius: 8px;
     cursor: pointer;
     min-height: 52px;
+    transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
 }
-.btn-ops:disabled { opacity: 0.5; cursor: default; }
 .btn-ops.btn-start {
     color: var(--green);
     border-color: var(--green);
@@ -2817,7 +2815,34 @@ footer {
     color: var(--yellow);
     border-color: var(--yellow);
 }
-.btn-ops:active { opacity: 0.7; }
+
+/* Hover effects — only on enabled buttons. Each role gets a tinted
+   background matching its border color + a subtle lift shadow. */
+.btn-ops:not(:disabled):hover {
+    transform: translateY(-1px);
+}
+.btn-ops.btn-start:not(:disabled):hover {
+    background: rgba(74, 222, 128, 0.14);
+    box-shadow: 0 2px 8px rgba(74, 222, 128, 0.18);
+}
+.btn-ops.btn-stop:not(:disabled):hover {
+    background: rgba(248, 113, 113, 0.14);
+    box-shadow: 0 2px 8px rgba(248, 113, 113, 0.18);
+}
+.btn-ops.btn-restart:not(:disabled):hover {
+    background: rgba(251, 191, 36, 0.14);
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.18);
+}
+.btn-ops:active { transform: translateY(0); opacity: 0.7; }
+
+/* Disabled (mutex-blocked) styling */
+.btn-ops:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--surface-2);
+    box-shadow: none;
+    transform: none;
+}
 
 .ops-block {
     background: var(--surface);
