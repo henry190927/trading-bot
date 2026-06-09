@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -56,6 +57,26 @@ func main() {
 		if _, err := fmt.Sscanf(v, "%f", &bw); err == nil && bw > 0 && bw < 1 {
 			indicator.BodyWeight = bw
 			log.Printf("volume profile body-weighting enabled: %.2f", bw)
+		}
+	}
+
+	// Env-var overrides for monitor-specific config so the Ops page
+	// can persist changes by editing /opt/trading/.env. Env wins over
+	// CLI flag if both are set — same convention as the primary daemon.
+	if v := os.Getenv("MONITOR_TFS"); strings.TrimSpace(v) != "" {
+		*includeTFs = v
+		log.Printf("MONITOR_TFS env override: %s", v)
+	}
+	if v := os.Getenv("MONITOR_MIN_SCORE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 8 {
+			*minScore = n
+			log.Printf("MONITOR_MIN_SCORE env override: %d", n)
+		}
+	}
+	if v := os.Getenv("MONITOR_MIN_TFS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 2 && n <= 5 {
+			*minTFs = n
+			log.Printf("MONITOR_MIN_TFS env override: %d", n)
 		}
 	}
 

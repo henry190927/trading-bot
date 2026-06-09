@@ -59,15 +59,22 @@
     <input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required>
   </div>
 
-  <div class="field-row">
-    <div class="field">
-      <label for="tf">Timeframe</label>
-      <input type="text" name="tf" id="tf" value="{{.TF}}" placeholder="1h">
+  <div class="field">
+    <label>Timeframe</label>
+    <div class="tf-picker-inline" role="radiogroup" aria-label="timeframe">
+      {{$cur := .TF}}
+      {{range .TFOptions}}
+        <label class="tf-pill{{if eq . $cur}} active{{end}}">
+          <input type="radio" name="tf" value="{{.}}" {{if eq . $cur}}checked{{end}}>
+          <span>{{.}}</span>
+        </label>
+      {{end}}
     </div>
-    <div class="field">
-      <label for="fee_bps">Fee (bps RT)</label>
-      <input type="number" step="any" inputmode="decimal" name="fee_bps" id="fee_bps" value="{{.FeeBps}}">
-    </div>
+  </div>
+
+  <div class="field">
+    <label for="fee_bps">Fee (bps RT)</label>
+    <input type="number" step="any" inputmode="decimal" name="fee_bps" id="fee_bps" value="{{.FeeBps}}">
   </div>
 
   <div class="form-actions">
@@ -82,6 +89,22 @@
 <footer>
   <span>scores entry confluence vs. engine + sweep / fib / BOLL / HVN context</span>
 </footer>
+
+<script>
+// Keep .active in sync with the radio's checked state — :has(input:checked)
+// covers modern browsers, this script handles the rest.
+(function () {
+    var pills = document.querySelectorAll('.tf-pill');
+    pills.forEach(function (p) {
+        var radio = p.querySelector('input[type="radio"]');
+        if (!radio) return;
+        radio.addEventListener('change', function () {
+            pills.forEach(function (x) { x.classList.remove('active'); });
+            p.classList.add('active');
+        });
+    });
+})();
+</script>
 
 </body>
 </html>

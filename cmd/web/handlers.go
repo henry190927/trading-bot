@@ -1873,12 +1873,13 @@ func templateFuncs() template.FuncMap {
 // re-validate a slightly tweaked entry by adjusting URL bookmarks).
 func (s *server) handleValidateForm(c *gin.Context) {
 	c.HTML(http.StatusOK, "validate_form.html", gin.H{
-		"Symbol":  strings.ToUpper(c.Query("symbol")),
-		"Side":    strings.ToLower(c.Query("side")),
-		"Entry":   c.Query("entry"),
-		"TF":      defaultStr(c.Query("tf"), "1h"),
-		"FeeBps":  defaultStr(c.Query("fee_bps"), "6"),
-		"Symbols": []string{"BTC", "ETH", "XAU", "XAG"},
+		"Symbol":    strings.ToUpper(c.Query("symbol")),
+		"Side":      strings.ToLower(c.Query("side")),
+		"Entry":     c.Query("entry"),
+		"TF":        defaultStr(c.Query("tf"), "1h"),
+		"FeeBps":    defaultStr(c.Query("fee_bps"), "6"),
+		"Symbols":   []string{"BTC", "ETH", "XAU", "XAG"},
+		"TFOptions": []string{"15m", "30m", "1h", "2h", "4h", "1d"},
 	})
 }
 
@@ -1895,13 +1896,14 @@ func (s *server) handleValidatePost(c *gin.Context) {
 
 	rerender := func(errMsg string) {
 		c.HTML(http.StatusOK, "validate_form.html", gin.H{
-			"Symbol":  symStr,
-			"Side":    sideStr,
-			"Entry":   c.PostForm("entry"),
-			"TF":      tfStr,
-			"FeeBps":  defaultStr(c.PostForm("fee_bps"), "6"),
-			"Symbols": []string{"BTC", "ETH", "XAU", "XAG"},
-			"Error":   errMsg,
+			"Symbol":    symStr,
+			"Side":      sideStr,
+			"Entry":     c.PostForm("entry"),
+			"TF":        tfStr,
+			"FeeBps":    defaultStr(c.PostForm("fee_bps"), "6"),
+			"Symbols":   []string{"BTC", "ETH", "XAU", "XAG"},
+			"TFOptions": []string{"15m", "30m", "1h", "2h", "4h", "1d"},
+			"Error":     errMsg,
 		})
 	}
 
