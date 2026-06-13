@@ -102,6 +102,11 @@
           {{if .Diagnose.RecentFlashBarBearish}}<span class="ot-flag knife">⚠ falling knife</span>{{end}}
           {{if .Diagnose.RecentFlashBarBullish}}<span class="ot-flag squeeze">⚠ blow-off risk</span>{{end}}
         </div>
+        {{if .HasDiff}}
+          <div class="ot-diff diff-{{or .DiffClass "flat"}}" title="how the validator picture has shifted since you committed">
+            Δ /10 <strong>{{fmtSigned1 .ScoreDelta}}</strong> vs entry · {{.DiffCause}}
+          </div>
+        {{end}}
       {{end}}
       <div class="ot-actions">
         <a href="/journal/{{.Trade.ID}}/close" class="btn-close-trade">Close trade</a>

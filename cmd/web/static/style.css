@@ -2198,6 +2198,38 @@ footer {
     border: 1px solid rgba(248, 113, 113, 0.55);
 }
 
+/* Diff-since-entry row — one-line summary of how the validator state
+   has shifted since the user clicked +record. Surfaces the most
+   actionable structural change so the trader doesn't have to mentally
+   compare every chip. Tinted by direction of the /10 delta. */
+.ot-diff {
+    margin: 0.35rem 0 0;
+    padding: 0.32rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    background: rgba(139, 148, 158, 0.10);
+    border: 1px solid rgba(139, 148, 158, 0.30);
+}
+.ot-diff strong {
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0.15rem;
+}
+.ot-diff.diff-down {
+    color: var(--red);
+    background: rgba(248, 113, 113, 0.10);
+    border-color: rgba(248, 113, 113, 0.40);
+}
+.ot-diff.diff-down strong { color: var(--red); }
+.ot-diff.diff-up {
+    color: var(--green);
+    background: rgba(74, 222, 128, 0.10);
+    border-color: rgba(74, 222, 128, 0.40);
+}
+.ot-diff.diff-up strong { color: var(--green); }
+
 /* Pending open-trade card (recorded but entry hasn't filled yet) */
 .open-trade-card.status-pending {
     border-left-color: var(--yellow);

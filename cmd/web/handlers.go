@@ -146,6 +146,15 @@ type openTradeCard struct {
 	// Pending-state fields (populated when Trade.IsPending()).
 	DistToEntryPct float64 // |mark - entry| / entry * 100, signed for direction
 	PendingSince   time.Duration
+
+	// Diff-since-entry (populated only when the trade has a non-empty
+	// SignalCtx snapshot and we have a current Diagnose). Shows the
+	// trader how the validator picture has shifted since they committed,
+	// so they can distinguish "price drifted" from "thesis broke".
+	HasDiff     bool
+	ScoreDelta  float64 // current /10 minus entry /10
+	DiffCause   string  // one-line headline of the most actionable change
+	DiffClass   string  // "up" / "down" / "" — drives chip colour
 }
 
 func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView) []openTradeCard {
@@ -332,6 +341,24 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 					}
 					r := validator.Validate(sym, market.Timeframe(tfStr), side, entry, 6.0, v.Candles, card.MarkPrice)
 					card.Diagnose = &r
+					// Diff-since-entry: parse the journal's snapshot from
+					// +record time, compare to the live re-validation,
+					// surface the most actionable structural change.
+					if t.SignalCtx != "" {
+						entryCtx := parseSignalCtx(t.SignalCtx)
+						delta, cause, has := diagnoseDelta(entryCtx, card.Diagnose)
+						if has {
+							card.HasDiff = true
+							card.ScoreDelta = delta
+							card.DiffCause = cause
+							switch {
+							case delta < -0.5:
+								card.DiffClass = "down"
+							case delta > 0.5:
+								card.DiffClass = "up"
+							}
+						}
+					}
 				}
 			}
 		}
@@ -1536,6 +1563,103 @@ func buildDailyCalendar(trades []journal.Trade, days int) [][]dailyCell {
 	return grid
 }
 
+// parseSignalCtx parses the journal's signal_ctx column (semicolon-
+// delimited key=value pairs we wrote at +record time) back into a map
+// for diff comparison against the live validator result.
+func parseSignalCtx(s string) map[string]string {
+	out := map[string]string{}
+	if s == "" {
+		return out
+	}
+	for _, kv := range strings.Split(s, ";") {
+		if i := strings.Index(kv, "="); i > 0 {
+			out[strings.TrimSpace(kv[:i])] = strings.TrimSpace(kv[i+1:])
+		}
+	}
+	return out
+}
+
+// diagnoseDelta computes the score-delta + a one-line "most actionable
+// cause" of the change, by comparing the validator state at entry (from
+// the journal's signal_ctx snapshot) to the current validator result.
+// Returns (delta, cause, hasDiff). cause is empty if there's nothing
+// notable to surface even when delta is non-zero.
+func diagnoseDelta(entry map[string]string, current *validator.Result) (float64, string, bool) {
+	if len(entry) == 0 || current == nil {
+		return 0, "", false
+	}
+	var entryScore float64
+	if v, ok := entry["v"]; ok {
+		_, _ = fmt.Sscanf(v, "%f", &entryScore)
+	}
+	delta := current.Total - entryScore
+
+	// Find structural causes in priority order. Most-actionable first.
+	// We surface ONE cause to keep the chip readable; the rest still
+	// show in the existing diagnose chips on the same row.
+
+	// 1. Flash bar appeared since entry — strongest reversal warning.
+	if current.RecentFlashBarBearish {
+		if _, had := entry["knife"]; !had {
+			return delta, "⚠ falling-knife flag appeared", true
+		}
+	}
+	if current.RecentFlashBarBullish {
+		if _, had := entry["squeeze"]; !had {
+			return delta, "⚠ blow-off flag appeared", true
+		}
+	}
+
+	// 2. POC drift direction flipped.
+	entryDrift := entry["d"] // "up" | "down" | "" (flat omitted at capture)
+	currentDrift := ""
+	switch current.POCMig.Trend {
+	case indicator.POCRising:
+		currentDrift = "up"
+	case indicator.POCFalling:
+		currentDrift = "down"
+	}
+	if entryDrift != "" && currentDrift != "" && entryDrift != currentDrift {
+		return delta, fmt.Sprintf("regime drift flipped (%s → %s)", entryDrift, currentDrift), true
+	}
+	if entryDrift != "" && currentDrift == "" {
+		return delta, fmt.Sprintf("regime drift collapsed (%s → flat)", entryDrift), true
+	}
+
+	// 3. VA position moved.
+	entryVA := entry["va"]
+	currentVA := ""
+	switch {
+	case current.AtVAH:
+		currentVA = "at_VAH"
+	case current.AtVAL:
+		currentVA = "at_VAL"
+	case current.InsideVA:
+		currentVA = "in"
+	case current.OutsideVAUp:
+		currentVA = "above"
+	case current.OutsideVADn:
+		currentVA = "below"
+	}
+	if entryVA != "" && currentVA != "" && entryVA != currentVA {
+		// Edge-leaving is more meaningful than edge-arriving for held trades.
+		if entryVA == "at_VAH" || entryVA == "at_VAL" {
+			return delta, fmt.Sprintf("left VA edge (%s → %s)", entryVA, currentVA), true
+		}
+		return delta, fmt.Sprintf("VA pos %s → %s", entryVA, currentVA), true
+	}
+
+	// 4. No structural change — describe the score delta if meaningful.
+	switch {
+	case delta <= -1.5:
+		return delta, "price drift only (no structural change)", true
+	case delta >= 1.5:
+		return delta, "score climbed (factors firming up)", true
+	}
+	// Small delta + no structural change — not worth surfacing.
+	return delta, "", false
+}
+
 // buildSignalCtx packs the validator + engine state at signal moment
 // into a compact key=value string for the journal's signal_ctx column.
 // Shape: "v=5.5;ver=TAKE;d=up;st=1;va=at_VAL;f=-0.0004"
@@ -1618,6 +1742,9 @@ func templateFuncs() template.FuncMap {
 			return fmt.Sprintf("%+.4f%%", v*100)
 		},
 		"mulPct": func(v float64) float64 { return v * 100 },
+		"fmtSigned1": func(v float64) string {
+			return fmt.Sprintf("%+.1f", v)
+		},
 		"driftArrow": func(t indicator.POCTrend) string {
 			switch t {
 			case indicator.POCRising:
