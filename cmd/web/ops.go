@@ -191,7 +191,7 @@ func (s *server) handleOpsPage(c *gin.Context) {
 		"Primary":          readDaemonStatus("trading-bot"),
 		"Monitor":          readDaemonStatus("trading-monitor"),
 		"ValidTFs":         validTFs,
-		"MonitorTFOptions": []string{"15m", "30m", "1h", "2h", "4h"},
+		"MonitorTFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h"},
 	})
 }
 
@@ -332,7 +332,7 @@ func (s *server) opsConfigBot(c *gin.Context) {
 // / MONITOR_MIN_TFS, then trading-monitor.service is restarted (if active)
 // so it re-reads them at startup.
 func (s *server) opsConfigMonitor(c *gin.Context) {
-	monitorTFs := []string{"15m", "30m", "1h", "2h", "4h"}
+	monitorTFs := []string{"5m", "15m", "30m", "1h", "2h", "4h"}
 
 	// PostFormArray returns all checkbox values for name="tfs".
 	selectedTFs := c.PostFormArray("tfs")

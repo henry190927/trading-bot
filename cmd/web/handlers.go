@@ -2006,7 +2006,7 @@ func (s *server) handleValidateForm(c *gin.Context) {
 		"TF":        defaultStr(c.Query("tf"), "1h"),
 		"FeeBps":    defaultStr(c.Query("fee_bps"), "6"),
 		"Symbols":   []string{"BTC", "ETH", "XAU", "XAG"},
-		"TFOptions": []string{"15m", "30m", "1h", "2h", "4h", "1d"},
+		"TFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 	})
 }
 
@@ -2029,7 +2029,7 @@ func (s *server) handleValidatePost(c *gin.Context) {
 			"TF":        tfStr,
 			"FeeBps":    defaultStr(c.PostForm("fee_bps"), "6"),
 			"Symbols":   []string{"BTC", "ETH", "XAU", "XAG"},
-			"TFOptions": []string{"15m", "30m", "1h", "2h", "4h", "1d"},
+			"TFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 			"Error":     errMsg,
 		})
 	}

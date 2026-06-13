@@ -146,6 +146,10 @@ func tfsThatJustClosed(t time.Time, monitored []market.Timeframe) []market.Timef
 	min, hr := t.Minute(), t.Hour()
 	for _, tf := range monitored {
 		switch tf {
+		case market.TF5m:
+			if min%5 == 0 {
+				out = append(out, tf)
+			}
 		case market.TF15m:
 			if min%15 == 0 {
 				out = append(out, tf)
@@ -181,10 +185,10 @@ func parseTFList(s string) ([]market.Timeframe, error) {
 		}
 		tf := market.Timeframe(p)
 		switch tf {
-		case market.TF15m, market.TF30m, market.TF1h, market.TF2h, market.TF4h:
+		case market.TF5m, market.TF15m, market.TF30m, market.TF1h, market.TF2h, market.TF4h:
 			out = append(out, tf)
 		default:
-			return nil, fmt.Errorf("unsupported TF %q (allowed: 15m,30m,1h,2h,4h)", p)
+			return nil, fmt.Errorf("unsupported TF %q (allowed: 5m,15m,30m,1h,2h,4h)", p)
 		}
 	}
 	return out, nil
@@ -202,6 +206,8 @@ func tfList(tfs []market.Timeframe) []string {
 // canonical plan attached to the alert comes from the longest TF.
 func tfRank(tf market.Timeframe) int {
 	switch tf {
+	case market.TF5m:
+		return 0
 	case market.TF15m:
 		return 1
 	case market.TF30m:
