@@ -54,6 +54,7 @@ type opsStatus struct {
 	MonitorTFs      []string `json:"monitor_tfs,omitempty"`
 	MonitorMinScore int      `json:"monitor_min_score,omitempty"`
 	MonitorMinTFs   int      `json:"monitor_min_tfs,omitempty"`
+	MonitorMinRatio float64  `json:"monitor_min_ratio"` // 0 = disabled (always emitted so UI can distinguish "off" from "unset")
 }
 
 // readDaemonStatus checks the running systemd unit + (for trading-bot)
@@ -103,6 +104,10 @@ func readDaemonStatus(service string) opsStatus {
 			case strings.HasPrefix(line, "MONITOR_MIN_TFS="):
 				if v, err := strconv.Atoi(strings.TrimPrefix(line, "MONITOR_MIN_TFS=")); err == nil {
 					st.MonitorMinTFs = v
+				}
+			case strings.HasPrefix(line, "MONITOR_MIN_RATIO="):
+				if v, err := strconv.ParseFloat(strings.TrimPrefix(line, "MONITOR_MIN_RATIO="), 64); err == nil {
+					st.MonitorMinRatio = v
 				}
 			}
 		}
@@ -281,7 +286,7 @@ func (s *server) handleOpsRestart(c *gin.Context) {
 // handleOpsConfig accepts config changes for either daemon and rewrites the
 // .env file, then restarts the affected service so the new values take effect.
 // Routes by ?service= query: trading-bot edits TRADING_TF + TRADING_MIN_SCORE;
-// trading-monitor edits MONITOR_TFS + MONITOR_MIN_SCORE + MONITOR_MIN_TFS.
+// trading-monitor edits MONITOR_TFS + MONITOR_MIN_SCORE + MONITOR_MIN_TFS + MONITOR_MIN_RATIO.
 func (s *server) handleOpsConfig(c *gin.Context) {
 	svc := c.DefaultQuery("service", "trading-bot")
 	switch svc {
@@ -344,8 +349,10 @@ func (s *server) opsConfigMonitor(c *gin.Context) {
 	}
 	scoreStr := strings.TrimSpace(c.PostForm("min_score"))
 	tfsStr := strings.TrimSpace(c.PostForm("min_tfs"))
+	ratioStr := strings.TrimSpace(c.PostForm("min_ratio"))
 
 	var score, mtfs int
+	var ratioPtr *float64
 	if scoreStr != "" {
 		v, err := strconv.Atoi(scoreStr)
 		if err != nil || v < 1 || v > 8 {
@@ -356,13 +363,21 @@ func (s *server) opsConfigMonitor(c *gin.Context) {
 	}
 	if tfsStr != "" {
 		v, err := strconv.Atoi(tfsStr)
-		if err != nil || v < 2 || v > 5 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "min_tfs must be 2-5"})
+		if err != nil || v < 1 || v > 5 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "min_tfs must be 1-5"})
 			return
 		}
 		mtfs = v
 	}
-	if len(selectedTFs) == 0 && score == 0 && mtfs == 0 {
+	if ratioStr != "" {
+		v, err := strconv.ParseFloat(ratioStr, 64)
+		if err != nil || v < 0 || v > 10 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "min_ratio must be 0-10 (0 disables)"})
+			return
+		}
+		ratioPtr = &v
+	}
+	if len(selectedTFs) == 0 && score == 0 && mtfs == 0 && ratioPtr == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "nothing to update"})
 		return
 	}
@@ -372,7 +387,7 @@ func (s *server) opsConfigMonitor(c *gin.Context) {
 		return
 	}
 
-	if err := updateMonitorEnvConfig(selectedTFs, score, mtfs); err != nil {
+	if err := updateMonitorEnvConfig(selectedTFs, score, mtfs, ratioPtr); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -388,9 +403,11 @@ func (s *server) opsConfigMonitor(c *gin.Context) {
 }
 
 // updateMonitorEnvConfig rewrites MONITOR_TFS / MONITOR_MIN_SCORE /
-// MONITOR_MIN_TFS in the .env file. Missing/zero values are skipped.
+// MONITOR_MIN_TFS / MONITOR_MIN_RATIO in the .env file. Missing/zero ints
+// are skipped; a nil minRatio means "don't touch", a non-nil value
+// (including 0 to disable) is written.
 // Lines that don't exist yet are appended; existing lines are replaced.
-func updateMonitorEnvConfig(tfs []string, minScore, minTFs int) error {
+func updateMonitorEnvConfig(tfs []string, minScore, minTFs int, minRatio *float64) error {
 	path := envPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -406,6 +423,9 @@ func updateMonitorEnvConfig(tfs []string, minScore, minTFs int) error {
 	}
 	if minTFs > 0 {
 		want["MONITOR_MIN_TFS"] = strconv.Itoa(minTFs)
+	}
+	if minRatio != nil {
+		want["MONITOR_MIN_RATIO"] = strconv.FormatFloat(*minRatio, 'f', -1, 64)
 	}
 	seen := map[string]bool{}
 	for i, line := range lines {

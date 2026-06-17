@@ -32,6 +32,7 @@ trading-web
 /price
 /journal
 /web
+/monitor
 
 # But `journal/`, `backtest/`, and similar names are also Go package
 # directories at root (journal/journal.go, backtest/backtest.go). Re-

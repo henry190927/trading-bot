@@ -40,12 +40,14 @@ import (
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/notify"
 	sig "myFirstGo/trading-bot/signal"
+	"myFirstGo/trading-bot/validator"
 )
 
 func main() {
 	config.LoadDotEnv()
-	minScore := flag.Int("min-score", 3, "per-TF score threshold; contributors below this don't count toward confluence")
-	minTFs := flag.Int("min-tfs", 2, "minimum number of agreeing TFs to fire a confluence alert")
+	minScore := flag.Int("min-score", 3, "per-TF engine score threshold; contributors below this don't count toward confluence")
+	minTFs := flag.Int("min-tfs", 2, "minimum number of agreeing TFs to fire an alert. min=1 makes it a multi-TF single-alerter; min=2+ enforces confluence.")
+	minRatio := flag.Float64("min-ratio", 0, "per-TF validator /10 threshold (structural fit). 0 = disabled. e.g. 6 means each contributing TF also needs validator.Total >= 6.0. Filters in addition to --min-score, not instead of.")
 	fetchDelay := flag.Duration("fetch-delay", 10*time.Second, "wait after minute boundary before fetching klines (gives BingX time to publish the just-closed bar)")
 	includeTFs := flag.String("tfs", "30m,1h,2h,4h", "comma-separated TFs to monitor. 15m is intentionally excluded by default — backtest shows net-negative on every symbol regardless of threshold.")
 	noMac := flag.Bool("no-mac", true, "disable macOS Notification Center; default off because this is a server-side daemon")
@@ -74,15 +76,28 @@ func main() {
 		}
 	}
 	if v := os.Getenv("MONITOR_MIN_TFS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 2 && n <= 5 {
+		// Floor lowered 2026-06-17 from 2 → 1 so user can use the monitor
+		// as a higher-quality single-TF alerter (gated by ratio/score).
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 5 {
 			*minTFs = n
 			log.Printf("MONITOR_MIN_TFS env override: %d", n)
+		}
+	}
+	if v := os.Getenv("MONITOR_MIN_RATIO"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f >= 0 && f <= 10 {
+			*minRatio = f
+			if f > 0 {
+				log.Printf("MONITOR_MIN_RATIO env override: %.1f", f)
+			}
 		}
 	}
 
 	monitoredTFs, err := parseTFList(*includeTFs)
 	if err != nil {
 		log.Fatalf("invalid --tfs: %v", err)
+	}
+	if *minTFs < 1 {
+		*minTFs = 1
 	}
 	if len(monitoredTFs) < *minTFs {
 		log.Fatalf("--min-tfs=%d but only %d TFs monitored — would never fire", *minTFs, len(monitoredTFs))
@@ -103,7 +118,11 @@ func main() {
 	go waitForShutdown(cancel)
 
 	dedup := newDedupSet()
-	log.Printf("multi-TF monitor up — TFs=%v min-score=%d min-tfs=%d", tfList(monitoredTFs), *minScore, *minTFs)
+	ratioMsg := "off"
+	if *minRatio > 0 {
+		ratioMsg = fmt.Sprintf("%.1f", *minRatio)
+	}
+	log.Printf("multi-TF monitor up — TFs=%v min-score=%d min-tfs=%d min-ratio=%s", tfList(monitoredTFs), *minScore, *minTFs, ratioMsg)
 
 	for {
 		// Sleep to the next UTC minute boundary.
@@ -128,7 +147,7 @@ func main() {
 		}
 
 		log.Printf("tick %s — scanning TFs %v", time.Now().UTC().Format("15:04:05Z"), tfList(closed))
-		scanTick(ctx, client, closed, *minScore, *minTFs, notifier, dedup)
+		scanTick(ctx, client, closed, *minScore, *minTFs, *minRatio, notifier, dedup)
 	}
 }
 
@@ -225,15 +244,16 @@ func tfRank(tf market.Timeframe) int {
 // ─── Scanning ──────────────────────────────────────────────────────
 
 type tfHit struct {
-	TF     market.Timeframe
-	Sig    sig.Signal
-	Candle time.Time // last closed bar's CloseTime
+	TF       market.Timeframe
+	Sig      sig.Signal
+	Candle   time.Time // last closed bar's CloseTime
+	Validator float64  // validator.Result.Total at signal moment; 0 if minRatio gating disabled
 }
 
 // scanTick evaluates every (symbol, tf) in parallel, groups hits by
 // (symbol, side), and emits confluence alerts that meet min-tfs +
 // min-score thresholds. Skips groups dedup has already marked.
-func scanTick(ctx context.Context, client *bingx.Client, tfs []market.Timeframe, minScore, minTFs int, n notify.Notifier, d *dedupSet) {
+func scanTick(ctx context.Context, client *bingx.Client, tfs []market.Timeframe, minScore, minTFs int, minRatio float64, n notify.Notifier, d *dedupSet) {
 	type job struct {
 		sym market.Symbol
 		tf  market.Timeframe
@@ -252,7 +272,7 @@ func scanTick(ctx context.Context, client *bingx.Client, tfs []market.Timeframe,
 		wg.Add(1)
 		go func(i int, j job) {
 			defer wg.Done()
-			h, ok := evalOne(ctx, client, j.sym, j.tf, minScore)
+			h, ok := evalOne(ctx, client, j.sym, j.tf, minScore, minRatio)
 			results[i] = h
 			hasResult[i] = ok
 		}(i, j)
@@ -302,9 +322,10 @@ func scanTick(ctx context.Context, client *bingx.Client, tfs []market.Timeframe,
 }
 
 // evalOne fetches candles + context for one (symbol, tf) and runs the
-// engine. Returns a tfHit if the signal would emit at minScore on
-// that TF alone; otherwise returns ok=false.
-func evalOne(ctx context.Context, client *bingx.Client, sym market.Symbol, tf market.Timeframe, minScore int) (tfHit, bool) {
+// engine. Returns a tfHit if the signal would emit at minScore AND the
+// validator.Total >= minRatio (when minRatio > 0). Otherwise ok=false.
+// Validator is short-circuited when minRatio=0 (no extra work).
+func evalOne(ctx context.Context, client *bingx.Client, sym market.Symbol, tf market.Timeframe, minScore int, minRatio float64) (tfHit, bool) {
 	candles, err := client.Klines(ctx, sym, tf, 300)
 	if err != nil {
 		log.Printf("%s %s: klines: %v", sym, tf, err)
@@ -329,7 +350,20 @@ func evalOne(ctx context.Context, client *bingx.Client, sym market.Symbol, tf ma
 	if s.Side == sig.Flat || s.Score < minScore || s.Plan.Entry == 0 {
 		return tfHit{}, false
 	}
-	return tfHit{TF: tf, Sig: s, Candle: candles[len(candles)-1].CloseTime}, true
+	// Optional /10 validator gate. When minRatio > 0, the candidate must
+	// also clear the validator's structural-fit score. The signal_ctx
+	// snapshot we capture at +record time uses the same Total — so this
+	// effectively pre-filters alerts to those that would already get a
+	// TAKE-or-better verdict from the dashboard's live diagnose.
+	var ratio float64
+	if minRatio > 0 {
+		r := validator.Validate(sym, tf, s.Side, s.Plan.Entry, 6.0, candles, markPrice)
+		ratio = r.Total
+		if ratio < minRatio {
+			return tfHit{}, false
+		}
+	}
+	return tfHit{TF: tf, Sig: s, Candle: candles[len(candles)-1].CloseTime, Validator: ratio}, true
 }
 
 // ─── Alert emission ────────────────────────────────────────────────
@@ -347,7 +381,11 @@ func emitConfluence(ctx context.Context, sym market.Symbol, side sig.Side, hits 
 		if anchor == "" {
 			anchor = "-"
 		}
-		reasons = append(reasons, fmt.Sprintf("%s score=%d anchor=%s", h.TF, h.Sig.Score, anchor))
+		ratioStr := ""
+		if h.Validator > 0 {
+			ratioStr = fmt.Sprintf(" /10=%.1f", h.Validator)
+		}
+		reasons = append(reasons, fmt.Sprintf("%s score=%d%s anchor=%s", h.TF, h.Sig.Score, ratioStr, anchor))
 	}
 	canonical := hits[0].Sig
 	synthSig := sig.Signal{

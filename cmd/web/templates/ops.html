@@ -62,6 +62,7 @@
       <span class="ops-config-pill">TFs <strong data-role="monitor-tfs">{{range $i, $t := .Monitor.MonitorTFs}}{{if $i}}·{{end}}{{$t}}{{end}}</strong></span>
       <span class="ops-config-pill">min-score <strong data-role="monitor-score">{{.Monitor.MonitorMinScore}}</strong></span>
       <span class="ops-config-pill">min-tfs <strong data-role="monitor-mintfs">{{.Monitor.MonitorMinTFs}}</strong></span>
+      <span class="ops-config-pill">min-ratio <strong data-role="monitor-minratio">{{if gt .Monitor.MonitorMinRatio 0.0}}{{printf "%.1f" .Monitor.MonitorMinRatio}}{{else}}off{{end}}</strong></span>
     </div>
   </div>
   <div class="ops-actions">
@@ -123,8 +124,12 @@
         <input type="number" min="1" max="8" step="1" name="min_score" id="ops-monitor-min-score" value="{{.Monitor.MonitorMinScore}}">
       </div>
       <div class="field">
-        <label for="ops-monitor-min-tfs">min-tfs (agreement)</label>
-        <input type="number" min="2" max="5" step="1" name="min_tfs" id="ops-monitor-min-tfs" value="{{.Monitor.MonitorMinTFs}}">
+        <label for="ops-monitor-min-tfs">min-tfs (agreement) <span class="hint">(1 = single-TF alerter)</span></label>
+        <input type="number" min="1" max="5" step="1" name="min_tfs" id="ops-monitor-min-tfs" value="{{.Monitor.MonitorMinTFs}}">
+      </div>
+      <div class="field">
+        <label for="ops-monitor-min-ratio">min-ratio (/10) <span class="hint">(structural fit; 0 disables)</span></label>
+        <input type="number" min="0" max="10" step="0.1" name="min_ratio" id="ops-monitor-min-ratio" value="{{if gt .Monitor.MonitorMinRatio 0.0}}{{printf "%.1f" .Monitor.MonitorMinRatio}}{{else}}0{{end}}">
       </div>
     </div>
     <div class="form-actions">
@@ -227,6 +232,11 @@
         if (mScore && s.monitor_min_score) mScore.textContent = String(s.monitor_min_score);
         var mMinTFs = block.querySelector('[data-role="monitor-mintfs"]');
         if (mMinTFs && s.monitor_min_tfs) mMinTFs.textContent = String(s.monitor_min_tfs);
+        var mMinRatio = block.querySelector('[data-role="monitor-minratio"]');
+        if (mMinRatio && s.service === 'trading-monitor') {
+            var r = Number(s.monitor_min_ratio || 0);
+            mMinRatio.textContent = r > 0 ? r.toFixed(1) : 'off';
+        }
         applyMutexUI();
     }
 
@@ -285,8 +295,11 @@
         });
         var score = document.getElementById('ops-monitor-min-score').value;
         var mtfs = document.getElementById('ops-monitor-min-tfs').value;
+        var mratio = document.getElementById('ops-monitor-min-ratio').value;
         if (score) form.set('min_score', score);
         if (mtfs)  form.set('min_tfs', mtfs);
+        // min_ratio: send even when "0" (means: disable). Empty string = don't touch.
+        if (mratio !== '') form.set('min_ratio', mratio);
         if (!form.toString()) {
             showToast('nothing to change', 'err');
             return;
