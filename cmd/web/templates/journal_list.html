@@ -21,6 +21,15 @@
 
 <main>
 
+{{if .TP1Status}}
+  <div class="tp1-flash tp1-{{.TP1Status}}" role="status">
+    {{if eq .TP1Status "ok"}}✓ {{end}}
+    {{if eq .TP1Status "skip"}}ⓘ {{end}}
+    {{if eq .TP1Status "error"}}⚠ {{end}}
+    <strong>BingX TP1:</strong> {{.TP1Msg}}
+  </div>
+{{end}}
+
 {{if .Error}}
   <p class="err">⚠ {{.Error}}</p>
 {{else}}

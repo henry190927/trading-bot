@@ -237,18 +237,18 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		if !ok || v.Err != "" || len(v.Candles) == 0 {
 			continue
 		}
-		// Floor = opened_at strictly. Only bars closing AFTER the user
-		// clicked +record count as potential fills — mirrors how a
-		// real limit order behaves on an exchange (the order doesn't
-		// exist until placed). Using analyzed_at as a wider floor
-		// caused false positives because the bar containing the click
-		// often has Low/High that touched entry before the click.
-		// If the user records too late and misses a real fill, they
-		// can manually set filled_at via the edit form.
+		// Floor = opened_at strictly. The candle gate is on c.OpenTime
+		// (NOT CloseTime) — a bar's Low/High covers the WHOLE bar, so
+		// if the bar started before opened_at, its extremes may reflect
+		// price action BEFORE the limit order existed. Using CloseTime
+		// here was a bug that mis-filled trades opened mid-bar (e.g. a
+		// 1h trade opened at 15:55 would inherit the 15:00-16:00 bar's
+		// 55min of pre-open Low). The live-mark fallback below handles
+		// the "trade just opened, no full post-open bar yet" gap.
 		floor := t.OpenedAt
 		hit := false
 		for _, c := range v.Candles {
-			if !c.CloseTime.After(floor) {
+			if !c.OpenTime.After(floor) {
 				continue
 			}
 			var barHit bool
@@ -591,21 +591,24 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		analyzedAt = time.Now().Local().Format("2006-01-02T15:04")
 	}
 	c.HTML(http.StatusOK, "journal_new.html", gin.H{
-		"Symbol":     c.Query("symbol"),
-		"Side":       c.Query("side"),
-		"Entry":      c.Query("entry"),
-		"Stop":       c.Query("stop"),
-		"TP1":        c.Query("tp1"),
-		"TP2":        c.Query("tp2"),
-		"Anchor":     c.Query("anchor"),
-		"TF":         c.Query("tf"),
-		"Score":      c.Query("score"),
-		"Notes":      "",
-		"AnalyzedAt": analyzedAt,
-		"SignalCtx":  c.Query("ctx"), // verbatim from recordHref / validateRecordHref
-		"Symbols":    []string{"BTC", "ETH", "XAU", "XAG"},
-		"Anchors":    recommendedAnchors,
-		"Error":      "",
+		"Symbol":        c.Query("symbol"),
+		"Side":          c.Query("side"),
+		"Entry":         c.Query("entry"),
+		"Stop":          c.Query("stop"),
+		"TP1":           c.Query("tp1"),
+		"TP2":           c.Query("tp2"),
+		"Anchor":        c.Query("anchor"),
+		"TF":            c.Query("tf"),
+		"Score":         c.Query("score"),
+		"Notes":         "",
+		"AnalyzedAt":    analyzedAt,
+		"SignalCtx":     c.Query("ctx"), // verbatim from recordHref / validateRecordHref
+		"Symbols":       []string{"BTC", "ETH", "XAU", "XAG"},
+		"Anchors":       recommendedAnchors,
+		"Error":         "",
+		"MarginUSDT":    "",
+		"TP1PartialPct": "50",
+		"PlaceTP1":      true,
 	})
 }
 
@@ -632,10 +635,13 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 			"Symbol": symbol, "Side": side, "Entry": entryStr, "Stop": stopStr,
 			"TP1": tp1Str, "TP2": tp2Str, "Anchor": anchor, "TF": tf,
 			"Score": score, "Notes": notes, "AnalyzedAt": analyzedAtStr,
-			"Leverage": leverageStr,
-			"Symbols":  []string{"BTC", "ETH", "XAU", "XAG"},
-			"Anchors":  recommendedAnchors,
-			"Error":    errMsg,
+			"Leverage":      leverageStr,
+			"MarginUSDT":    strings.TrimSpace(c.PostForm("margin_usdt")),
+			"TP1PartialPct": strings.TrimSpace(c.PostForm("tp1_partial_pct")),
+			"PlaceTP1":      c.PostForm("place_tp1") == "on",
+			"Symbols":       []string{"BTC", "ETH", "XAU", "XAG"},
+			"Anchors":       recommendedAnchors,
+			"Error":         errMsg,
 		})
 	}
 
@@ -718,7 +724,66 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		rerender("write journal: " + err.Error())
 		return
 	}
-	c.Redirect(http.StatusSeeOther, "/journal")
+
+	// Optional BingX TP1 reduce-only placement. The journal row is ALREADY
+	// written above, so any BingX-side error here is reported as a flash
+	// banner — it never blocks the user from recording the trade.
+	redirectURL := "/journal"
+	if c.PostForm("place_tp1") == "on" {
+		status, msg := s.placeTP1OnBingX(c, t, strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+		redirectURL = "/journal?tp1_status=" + url.QueryEscape(status) + "&tp1_msg=" + url.QueryEscape(msg)
+	}
+	c.Redirect(http.StatusSeeOther, redirectURL)
+}
+
+// placeTP1OnBingX looks up the open position for t.Symbol on BingX, then
+// submits a reduce-only LIMIT order at t.TP1 for the chosen partial %.
+// Returns (status, msg) where status is one of: "ok" / "skip" / "error".
+// Never panics; all failures are surfaced via msg.
+func (s *server) placeTP1OnBingX(c *gin.Context, t journal.Trade, partialStr string) (string, string) {
+	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
+		return "skip", "BingX API key/secret not configured in .env"
+	}
+	pct := 50.0
+	if partialStr != "" {
+		v, err := strconv.ParseFloat(partialStr, 64)
+		if err != nil || v <= 0 || v > 100 {
+			return "error", "tp1_partial_pct must be 1-100"
+		}
+		pct = v
+	}
+	sym, err := resolveWebSymbol(t.Symbol)
+	if err != nil {
+		return "error", err.Error()
+	}
+	pos, err := s.client.FindOpenPosition(c.Request.Context(), sym, t.Side)
+	if err != nil {
+		return "error", "read positions: " + err.Error()
+	}
+	if pos == nil {
+		return "skip", fmt.Sprintf("no open %s position on BingX for %s — open the position first, then TP1 will be placed on next record", t.Side, t.Symbol)
+	}
+	// Sanity: TP1 must be on the profitable side of entry for the position
+	// we're closing. The journal-form validation already enforced this for
+	// the *trade plan*, but the LIVE position might be different (e.g. user
+	// opened a different size/side). Re-check defensively.
+	if t.Side == "long" && t.TP1 <= pos.EntryPrice {
+		return "error", fmt.Sprintf("TP1 %.4f is not above live entry %.4f (long); refusing", t.TP1, pos.EntryPrice)
+	}
+	if t.Side == "short" && t.TP1 >= pos.EntryPrice {
+		return "error", fmt.Sprintf("TP1 %.4f is not below live entry %.4f (short); refusing", t.TP1, pos.EntryPrice)
+	}
+
+	qty := pos.Quantity * pct / 100
+	if qty <= 0 {
+		return "error", "computed qty <= 0"
+	}
+	hedgeMode := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
+	res, err := s.client.PlaceReduceOnlyLimit(c.Request.Context(), sym, t.Side, qty, t.TP1, hedgeMode)
+	if err != nil {
+		return "error", "place TP1: " + err.Error()
+	}
+	return "ok", fmt.Sprintf("TP1 placed on BingX — orderId=%s qty=%g @ %.4f (%.0f%% of %g)", res.OrderID, qty, t.TP1, pct, pos.Quantity)
 }
 
 // handleJournalCloseForm renders the close form for a given trade.
@@ -1000,7 +1065,17 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		rerender("write journal: " + err.Error())
 		return
 	}
-	c.Redirect(http.StatusSeeOther, "/journal")
+
+	// Same BingX TP1 placement as /journal/open. From edit, this is also the
+	// path used to (a) retroactively place TP1 on an existing journal row,
+	// or (b) re-fire the BingX API while iterating without spamming new
+	// journal entries.
+	redirectURL := "/journal"
+	if c.PostForm("place_tp1") == "on" {
+		status, msg := s.placeTP1OnBingX(c, trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+		redirectURL = "/journal?tp1_status=" + url.QueryEscape(status) + "&tp1_msg=" + url.QueryEscape(msg)
+	}
+	c.Redirect(http.StatusSeeOther, redirectURL)
 }
 
 // handleJournalDelete removes a trade by ID (POST only).
@@ -1040,19 +1115,20 @@ func editFormData(t journal.Trade, errMsg string) gin.H {
 		exitStr = fmt.Sprintf("%.4f", t.ExitPrice)
 	}
 	return gin.H{
-		"Trade":      t,
-		"OpenedAt":   asLocalInput(t.OpenedAt),
-		"AnalyzedAt": asLocalInput(t.AnalyzedAt),
-		"FilledAt":   asLocalInput(t.FilledAt),
-		"ClosedAt":   asLocalInput(t.ClosedAt),
-		"Entry":      fmt.Sprintf("%.4f", t.Entry),
-		"Stop":       fmt.Sprintf("%.4f", t.Stop),
-		"TP1":        fmt.Sprintf("%.4f", t.TP1),
-		"TP2":        fmt.Sprintf("%.4f", t.TP2),
-		"ExitPrice":  exitStr,
-		"Symbols":    []string{"BTC", "ETH", "XAU", "XAG"},
-		"Anchors":    recommendedAnchors,
-		"Error":      errMsg,
+		"Trade":         t,
+		"OpenedAt":      asLocalInput(t.OpenedAt),
+		"AnalyzedAt":    asLocalInput(t.AnalyzedAt),
+		"FilledAt":      asLocalInput(t.FilledAt),
+		"ClosedAt":      asLocalInput(t.ClosedAt),
+		"Entry":         fmt.Sprintf("%.4f", t.Entry),
+		"Stop":          fmt.Sprintf("%.4f", t.Stop),
+		"TP1":           fmt.Sprintf("%.4f", t.TP1),
+		"TP2":           fmt.Sprintf("%.4f", t.TP2),
+		"ExitPrice":     exitStr,
+		"Symbols":       []string{"BTC", "ETH", "XAU", "XAG"},
+		"Anchors":       recommendedAnchors,
+		"Error":         errMsg,
+		"TP1PartialPct": "50",
 	}
 }
 
@@ -1198,6 +1274,8 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"Calendar":     calendar,
 		"Periods":      periods,
 		"Equity":       equity,
+		"TP1Status":    c.Query("tp1_status"), // "" / "ok" / "skip" / "error" — flash from /journal/open
+		"TP1Msg":       c.Query("tp1_msg"),
 	})
 }
 

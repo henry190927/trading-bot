@@ -13,6 +13,10 @@ const (
 	PathFundingHistory = "/openApi/swap/v2/quote/fundingRate"
 	PathOpenInt        = "/openApi/swap/v2/quote/openInterest"
 	PathContract       = "/openApi/swap/v2/quote/contracts"
+
+	// Signed endpoints (require APIKey + APISecret + IP whitelist + trade scope).
+	PathPositions = "/openApi/swap/v2/user/positions"
+	PathOrder     = "/openApi/swap/v2/trade/order"
 )
 
 type RawKline struct {

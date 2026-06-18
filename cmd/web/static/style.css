@@ -554,6 +554,57 @@ footer {
     margin-bottom: 1rem;
     font-size: 0.95rem;
 }
+/* TP1 flash banner — shown once on /journal after /journal/open. */
+.tp1-flash {
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    border: 1px solid var(--border);
+}
+.tp1-ok    { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+.tp1-skip  { background: #0f1a2e;          color: var(--blue);  border-color: var(--blue); }
+.tp1-error { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
+.tp1-flash strong { color: inherit; }
+
+/* PnL preview pane on /journal/new — JS-driven; hidden until margin+entry set. */
+.pnl-preview {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 0.7rem 0.85rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem 1rem;
+    font-size: 0.9rem;
+}
+.pnl-row { display: flex; justify-content: space-between; gap: 0.5rem; }
+.pnl-label { color: var(--muted, #8b949e); }
+.pnl-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+.pnl-pos { color: var(--green); }
+.pnl-neg { color: var(--red); }
+.pnl-note {
+    grid-column: 1 / -1;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px dashed var(--border);
+    font-size: 0.78rem;
+    color: var(--muted, #8b949e);
+    line-height: 1.4;
+}
+
+.checkbox-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+}
+.checkbox-inline input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--green);
+}
 .trade-form {
     background: var(--surface);
     border: 1px solid var(--border);

@@ -178,6 +178,22 @@
     <textarea name="close_notes" id="close_notes" rows="2">{{.Trade.CloseNotes}}</textarea>
   </div>
 
+  <h2 class="form-section">BingX TP1 placement <span class="hint">(optional — places a reduce-only LIMIT against live position)</span></h2>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tp1_partial_pct">TP1 partial %</label>
+      <input type="number" min="1" max="100" step="1" name="tp1_partial_pct" id="tp1_partial_pct" value="{{.TP1PartialPct}}" placeholder="50">
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="checkbox-inline">
+      <input type="checkbox" name="place_tp1" id="place_tp1">
+      <span>(Re-)place TP1 reduce-only limit on BingX on save <span class="hint">(default off — may duplicate if one already exists; cancel old on BingX first)</span></span>
+    </label>
+  </div>
+
   <div class="form-actions">
     <a href="/journal" class="btn-cancel">Cancel</a>
     <button type="submit" class="btn-primary">Save changes</button>

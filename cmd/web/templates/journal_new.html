@@ -106,6 +106,39 @@
     </div>
   </div>
 
+  <div class="field-row">
+    <div class="field">
+      <label for="margin_usdt">USDT margin <span class="hint">(for PnL preview; collateral × leverage = notional)</span></label>
+      <input type="number" min="0" step="any" inputmode="decimal" name="margin_usdt" id="margin_usdt" value="{{.MarginUSDT}}" placeholder="e.g. 100">
+    </div>
+    <div class="field">
+      <label for="tp1_partial_pct">TP1 partial % <span class="hint">(reduce-only at TP1)</span></label>
+      <input type="number" min="1" max="100" step="1" name="tp1_partial_pct" id="tp1_partial_pct" value="{{.TP1PartialPct}}" placeholder="50">
+    </div>
+  </div>
+
+  <!-- PnL preview pane — JS-driven, updates as you type entry/stop/tp/margin/leverage. -->
+  <div class="pnl-preview" id="pnl-preview" hidden>
+    <div class="pnl-row"><span class="pnl-label">Qty</span><span class="pnl-val" id="pnl-qty">—</span></div>
+    <div class="pnl-row"><span class="pnl-label">Notional</span><span class="pnl-val" id="pnl-notional">—</span></div>
+    <div class="pnl-row pnl-tp1"><span class="pnl-label">TP1 (partial)</span><span class="pnl-val" id="pnl-tp1">—</span></div>
+    <div class="pnl-row pnl-tp2"><span class="pnl-label">TP2 (runner full)</span><span class="pnl-val" id="pnl-tp2">—</span></div>
+    <div class="pnl-row pnl-stop"><span class="pnl-label">Stop (full)</span><span class="pnl-val" id="pnl-stop">—</span></div>
+    <div class="pnl-note">
+      Gross PnL at exact fill. BingX's order-panel preview shows ~95% of these
+      values because it reserves ~5% of margin as an internal fee/maintenance
+      buffer. Actual settled PnL on close ≈ values here minus real maker/taker
+      fees (~0.04-0.10% × notional).
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="checkbox-inline">
+      <input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}>
+      <span>Place TP1 reduce-only limit on BingX <span class="hint">(reads live position, never opens new)</span></span>
+    </label>
+  </div>
+
   <div class="field">
     <label for="notes">Notes <span class="hint">(optional)</span></label>
     <textarea name="notes" id="notes" rows="3" placeholder="why you took this trade…">{{.Notes}}</textarea>
@@ -141,6 +174,89 @@
     }
     sym.addEventListener('change', maybeFill);
     maybeFill();
+})();
+
+// Live PnL preview: qty = (margin × leverage) / entry; PnL = qty × (exit-entry) × sideMult.
+// Updates on every relevant field change. Hidden if margin or entry is empty.
+(function () {
+    var ids = ['entry','stop','tp1','tp2','leverage','margin_usdt','tp1_partial_pct'];
+    var inputs = ids.map(function (i) { return document.getElementById(i); });
+    var sideRadios = document.querySelectorAll('input[name="side"]');
+    var pane = document.getElementById('pnl-preview');
+    if (!pane) return;
+
+    function fmt(n, digits) {
+        if (!isFinite(n)) return '—';
+        var d = digits === undefined ? 2 : digits;
+        return (n >= 0 ? '+' : '') + n.toFixed(d);
+    }
+    function num(el) { return el && el.value ? parseFloat(el.value) : NaN; }
+    function side() {
+        for (var i = 0; i < sideRadios.length; i++) if (sideRadios[i].checked) return sideRadios[i].value;
+        return '';
+    }
+
+    // Per-symbol qty precision from BingX /openApi/swap/v2/quote/contracts.
+    // BingX truncates (floors) submitted qty to the lot step before opening
+    // the position — so effective qty is slightly smaller than theoretical,
+    // and effective PnL is correspondingly smaller. Mirroring that floor
+    // here makes the preview match BingX's actual fill within rounding noise.
+    var qtyPrecision = { BTC: 4, ETH: 2, XAU: 4, XAG: 4 };
+
+    function floorTo(v, decimals) {
+        var f = Math.pow(10, decimals);
+        return Math.floor(v * f) / f;
+    }
+
+    function recompute() {
+        var entry = num(inputs[0]);
+        var stop  = num(inputs[1]);
+        var tp1   = num(inputs[2]);
+        var tp2   = num(inputs[3]);
+        var lev   = num(inputs[4]) || 1;
+        var margin = num(inputs[5]);
+        var pct   = num(inputs[6]); if (!isFinite(pct) || pct <= 0) pct = 50;
+        var s     = side();
+
+        if (!isFinite(entry) || entry <= 0 || !isFinite(margin) || margin <= 0 || !s) {
+            pane.hidden = true;
+            return;
+        }
+        pane.hidden = false;
+
+        var notional = margin * lev;
+        var rawQty = notional / entry;
+        var sym = document.getElementById('symbol').value;
+        var prec = qtyPrecision[sym];
+        var qty = (prec !== undefined) ? floorTo(rawQty, prec) : rawQty;
+        var mult = (s === 'long') ? 1 : -1;
+
+        // Display floored qty (matches what BingX will actually open).
+        document.getElementById('pnl-qty').textContent      = (prec !== undefined) ? qty.toFixed(prec) : qty.toFixed(4);
+        // Effective notional after rounding (qty × entry), not the theoretical input.
+        document.getElementById('pnl-notional').textContent = (qty * entry).toFixed(2) + ' USDT';
+
+        function pnl(exit) {
+            if (!isFinite(exit) || exit <= 0) return NaN;
+            return qty * (exit - entry) * mult;
+        }
+        var p1 = pnl(tp1) * (pct / 100);
+        var p2 = pnl(tp2);
+        var pS = pnl(stop);
+        var setVal = function(id, v) {
+            var el = document.getElementById(id);
+            el.textContent = isFinite(v) ? fmt(v) + ' USDT' : '—';
+            el.classList.toggle('pnl-pos', isFinite(v) && v > 0);
+            el.classList.toggle('pnl-neg', isFinite(v) && v < 0);
+        };
+        setVal('pnl-tp1', p1);
+        setVal('pnl-tp2', p2);
+        setVal('pnl-stop', pS);
+    }
+
+    inputs.forEach(function (el) { if (el) el.addEventListener('input', recompute); });
+    sideRadios.forEach(function (el) { el.addEventListener('change', recompute); });
+    recompute();
 })();
 </script>
 </body>
