@@ -2,6 +2,7 @@ package bingx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
@@ -27,14 +28,54 @@ func dryRunResult(sym market.Symbol, side, typ string, price, qty float64) *Orde
 }
 
 // OrderResult is the (trimmed) response from a successful place-order call.
+//
+// BingX returns the same orderId twice in the response — `orderId` as a
+// JSON number (int64 in practice), `orderID` as a JSON string. Either
+// would suffice on its own, but Go's json package applies case-insensitive
+// fallback when matching tags, and once it tries to assign the number
+// to a string field it errors out before getting to the string variant.
+// Pin the shape via custom UnmarshalJSON so both keys are accepted and
+// the string form (or number-formatted-as-string) is what we expose.
 type OrderResult struct {
-	OrderID  string  `json:"orderId"`
-	Symbol   string  `json:"symbol"`
-	Side     string  `json:"side"`
-	Type     string  `json:"type"`
-	Price    float64 `json:"price,string"`
-	Quantity float64 `json:"quantity,string"`
-	Status   string  `json:"status"`
+	OrderID  string
+	Symbol   string
+	Side     string
+	Type     string
+	Price    float64
+	Quantity float64
+	Status   string
+}
+
+// orderResultRaw mirrors the actual BingX response shape. Two distinct
+// fields for the dual-typed orderId/orderID so neither collides via
+// case-insensitive matching.
+type orderResultRaw struct {
+	OrderIDNum json.Number `json:"orderId"`
+	OrderIDStr string      `json:"orderID"`
+	Symbol     string      `json:"symbol"`
+	Side       string      `json:"side"`
+	Type       string      `json:"type"`
+	Price      float64     `json:"price"`
+	Quantity   float64     `json:"quantity"`
+	Status     string      `json:"status"`
+}
+
+func (o *OrderResult) UnmarshalJSON(data []byte) error {
+	var raw orderResultRaw
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	o.OrderID = raw.OrderIDStr
+	if o.OrderID == "" {
+		o.OrderID = raw.OrderIDNum.String()
+	}
+	o.Symbol = raw.Symbol
+	o.Side = raw.Side
+	o.Type = raw.Type
+	o.Price = raw.Price
+	o.Quantity = raw.Quantity
+	o.Status = raw.Status
+	return nil
 }
 
 // rawOrderResp mirrors BingX's place-order response shape:

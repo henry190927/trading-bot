@@ -4,9 +4,34 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/url"
 	"testing"
 )
+
+// TestOrderResultDualKeyOrderID pins the BingX-specific decoder shape:
+// the place-order response includes BOTH `orderId` (number) AND
+// `orderID` (string), with the string variant being what we want. A
+// previous bug let Go's case-insensitive fallback assign the number to
+// a string-typed OrderID field, which failed and dropped the orderId on
+// the floor (leading to orphan orders on the exchange).
+func TestOrderResultDualKeyOrderID(t *testing.T) {
+	// Verbatim response shape from a 2026-06-18 live BTC-USDT place call.
+	body := `{"orderId":2067557989984989184,"orderID":"2067557989984989184","symbol":"BTC-USDT","positionSide":"SHORT","side":"SELL","type":"LIMIT","price":64231.3,"quantity":0.0583,"status":"PENDING"}`
+	var r OrderResult
+	if err := json.Unmarshal([]byte(body), &r); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if r.OrderID != "2067557989984989184" {
+		t.Fatalf("OrderID = %q, want %q", r.OrderID, "2067557989984989184")
+	}
+	if r.Symbol != "BTC-USDT" || r.Side != "SELL" || r.Type != "LIMIT" {
+		t.Fatalf("metadata mismatch: %+v", r)
+	}
+	if r.Price != 64231.3 || r.Quantity != 0.0583 {
+		t.Fatalf("price/qty mismatch: price=%v qty=%v", r.Price, r.Quantity)
+	}
+}
 
 // TestSignatureCanonicalForm pins the canonical-query-string + HMAC-SHA256
 // logic used by signedRequest. Independently computing the expected signature

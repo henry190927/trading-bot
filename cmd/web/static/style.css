@@ -663,9 +663,9 @@ footer {
     font-size: 1.1rem;
 }
 .modal-warn {
-    background: var(--red-bg);
-    color: var(--red);
-    border: 1px solid var(--red);
+    background: #2e2614;
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
     margin: 0 0 0.8rem;
