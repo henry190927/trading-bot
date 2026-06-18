@@ -971,12 +971,35 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 	if err := s.client.SetLeverage(ctx, sym, levSide, t.Leverage); err != nil {
 		return "error", "set leverage: " + err.Error()
 	}
-	res, err := s.client.PlaceLimit(ctx, sym, t.Side, qty, t.Entry, hedge)
+	// Bundle SL and TP2 with the entry where applicable. BingX activates
+	// them the moment the entry fills, so neither the stop nor the TP2
+	// runner has a sweep-based delay. Sentinels in StopOrderID / TP2OrderID
+	// prevent the sweep from placing duplicates after fill. TP1 (partial)
+	// stays on the sweep path — bundled SL/TP close 100% of the position,
+	// which collides with partial scaling, so TP1 needs the explicit
+	// reduce-only LIMIT path.
+	var bundledStop, bundledTP float64
+	if t.StopAuto && t.Stop > 0 {
+		bundledStop = t.Stop
+	}
+	if t.TP2Auto && t.TP2 > 0 {
+		bundledTP = t.TP2
+	}
+	res, err := s.client.PlaceLimit(ctx, sym, t.Side, qty, t.Entry, bundledStop, bundledTP, hedge)
 	if err != nil {
 		return "error", "place entry: " + err.Error()
 	}
 	t.EntryOrderID = res.OrderID
-	return "ok", fmt.Sprintf("entry placed — orderId=%s qty=%g @ %.4f (margin %.2f × %dx)", res.OrderID, qty, t.Entry, t.MarginUSDT, t.Leverage)
+	bundledMsg := ""
+	if bundledStop > 0 {
+		t.StopOrderID = "ATTACHED:" + res.OrderID
+		bundledMsg += fmt.Sprintf(" + SL bundled @ %.4f", t.Stop)
+	}
+	if bundledTP > 0 {
+		t.TP2OrderID = "ATTACHED:" + res.OrderID
+		bundledMsg += fmt.Sprintf(" + TP2 bundled @ %.4f", t.TP2)
+	}
+	return "ok", fmt.Sprintf("entry placed — orderId=%s qty=%g @ %.4f (margin %.2f × %dx)%s", res.OrderID, qty, t.Entry, t.MarginUSDT, t.Leverage, bundledMsg)
 }
 
 // placeStopOnBingX submits a reduce-only STOP_MARKET sized to the full
@@ -1098,6 +1121,13 @@ func (s *server) unwindOnBingX(ctx context.Context, t *journal.Trade) []string {
 		}
 		if strings.HasPrefix(lg.id, "DRY-RUN") {
 			out = append(out, fmt.Sprintf("skip %s (DRY-RUN orderId)", lg.name))
+			continue
+		}
+		if strings.HasPrefix(lg.id, "ATTACHED:") {
+			// Stop bundled with entry on BingX side — when we cancel the
+			// entry (or the entry fills and the position is then market-
+			// closed below), BingX automatically tears the bundled SL down.
+			out = append(out, fmt.Sprintf("skip %s (bundled with entry; BingX auto-cancels)", lg.name))
 			continue
 		}
 		if err := s.client.CancelOrder(ctx, sym, lg.id); err != nil {

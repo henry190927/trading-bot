@@ -149,18 +149,25 @@ func (c *Client) PlaceReduceOnlyLimit(ctx context.Context, sym market.Symbol, po
 	return &resp.Order, nil
 }
 
-// PlaceLimit submits a LIMIT order that OPENS a new position. This is
-// the entry-order path used by /journal/open when the user opts to
-// auto-open on BingX. reduceOnly is explicitly false; the caller is
-// responsible for verifying via SetLeverage that the symbol's leverage
-// is correct before placing.
+// PlaceLimit submits a LIMIT order that OPENS a new position, optionally
+// with a BingX-managed stop-loss and/or take-profit bundled on. Bundled
+// SL/TP activate the instant the entry fills — closes the gap between
+// fill and sweep-based reduce-only placement, so the position is never
+// without a stop, and the runner-target TP2 is preset.
 //
 //   - side: "long" or "short" — direction of the position to open.
 //   - qty:  base-unit position size (already floored to lot precision).
-//   - price: limit price.
+//   - price: limit entry price.
+//   - stopPrice: stop trigger price. Pass 0 to skip bundled SL.
+//   - tpPrice: take-profit trigger price (typically TP2, since BingX
+//     bundles close 100% — partial TP1 is placed separately via sweep).
+//     Pass 0 to skip bundled TP.
 //   - hedgeMode: when true, positionSide=LONG/SHORT is sent (required by
 //     hedge-mode accounts).
-func (c *Client) PlaceLimit(ctx context.Context, sym market.Symbol, side string, qty, price float64, hedgeMode bool) (*OrderResult, error) {
+//
+// reduceOnly is explicitly false for the entry. The bundled SL/TP on
+// BingX side are automatically reduce-only (position-close triggers).
+func (c *Client) PlaceLimit(ctx context.Context, sym market.Symbol, side string, qty, price, stopPrice, tpPrice float64, hedgeMode bool) (*OrderResult, error) {
 	side = strings.ToLower(side)
 	if side != "long" && side != "short" {
 		return nil, fmt.Errorf("side must be long|short, got %q", side)
@@ -194,6 +201,25 @@ func (c *Client) PlaceLimit(ctx context.Context, sym market.Symbol, side string,
 		} else {
 			q.Set("positionSide", "SHORT")
 		}
+	}
+	if stopPrice > 0 {
+		// BingX accepts stopLoss as a JSON-encoded object. type=STOP_MARKET
+		// closes the position at market when stopPrice is touched on the
+		// MARK_PRICE feed (avoids wick-on-last-price stop hunts vs the
+		// LAST_PRICE trigger).
+		slJSON := fmt.Sprintf(`{"type":"STOP_MARKET","stopPrice":%s,"price":%s,"workingType":"MARK_PRICE"}`,
+			strconv.FormatFloat(stopPrice, 'f', -1, 64),
+			strconv.FormatFloat(stopPrice, 'f', -1, 64))
+		q.Set("stopLoss", slJSON)
+	}
+	if tpPrice > 0 {
+		// Bundled TP closes 100% of the position when tpPrice is touched.
+		// Pair with the partial-TP1 reduce-only LIMIT (placed separately
+		// via sweep) so TP1 scales out and bundled TP2 finishes the runner.
+		tpJSON := fmt.Sprintf(`{"type":"TAKE_PROFIT_MARKET","stopPrice":%s,"price":%s,"workingType":"MARK_PRICE"}`,
+			strconv.FormatFloat(tpPrice, 'f', -1, 64),
+			strconv.FormatFloat(tpPrice, 'f', -1, 64))
+		q.Set("takeProfit", tpJSON)
 	}
 
 	var resp rawOrderResp
