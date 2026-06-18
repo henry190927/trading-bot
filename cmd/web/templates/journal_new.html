@@ -147,21 +147,21 @@
     <div class="field">
       <label class="checkbox-inline">
         <input type="checkbox" name="place_stop" id="place_stop">
-        <span>Auto-place stop-loss (reduce-only STOP_MARKET) <span class="hint">on fill</span></span>
+        <span>Auto-place stop-loss <span class="hint">(bundled with entry — activates instantly when entry fills, full position close)</span></span>
       </label>
     </div>
 
     <div class="field">
       <label class="checkbox-inline">
         <input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}>
-        <span>Auto-place TP1 reduce-only LIMIT (partial %) <span class="hint">on fill</span></span>
+        <span>Auto-place TP1 partial reduce-only LIMIT <span class="hint">(placed by sweep after entry fills; partial %)</span></span>
       </label>
     </div>
 
     <div class="field">
       <label class="checkbox-inline">
         <input type="checkbox" name="place_tp2" id="place_tp2">
-        <span>Auto-place TP2 reduce-only LIMIT (remaining position) <span class="hint">on fill</span></span>
+        <span>Auto-place TP2 runner <span class="hint">(bundled with entry — activates instantly when entry fills, full position close)</span></span>
       </label>
     </div>
   </fieldset>
@@ -344,10 +344,15 @@
             list.appendChild(li);
         }
         add('Set leverage: ' + sym + ' → ' + lev + 'x');
-        add('Place LIMIT ' + side.toUpperCase() + ' (open): margin=' + margin + ' USDT @ entry ' + entry);
-        if (gck('place_stop'))  add('Then on fill: reduce-only STOP_MARKET @ ' + stop + ' (full close)');
-        if (gck('place_tp1'))   add('Then on fill: reduce-only LIMIT @ TP1 ' + tp1 + ' (' + partial + '% partial)');
-        if (gck('place_tp2'))   add('Then on fill: reduce-only LIMIT @ TP2 ' + tp2 + ' (remaining)');
+        var entryLine = 'Place LIMIT ' + side.toUpperCase() + ' (open): margin=' + margin + ' USDT @ entry ' + entry;
+        var bundled = [];
+        if (gck('place_stop')) bundled.push('SL @ ' + stop);
+        if (gck('place_tp2')) bundled.push('TP2 @ ' + tp2);
+        if (bundled.length) entryLine += ' [bundled: ' + bundled.join(', ') + ']';
+        add(entryLine);
+        if (gck('place_stop'))  add('  → SL bundled with entry, activates on fill (full close at ' + stop + ')');
+        if (gck('place_tp2'))   add('  → TP2 bundled with entry, activates on fill (full close at ' + tp2 + ')');
+        if (gck('place_tp1'))   add('Then via sweep after fill: reduce-only LIMIT @ TP1 ' + tp1 + ' (' + partial + '% partial)');
     }
 })();
 </script>

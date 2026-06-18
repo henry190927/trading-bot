@@ -203,21 +203,21 @@
   <div class="field">
     <label class="checkbox-inline">
       <input type="checkbox" name="place_tp1" id="place_tp1" {{if and .Trade.TP1Auto (not .Trade.TP1OrderID)}}checked{{end}}>
-      <span>Auto-place TP1 on save / fill-detection</span>
+      <span>Auto-place TP1 partial reduce-only LIMIT <span class="hint">(placed by sweep after fill)</span></span>
     </label>
   </div>
 
   <div class="field">
     <label class="checkbox-inline">
       <input type="checkbox" name="place_stop" id="place_stop" {{if and .Trade.StopAuto (not .Trade.StopOrderID)}}checked{{end}}>
-      <span>Auto-place stop-loss on fill-detection</span>
+      <span>Auto-place stop-loss <span class="hint">(sweep places reduce-only STOP_MARKET after fill; bundled-with-entry path is /journal/new only)</span></span>
     </label>
   </div>
 
   <div class="field">
     <label class="checkbox-inline">
       <input type="checkbox" name="place_tp2" id="place_tp2" {{if and .Trade.TP2Auto (not .Trade.TP2OrderID)}}checked{{end}}>
-      <span>Auto-place TP2 (remaining position) on fill-detection</span>
+      <span>Auto-place TP2 runner <span class="hint">(sweep places reduce-only LIMIT for remaining qty after fill; bundled-with-entry path is /journal/new only)</span></span>
     </label>
   </div>
 
