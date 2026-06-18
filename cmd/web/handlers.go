@@ -854,6 +854,9 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 // Returns (status, msg) where status is one of: "ok" / "skip" / "error".
 // Never panics; all failures are surfaced via msg.
 func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialStr string) (string, string) {
+	if t.TP1OrderID != "" {
+		return "skip", fmt.Sprintf("TP1 already placed (orderId=%s) — cancel on BingX first to re-place", t.TP1OrderID)
+	}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
 	}
@@ -930,6 +933,9 @@ func hedgeModeEnabled() bool {
 // (floored to lot precision). On success, writes the orderId into
 // t.EntryOrderID. Returns (status, msg) for the /journal flash banner.
 func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (string, string) {
+	if t.EntryOrderID != "" {
+		return "skip", fmt.Sprintf("entry already placed (orderId=%s) — cancel on BingX first to re-place", t.EntryOrderID)
+	}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
 	}
@@ -977,6 +983,9 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 // live position (after TP1's partial is also placed, the stop still
 // covers everything reduce-only can touch — BingX won't over-close).
 func (s *server) placeStopOnBingX(ctx context.Context, t *journal.Trade) (string, string) {
+	if t.StopOrderID != "" {
+		return "skip", fmt.Sprintf("stop already placed (orderId=%s) — cancel on BingX first to re-place", t.StopOrderID)
+	}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
 	}
@@ -1011,6 +1020,9 @@ func (s *server) placeStopOnBingX(ctx context.Context, t *journal.Trade) (string
 // full qty minus what we'd close at TP1 (so TP1 + TP2 together fully
 // close the position).
 func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1PartialPct float64) (string, string) {
+	if t.TP2OrderID != "" {
+		return "skip", fmt.Sprintf("TP2 already placed (orderId=%s) — cancel on BingX first to re-place", t.TP2OrderID)
+	}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
 	}
