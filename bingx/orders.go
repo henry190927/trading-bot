@@ -3,12 +3,28 @@ package bingx
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"myFirstGo/trading-bot/market"
 )
+
+// dryRunResult builds a deterministic-shape mock for DryRun branches so
+// the caller can treat it like a real OrderResult without nil-checking.
+// The orderId carries the symbol + a timestamp so log lines are easy to
+// correlate with the form submission that triggered them.
+func dryRunResult(sym market.Symbol, side, typ string, price, qty float64) *OrderResult {
+	id := fmt.Sprintf("DRY-RUN-%s-%d", sym, time.Now().UnixNano())
+	log.Printf("[DRY-RUN] would have sent %s %s %s sym=%s qty=%g price=%g (orderId=%s)",
+		typ, side, "(no http)", sym, qty, price, id)
+	return &OrderResult{
+		OrderID: id, Symbol: string(sym), Side: side, Type: typ,
+		Price: price, Quantity: qty, Status: "DRY_RUN",
+	}
+}
 
 // OrderResult is the (trimmed) response from a successful place-order call.
 type OrderResult struct {
@@ -64,6 +80,10 @@ func (c *Client) PlaceReduceOnlyLimit(ctx context.Context, sym market.Symbol, po
 		orderSide = "BUY"
 	}
 
+	if c.DryRun {
+		return dryRunResult(sym, orderSide, "LIMIT_REDUCE_ONLY", price, qty), nil
+	}
+
 	q := url.Values{}
 	q.Set("symbol", string(sym))
 	q.Set("side", orderSide)
@@ -86,4 +106,132 @@ func (c *Client) PlaceReduceOnlyLimit(ctx context.Context, sym market.Symbol, po
 		return nil, err
 	}
 	return &resp.Order, nil
+}
+
+// PlaceLimit submits a LIMIT order that OPENS a new position. This is
+// the entry-order path used by /journal/open when the user opts to
+// auto-open on BingX. reduceOnly is explicitly false; the caller is
+// responsible for verifying via SetLeverage that the symbol's leverage
+// is correct before placing.
+//
+//   - side: "long" or "short" — direction of the position to open.
+//   - qty:  base-unit position size (already floored to lot precision).
+//   - price: limit price.
+//   - hedgeMode: when true, positionSide=LONG/SHORT is sent (required by
+//     hedge-mode accounts).
+func (c *Client) PlaceLimit(ctx context.Context, sym market.Symbol, side string, qty, price float64, hedgeMode bool) (*OrderResult, error) {
+	side = strings.ToLower(side)
+	if side != "long" && side != "short" {
+		return nil, fmt.Errorf("side must be long|short, got %q", side)
+	}
+	if qty <= 0 {
+		return nil, fmt.Errorf("qty must be > 0, got %v", qty)
+	}
+	if price <= 0 {
+		return nil, fmt.Errorf("price must be > 0, got %v", price)
+	}
+
+	orderSide := "BUY"
+	if side == "short" {
+		orderSide = "SELL"
+	}
+
+	if c.DryRun {
+		return dryRunResult(sym, orderSide, "LIMIT_OPEN", price, qty), nil
+	}
+
+	q := url.Values{}
+	q.Set("symbol", string(sym))
+	q.Set("side", orderSide)
+	q.Set("type", "LIMIT")
+	q.Set("price", strconv.FormatFloat(price, 'f', -1, 64))
+	q.Set("quantity", strconv.FormatFloat(qty, 'f', -1, 64))
+	q.Set("timeInForce", "GTC")
+	if hedgeMode {
+		if side == "long" {
+			q.Set("positionSide", "LONG")
+		} else {
+			q.Set("positionSide", "SHORT")
+		}
+	}
+
+	var resp rawOrderResp
+	if err := c.signedRequest(ctx, "POST", PathOrder, q, &resp); err != nil {
+		return nil, err
+	}
+	return &resp.Order, nil
+}
+
+// PlaceStopMarket submits a reduce-only STOP_MARKET that closes the
+// position when stopPrice is touched. Sized to the full live position
+// (caller computes qty from OpenPosition).
+//
+//   - posSide: "long" or "short" — the side of the EXISTING POSITION
+//     we want to close on stop.
+//   - qty: base-unit size to close (typically the full position).
+//   - stopPrice: trigger price.
+func (c *Client) PlaceStopMarket(ctx context.Context, sym market.Symbol, posSide string, qty, stopPrice float64, hedgeMode bool) (*OrderResult, error) {
+	posSide = strings.ToLower(posSide)
+	if posSide != "long" && posSide != "short" {
+		return nil, fmt.Errorf("posSide must be long|short, got %q", posSide)
+	}
+	if qty <= 0 {
+		return nil, fmt.Errorf("qty must be > 0, got %v", qty)
+	}
+	if stopPrice <= 0 {
+		return nil, fmt.Errorf("stopPrice must be > 0, got %v", stopPrice)
+	}
+
+	orderSide := "SELL"
+	if posSide == "short" {
+		orderSide = "BUY"
+	}
+
+	if c.DryRun {
+		return dryRunResult(sym, orderSide, "STOP_MARKET_REDUCE_ONLY", stopPrice, qty), nil
+	}
+
+	q := url.Values{}
+	q.Set("symbol", string(sym))
+	q.Set("side", orderSide)
+	q.Set("type", "STOP_MARKET")
+	q.Set("stopPrice", strconv.FormatFloat(stopPrice, 'f', -1, 64))
+	q.Set("quantity", strconv.FormatFloat(qty, 'f', -1, 64))
+	q.Set("reduceOnly", "true")
+	q.Set("workingType", "MARK_PRICE")
+	if hedgeMode {
+		if posSide == "long" {
+			q.Set("positionSide", "LONG")
+		} else {
+			q.Set("positionSide", "SHORT")
+		}
+	}
+
+	var resp rawOrderResp
+	if err := c.signedRequest(ctx, "POST", PathOrder, q, &resp); err != nil {
+		return nil, err
+	}
+	return &resp.Order, nil
+}
+
+// SetLeverage updates the symbol's leverage on BingX. In hedge mode the
+// side ("LONG" or "SHORT") matters; in one-way mode pass "BOTH". The
+// call is idempotent — BingX accepts re-setting to the same value.
+func (c *Client) SetLeverage(ctx context.Context, sym market.Symbol, side string, leverage int) error {
+	side = strings.ToUpper(side)
+	if side != "LONG" && side != "SHORT" && side != "BOTH" {
+		return fmt.Errorf("side must be LONG|SHORT|BOTH, got %q", side)
+	}
+	if leverage < 1 || leverage > 500 {
+		return fmt.Errorf("leverage must be 1-500, got %d", leverage)
+	}
+	if c.DryRun {
+		log.Printf("[DRY-RUN] would have set leverage %s side=%s lev=%d", sym, side, leverage)
+		return nil
+	}
+	q := url.Values{}
+	q.Set("symbol", string(sym))
+	q.Set("side", side)
+	q.Set("leverage", strconv.Itoa(leverage))
+	return c.signedRequest(ctx, "POST", PathLeverage, q, nil)
 }

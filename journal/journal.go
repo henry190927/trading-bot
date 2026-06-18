@@ -24,7 +24,8 @@ import (
 //	v4 = 19 cols (adds leverage at end)
 //	v5 = 20 cols (adds filled_at at end)
 //	v6 = 21 cols (adds signal_ctx — analyst snapshot at signal time)
-//	v7 = 23 cols (adds tp1_auto + tp1_order_id — auto-TP1 placement state) — current
+//	v7 = 23 cols (adds tp1_auto + tp1_order_id — auto-TP1 placement state)
+//	v8 = 29 cols (adds margin_usdt + entry/stop/tp2 auto-placement state) — current
 var Header = []string{
 	"id", "opened_at", "analyzed_at", "closed_at", "symbol", "side", "tf", "score",
 	"entry", "stop", "tp1", "tp2",
@@ -35,6 +36,12 @@ var Header = []string{
 	"signal_ctx",
 	"tp1_auto",
 	"tp1_order_id",
+	"margin_usdt",
+	"entry_order_id",
+	"stop_auto",
+	"stop_order_id",
+	"tp2_auto",
+	"tp2_order_id",
 }
 
 // Trade is one journal row.
@@ -91,6 +98,27 @@ type Trade struct {
 	// TP1OrderID is the BingX orderId of the placed TP1 reduce-only LIMIT,
 	// or "" if not yet placed. Sweep skips re-placement once non-empty.
 	TP1OrderID string
+	// MarginUSDT is the user-specified collateral for the trade. Used to
+	// compute qty = floor((margin × leverage) / entry) at placement time.
+	// Optional (0 = not recorded; only required when auto-opening on BingX).
+	MarginUSDT float64
+	// EntryOrderID is the BingX orderId of the placed LIMIT entry order
+	// when /journal/open did auto-open. Empty means the user opened
+	// manually on BingX.
+	EntryOrderID string
+	// StopAuto is the persistent intent to auto-place a reduce-only
+	// STOP_MARKET when the position is detected. Same retry semantics as
+	// [[TP1Auto]] — sweep keeps trying until StopOrderID is non-empty.
+	StopAuto bool
+	// StopOrderID is the BingX orderId of the placed stop, or "" if not
+	// yet placed.
+	StopOrderID string
+	// TP2Auto is the persistent intent to auto-place a reduce-only LIMIT
+	// at TP2 for the remaining (post-TP1) position size.
+	TP2Auto bool
+	// TP2OrderID is the BingX orderId of the placed TP2 limit, or "" if
+	// not yet placed.
+	TP2OrderID string
 }
 
 // IsOpen reports whether the trade is still open (no close time set).
@@ -386,8 +414,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV6(row), nil
 	case 23:
 		return parseRowV7(row), nil
+	case 29:
+		return parseRowV8(row), nil
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23/29 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -518,6 +548,21 @@ func parseRowV7(row []string) Trade {
 	return t
 }
 
+// parseRowV8 is v7 + margin_usdt (23) + entry_order_id (24) +
+// stop_auto (25) + stop_order_id (26) + tp2_auto (27) + tp2_order_id (28).
+func parseRowV8(row []string) Trade {
+	t := parseRowV7(row[:23])
+	if row[23] != "" {
+		t.MarginUSDT, _ = strconv.ParseFloat(row[23], 64)
+	}
+	t.EntryOrderID = row[24]
+	t.StopAuto = row[25] == "true"
+	t.StopOrderID = row[26]
+	t.TP2Auto = row[27] == "true"
+	t.TP2OrderID = row[28]
+	return t
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -533,6 +578,10 @@ func rowFromTrade(t Trade) []string {
 	}
 	if !t.ClosedAt.IsZero() {
 		rR = strconv.FormatFloat(t.RRealized, 'f', 4, 64)
+	}
+	marginStr := ""
+	if t.MarginUSDT > 0 {
+		marginStr = strconv.FormatFloat(t.MarginUSDT, 'f', -1, 64)
 	}
 	lev := ""
 	if t.Leverage > 0 {
@@ -566,6 +615,12 @@ func rowFromTrade(t Trade) []string {
 		t.SignalCtx,
 		boolStr(t.TP1Auto),
 		t.TP1OrderID,
+		marginStr,
+		t.EntryOrderID,
+		boolStr(t.StopAuto),
+		t.StopOrderID,
+		boolStr(t.TP2Auto),
+		t.TP2OrderID,
 	}
 }
 

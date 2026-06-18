@@ -178,12 +178,18 @@
     <textarea name="close_notes" id="close_notes" rows="2">{{.Trade.CloseNotes}}</textarea>
   </div>
 
-  <h2 class="form-section">BingX TP1 placement <span class="hint">(optional — reduce-only LIMIT against live position)</span></h2>
+  <h2 class="form-section">BingX auto-orders <span class="hint">(reduce-only against live position)</span></h2>
 
-  {{if .Trade.TP1OrderID}}
+  {{if or (or .Trade.EntryOrderID .Trade.TP1OrderID) (or .Trade.StopOrderID .Trade.TP2OrderID)}}
     <div class="field-info">
-      ✓ TP1 already placed on BingX — orderId <code>{{.Trade.TP1OrderID}}</code>.
-      Re-checking the box below will place an <strong>additional</strong> limit (duplicate). Cancel the existing one on BingX first if you want to re-place at a different price.
+      Placed orders on BingX:
+      <ul style="margin:0.3rem 0 0; padding-left:1.2rem;">
+        {{if .Trade.EntryOrderID}}<li>Entry: <code>{{.Trade.EntryOrderID}}</code></li>{{end}}
+        {{if .Trade.StopOrderID}}<li>Stop: <code>{{.Trade.StopOrderID}}</code></li>{{end}}
+        {{if .Trade.TP1OrderID}}<li>TP1: <code>{{.Trade.TP1OrderID}}</code></li>{{end}}
+        {{if .Trade.TP2OrderID}}<li>TP2: <code>{{.Trade.TP2OrderID}}</code></li>{{end}}
+      </ul>
+      <div style="margin-top:0.4rem; font-size:0.85rem;">Re-checking a box below will place an <strong>additional</strong> order for that leg. Cancel the existing one on BingX first if you want to re-place.</div>
     </div>
   {{end}}
 
@@ -197,9 +203,21 @@
   <div class="field">
     <label class="checkbox-inline">
       <input type="checkbox" name="place_tp1" id="place_tp1" {{if and .Trade.TP1Auto (not .Trade.TP1OrderID)}}checked{{end}}>
-      <span>Auto-place TP1 on save / fill-detection
-        <span class="hint">(persists intent across refreshes; sweep retries until success or you uncheck)</span>
-      </span>
+      <span>Auto-place TP1 on save / fill-detection</span>
+    </label>
+  </div>
+
+  <div class="field">
+    <label class="checkbox-inline">
+      <input type="checkbox" name="place_stop" id="place_stop" {{if and .Trade.StopAuto (not .Trade.StopOrderID)}}checked{{end}}>
+      <span>Auto-place stop-loss on fill-detection</span>
+    </label>
+  </div>
+
+  <div class="field">
+    <label class="checkbox-inline">
+      <input type="checkbox" name="place_tp2" id="place_tp2" {{if and .Trade.TP2Auto (not .Trade.TP2OrderID)}}checked{{end}}>
+      <span>Auto-place TP2 (remaining position) on fill-detection</span>
     </label>
   </div>
 

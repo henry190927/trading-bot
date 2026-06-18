@@ -32,6 +32,13 @@ type Client struct {
 	APISecret string
 	Host      string
 	HTTP      *http.Client
+	// DryRun, when true, makes all WRITE endpoints (PlaceLimit,
+	// PlaceReduceOnlyLimit, PlaceStopMarket, SetLeverage) log the request
+	// they would have sent and return a mock OrderResult with a
+	// "DRY-RUN-..." orderId instead of hitting BingX. READ endpoints
+	// (Klines, OpenPositions, FundingRate, etc.) are NOT affected — they
+	// always go to the real API.
+	DryRun bool
 }
 
 func New(apiKey, apiSecret string) *Client {

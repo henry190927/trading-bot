@@ -61,9 +61,12 @@ func main() {
 	}
 	r.StaticFS("/static", http.FS(staticFS))
 
-	srv := &server{
-		client: bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET")),
+	bxClient := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
+	if os.Getenv("BINGX_DRY_RUN") == "true" {
+		bxClient.DryRun = true
+		log.Printf("[BINGX_DRY_RUN=true] all write endpoints will log + return mock orderIds — no real orders sent")
 	}
+	srv := &server{client: bxClient}
 	r.GET("/", srv.handleDashboard)
 	r.GET("/journal", srv.handleJournalList)
 	r.GET("/journal/new", srv.handleJournalNew)

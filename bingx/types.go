@@ -17,6 +17,7 @@ const (
 	// Signed endpoints (require APIKey + APISecret + IP whitelist + trade scope).
 	PathPositions = "/openApi/swap/v2/user/positions"
 	PathOrder     = "/openApi/swap/v2/trade/order"
+	PathLeverage  = "/openApi/swap/v2/trade/leverage"
 )
 
 type RawKline struct {

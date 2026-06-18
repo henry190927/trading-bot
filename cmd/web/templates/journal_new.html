@@ -132,12 +132,39 @@
     </div>
   </div>
 
-  <div class="field">
-    <label class="checkbox-inline">
-      <input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}>
-      <span>Auto-place TP1 reduce-only limit on BingX <span class="hint">(tries now; if no position yet, retries on fill-detection sweep)</span></span>
-    </label>
-  </div>
+  <fieldset class="bingx-block">
+    <legend>BingX auto-orders <span class="hint">(reduce-only safety enforced on stop/TP1/TP2)</span></legend>
+
+    <div class="field">
+      <label class="checkbox-inline">
+        <input type="checkbox" name="open_position" id="open_position">
+        <span><strong>Open position on BingX</strong> — place entry LIMIT now (requires margin + leverage)
+          <span class="hint">⚠ real money; shows confirm dialog before submit</span>
+        </span>
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="checkbox-inline">
+        <input type="checkbox" name="place_stop" id="place_stop">
+        <span>Auto-place stop-loss (reduce-only STOP_MARKET) <span class="hint">on fill</span></span>
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="checkbox-inline">
+        <input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}>
+        <span>Auto-place TP1 reduce-only LIMIT (partial %) <span class="hint">on fill</span></span>
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="checkbox-inline">
+        <input type="checkbox" name="place_tp2" id="place_tp2">
+        <span>Auto-place TP2 reduce-only LIMIT (remaining position) <span class="hint">on fill</span></span>
+      </label>
+    </div>
+  </fieldset>
 
   <div class="field">
     <label for="notes">Notes <span class="hint">(optional)</span></label>
@@ -148,10 +175,23 @@
 
   <div class="form-actions">
     <a href="/journal" class="btn-cancel">Cancel</a>
-    <button type="submit" class="btn-primary">Record trade</button>
+    <button type="submit" class="btn-primary" id="submit-btn">Record trade</button>
   </div>
 
 </form>
+
+<!-- Confirmation modal — shown by JS when open_position is checked at submit time. -->
+<div id="confirm-modal" class="modal-overlay" hidden>
+  <div class="modal-dialog">
+    <h3>Confirm BingX orders</h3>
+    <p class="modal-warn">⚠ This will send <strong>real orders</strong> to BingX. Review below before confirming.</p>
+    <ul id="confirm-list"></ul>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="confirm-cancel">Cancel</button>
+      <button type="button" class="btn-primary" id="confirm-send">Send orders</button>
+    </div>
+  </div>
+</div>
 
 </main>
 
@@ -257,6 +297,58 @@
     inputs.forEach(function (el) { if (el) el.addEventListener('input', recompute); });
     sideRadios.forEach(function (el) { el.addEventListener('change', recompute); });
     recompute();
+})();
+
+// Confirmation modal for "Open position on BingX". When the user submits
+// the form with open_position checked, intercept and show a summary of
+// every order that will be sent. They must explicitly confirm before the
+// form actually POSTs. Submit proceeds untouched if open_position is
+// unchecked (existing alert-only / TP1-only flow).
+(function () {
+    var form = document.querySelector('form[action="/journal/open"]');
+    var openPos = document.getElementById('open_position');
+    var modal = document.getElementById('confirm-modal');
+    var list = document.getElementById('confirm-list');
+    var cancelBtn = document.getElementById('confirm-cancel');
+    var sendBtn = document.getElementById('confirm-send');
+    if (!form || !openPos || !modal) return;
+
+    var armed = false; // gate: true once user clicked "Send orders" in modal
+    form.addEventListener('submit', function (ev) {
+        if (!openPos.checked || armed) return;
+        ev.preventDefault();
+        buildSummary();
+        modal.hidden = false;
+    });
+    cancelBtn.addEventListener('click', function () { modal.hidden = true; });
+    sendBtn.addEventListener('click', function () {
+        armed = true;
+        modal.hidden = true;
+        form.requestSubmit();
+    });
+
+    function gv(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+    function gck(id) { var el = document.getElementById(id); return el && el.checked; }
+
+    function buildSummary() {
+        list.innerHTML = '';
+        var sym = gv('symbol');
+        var side = (document.querySelector('input[name="side"]:checked') || {}).value || '?';
+        var entry = gv('entry'), stop = gv('stop'), tp1 = gv('tp1'), tp2 = gv('tp2');
+        var margin = gv('margin_usdt'), lev = gv('leverage');
+        var partial = gv('tp1_partial_pct') || '50';
+
+        function add(label) {
+            var li = document.createElement('li');
+            li.textContent = label;
+            list.appendChild(li);
+        }
+        add('Set leverage: ' + sym + ' → ' + lev + 'x');
+        add('Place LIMIT ' + side.toUpperCase() + ' (open): margin=' + margin + ' USDT @ entry ' + entry);
+        if (gck('place_stop'))  add('Then on fill: reduce-only STOP_MARKET @ ' + stop + ' (full close)');
+        if (gck('place_tp1'))   add('Then on fill: reduce-only LIMIT @ TP1 ' + tp1 + ' (' + partial + '% partial)');
+        if (gck('place_tp2'))   add('Then on fill: reduce-only LIMIT @ TP2 ' + tp2 + ' (remaining)');
+    }
 })();
 </script>
 </body>
