@@ -290,6 +290,33 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 			}
 		}
 	}
+	// Pass 2: auto-place TP1 reduce-only LIMIT for active trades that
+	// (a) opted into auto-placement at open/edit time (TP1Auto=true), and
+	// (b) haven't yet had a successful placement (TP1OrderID==""). This
+	// covers both the fresh "pending→active just now" transition above
+	// AND any trade that was active before but failed an earlier placement
+	// (e.g. position not yet visible at the time of /journal/open). The
+	// reduce-only flag is hard-coded in PlaceReduceOnlyLimit so the worst
+	// possible outcome of a misfire is BingX rejecting with reduce-only
+	// error — never an unintended position open.
+	for i := range trades {
+		t := &trades[i]
+		if !t.IsActive() || !t.TP1Auto || t.TP1OrderID != "" {
+			continue
+		}
+		status, msg := s.placeTP1OnBingX(ctx, t, "")
+		switch status {
+		case "ok":
+			log.Printf("auto-tp1: trade #%d %s %s → %s", t.ID, t.Symbol, t.Side, msg)
+			tradesChanged = true
+		case "skip":
+			// Most common case before BingX position appears — silent;
+			// retried on every refresh until success or user opts out.
+		case "error":
+			log.Printf("auto-tp1: trade #%d %s %s ERROR: %s", t.ID, t.Symbol, t.Side, msg)
+		}
+	}
+
 	if tradesChanged {
 		if err := journal.WriteAll("", trades); err != nil {
 			// Soft-fail: log only, dashboard still renders w/ in-memory state.
@@ -702,6 +729,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		leverage = n
 	}
 
+	autoTP1 := c.PostForm("place_tp1") == "on"
 	t := journal.Trade{
 		ID:         journal.NextID(trades),
 		OpenedAt:   now,
@@ -718,8 +746,10 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		OpenNotes:  notes,
 		Leverage:   leverage,
 		SignalCtx:  strings.TrimSpace(c.PostForm("signal_ctx")),
+		TP1Auto:    autoTP1,
 	}
 	trades = append(trades, t)
+	idx := len(trades) - 1
 	if err := journal.WriteAll("", trades); err != nil {
 		rerender("write journal: " + err.Error())
 		return
@@ -728,9 +758,17 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	// Optional BingX TP1 reduce-only placement. The journal row is ALREADY
 	// written above, so any BingX-side error here is reported as a flash
 	// banner — it never blocks the user from recording the trade.
+	// When position doesn't exist yet (limit order pending), placeTP1OnBingX
+	// returns "skip" and the fill-detection sweep will retry once the
+	// position appears (because TP1Auto=true is persisted above).
 	redirectURL := "/journal"
-	if c.PostForm("place_tp1") == "on" {
-		status, msg := s.placeTP1OnBingX(c, t, strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+	if autoTP1 {
+		status, msg := s.placeTP1OnBingX(c.Request.Context(), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+		if trades[idx].TP1OrderID != "" {
+			if err := journal.WriteAll("", trades); err != nil {
+				log.Printf("auto-tp1: post-place journal write failed (orderId=%s): %v", trades[idx].TP1OrderID, err)
+			}
+		}
 		redirectURL = "/journal?tp1_status=" + url.QueryEscape(status) + "&tp1_msg=" + url.QueryEscape(msg)
 	}
 	c.Redirect(http.StatusSeeOther, redirectURL)
@@ -738,9 +776,11 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 
 // placeTP1OnBingX looks up the open position for t.Symbol on BingX, then
 // submits a reduce-only LIMIT order at t.TP1 for the chosen partial %.
+// On success, writes the returned orderId into t.TP1OrderID — the caller
+// is responsible for persisting the mutated trade back to the journal.
 // Returns (status, msg) where status is one of: "ok" / "skip" / "error".
 // Never panics; all failures are surfaced via msg.
-func (s *server) placeTP1OnBingX(c *gin.Context, t journal.Trade, partialStr string) (string, string) {
+func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialStr string) (string, string) {
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
 	}
@@ -756,12 +796,12 @@ func (s *server) placeTP1OnBingX(c *gin.Context, t journal.Trade, partialStr str
 	if err != nil {
 		return "error", err.Error()
 	}
-	pos, err := s.client.FindOpenPosition(c.Request.Context(), sym, t.Side)
+	pos, err := s.client.FindOpenPosition(ctx, sym, t.Side)
 	if err != nil {
 		return "error", "read positions: " + err.Error()
 	}
 	if pos == nil {
-		return "skip", fmt.Sprintf("no open %s position on BingX for %s — open the position first, then TP1 will be placed on next record", t.Side, t.Symbol)
+		return "skip", fmt.Sprintf("no open %s position on BingX for %s — TP1 will be retried on next fill-detection sweep", t.Side, t.Symbol)
 	}
 	// Sanity: TP1 must be on the profitable side of entry for the position
 	// we're closing. The journal-form validation already enforced this for
@@ -779,10 +819,11 @@ func (s *server) placeTP1OnBingX(c *gin.Context, t journal.Trade, partialStr str
 		return "error", "computed qty <= 0"
 	}
 	hedgeMode := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
-	res, err := s.client.PlaceReduceOnlyLimit(c.Request.Context(), sym, t.Side, qty, t.TP1, hedgeMode)
+	res, err := s.client.PlaceReduceOnlyLimit(ctx, sym, t.Side, qty, t.TP1, hedgeMode)
 	if err != nil {
 		return "error", "place TP1: " + err.Error()
 	}
+	t.TP1OrderID = res.OrderID
 	return "ok", fmt.Sprintf("TP1 placed on BingX — orderId=%s qty=%g @ %.4f (%.0f%% of %g)", res.OrderID, qty, t.TP1, pct, pos.Quantity)
 }
 
@@ -1061,6 +1102,11 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		trades[idx].RRealized = journal.RealizedR(trades[idx], exitPrice)
 	}
 
+	// Persist the auto-TP1 intent flag from the edit form. Editing always
+	// reflects the current checkbox state: unchecked = clear future auto-retry.
+	autoTP1 := c.PostForm("place_tp1") == "on"
+	trades[idx].TP1Auto = autoTP1
+
 	if err := journal.WriteAll("", trades); err != nil {
 		rerender("write journal: " + err.Error())
 		return
@@ -1071,8 +1117,13 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	// or (b) re-fire the BingX API while iterating without spamming new
 	// journal entries.
 	redirectURL := "/journal"
-	if c.PostForm("place_tp1") == "on" {
-		status, msg := s.placeTP1OnBingX(c, trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+	if autoTP1 {
+		status, msg := s.placeTP1OnBingX(c.Request.Context(), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+		if trades[idx].TP1OrderID != "" {
+			if err := journal.WriteAll("", trades); err != nil {
+				log.Printf("auto-tp1: post-place journal write failed (orderId=%s): %v", trades[idx].TP1OrderID, err)
+			}
+		}
 		redirectURL = "/journal?tp1_status=" + url.QueryEscape(status) + "&tp1_msg=" + url.QueryEscape(msg)
 	}
 	c.Redirect(http.StatusSeeOther, redirectURL)

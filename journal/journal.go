@@ -23,7 +23,8 @@ import (
 //	v3 = 18 cols (adds score after tf)
 //	v4 = 19 cols (adds leverage at end)
 //	v5 = 20 cols (adds filled_at at end)
-//	v6 = 21 cols (adds signal_ctx — analyst snapshot at signal time) — current
+//	v6 = 21 cols (adds signal_ctx — analyst snapshot at signal time)
+//	v7 = 23 cols (adds tp1_auto + tp1_order_id — auto-TP1 placement state) — current
 var Header = []string{
 	"id", "opened_at", "analyzed_at", "closed_at", "symbol", "side", "tf", "score",
 	"entry", "stop", "tp1", "tp2",
@@ -32,6 +33,8 @@ var Header = []string{
 	"leverage",
 	"filled_at",
 	"signal_ctx",
+	"tp1_auto",
+	"tp1_order_id",
 }
 
 // Trade is one journal row.
@@ -80,6 +83,14 @@ type Trade struct {
 	// a 1R win on 100x leverage gross-returns about 100× the price-move %.
 	// Doesn't affect R computation — R is leverage-independent by definition.
 	Leverage int
+	// TP1Auto is the persistent intent flag for auto-placing a reduce-only
+	// TP1 LIMIT order on BingX. Set when the user checks "Place TP1" on the
+	// open/edit form. Survives across refreshes so the fill-detection sweep
+	// can retry placement once the live position appears.
+	TP1Auto bool
+	// TP1OrderID is the BingX orderId of the placed TP1 reduce-only LIMIT,
+	// or "" if not yet placed. Sweep skips re-placement once non-empty.
+	TP1OrderID string
 }
 
 // IsOpen reports whether the trade is still open (no close time set).
@@ -373,8 +384,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV5(row), nil
 	case 21:
 		return parseRowV6(row), nil
+	case 23:
+		return parseRowV7(row), nil
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -497,6 +510,14 @@ func parseRowV6(row []string) Trade {
 	return t
 }
 
+// parseRowV7 is v6 + `tp1_auto` (index 21) + `tp1_order_id` (index 22).
+func parseRowV7(row []string) Trade {
+	t := parseRowV6(row[:21])
+	t.TP1Auto = row[21] == "true"
+	t.TP1OrderID = row[22]
+	return t
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -543,7 +564,19 @@ func rowFromTrade(t Trade) []string {
 		lev,
 		filledAt,
 		t.SignalCtx,
+		boolStr(t.TP1Auto),
+		t.TP1OrderID,
 	}
+}
+
+// boolStr renders a bool as "true" / "" so the CSV stays compact when
+// the flag is unset (most legacy rows). Empty string also parses back as
+// false in parseRowV7, keeping the round-trip lossless.
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return ""
 }
 
 // SortByOpenedDesc sorts the slice newest-first by OpenedAt.

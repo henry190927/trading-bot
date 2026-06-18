@@ -178,7 +178,14 @@
     <textarea name="close_notes" id="close_notes" rows="2">{{.Trade.CloseNotes}}</textarea>
   </div>
 
-  <h2 class="form-section">BingX TP1 placement <span class="hint">(optional — places a reduce-only LIMIT against live position)</span></h2>
+  <h2 class="form-section">BingX TP1 placement <span class="hint">(optional — reduce-only LIMIT against live position)</span></h2>
+
+  {{if .Trade.TP1OrderID}}
+    <div class="field-info">
+      ✓ TP1 already placed on BingX — orderId <code>{{.Trade.TP1OrderID}}</code>.
+      Re-checking the box below will place an <strong>additional</strong> limit (duplicate). Cancel the existing one on BingX first if you want to re-place at a different price.
+    </div>
+  {{end}}
 
   <div class="field-row">
     <div class="field">
@@ -189,8 +196,10 @@
 
   <div class="field">
     <label class="checkbox-inline">
-      <input type="checkbox" name="place_tp1" id="place_tp1">
-      <span>(Re-)place TP1 reduce-only limit on BingX on save <span class="hint">(default off — may duplicate if one already exists; cancel old on BingX first)</span></span>
+      <input type="checkbox" name="place_tp1" id="place_tp1" {{if and .Trade.TP1Auto (not .Trade.TP1OrderID)}}checked{{end}}>
+      <span>Auto-place TP1 on save / fill-detection
+        <span class="hint">(persists intent across refreshes; sweep retries until success or you uncheck)</span>
+      </span>
     </label>
   </div>
 

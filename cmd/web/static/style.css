@@ -593,6 +593,22 @@ footer {
     line-height: 1.4;
 }
 
+.field-info {
+    background: #0f1a2e;
+    color: var(--blue);
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.85rem;
+    font-size: 0.9rem;
+}
+.field-info code {
+    background: rgba(255,255,255,0.06);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
 .checkbox-inline {
     display: flex;
     align-items: center;

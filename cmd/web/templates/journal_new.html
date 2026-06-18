@@ -135,7 +135,7 @@
   <div class="field">
     <label class="checkbox-inline">
       <input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}>
-      <span>Place TP1 reduce-only limit on BingX <span class="hint">(reads live position, never opens new)</span></span>
+      <span>Auto-place TP1 reduce-only limit on BingX <span class="hint">(tries now; if no position yet, retries on fill-detection sweep)</span></span>
     </label>
   </div>
 
