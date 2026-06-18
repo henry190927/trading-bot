@@ -214,6 +214,64 @@ func (c *Client) PlaceStopMarket(ctx context.Context, sym market.Symbol, posSide
 	return &resp.Order, nil
 }
 
+// CancelOrder cancels a single pending order by orderId. BingX's spec
+// is DELETE on /trade/order with symbol + orderId in the query. Errors
+// like "order not found" (already filled / already cancelled) are
+// returned by BingX as code=80014/80020 and surface as Go errors here;
+// callers usually want to tolerate them when sweeping a "best-effort
+// unwind".
+func (c *Client) CancelOrder(ctx context.Context, sym market.Symbol, orderID string) error {
+	if orderID == "" {
+		return fmt.Errorf("orderID is required")
+	}
+	if c.DryRun {
+		log.Printf("[DRY-RUN] would have cancelled order %s on %s", orderID, sym)
+		return nil
+	}
+	q := url.Values{}
+	q.Set("symbol", string(sym))
+	q.Set("orderId", orderID)
+	return c.signedRequest(ctx, "DELETE", PathCancelOrder, q, nil)
+}
+
+// MarketCloseReduceOnly submits a reduce-only MARKET order that closes
+// (the requested qty of) the live position immediately. Used by the
+// /journal/:id/unwind flow when the user wants to abandon a trade.
+func (c *Client) MarketCloseReduceOnly(ctx context.Context, sym market.Symbol, posSide string, qty float64, hedgeMode bool) (*OrderResult, error) {
+	posSide = strings.ToLower(posSide)
+	if posSide != "long" && posSide != "short" {
+		return nil, fmt.Errorf("posSide must be long|short, got %q", posSide)
+	}
+	if qty <= 0 {
+		return nil, fmt.Errorf("qty must be > 0, got %v", qty)
+	}
+	orderSide := "SELL"
+	if posSide == "short" {
+		orderSide = "BUY"
+	}
+	if c.DryRun {
+		return dryRunResult(sym, orderSide, "MARKET_REDUCE_ONLY", 0, qty), nil
+	}
+	q := url.Values{}
+	q.Set("symbol", string(sym))
+	q.Set("side", orderSide)
+	q.Set("type", "MARKET")
+	q.Set("quantity", strconv.FormatFloat(qty, 'f', -1, 64))
+	q.Set("reduceOnly", "true")
+	if hedgeMode {
+		if posSide == "long" {
+			q.Set("positionSide", "LONG")
+		} else {
+			q.Set("positionSide", "SHORT")
+		}
+	}
+	var resp rawOrderResp
+	if err := c.signedRequest(ctx, "POST", PathOrder, q, &resp); err != nil {
+		return nil, err
+	}
+	return &resp.Order, nil
+}
+
 // SetLeverage updates the symbol's leverage on BingX. In hedge mode the
 // side ("LONG" or "SHORT") matters; in one-way mode pass "BOTH". The
 // call is idempotent — BingX accepts re-setting to the same value.

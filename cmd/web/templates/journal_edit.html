@@ -228,9 +228,18 @@
 
 </form>
 
+{{$hasOrders := or (or .Trade.EntryOrderID .Trade.TP1OrderID) (or .Trade.StopOrderID .Trade.TP2OrderID)}}
+{{if $hasOrders}}
+<form method="POST" action="/journal/{{.Trade.ID}}/unwind" class="danger-form"
+      onsubmit="return confirm('UNWIND #{{.Trade.ID}}: cancel all BingX orders + market-close any live position + delete journal row?\n\nThis cannot be undone.');">
+  <button type="submit" class="btn-danger">Unwind on BingX + delete</button>
+  <p class="hint" style="margin-top:0.3rem;">Cancels every stored orderId for this trade, then market-closes the live position if it still exists, then removes this journal row.</p>
+</form>
+{{end}}
+
 <form method="POST" action="/journal/{{.Trade.ID}}/delete" class="danger-form"
-      onsubmit="return confirm('Delete trade #{{.Trade.ID}} ({{.Trade.Symbol}})? This cannot be undone.');">
-  <button type="submit" class="btn-danger">Delete trade #{{.Trade.ID}}</button>
+      onsubmit="return confirm('Delete journal entry #{{.Trade.ID}} ({{.Trade.Symbol}}) only? BingX orders / position are NOT touched.');">
+  <button type="submit" class="btn-danger">{{if $hasOrders}}Delete journal entry only{{else}}Delete trade #{{.Trade.ID}}{{end}}</button>
 </form>
 
 {{end}}{{/* if .Trade.ID */}}

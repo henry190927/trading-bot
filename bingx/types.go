@@ -15,9 +15,10 @@ const (
 	PathContract       = "/openApi/swap/v2/quote/contracts"
 
 	// Signed endpoints (require APIKey + APISecret + IP whitelist + trade scope).
-	PathPositions = "/openApi/swap/v2/user/positions"
-	PathOrder     = "/openApi/swap/v2/trade/order"
-	PathLeverage  = "/openApi/swap/v2/trade/leverage"
+	PathPositions   = "/openApi/swap/v2/user/positions"
+	PathOrder       = "/openApi/swap/v2/trade/order"
+	PathCancelOrder = "/openApi/swap/v2/trade/order" // DELETE on /trade/order cancels
+	PathLeverage    = "/openApi/swap/v2/trade/leverage"
 )
 
 type RawKline struct {

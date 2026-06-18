@@ -1052,6 +1052,113 @@ func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1Parti
 	return "ok", fmt.Sprintf("TP2 placed — orderId=%s qty=%g @ %.4f (remaining after %.0f%% TP1)", res.OrderID, tp2Qty, t.TP2, tp1PartialPct)
 }
 
+// unwindOnBingX is the "abandon this trade" path: cancels every known
+// pending order tied to t (entry / stop / TP1 / TP2), then market-closes
+// any remaining live position. Returns a list of human-readable status
+// lines suitable for the /journal flash banner. Tolerant: cancel-already-
+// cancelled or no-live-position are treated as best-effort soft-success.
+//
+// Mutates t to clear orderIds that were cancelled (so the journal row,
+// if the caller chooses to keep it, reflects reality).
+func (s *server) unwindOnBingX(ctx context.Context, t *journal.Trade) []string {
+	out := []string{}
+	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
+		return []string{"BingX API not configured — nothing to unwind"}
+	}
+	sym, err := resolveWebSymbol(t.Symbol)
+	if err != nil {
+		return []string{"resolve symbol: " + err.Error()}
+	}
+
+	// 1. Cancel known orderIds. Iterate explicitly so the flash log shows
+	//    which leg was which (entry vs stop vs tp1 vs tp2). DRY-RUN
+	//    orderIds (placed by previous DRY-RUN smoke tests) are skipped
+	//    so we don't call cancel with a fake id BingX won't recognize.
+	type leg struct{ name, id string }
+	for _, lg := range []leg{
+		{"entry", t.EntryOrderID},
+		{"stop", t.StopOrderID},
+		{"tp1", t.TP1OrderID},
+		{"tp2", t.TP2OrderID},
+	} {
+		if lg.id == "" {
+			continue
+		}
+		if strings.HasPrefix(lg.id, "DRY-RUN") {
+			out = append(out, fmt.Sprintf("skip %s (DRY-RUN orderId)", lg.name))
+			continue
+		}
+		if err := s.client.CancelOrder(ctx, sym, lg.id); err != nil {
+			out = append(out, fmt.Sprintf("cancel %s (%s): %s", lg.name, lg.id, err.Error()))
+			continue
+		}
+		out = append(out, fmt.Sprintf("cancelled %s order %s", lg.name, lg.id))
+		// Clear from journal regardless of whether caller keeps the row.
+		switch lg.name {
+		case "entry":
+			t.EntryOrderID = ""
+		case "stop":
+			t.StopOrderID = ""
+		case "tp1":
+			t.TP1OrderID = ""
+		case "tp2":
+			t.TP2OrderID = ""
+		}
+	}
+
+	// 2. Market-close any remaining live position. FindOpenPosition uses
+	//    the same side-matching the original placement used, so we
+	//    won't touch a hedged opposite-side position by accident.
+	pos, err := s.client.FindOpenPosition(ctx, sym, t.Side)
+	if err != nil {
+		out = append(out, "read position: "+err.Error())
+		return out
+	}
+	if pos == nil {
+		out = append(out, "no live position to close")
+		return out
+	}
+	hedge := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
+	res, err := s.client.MarketCloseReduceOnly(ctx, sym, t.Side, pos.Quantity, hedge)
+	if err != nil {
+		out = append(out, "market close: "+err.Error())
+		return out
+	}
+	out = append(out, fmt.Sprintf("market closed %g %s @ market (orderId=%s)", pos.Quantity, t.Symbol, res.OrderID))
+	return out
+}
+
+// handleJournalUnwind cancels all BingX orders + market-closes any live
+// position tied to this trade, then deletes the journal row. Distinct
+// from handleJournalDelete (which only removes the row).
+func (s *server) handleJournalUnwind(c *gin.Context) {
+	_, idx, trades, err := s.loadTradeByID(c)
+	if err != nil {
+		c.String(http.StatusNotFound, "%s", err.Error())
+		return
+	}
+	t := &trades[idx]
+	msgs := s.unwindOnBingX(c.Request.Context(), t)
+	id := t.ID
+
+	// Drop the row regardless of unwind outcome — the user pressed
+	// "Unwind + Delete" and we logged whatever happened on BingX side.
+	out := make([]journal.Trade, 0, len(trades)-1)
+	for i, x := range trades {
+		if i == idx {
+			continue
+		}
+		out = append(out, x)
+	}
+	if err := journal.WriteAll("", out); err != nil {
+		c.String(http.StatusInternalServerError, "write journal: %s", err.Error())
+		return
+	}
+
+	flash := fmt.Sprintf("UNWIND #%d:\n%s", id, strings.Join(msgs, "\n"))
+	c.Redirect(http.StatusSeeOther, "/journal?tp1_status=ok&tp1_msg="+url.QueryEscape(flash))
+}
+
 // handleJournalCloseForm renders the close form for a given trade.
 func (s *server) handleJournalCloseForm(c *gin.Context) {
 	t, idx, trades, err := s.loadTradeByID(c)

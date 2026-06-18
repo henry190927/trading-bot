@@ -76,6 +76,7 @@ func main() {
 	r.GET("/journal/:id/edit", srv.handleJournalEditForm)
 	r.POST("/journal/:id/edit", srv.handleJournalEditPost)
 	r.POST("/journal/:id/delete", srv.handleJournalDelete)
+	r.POST("/journal/:id/unwind", srv.handleJournalUnwind)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
 	r.GET("/ops", srv.handleOpsPage)
