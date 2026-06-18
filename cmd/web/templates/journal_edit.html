@@ -233,7 +233,7 @@
 <form method="POST" action="/journal/{{.Trade.ID}}/unwind" class="danger-form"
       onsubmit="return confirm('UNWIND #{{.Trade.ID}}: cancel all BingX orders + market-close any live position + delete journal row?\n\nThis cannot be undone.');">
   <button type="submit" class="btn-danger">Unwind on BingX + delete</button>
-  <p class="hint" style="margin-top:0.3rem;">Cancels every stored orderId for this trade, then market-closes the live position if it still exists, then removes this journal row.</p>
+  <p class="hint">Cancels every stored orderId for this trade, then market-closes the live position if it still exists, then removes this journal row.</p>
 </form>
 {{end}}
 
