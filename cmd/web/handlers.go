@@ -651,9 +651,10 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		"Symbols":       []string{"BTC", "ETH", "XAU", "XAG"},
 		"Anchors":       recommendedAnchors,
 		"Error":         "",
-		"MarginUSDT":    "",
-		"TP1PartialPct": "50",
-		"PlaceTP1":      true,
+		"MarginUSDT":     "",
+		"TP1PartialPct":  "50",
+		"PlaceTP1":       true,
+		"MarginOverride": false,
 	})
 }
 
@@ -680,13 +681,14 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 			"Symbol": symbol, "Side": side, "Entry": entryStr, "Stop": stopStr,
 			"TP1": tp1Str, "TP2": tp2Str, "Anchor": anchor, "TF": tf,
 			"Score": score, "Notes": notes, "AnalyzedAt": analyzedAtStr,
-			"Leverage":      leverageStr,
-			"MarginUSDT":    strings.TrimSpace(c.PostForm("margin_usdt")),
-			"TP1PartialPct": strings.TrimSpace(c.PostForm("tp1_partial_pct")),
-			"PlaceTP1":      c.PostForm("place_tp1") == "on",
-			"Symbols":       []string{"BTC", "ETH", "XAU", "XAG"},
-			"Anchors":       recommendedAnchors,
-			"Error":         errMsg,
+			"Leverage":       leverageStr,
+			"MarginUSDT":     strings.TrimSpace(c.PostForm("margin_usdt")),
+			"TP1PartialPct":  strings.TrimSpace(c.PostForm("tp1_partial_pct")),
+			"PlaceTP1":       c.PostForm("place_tp1") == "on",
+			"MarginOverride": c.PostForm("margin_override") == "on",
+			"Symbols":        []string{"BTC", "ETH", "XAU", "XAG"},
+			"Anchors":        recommendedAnchors,
+			"Error":          errMsg,
 		})
 	}
 
@@ -764,13 +766,17 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 				marginCap = f
 			}
 		}
+		marginOverride := c.PostForm("margin_override") == "on"
 		if marginUSDT <= 0 {
 			rerender("margin_usdt required when 'Open position on BingX' is checked")
 			return
 		}
-		if marginUSDT > marginCap {
-			rerender(fmt.Sprintf("margin_usdt %.2f exceeds BINGX_MAX_MARGIN_USDT=%.2f", marginUSDT, marginCap))
+		if marginUSDT > marginCap && !marginOverride {
+			rerender(fmt.Sprintf("margin_usdt %.2f exceeds BINGX_MAX_MARGIN_USDT=%.2f — tick 'Allow margin > cap' to override", marginUSDT, marginCap))
 			return
+		}
+		if marginUSDT > marginCap && marginOverride {
+			log.Printf("auto-open: margin override accepted (%.2f > cap %.2f) for %s %s", marginUSDT, marginCap, symbol, side)
 		}
 		if leverage < 1 {
 			rerender("leverage required when 'Open position on BingX' is checked")

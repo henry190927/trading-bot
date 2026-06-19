@@ -108,13 +108,20 @@
 
   <div class="field-row">
     <div class="field">
-      <label for="margin_usdt">USDT margin <span class="hint">(for PnL preview; collateral × leverage = notional)</span></label>
+      <label for="margin_usdt">USDT margin <span class="hint">(collateral × leverage = notional; cap default $200, tick override below to exceed)</span></label>
       <input type="number" min="0" step="any" inputmode="decimal" name="margin_usdt" id="margin_usdt" value="{{.MarginUSDT}}" placeholder="e.g. 100">
     </div>
     <div class="field">
       <label for="tp1_partial_pct">TP1 partial % <span class="hint">(reduce-only at TP1)</span></label>
       <input type="number" min="1" max="100" step="1" name="tp1_partial_pct" id="tp1_partial_pct" value="{{.TP1PartialPct}}" placeholder="50">
     </div>
+  </div>
+
+  <div class="field">
+    <label class="checkbox-inline">
+      <input type="checkbox" name="margin_override" id="margin_override" {{if .MarginOverride}}checked{{end}}>
+      <span>Allow margin &gt; cap <span class="hint">(for this trade only; default cap from BINGX_MAX_MARGIN_USDT env, currently $200)</span></span>
+    </label>
   </div>
 
   <!-- PnL preview pane — JS-driven, updates as you type entry/stop/tp/margin/leverage. -->
@@ -330,6 +337,8 @@
     function gv(id) { var el = document.getElementById(id); return el ? el.value : ''; }
     function gck(id) { var el = document.getElementById(id); return el && el.checked; }
 
+    var MARGIN_CAP = 200;  // visual cue only — actual cap enforcement is server-side via BINGX_MAX_MARGIN_USDT
+
     function buildSummary() {
         list.innerHTML = '';
         var sym = gv('symbol');
@@ -337,11 +346,19 @@
         var entry = gv('entry'), stop = gv('stop'), tp1 = gv('tp1'), tp2 = gv('tp2');
         var margin = gv('margin_usdt'), lev = gv('leverage');
         var partial = gv('tp1_partial_pct') || '50';
+        var override = gck('margin_override');
+        var marginNum = parseFloat(margin);
 
-        function add(label) {
+        function add(label, cls) {
             var li = document.createElement('li');
             li.textContent = label;
+            if (cls) li.className = cls;
             list.appendChild(li);
+        }
+        // Override warning floats to the top so the eye catches it before
+        // the order list. Red bg, distinct from the amber default warn.
+        if (override && isFinite(marginNum) && marginNum > MARGIN_CAP) {
+            add('⚠ MARGIN OVERRIDE — using ' + margin + ' USDT (default cap $' + MARGIN_CAP + ')', 'modal-override-warn');
         }
         add('Set leverage: ' + sym + ' → ' + lev + 'x');
         var entryLine = 'Place LIMIT ' + side.toUpperCase() + ' (open): margin=' + margin + ' USDT @ entry ' + entry;

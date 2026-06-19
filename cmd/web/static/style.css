@@ -681,6 +681,16 @@ footer {
     font-variant-numeric: tabular-nums;
     word-break: break-word;
 }
+.modal-dialog li.modal-override-warn {
+    color: var(--red);
+    background: var(--red-bg);
+    border: 1px solid var(--red);
+    border-radius: 4px;
+    padding: 0.35rem 0.5rem;
+    margin-left: -1rem;
+    font-weight: 600;
+    list-style: none;
+}
 .modal-actions {
     display: flex;
     justify-content: flex-end;
