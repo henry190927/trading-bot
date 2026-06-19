@@ -10,7 +10,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -42,15 +44,22 @@ func (c *Client) signedRequest(ctx context.Context, method, path string, params 
 	}
 	params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
 
-	// BingX docs: signature = HMAC-SHA256(secret, queryString). They don't
-	// require sorted keys, but url.Values.Encode() sorts alphabetically
-	// which gives us a stable canonical form for debugging.
-	canonical := params.Encode()
+	// BingX signs over the RAW (non-URL-encoded) canonical query string,
+	// not the percent-encoded form url.Values.Encode() produces. For simple
+	// values this is a distinction without a difference (alphanumerics and
+	// `-_.~` don't get encoded anyway), but when a value contains JSON
+	// (e.g. stopLoss / takeProfit on the place-order endpoint), `{`, `"`,
+	// `:`, `,`, `}` all encode to %xx — Go would HMAC the %-form and BingX
+	// would HMAC the raw form, signatures diverge, request rejected with
+	// code=100001. Build a sorted raw canonical here, sign over that, and
+	// send the percent-encoded form on the wire (BingX URL-decodes before
+	// re-canonicalizing for signature check).
+	signCanonical := rawCanonical(params)
 	mac := hmac.New(sha256.New, []byte(c.APISecret))
-	mac.Write([]byte(canonical))
+	mac.Write([]byte(signCanonical))
 	sig := hex.EncodeToString(mac.Sum(nil))
 
-	endpoint := c.Host + path + "?" + canonical + "&signature=" + sig
+	endpoint := c.Host + path + "?" + params.Encode() + "&signature=" + sig
 
 	var body io.Reader
 	// BingX accepts the signed params in the query string for ALL methods,
@@ -95,4 +104,26 @@ func (c *Client) signedRequest(ctx context.Context, method, path string, params 
 		return fmt.Errorf("decode data: %w (body=%s)", err, env.Data)
 	}
 	return nil
+}
+
+// rawCanonical builds the alphabetically-sorted "key=value&key=value..."
+// form WITHOUT URL-encoding values. Matches BingX's HMAC signing input —
+// percent-encoded values produce a mismatch when the value contains
+// non-alphanumeric characters like JSON braces or quotes.
+func rawCanonical(params url.Values) string {
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var sb strings.Builder
+	for i, k := range keys {
+		if i > 0 {
+			sb.WriteByte('&')
+		}
+		sb.WriteString(k)
+		sb.WriteByte('=')
+		sb.WriteString(params.Get(k))
+	}
+	return sb.String()
 }

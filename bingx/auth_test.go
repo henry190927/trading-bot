@@ -69,3 +69,26 @@ func TestSignatureCanonicalForm(t *testing.T) {
 		t.Fatalf("hmac-sha256 hex length = %d, want 64", len(got))
 	}
 }
+
+// TestRawCanonicalWithJSONValue pins the raw-canonical form (used for
+// signing) so JSON-bearing values like stopLoss / takeProfit are NOT
+// percent-encoded. BingX HMAC-verifies against the raw form; an earlier
+// version that signed url.Values.Encode() output got code=100001
+// "signature mismatch" the moment a place-order call carried a stopLoss
+// JSON body alongside the entry.
+func TestRawCanonicalWithJSONValue(t *testing.T) {
+	params := url.Values{}
+	params.Set("symbol", "ETH-USDT")
+	params.Set("side", "BUY")
+	params.Set("stopLoss", `{"type":"STOP_MARKET","stopPrice":1700}`)
+	params.Set("timestamp", "1718640000000")
+
+	got := rawCanonical(params)
+	// Keys sorted alphabetically, values appear verbatim — `{`, `"`, `:`,
+	// `,`, `}` all uncoded. Anything else would mean BingX-side hash
+	// would diverge from ours.
+	want := `side=BUY&stopLoss={"type":"STOP_MARKET","stopPrice":1700}&symbol=ETH-USDT&timestamp=1718640000000`
+	if got != want {
+		t.Fatalf("rawCanonical mismatch:\n got:  %s\n want: %s", got, want)
+	}
+}
