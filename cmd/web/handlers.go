@@ -1101,20 +1101,24 @@ func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1Parti
 //
 // Mutates t to clear orderIds that were cancelled (so the journal row,
 // if the caller chooses to keep it, reflects reality).
-func (s *server) unwindOnBingX(ctx context.Context, t *journal.Trade) []string {
+// cancelTrackedOrdersOnBingX cancels every non-empty orderId stored on
+// t (entry / stop / tp1 / tp2), tolerating "already gone" errors from
+// BingX. Mutates t to clear cancelled orderIds. Returns one status line
+// per leg. DRY-RUN sentinels and ATTACHED-to-entry sentinels (bundled
+// SL/TP that BingX manages itself) are skipped without calling the API.
+//
+// Used by both the unwind path (cancel + market-close) and the close
+// path (cancel after user records the exit, so the journal row's
+// remaining orderIds don't orphan on BingX).
+func (s *server) cancelTrackedOrdersOnBingX(ctx context.Context, t *journal.Trade) []string {
 	out := []string{}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
-		return []string{"BingX API not configured — nothing to unwind"}
+		return []string{"BingX API not configured — nothing to cancel"}
 	}
 	sym, err := resolveWebSymbol(t.Symbol)
 	if err != nil {
 		return []string{"resolve symbol: " + err.Error()}
 	}
-
-	// 1. Cancel known orderIds. Iterate explicitly so the flash log shows
-	//    which leg was which (entry vs stop vs tp1 vs tp2). DRY-RUN
-	//    orderIds (placed by previous DRY-RUN smoke tests) are skipped
-	//    so we don't call cancel with a fake id BingX won't recognize.
 	type leg struct{ name, id string }
 	for _, lg := range []leg{
 		{"entry", t.EntryOrderID},
@@ -1130,9 +1134,6 @@ func (s *server) unwindOnBingX(ctx context.Context, t *journal.Trade) []string {
 			continue
 		}
 		if strings.HasPrefix(lg.id, "ATTACHED:") {
-			// Stop bundled with entry on BingX side — when we cancel the
-			// entry (or the entry fills and the position is then market-
-			// closed below), BingX automatically tears the bundled SL down.
 			out = append(out, fmt.Sprintf("skip %s (bundled with entry; BingX auto-cancels)", lg.name))
 			continue
 		}
@@ -1141,7 +1142,6 @@ func (s *server) unwindOnBingX(ctx context.Context, t *journal.Trade) []string {
 			continue
 		}
 		out = append(out, fmt.Sprintf("cancelled %s order %s", lg.name, lg.id))
-		// Clear from journal regardless of whether caller keeps the row.
 		switch lg.name {
 		case "entry":
 			t.EntryOrderID = ""
@@ -1153,10 +1153,15 @@ func (s *server) unwindOnBingX(ctx context.Context, t *journal.Trade) []string {
 			t.TP2OrderID = ""
 		}
 	}
+	return out
+}
 
-	// 2. Market-close any remaining live position. FindOpenPosition uses
-	//    the same side-matching the original placement used, so we
-	//    won't touch a hedged opposite-side position by accident.
+func (s *server) unwindOnBingX(ctx context.Context, t *journal.Trade) []string {
+	out := s.cancelTrackedOrdersOnBingX(ctx, t)
+	sym, err := resolveWebSymbol(t.Symbol)
+	if err != nil {
+		return out
+	}
 	pos, err := s.client.FindOpenPosition(ctx, sym, t.Side)
 	if err != nil {
 		out = append(out, "read position: "+err.Error())
@@ -1306,11 +1311,28 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 		trades[idx].RRealized = journal.RealizedR(trades[idx], exit)
 	}
 
+	// Cancel any still-pending BingX orderIds tied to this trade. Closing
+	// a journal row implies "this trade is done"; anything BingX still
+	// thinks is open (sweep-placed TP1 reduce-only, residual stop, etc.)
+	// is by definition an orphan. Default ON; the user can untick the
+	// checkbox on the close form to skip (rare).
+	cancelOrders := c.PostForm("cancel_orders") == "on"
+	cancelMsgs := []string{}
+	if cancelOrders {
+		cancelMsgs = s.cancelTrackedOrdersOnBingX(c.Request.Context(), &trades[idx])
+	}
+
 	if err := journal.WriteAll("", trades); err != nil {
 		rerender("write journal: " + err.Error())
 		return
 	}
-	c.Redirect(http.StatusSeeOther, "/journal")
+
+	redirect := "/journal"
+	if len(cancelMsgs) > 0 {
+		flash := fmt.Sprintf("CLOSE #%d cancel results:\n%s", trades[idx].ID, strings.Join(cancelMsgs, "\n"))
+		redirect = "/journal?tp1_status=ok&tp1_msg=" + url.QueryEscape(flash)
+	}
+	c.Redirect(http.StatusSeeOther, redirect)
 }
 
 // handleJournalEditForm renders the full-edit form for a trade.

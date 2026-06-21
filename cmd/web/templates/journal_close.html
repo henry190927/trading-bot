@@ -94,6 +94,13 @@
     <textarea name="notes" id="close_notes" rows="3" placeholder="how did it play out…">{{.Notes}}</textarea>
   </div>
 
+  <div class="field">
+    <label class="checkbox-inline">
+      <input type="checkbox" name="cancel_orders" id="cancel_orders" checked>
+      <span>Cancel remaining BingX orders <span class="hint">(entry/stop/tp1/tp2 tracked in journal; bundled-with-entry orders are auto-cancelled by BingX, sentinels skipped)</span></span>
+    </label>
+  </div>
+
   <div class="form-actions">
     <a href="/journal" class="btn-cancel">Cancel</a>
     <button type="submit" class="btn-primary">Close trade</button>
