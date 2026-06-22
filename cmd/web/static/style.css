@@ -567,6 +567,30 @@ footer {
 .tp1-error { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
 .tp1-flash strong { color: inherit; }
 
+/* Macro blackout banner — shown above all dashboard sections.
+   .macro-active fires when current time is INSIDE the [-before, +after]
+   window; .macro-upcoming fires when the next event's window starts
+   within 6h. Active is red (signals suppressed = trading risk now),
+   upcoming is amber (heads-up, not yet blocked). */
+.macro-banner {
+    border-radius: 6px;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+.macro-banner .hint { color: inherit; opacity: 0.85; }
+.macro-active {
+    background: var(--red-bg);
+    color: var(--red);
+    border: 1px solid var(--red);
+}
+.macro-upcoming {
+    background: #2e2614;
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+}
+
 /* PnL preview pane on /journal/new — JS-driven; hidden until margin+entry set. */
 .pnl-preview {
     background: var(--surface);

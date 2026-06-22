@@ -1,0 +1,40 @@
+{
+  "events": [
+    {
+      "name": "FOMC Rate Decision",
+      "datetime_utc": "2026-07-29T18:00:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 120
+    },
+    {
+      "name": "US CPI (June)",
+      "datetime_utc": "2026-07-15T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "US NFP (July)",
+      "datetime_utc": "2026-08-07T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "US CPI (July)",
+      "datetime_utc": "2026-08-12T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "US PPI (July)",
+      "datetime_utc": "2026-08-13T12:30:00Z",
+      "blackout_before_min": 30,
+      "blackout_after_min": 60
+    },
+    {
+      "name": "FOMC Rate Decision",
+      "datetime_utc": "2026-09-16T18:00:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 120
+    }
+  ]
+}

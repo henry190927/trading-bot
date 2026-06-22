@@ -38,6 +38,18 @@
 
 <main>
 
+{{if .MacroActive}}
+  <div class="macro-banner macro-active" role="alert">
+    <strong>⛔ MACRO BLACKOUT ACTIVE</strong> — {{.MacroActive.Name}}
+    <span class="hint">(window {{.MacroActive.BeforeMinutes}}min before / {{.MacroActive.AfterMinutes}}min after; signals suppressed)</span>
+  </div>
+{{else if .MacroUpcoming}}
+  <div class="macro-banner macro-upcoming" role="status">
+    ⚠ Upcoming macro release: <strong>{{.MacroUpcoming.Name}}</strong>
+    <span class="hint">— blackout starts in {{fmtElapsed .MacroUpcomingIn}}</span>
+  </div>
+{{end}}
+
 {{if .OpenTrades}}
 <section class="dashboard-section open-trades-section">
   <h2 class="section-title">

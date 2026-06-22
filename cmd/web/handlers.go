@@ -22,6 +22,7 @@ import (
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/journal"
+	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/signal"
 	"myFirstGo/trading-bot/validator"
@@ -121,13 +122,31 @@ func (s *server) handleDashboard(c *gin.Context) {
 	c.Header("Cache-Control", "no-store, must-revalidate")
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", "0")
+	// Macro blackout state — show banner when active, or when upcoming
+	// within 6h so the user gets a heads-up before placing a trade that
+	// would straddle the event.
+	nowUTC := time.Now().UTC()
+	activeBO := macro.ActiveAt(nowUTC)
+	var upcomingBO *macro.Event
+	var upcomingIn time.Duration
+	if activeBO == nil {
+		upcomingBO = macro.NextUpcoming(nowUTC, 6*time.Hour)
+		if upcomingBO != nil {
+			start, _ := upcomingBO.Window()
+			upcomingIn = start.Sub(nowUTC)
+		}
+	}
+
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
-		"TF":           tf,
-		"Symbols":      views,
-		"OpenTrades":   openTrades,
-		"Now":          time.Now().Format("2006-01-02 15:04:05"),
-		"TFOptions":    []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
-		"MinTradeable": 3, // for verdict coloring
+		"TF":              tf,
+		"Symbols":         views,
+		"OpenTrades":      openTrades,
+		"Now":             time.Now().Format("2006-01-02 15:04:05"),
+		"TFOptions":       []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
+		"MinTradeable":    3,
+		"MacroActive":     activeBO,
+		"MacroUpcoming":   upcomingBO,
+		"MacroUpcomingIn": upcomingIn,
 	})
 }
 

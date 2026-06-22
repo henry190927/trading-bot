@@ -2,10 +2,12 @@ package signal
 
 import (
 	"fmt"
+	"time"
 
 	"myFirstGo/trading-bot/analyzer"
 	"myFirstGo/trading-bot/dxy"
 	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/market"
 )
 
@@ -104,6 +106,21 @@ const (
 )
 
 func Evaluate(in Inputs) Signal {
+	// Macro blackout gate. If we're inside the [-before, +after] window of
+	// a CPI/FOMC/NFP/PPI release, suppress the signal regardless of what
+	// the engine thinks: data-driven wicks dominate setup mechanics during
+	// these windows (see #23: XAG short stopped on a CPI wick before mark
+	// reverted past TP2). Daemon, monitor, dashboard, validator all see a
+	// Flat signal and the Reason carries the event name so the user knows
+	// why nothing is being suggested.
+	if evt := macro.ActiveAt(time.Now().UTC()); evt != nil {
+		return Signal{
+			Symbol:    in.Symbol,
+			Timeframe: in.Timeframe,
+			Reasons:   []string{fmt.Sprintf("macro blackout: %s (window %dmin before / %dmin after)", evt.Name, evt.BeforeMinutes, evt.AfterMinutes)},
+		}
+	}
+
 	closes := market.Closes(in.Candles)
 	if len(closes) < 60 {
 		return Signal{Symbol: in.Symbol, Timeframe: in.Timeframe}
