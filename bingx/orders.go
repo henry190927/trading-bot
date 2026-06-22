@@ -131,15 +131,22 @@ func (c *Client) PlaceReduceOnlyLimit(ctx context.Context, sym market.Symbol, po
 	q.Set("type", "LIMIT")
 	q.Set("price", strconv.FormatFloat(price, 'f', -1, 64))
 	q.Set("quantity", strconv.FormatFloat(qty, 'f', -1, 64))
-	q.Set("reduceOnly", "true")
 	q.Set("timeInForce", "GTC")
 	if hedgeMode {
 		// Hedge mode: positionSide must be the LONG/SHORT we're reducing.
+		// BingX REJECTS reduceOnly=true in hedge mode (code=109400) because
+		// positionSide alone tells the exchange which leg this order is
+		// against — sending both is redundant and treated as invalid.
 		if posSide == "long" {
 			q.Set("positionSide", "LONG")
 		} else {
 			q.Set("positionSide", "SHORT")
 		}
+	} else {
+		// One-way mode: positionSide=BOTH (implicit), reduceOnly is the
+		// only thing keeping the order from over-closing into a new
+		// counter-position.
+		q.Set("reduceOnly", "true")
 	}
 
 	var resp rawOrderResp
@@ -264,14 +271,17 @@ func (c *Client) PlaceStopMarket(ctx context.Context, sym market.Symbol, posSide
 	q.Set("type", "STOP_MARKET")
 	q.Set("stopPrice", strconv.FormatFloat(stopPrice, 'f', -1, 64))
 	q.Set("quantity", strconv.FormatFloat(qty, 'f', -1, 64))
-	q.Set("reduceOnly", "true")
 	q.Set("workingType", "MARK_PRICE")
 	if hedgeMode {
+		// See PlaceReduceOnlyLimit: BingX rejects reduceOnly in hedge mode;
+		// positionSide carries the close-side semantics.
 		if posSide == "long" {
 			q.Set("positionSide", "LONG")
 		} else {
 			q.Set("positionSide", "SHORT")
 		}
+	} else {
+		q.Set("reduceOnly", "true")
 	}
 
 	var resp rawOrderResp
@@ -324,13 +334,14 @@ func (c *Client) MarketCloseReduceOnly(ctx context.Context, sym market.Symbol, p
 	q.Set("side", orderSide)
 	q.Set("type", "MARKET")
 	q.Set("quantity", strconv.FormatFloat(qty, 'f', -1, 64))
-	q.Set("reduceOnly", "true")
 	if hedgeMode {
 		if posSide == "long" {
 			q.Set("positionSide", "LONG")
 		} else {
 			q.Set("positionSide", "SHORT")
 		}
+	} else {
+		q.Set("reduceOnly", "true")
 	}
 	var resp rawOrderResp
 	if err := c.signedRequest(ctx, "POST", PathOrder, q, &resp); err != nil {
