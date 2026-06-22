@@ -7,6 +7,9 @@
 # instead of in your shell rc). Loaded automatically if it exists.
 Makefile.local
 
+# Personal feature roadmap — scratchpad, not for distribution.
+ROADMAP.md
+
 # User trade journal — personal data, lives on the VPS
 journal.csv
 

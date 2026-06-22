@@ -151,6 +151,40 @@ func Evaluate(in Inputs) Signal {
 	sig := Signal{Symbol: in.Symbol, Timeframe: in.Timeframe, Price: price, Fib: fib, VP: vp, POCMig: pocMig, Opens: opens}
 	bullVotes, bearVotes := 0, 0
 
+	// Volume confirmation gate — METALS ONLY (per 2026-06-22 backtest A/B).
+	//
+	// The mechanic: ratio of the signal bar's volume vs the avg of the
+	// prior 19 bars. Below 1.0 = below-average volume; the gate suppresses
+	// bar-event votes (sweep, MACD cross) when relVol < 1.0. POSITION-based
+	// votes (RSI, BOLL, Fib) and SPAN-based votes (divergence) are NOT
+	// gated — their quality doesn't correlate with single-bar volume the
+	// same way.
+	//
+	// Per-symbol enable: 60/90/120d backtest showed asymmetric impact —
+	// crypto (BTC/ETH) DEGRADED across all windows (−17R aggregate, the
+	// gate threw away genuinely tradeable signals because crypto's
+	// baseline volume is high enough that even "low" bars carry
+	// follow-through). Metals (XAU/XAG) IMPROVED in 5/6 windows (+25R
+	// aggregate, gate cleanly removes drift-style fake-outs because NCCO*
+	// CFD perps have high volume variance). So enable for XAU/XAG only.
+	volumeConfirmEnabled := isVolumeConfirmSymbol(in.Symbol)
+	const volumeConfirmThreshold = 1.0
+	var relVol float64 = 1.0
+	if last >= 20 {
+		var avgVol float64
+		for i := last - 19; i < last; i++ {
+			avgVol += in.Candles[i].Volume
+		}
+		avgVol /= 19.0
+		if avgVol > 0 {
+			relVol = in.Candles[last].Volume / avgVol
+		}
+	}
+	// volumeConfirmed: when the gate is disabled for this symbol (crypto),
+	// always true so the vote runs unconditionally. When enabled (metals),
+	// require relVol >= threshold.
+	volumeConfirmed := !volumeConfirmEnabled || relVol >= volumeConfirmThreshold
+
 	if rsi[last] < 30 {
 		bullVotes++
 		sig.Reasons = append(sig.Reasons, "RSI oversold")
@@ -160,11 +194,19 @@ func Evaluate(in Inputs) Signal {
 	}
 
 	if m := macd[last]; m.Histogram > 0 && macd[last-1].Histogram <= 0 {
-		bullVotes++
-		sig.Reasons = append(sig.Reasons, "MACD bullish cross")
+		if volumeConfirmed {
+			bullVotes++
+			sig.Reasons = append(sig.Reasons, fmt.Sprintf("MACD bullish cross (vol %.2fx)", relVol))
+		} else {
+			sig.Notes = append(sig.Notes, fmt.Sprintf("MACD bullish cross suppressed — low volume %.2fx (<%.1fx threshold)", relVol, volumeConfirmThreshold))
+		}
 	} else if m.Histogram < 0 && macd[last-1].Histogram >= 0 {
-		bearVotes++
-		sig.Reasons = append(sig.Reasons, "MACD bearish cross")
+		if volumeConfirmed {
+			bearVotes++
+			sig.Reasons = append(sig.Reasons, fmt.Sprintf("MACD bearish cross (vol %.2fx)", relVol))
+		} else {
+			sig.Notes = append(sig.Notes, fmt.Sprintf("MACD bearish cross suppressed — low volume %.2fx (<%.1fx threshold)", relVol, volumeConfirmThreshold))
+		}
 	}
 
 	if b := boll[last]; b.Lower != 0 {
@@ -202,18 +244,28 @@ func Evaluate(in Inputs) Signal {
 		if sw.SweepIdx != last {
 			continue
 		}
+		// Volume confirmation: a sweep is a liquidity event where price
+		// punches through a level. Without volume, it's drift past the
+		// level rather than absorbtion of stops — historically lower
+		// follow-through. Gate the sweep VOTE on relVol >= threshold;
+		// the sweep itself still surfaces in Reasons either way so the
+		// trader sees it.
+		if !volumeConfirmed {
+			sig.Notes = append(sig.Notes, fmt.Sprintf("Liquidity grab at %.2f suppressed — low volume %.2fx (<%.1fx threshold)", sw.Level, relVol, volumeConfirmThreshold))
+			continue
+		}
 		if sw.Side == analyzer.SweepLow {
 			if !sweepBull {
 				bullVotes++
 				sweepBull = true
 			}
-			sig.Reasons = append(sig.Reasons, fmt.Sprintf("Liquidity grab at %.2f (low side)", sw.Level))
+			sig.Reasons = append(sig.Reasons, fmt.Sprintf("Liquidity grab at %.2f (low side, vol %.2fx)", sw.Level, relVol))
 		} else {
 			if !sweepBear {
 				bearVotes++
 				sweepBear = true
 			}
-			sig.Reasons = append(sig.Reasons, fmt.Sprintf("Liquidity grab at %.2f (high side)", sw.Level))
+			sig.Reasons = append(sig.Reasons, fmt.Sprintf("Liquidity grab at %.2f (high side, vol %.2fx)", sw.Level, relVol))
 		}
 	}
 
@@ -458,6 +510,15 @@ func annotateContextWarnings(sig *Signal, ctx Context) {
 // isPreciousMetal returns true for symbols where DXY trend acts as a macro
 // veto. Crypto symbols ignore DXY (correlation is weaker and regime-dependent).
 func isPreciousMetal(s market.Symbol) bool {
+	return s == market.XAUUSDT || s == market.XAGUSDT
+}
+
+// isVolumeConfirmSymbol returns true for symbols where the bar-event
+// volume gate (sweep / MACD cross suppression on relVol < 1.0) applies.
+// Per the 2026-06-22 backtest, crypto degraded under the gate while
+// metals improved — same per-symbol split as the DXY check above, by
+// coincidence not design.
+func isVolumeConfirmSymbol(s market.Symbol) bool {
 	return s == market.XAUUSDT || s == market.XAGUSDT
 }
 
