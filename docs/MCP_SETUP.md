@@ -32,80 +32,231 @@ All output is markdown — LLM-friendly, not raw JSON dumps.
 
 ---
 
-## Install (Mac)
+## Install (Mac) — step by step
 
-### 1. Build the binary
+### 1. Get a read-only BingX key
+
+BingX → API Management → Create API Key. **Only check "Read" /
+"Perpetual Futures Read"**. Do NOT check Trade or Withdraw. The
+trade-permission key stays on the VPS where execution lives; this
+local MCP only needs to *see* positions and candles.
+
+(If you reuse the VPS's trade-permission key here, a compromised
+laptop config could route real orders. Don't.)
+
+### 2. Build + install the MCP binary
 
 ```bash
 cd /Users/henry.yeh/GolandProjects/myFirstGo/trading-bot
 make mcp-install
 ```
 
-This builds `cmd/mcp` and installs to `~/bin/trading-bot-mcp`. Make sure
-`~/bin` is in your `PATH` (it usually is on Mac; check with `echo $PATH`).
-
-### 2. Sync journal.csv from VPS
-
-The MCP server reads `journal.csv` from a local path. Keep it fresh
-with a periodic scp from VPS:
+Installs to `~/bin/trading-bot-mcp`. Verify:
 
 ```bash
-# One-off pull:
-scp -i ~/.ssh/oracle-trading.key \
-    ubuntu@your.vps.ip:/opt/trading/journal.csv \
-    ~/trading-bot-data/journal.csv
+which trading-bot-mcp
+# /Users/henry.yeh/bin/trading-bot-mcp
+```
 
-# Or add to crontab (every 5 minutes):
+### 3. Sync journal.csv from VPS to local path
+
+```bash
+make mcp-sync-journal
+# → ~/trading-bot-data/journal.csv
+```
+
+Auto-refresh every 5 minutes via cron:
+
+```bash
+crontab -e
+# Add the line below:
 */5 * * * * scp -i ~/.ssh/oracle-trading.key ubuntu@your.vps.ip:/opt/trading/journal.csv ~/trading-bot-data/journal.csv >/dev/null 2>&1
 ```
 
-> Live BingX position / candle / mark price calls don't need a local
-> sync — those go directly to BingX via the API.
+(Live BingX position / candle / mark price calls don't need this
+sync — they go directly to BingX via the API.)
 
-### 3. Register with Claude Code
+### 4. Register with Claude Code
 
-Add to `~/.claude/config.json` (or wherever your Claude Code config
-lives — `claude config path` will tell you):
+**Option A — claude CLI (recommended, no JSON typos)**:
+
+```bash
+claude mcp add trading-bot ~/bin/trading-bot-mcp \
+  --env JOURNAL_PATH=$HOME/trading-bot-data/journal.csv \
+  --env BINGX_API_KEY=<paste read-only key> \
+  --env BINGX_API_SECRET=<paste read-only secret>
+```
+
+**Option B — edit `~/.claude.json` manually**, add a top-level
+`mcpServers` section:
 
 ```json
-{
-  "mcpServers": {
-    "trading-bot": {
-      "command": "/Users/henry.yeh/bin/trading-bot-mcp",
-      "env": {
-        "JOURNAL_PATH": "/Users/henry.yeh/trading-bot-data/journal.csv",
-        "BINGX_API_KEY":    "<paste your read-permission key>",
-        "BINGX_API_SECRET": "<paste your read-permission secret>"
-      }
+"mcpServers": {
+  "trading-bot": {
+    "command": "/Users/henry.yeh/bin/trading-bot-mcp",
+    "env": {
+      "JOURNAL_PATH":     "/Users/henry.yeh/trading-bot-data/journal.csv",
+      "BINGX_API_KEY":    "<paste read-only key>",
+      "BINGX_API_SECRET": "<paste read-only secret>"
     }
   }
 }
 ```
 
-> **Security note**: the env block in this config file is plaintext.
-> Use a **read-only** BingX key here (no trade scope, no withdraw) so
-> a compromise can't move funds. The trade-permission key stays on the
-> VPS where execution lives.
+⚠ The env block is plaintext on disk. Read-only keys only.
 
-> If `BINGX_API_KEY` is empty, tools that need live data
-> (`get_open_positions`, parts of `get_trade`) will degrade gracefully —
-> they return what they can from journal.csv and skip the live calls.
+### 5. Restart Claude Code
 
-### 4. Verify
+Existing sessions don't pick up new MCP servers. Open a fresh
+terminal and run `claude`. The new session will spawn
+`trading-bot-mcp` as a subprocess on first MCP call.
 
-Restart Claude Code (`claude` in a fresh terminal). At the prompt:
+### 6. Verify
 
 ```
 > list the trading-bot tools
 ```
 
-Claude Code should respond with the 6 tools above. Then try:
+Should respond with 6 tools (`get_trade`, `get_open_positions`,
+`get_recent_candles`, `get_journal_history`, `get_macro_events_near`,
+`get_backtest_facts`). Smoke test:
 
 ```
 > get_backtest_facts
 > get_open_positions
-> analyze trade #25 using the get_trade tool + my journal context
+> get_recent_candles BTC 1h 30
 ```
+
+---
+
+## Sample analysis prompts (Quant terminology)
+
+Once registered, drop these into a fresh `claude` session as
+starting points. The MCP server's `serverInstructions` already
+establishes Quant-Trader persona + the user's discipline rules,
+so prompts can stay terse and assume the framing.
+
+### Per-trade analysis (open or closed)
+
+> Analyze trade #25 via get_trade. Quant framing: status snapshot,
+> setup quality vs backtest facts (use get_backtest_facts), path
+> observation, regime context, verdict with confidence.
+
+> Trade #25 health check: get_trade + get_open_positions to
+> confirm BingX state matches journal. Identify execution leaks if
+> any. End with journal one-liner.
+
+> Compare trade #25 to last 5 same-symbol entries
+> (get_journal_history symbol=XAU limit=5). Is this setup in
+> distribution or a tail outlier? Quantify R dispersion, hit-rate
+> delta, hold-time delta.
+
+### Pre-trade review (before pulling the trigger)
+
+> Pre-trade review. Proposed: ETH SHORT @ 1680, stop 1695, TP1
+> 1670, TP2 1660, score 3, ratio 7.5/10. Use get_backtest_facts
+> to anchor symbol/TF edge. get_macro_events_near now() to flag
+> event windows. get_open_positions for concurrent exposure.
+> get_recent_candles ETH 1h 50 for structure. Output: GO / WAIT /
+> DON'T with reasoning. Quantify expectancy where possible.
+
+> Quick sanity check on [SYMBOL] [SIDE] @ [PRICE]: cross-check
+> backtest fact table, current LH-LL or HH-HL structure, and any
+> macro window within 4h. One-paragraph verdict.
+
+### Portfolio / regime assessment
+
+> Pull get_open_positions and give me a portfolio-level risk
+> read: notional exposure, side concentration, max R if all SL
+> hit vs max R if all TP hit. Note correlation if multiple
+> positions are on the same side of risk-on/risk-off.
+
+> Cross-symbol regime classification: pull get_recent_candles
+> for BTC 1h, ETH 1h, XAU 1h, XAG 1h (50 bars each). Identify
+> risk-on vs safe-haven flow, alignment vs dispersion, and which
+> of the 4 is currently structurally strongest / weakest.
+
+> Anchor-strength scan: for each of the 4 symbols, fetch 50 1h
+> bars and report whether structure is HH-HL trending,
+> LH-LL trending, or ranging. Flag symbols where mean-reversion
+> would be counter-trend (high risk).
+
+### Post-mortem / journal analysis
+
+> Pull last 10 closed trades via get_journal_history limit=10.
+> Identify the pattern in the losers: common setup
+> characteristics, common exit reasons, recurring discipline
+> leaks. End with one structural takeaway.
+
+> Symbol-level expectancy review: get_journal_history per symbol
+> (BTC, ETH, XAU, XAG, limit=20 each). Hit rate, avg R, R
+> dispersion (std), time-to-resolution. Which symbol is earning
+> its place in the universe?
+
+> Compare last 5 TP1-hit trades vs last 5 stop-hit trades:
+> setup features, score/ratio at entry, TF, anchor type. What
+> separates winners from losers in this strategy's current
+> regime?
+
+### Macro-event aware
+
+> get_macro_events_near 2026-07-15T12:30:00Z then get_recent_candles
+> XAU 1h 50. Build a risk plan: which hours to avoid trading, what
+> to do with any open XAU position in the blackout window.
+
+> Pull next 30 days of macro events via get_macro_events_near with
+> rolling timestamps. Build a calendar of windows when I should
+> not enter new positions.
+
+### Backtest-anchored decisions
+
+> Use get_backtest_facts. Given the current dashboard shows XAU
+> 1h setup at score 3 / ratio 7.0, should I take it? Reference
+> the symbol's historical aggregate net R per window. Quantify
+> "below threshold" vs "above threshold" decision rule.
+
+> Cross-check the XAG 2h discretionary edge claim with backtest
+> facts. If XAG 2h delivered +33R aggregate, what is the average
+> per-trade expectancy and how many trades did that come from?
+> Is the sample size sufficient to claim robust edge?
+
+### Multi-symbol comparison
+
+> Pull get_recent_candles for BTC 1h, ETH 1h, XAG 2h, XAU 1h, 50
+> each. Rank them by current "setup quality" using these factors:
+> distance from BOLL bands, RSI extremity, volume profile. Output
+> a ranked table.
+
+### Execution / order management
+
+> Trade #26 hit stop earlier today. Pull get_trade(26) and
+> get_recent_candles ETH 30m 60. Was this a path-noise stop
+> (price reverted past TP within 6 bars) or a thesis-failure
+> stop (price kept going against)? Apply the
+> stopped-then-reversed framework from feedback-execution
+> memory rule.
+
+---
+
+## Notes on prompt style
+
+The MCP server's `serverInstructions` is short on purpose — it
+sets persona + discipline rules and points Claude at the tools.
+The verbosity of the prompt determines how thoroughly Claude
+mines the tools.
+
+- **Lazy / short prompts** ("analyze #25") → Claude usually pulls
+  get_trade + maybe one other tool. Cheap, fast, mediocre depth.
+- **Structured prompts** (specifying which tools and which
+  framing) → Claude does the full pull and synthesizes. Higher
+  token cost but proper Quant-level output.
+- **Multi-step iteration** ("first pull X, then…", or
+  ask follow-ups) → leverages Claude Code's session memory.
+  This is where the MCP path beats the API-button path on
+  depth.
+
+When in doubt, **explicitly name the tools** in your prompt —
+Claude prioritizes tool calls when you instruct it to.
 
 ---
 
