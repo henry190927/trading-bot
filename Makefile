@@ -227,6 +227,36 @@ monitor-logs:
 monitor-restart:
 	@$(SSH) 'sudo systemctl restart trading-monitor && sudo systemctl status trading-monitor --no-pager | head -4'
 
+# ---- MCP server for Claude Code (zero-cost AI advisor path) ----
+#
+# Builds cmd/mcp and installs to ~/bin/trading-bot-mcp so Claude Code
+# can launch it as a stdio subprocess. After install, register in your
+# Claude Code config — see docs/MCP_SETUP.md.
+#
+# Uses CGO_ENABLED=0 so the binary works on either a vanilla mac or
+# any future linux deployment without runtime cgo deps.
+mcp-build:
+	@echo "▶ building trading-bot MCP server..."
+	@CGO_ENABLED=0 $(GO) build -buildvcs=false -o /tmp/trading-bot-mcp ./cmd/mcp
+
+mcp-install: mcp-build
+	@mkdir -p $(HOME)/bin
+	@mv /tmp/trading-bot-mcp $(HOME)/bin/trading-bot-mcp
+	@chmod +x $(HOME)/bin/trading-bot-mcp
+	@echo "✓ installed: $(HOME)/bin/trading-bot-mcp"
+	@echo ""
+	@echo "Next steps (one-time):"
+	@echo "  1. mkdir -p ~/trading-bot-data && scp -i ~/.ssh/oracle-trading.key \\"
+	@echo "       ubuntu@your.vps.ip:/opt/trading/journal.csv \\"
+	@echo "       ~/trading-bot-data/journal.csv"
+	@echo "  2. Register the server in your Claude Code config — see docs/MCP_SETUP.md"
+	@echo "  3. Restart 'claude' to pick up the new tools"
+
+mcp-sync-journal:
+	@mkdir -p $(HOME)/trading-bot-data
+	@$(SCP) $(ORACLE_USER)@$(ORACLE_HOST):/opt/trading/journal.csv $(HOME)/trading-bot-data/journal.csv
+	@echo "✓ journal.csv synced to ~/trading-bot-data/journal.csv"
+
 # ---- journal: positional pass-through to the VPS ----
 # We always run the journal on the VPS so all entries are in one place.
 jopen:

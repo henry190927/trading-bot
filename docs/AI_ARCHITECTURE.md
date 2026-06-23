@@ -223,6 +223,25 @@ the analysis output quality on real trades.
 
 ---
 
+## MCP server path (shipped 2026-06-23)
+
+The trading-web `/ai/analyze` button is the **API-key inference path**.
+The MCP server (`cmd/mcp/`) is the **OAuth inference path** — same
+context packaging, same Quant persona instructions, but inference runs
+inside the user's Claude Code session (no API key, no per-call billing).
+
+Setup, env vars, and the Claude Code config snippet are in
+[`MCP_SETUP.md`](MCP_SETUP.md).
+
+The two paths share `ai/context.go` for context packaging and
+`SystemPromptQuantAdvisor` for the persona contract — update one, both
+benefit. Pick path based on workflow:
+
+| Where you are | Use |
+|---|---|
+| Terminal / dev machine, deep analysis | MCP (free, full Claude Code iteration) |
+| Mobile / quick verdict | Web button (API key, $1-5/mo) |
+
 ## File layout
 
 | Path | Purpose |
@@ -233,6 +252,8 @@ the analysis output quality on real trades.
 | `cmd/web/handlers.go` | `handleAIAnalyzeTrade` endpoint + in-memory cache on `server`. |
 | `cmd/web/templates/journal_list.html` | 🤖 Analyze button + collapsible pane + minimal markdown renderer. |
 | `cmd/web/static/style.css` | `.btn-analyze`, `.ai-analysis-pane`, `.ai-md-table` styling. |
+| `cmd/mcp/main.go` | MCP server binary. Same Quant persona via `serverInstructions`. Reuses `ai/context.go` + `journal/` + `bingx/` + `macro/`. |
+| `docs/MCP_SETUP.md` | Install + Claude Code config + journal.csv sync workflow. |
 
 ## Env vars
 

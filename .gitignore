@@ -36,6 +36,7 @@ trading-web
 /journal
 /web
 /monitor
+/mcp
 
 # But `journal/`, `backtest/`, and similar names are also Go package
 # directories at root (journal/journal.go, backtest/backtest.go). Re-
