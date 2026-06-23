@@ -287,6 +287,19 @@
           <a href="/journal/{{.ID}}/close" class="btn-close-trade">Close trade</a>
         {{end}}
         <a href="/journal/{{.ID}}/edit" class="btn-edit">Edit</a>
+        <button type="button" class="btn-analyze" data-trade-id="{{.ID}}">🤖 Analyze</button>
+      </div>
+
+      <div class="ai-analysis-pane" data-pane-for="{{.ID}}" hidden>
+        <div class="ai-analysis-header">
+          <strong>AI Quant analysis</strong>
+          <span class="ai-meta" data-meta-for="{{.ID}}"></span>
+          <button type="button" class="ai-close-btn" data-close-pane="{{.ID}}">×</button>
+        </div>
+        <div class="ai-analysis-body" data-body-for="{{.ID}}">
+          <em class="ai-loading">Loading…</em>
+        </div>
+        <div class="ai-disclaimer">AI analysis — informational, not financial advice. You own the decision.</div>
       </div>
     </article>
   {{end}}
@@ -360,6 +373,105 @@
     if (saved && Array.from(tabs).some(function (t) { return t.dataset.tab === saved; })) {
         activate(saved);
     }
+})();
+
+// AI Analyze button — toggles the per-trade analysis pane. First click
+// hits POST /ai/analyze/:id, subsequent clicks just toggle visibility
+// (server-side cache prevents re-billing on repeat clicks anyway).
+(function () {
+    function fmtCost(usd) {
+        if (!usd && usd !== 0) return '';
+        if (usd === 0) return '(DRY-RUN, $0)';
+        return '($' + usd.toFixed(4) + ')';
+    }
+    // Minimal markdown-to-HTML renderer: handles fenced code blocks,
+    // headings, bold, italic, and inline code. Not a full parser — we
+    // trust the LLM output isn't adversarial. Keeps the pane readable
+    // without pulling a library.
+    function renderMD(s) {
+        // Escape HTML first.
+        s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Fenced code blocks.
+        s = s.replace(/```([\s\S]*?)```/g, function (_, code) {
+            return '<pre><code>' + code + '</code></pre>';
+        });
+        // Headings.
+        s = s.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+        s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+        s = s.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+        // Bold + italic + inline code.
+        s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+        // Tables (very light — only convert pipe rows into <table>).
+        var lines = s.split('\n');
+        var out = [];
+        var inTable = false;
+        for (var i = 0; i < lines.length; i++) {
+            var ln = lines[i];
+            if (ln.match(/^\s*\|.*\|\s*$/)) {
+                if (!inTable) { out.push('<table class="ai-md-table">'); inTable = true; }
+                // Skip pure separator rows (---|---|---).
+                if (ln.match(/^\s*\|?\s*:?-+:?(\s*\|\s*:?-+:?)+\s*\|?\s*$/)) continue;
+                var cells = ln.replace(/^\s*\||\|\s*$/g, '').split('|').map(function (c) { return c.trim(); });
+                var tag = (i > 0 && lines[i + 1] && lines[i + 1].match(/^\s*\|?\s*:?-+/)) ? 'th' : 'td';
+                out.push('<tr><' + tag + '>' + cells.join('</' + tag + '><' + tag + '>') + '</' + tag + '></tr>');
+            } else {
+                if (inTable) { out.push('</table>'); inTable = false; }
+                out.push(ln);
+            }
+        }
+        if (inTable) out.push('</table>');
+        return out.join('\n').replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>');
+    }
+
+    document.querySelectorAll('.btn-analyze').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.dataset.tradeId;
+            var pane = document.querySelector('[data-pane-for="' + id + '"]');
+            var body = document.querySelector('[data-body-for="' + id + '"]');
+            var meta = document.querySelector('[data-meta-for="' + id + '"]');
+            if (!pane || !body) return;
+            if (!pane.hidden) { pane.hidden = true; return; }
+            pane.hidden = false;
+            // If already loaded, just re-show.
+            if (body.dataset.loaded === '1') return;
+            body.innerHTML = '<em class="ai-loading">Querying Quant advisor…</em>';
+            meta.textContent = '';
+            btn.disabled = true;
+            fetch('/ai/analyze/' + id, { method: 'POST' })
+                .then(function (r) {
+                    return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+                })
+                .then(function (res) {
+                    if (!res.ok) {
+                        body.innerHTML = '<div class="ai-error">⚠ ' + (res.body.error || 'unknown error') + '</div>';
+                        return;
+                    }
+                    body.innerHTML = renderMD(res.body.text);
+                    body.dataset.loaded = '1';
+                    var costStr = fmtCost(res.body.cost_usd);
+                    var cachedStr = res.body.cached ? ' · cached' : '';
+                    var tokStr = (res.body.input_tokens + res.body.output_tokens) > 0
+                        ? (res.body.input_tokens + '+' + res.body.output_tokens + ' tok ')
+                        : '';
+                    meta.textContent = tokStr + costStr + cachedStr;
+                })
+                .catch(function (e) {
+                    body.innerHTML = '<div class="ai-error">⚠ network error: ' + e + '</div>';
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                });
+        });
+    });
+    document.querySelectorAll('.ai-close-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var id = b.dataset.closePane;
+            var pane = document.querySelector('[data-pane-for="' + id + '"]');
+            if (pane) pane.hidden = true;
+        });
+    });
 })();
 </script>
 </body>

@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"myFirstGo/trading-bot/ai"
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/indicator"
@@ -66,7 +67,18 @@ func main() {
 		bxClient.DryRun = true
 		log.Printf("[BINGX_DRY_RUN=true] all write endpoints will log + return mock orderIds — no real orders sent")
 	}
-	srv := &server{client: bxClient}
+	aiClient := ai.New()
+	if ai.DryRunFromEnv() {
+		aiClient.DryRun = true
+		log.Printf("[ANTHROPIC_DRY_RUN=true] AI advisor calls will log + return stub response — no real Anthropic API calls")
+	} else if ai.APIKeyFromEnv() == "" {
+		log.Printf("[ai] ANTHROPIC_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable ANTHROPIC_DRY_RUN=true for testing.")
+	}
+	srv := &server{
+		client:  bxClient,
+		ai:      aiClient,
+		aiCache: make(map[int]aiCacheEntry),
+	}
 	r.GET("/", srv.handleDashboard)
 	r.GET("/journal", srv.handleJournalList)
 	r.GET("/journal/new", srv.handleJournalNew)
@@ -77,6 +89,7 @@ func main() {
 	r.POST("/journal/:id/edit", srv.handleJournalEditPost)
 	r.POST("/journal/:id/delete", srv.handleJournalDelete)
 	r.POST("/journal/:id/unwind", srv.handleJournalUnwind)
+	r.POST("/ai/analyze/:id", srv.handleAIAnalyzeTrade)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
 	r.GET("/ops", srv.handleOpsPage)

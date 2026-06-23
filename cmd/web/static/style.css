@@ -591,6 +591,104 @@ footer {
     border: 1px solid var(--yellow);
 }
 
+/* AI Analyze button + per-trade analysis pane. Lives inside .trade-card
+   on /journal. Styled to read as an inline collapsible note, not a
+   modal — the user is reviewing the trade alongside other journal rows. */
+.btn-analyze {
+    background: transparent;
+    color: var(--blue);
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 500;
+}
+.btn-analyze:hover { background: rgba(88, 166, 255, 0.1); }
+.btn-analyze:disabled { opacity: 0.5; cursor: progress; }
+
+.ai-analysis-pane {
+    margin-top: 0.85rem;
+    padding: 0.85rem 1rem;
+    background: #0f1a2e;
+    border: 1px solid var(--blue);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.ai-analysis-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px dashed var(--border);
+}
+.ai-analysis-header strong { color: var(--blue); }
+.ai-meta { color: var(--muted, #8b949e); font-size: 0.78rem; flex: 1; }
+.ai-close-btn {
+    background: none;
+    color: var(--muted, #8b949e);
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 0.3rem;
+    line-height: 1;
+}
+.ai-close-btn:hover { color: var(--red); }
+
+.ai-analysis-body { word-break: break-word; }
+.ai-analysis-body h2, .ai-analysis-body h3, .ai-analysis-body h4 {
+    margin: 0.7rem 0 0.3rem;
+    color: var(--blue);
+    font-size: 0.95rem;
+}
+.ai-analysis-body pre {
+    background: rgba(0,0,0,0.4);
+    padding: 0.5rem 0.7rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+}
+.ai-analysis-body code {
+    background: rgba(255,255,255,0.08);
+    padding: 0.05rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+.ai-analysis-body pre code { background: none; padding: 0; }
+.ai-md-table {
+    border-collapse: collapse;
+    margin: 0.5rem 0;
+    font-size: 0.85rem;
+    width: 100%;
+}
+.ai-md-table th, .ai-md-table td {
+    border: 1px solid var(--border);
+    padding: 0.3rem 0.5rem;
+    text-align: left;
+}
+.ai-md-table th {
+    background: rgba(255,255,255,0.06);
+    font-weight: 600;
+}
+.ai-loading { color: var(--muted, #8b949e); }
+.ai-error {
+    color: var(--red);
+    background: var(--red-bg);
+    padding: 0.5rem 0.7rem;
+    border-radius: 4px;
+}
+.ai-disclaimer {
+    margin-top: 0.6rem;
+    padding-top: 0.4rem;
+    border-top: 1px dashed var(--border);
+    color: var(--muted, #8b949e);
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
 /* PnL preview pane on /journal/new — JS-driven; hidden until margin+entry set. */
 .pnl-preview {
     background: var(--surface);

@@ -25,11 +25,28 @@ import (
 	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/signal"
+	"myFirstGo/trading-bot/ai"
 	"myFirstGo/trading-bot/validator"
 )
 
 type server struct {
 	client *bingx.Client
+	ai     *ai.Client
+
+	// aiCache memoizes /ai/analyze responses by trade ID so repeat
+	// clicks (page refresh, accordion re-open) don't re-bill against
+	// the user's token budget. Invalidated when the trade row is
+	// edited or closed.
+	aiCacheMu sync.Mutex
+	aiCache   map[int]aiCacheEntry
+}
+
+type aiCacheEntry struct {
+	Text         string
+	InputTokens  int
+	OutputTokens int
+	CostUSD      float64
+	GeneratedAt  time.Time
 }
 
 // symbolView is the per-symbol bundle the dashboard template iterates over.
@@ -1553,6 +1570,143 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		redirectURL = "/journal?tp1_status=" + url.QueryEscape(status) + "&tp1_msg=" + url.QueryEscape(msg)
 	}
 	c.Redirect(http.StatusSeeOther, redirectURL)
+}
+
+// handleAIAnalyzeTrade is the Phase 1 AI advisor endpoint. POST
+// /ai/analyze/:id — packages the trade's plan + journal context + live
+// BingX position + recent same-symbol history + macro events into a
+// structured user message, sends to Anthropic with the Quant persona
+// system prompt, and returns the response as JSON.
+//
+// Cached per trade ID in memory so repeat clicks (page refresh, modal
+// re-open) don't re-bill. Cache invalidates implicitly when the user
+// edits or closes the trade (next call computes fresh context anyway).
+func (s *server) handleAIAnalyzeTrade(c *gin.Context) {
+	t, _, _, err := s.loadTradeByID(c)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if s.ai == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ai client not initialized"})
+		return
+	}
+	apiKey := ai.APIKeyFromEnv()
+	if apiKey == "" && !s.ai.DryRun {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ANTHROPIC_API_KEY not configured on server. Set it in .env or enable ANTHROPIC_DRY_RUN=true for stub responses."})
+		return
+	}
+
+	// Cache hit? Return immediately.
+	s.aiCacheMu.Lock()
+	if cached, ok := s.aiCache[t.ID]; ok {
+		s.aiCacheMu.Unlock()
+		c.JSON(http.StatusOK, gin.H{
+			"text":          cached.Text,
+			"input_tokens":  cached.InputTokens,
+			"output_tokens": cached.OutputTokens,
+			"cost_usd":      cached.CostUSD,
+			"generated_at":  cached.GeneratedAt.Format(time.RFC3339),
+			"cached":        true,
+		})
+		return
+	}
+	s.aiCacheMu.Unlock()
+
+	// Gather context. Each fetcher is best-effort; missing data just
+	// means the LLM sees a smaller prompt, not an error.
+	inputs := ai.TradeAnalysisInputs{Trade: t}
+
+	// Live BingX position + mark price for the trade's symbol.
+	if sym, err := resolveWebSymbol(t.Symbol); err == nil && s.client != nil {
+		if pos, perr := s.client.FindOpenPosition(c.Request.Context(), sym, t.Side); perr == nil && pos != nil {
+			inputs.LivePosition = pos
+		}
+		if fr, ferr := s.client.FundingRate(c.Request.Context(), sym); ferr == nil {
+			inputs.MarkPrice = fr.MarkPrice
+		}
+	}
+
+	// Recent candles for the trade's TF (skip if TF unparseable).
+	if sym, err := resolveWebSymbol(t.Symbol); err == nil && s.client != nil {
+		tfStr := t.TF
+		if j := strings.Index(tfStr, ","); j >= 0 {
+			tfStr = strings.TrimSpace(tfStr[:j])
+		}
+		if tfStr != "" {
+			if candles, cerr := s.client.Klines(c.Request.Context(), sym, market.Timeframe(tfStr), 50); cerr == nil {
+				inputs.RecentBars = candles
+			}
+		}
+	}
+
+	// Recent same-symbol closed trades for journal context (last 5).
+	allTrades, _ := journal.ReadAll("")
+	for i := len(allTrades) - 1; i >= 0 && len(inputs.RecentSame) < 5; i-- {
+		r := allTrades[i]
+		if r.ID == t.ID {
+			continue
+		}
+		if r.Symbol != t.Symbol {
+			continue
+		}
+		if r.ClosedAt.IsZero() {
+			continue
+		}
+		inputs.RecentSame = append(inputs.RecentSame, r)
+	}
+
+	// Macro events within ±24h of opened_at (or now if still open).
+	anchor := t.OpenedAt
+	if anchor.IsZero() {
+		anchor = time.Now()
+	}
+	for _, e := range macro.All() {
+		delta := e.DatetimeUTC.Sub(anchor)
+		if delta < -24*time.Hour || delta > 24*time.Hour {
+			continue
+		}
+		inputs.MacroNear = append(inputs.MacroNear, e)
+	}
+
+	userMsg := ai.BuildTradeAnalysisMessage(inputs)
+
+	// Call Anthropic.
+	resp, err := s.ai.Send(c.Request.Context(), ai.SendOptions{
+		APIKey:      apiKey,
+		System:      ai.SystemPromptQuantAdvisor,
+		Messages:    []ai.Message{{Role: "user", Content: userMsg}},
+		Temperature: 0.3, // analytical determinism — low temp, not creative writing
+	})
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "anthropic call failed: " + err.Error()})
+		return
+	}
+
+	cost := resp.EstimatedCostUSD()
+	now := time.Now().UTC()
+	s.aiCacheMu.Lock()
+	s.aiCache[t.ID] = aiCacheEntry{
+		Text:         resp.Text,
+		InputTokens:  resp.InputTokens,
+		OutputTokens: resp.OutputTokens,
+		CostUSD:      cost,
+		GeneratedAt:  now,
+	}
+	s.aiCacheMu.Unlock()
+	log.Printf("ai.analyze trade #%d: %d/%d tokens, est $%.4f, stop=%s",
+		t.ID, resp.InputTokens, resp.OutputTokens, cost, resp.StopReason)
+
+	c.JSON(http.StatusOK, gin.H{
+		"text":          resp.Text,
+		"input_tokens":  resp.InputTokens,
+		"output_tokens": resp.OutputTokens,
+		"cost_usd":      cost,
+		"model":         resp.Model,
+		"stop_reason":   resp.StopReason,
+		"generated_at":  now.Format(time.RFC3339),
+		"cached":        false,
+	})
 }
 
 // handleJournalDelete removes a trade by ID (POST only).
