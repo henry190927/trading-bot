@@ -320,6 +320,50 @@ func Evaluate(in Inputs) Signal {
 		}
 	}
 
+	// Volume anomaly vote — catches momentum/breakout situations the
+	// mean-reversion votes structurally miss. Trigger: signal bar volume
+	// > 3.0× 20-bar average (a much stronger threshold than the
+	// range-expansion vote above at 1.5×, which gates on neutral RSI;
+	// this one is NOT RSI-gated by design — extreme-volume bars at RSI
+	// extremes can be capitulation flushes or breakout continuations,
+	// both of which the engine wants to see).
+	//
+	// Direction: bar close vs open. Bearish bar with anomalous volume
+	// is a continuation-short signal; bullish bar with anomalous volume
+	// is a continuation-long. Conflicting with mean-rev votes (e.g. RSI<30
+	// bullish + 3× vol bearish bar at the same time) → the bullVotes /
+	// bearVotes max() naturally cancels — that's the desired behavior
+	// for genuinely ambiguous setups.
+	//
+	// Motivation: 2026-06-23 ETH 15:55-16:15 cascade (-2.7% in 20min)
+	// passed our engine with 0/10 across all TFs because RSI / MACD /
+	// BOLL / sweep were all silent. The 14:20 and 16:15 bars had 9-10×
+	// volume but the existing range-expansion vote required RSI in
+	// neutral band AND range > 1.5×ATR simultaneously, which the user's
+	// observation moment didn't satisfy. This vote backs up the
+	// observation regardless of those gates.
+	if isVolumeAnomalySymbol(in.Symbol) && last >= 20 {
+		bar := in.Candles[last]
+		var avgVol float64
+		for i := last - 19; i <= last; i++ {
+			avgVol += in.Candles[i].Volume
+		}
+		avgVol /= 20.0
+		if avgVol > 0 && bar.Volume > 3.0*avgVol {
+			ratio := bar.Volume / avgVol
+			switch {
+			case bar.Close > bar.Open:
+				bullVotes++
+				sig.Reasons = append(sig.Reasons,
+					fmt.Sprintf("Volume anomaly + bullish bar (vol %.1fx 20-bar avg)", ratio))
+			case bar.Close < bar.Open:
+				bearVotes++
+				sig.Reasons = append(sig.Reasons,
+					fmt.Sprintf("Volume anomaly + bearish bar (vol %.1fx 20-bar avg)", ratio))
+			}
+		}
+	}
+
 	// Double top / bottom. Same story as range expansion — informative but
 	// symbol-regime dependent in backtest, so display-only.
 	dPatterns := analyzer.DetectDoublePatterns(in.Candles, 80, 2, 5, 5, 0.003, 0.01)
@@ -520,6 +564,28 @@ func isPreciousMetal(s market.Symbol) bool {
 // coincidence not design.
 func isVolumeConfirmSymbol(s market.Symbol) bool {
 	return s == market.XAUUSDT || s == market.XAGUSDT
+}
+
+// isVolumeAnomalySymbol returns true for symbols where the volume-anomaly
+// vote (signal bar vol > 3× 20-bar avg → vote in bar direction) is
+// enabled. Per the 2026-06-23 backtest A/B (60/90/120d × 4 symbols at 1h):
+//
+//	Symbol  60d Δ  90d Δ  120d Δ  3-window total
+//	BTC     +3.56  +4.43  +2.28   +10.27R ✓✓
+//	ETH     -4.77  -0.17  -3.54    -8.48R
+//	XAU     +2.12  -0.97  -0.11    +1.04R ≈ flat
+//	XAG     -7.58 -12.82 -13.58   -33.98R ❌
+//
+// Asymmetric — BTC improved 3/3 windows consistently; ETH/XAG hurt
+// (ETH: noisy volume signature, false positives; XAG: already gates
+// via isVolumeConfirmSymbol's 1.0× threshold, so stacking a 3× anomaly
+// vote double-counts the same signal). XAU was a wash.
+//
+// Enable BTC only — ship-gate compliant + captures the breakout-like
+// continuations BTC's clean tape rewards. Re-test if BTC's volume
+// behavior regime-shifts.
+func isVolumeAnomalySymbol(s market.Symbol) bool {
+	return s == market.BTCUSDT
 }
 
 // shortName returns BTC / ETH / XAU / XAG for logging; falls back to the
