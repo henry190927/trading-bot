@@ -364,6 +364,47 @@ func Evaluate(in Inputs) Signal {
 		}
 	}
 
+	// Trend-structure vote (ETH only) — adds a directional bias when the
+	// last 3 swing highs AND the last 3 swing lows are all monotonic in
+	// the same direction (strict LH-LL = downtrend, HH-HL = uptrend).
+	// Neutral structures don't vote.
+	//
+	// Per 2026-06-23 backtest A/B (60/90/120d × 4 symbols at 1h):
+	//
+	//	Symbol  60d Δ   90d Δ   120d Δ  3-window total
+	//	BTC     -0.06   -3.34   -14.19  -17.59R ❌ (120d fails >±10R rule)
+	//	ETH     +3.93   +3.67   -1.13    +6.47R ✓
+	//	XAU     -2.25   -2.94   +5.66    +0.47R ≈ flat
+	//	XAG     -1.56   +3.10   -5.50    -3.96R
+	//
+	// BTC: vote misfires in choppy regime, adds +6/+7/+6 new signals per
+	// window most of which net negative — the engine's existing edge on
+	// BTC is at extremes, and structure votes against it dilute that.
+	// ETH: 2/3 windows clean win (+3-4R per window) — exactly the
+	// 2026-06-23 1680 case structurally (LH-LL series 1712→1693→1690
+	// would have triggered a bear vote even when other votes were silent).
+	//
+	// Enable ETH only. Same per-symbol allowlist pattern as the
+	// volume-anomaly vote.
+	if isStructureVoteSymbol(in.Symbol) {
+		if structure, tops, bots := ClassifyTrendStructure(in.Candles); structure != StructNeutral && len(tops) >= 3 && len(bots) >= 3 {
+			switch structure {
+			case StructUptrend:
+				bullVotes++
+				sig.Reasons = append(sig.Reasons,
+					fmt.Sprintf("HH-HL uptrend (highs %.4f→%.4f→%.4f, lows %.4f→%.4f→%.4f)",
+						tops[0].Price, tops[1].Price, tops[2].Price,
+						bots[0].Price, bots[1].Price, bots[2].Price))
+			case StructDowntrend:
+				bearVotes++
+				sig.Reasons = append(sig.Reasons,
+					fmt.Sprintf("LH-LL downtrend (highs %.4f→%.4f→%.4f, lows %.4f→%.4f→%.4f)",
+						tops[0].Price, tops[1].Price, tops[2].Price,
+						bots[0].Price, bots[1].Price, bots[2].Price))
+			}
+		}
+	}
+
 	// Double top / bottom. Same story as range expansion — informative but
 	// symbol-regime dependent in backtest, so display-only.
 	dPatterns := analyzer.DetectDoublePatterns(in.Candles, 80, 2, 5, 5, 0.003, 0.01)
@@ -586,6 +627,23 @@ func isVolumeConfirmSymbol(s market.Symbol) bool {
 // behavior regime-shifts.
 func isVolumeAnomalySymbol(s market.Symbol) bool {
 	return s == market.BTCUSDT
+}
+
+// isStructureVoteSymbol returns true for symbols where the LH-LL /
+// HH-HL trend-structure vote is enabled. Per 2026-06-23 backtest A/B:
+//
+//	Symbol  60d Δ   90d Δ   120d Δ  3-window total
+//	BTC     -0.06   -3.34   -14.19  -17.59R ❌
+//	ETH     +3.93   +3.67   -1.13    +6.47R ✓
+//	XAU     -2.25   -2.94   +5.66    +0.47R ≈ flat
+//	XAG     -1.56   +3.10   -5.50    -3.96R
+//
+// ETH 2/3 windows improved cleanly; BTC 120d −14R fails ship gate.
+// Enable ETH only. Rationale matches user's 2026-06-23 ETH 1680
+// observation: LH-LL series (1712→1693→1690) should have flagged
+// the cascade direction even when oscillator votes were silent.
+func isStructureVoteSymbol(s market.Symbol) bool {
+	return s == market.ETHUSDT
 }
 
 // shortName returns BTC / ETH / XAU / XAG for logging; falls back to the
