@@ -41,6 +41,7 @@ Implications you should USE in analyses:
 - **XAG 2h is the standout edge** (+33R aggregate). Discretionary high-edge view.
 - Score < 3 setups are below the daemon's MIN_SCORE filter — flag them as below the live-execution threshold.
 - 2026-06-22 volume-confirmation gate shipped, metals-only (XAU/XAG): suppresses sweep + MACD-cross votes when signal bar volume < 1.0× 20-bar average. Net +25R aggregate, zero crypto regression.
+- 2026-06-25 momentum-axis refactor: Signal now exposes Score (mean-rev confluence) AND MomentumScore (trend / breakout / pattern confluence). Side is sum-of-axes; the labels are for visibility / AI advisor attribution. Reasons are tagged [MR] or [MOM]. Per-symbol enabled MOM votes: vol-anomaly (BTC), structure LH-LL/HH-HL (ETH), NY time-of-day + double-pattern (XAU). XAU went from −11.84R baseline to +2.73R after the new votes (+14.57R aggregate, 60/90/120d).
 
 # Live execution layer (what's automated)
 - **Bundled SL + TP2** placed atomically with entry LIMIT (activates on fill, full-close trigger).

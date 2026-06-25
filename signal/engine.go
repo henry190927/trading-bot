@@ -34,16 +34,32 @@ type Signal struct {
 	Symbol    market.Symbol
 	Timeframe market.Timeframe
 	Side      Side
-	Score     int // count of confluent factors that fired
-	Reasons   []string
-	Notes     []string // observations shown for context, do NOT vote (range expansion, double patterns, etc.)
-	Warnings  []string // crowd/funding warnings — caller should size down or skip
-	Price     float64
-	Fib       indicator.FibRetracement
-	VP        indicator.VolumeProfile // chip-concentration map (籌碼密集區)
-	POCMig    indicator.POCMigration  // POC drift across 50/100/200 windows (display + validator only)
-	Opens     Opens                   // daily / weekly / monthly opening prices (display-only)
-	Plan      Plan                    // execution plan (entry/stop/TP)
+	// Score is the MEAN-REVERSION confluence score — count of mean-rev
+	// votes that fired in the winning direction (RSI extreme, BOLL band
+	// touch, Fib pullback, sweep, divergence, MACD cross, range
+	// expansion). This is the legacy Score field; existing callers,
+	// thresholds, and journal rows continue to interpret it as before.
+	Score int
+	// MomentumScore is a PARALLEL axis tracking trend / breakout / pattern
+	// votes (volume anomaly, LH-LL / HH-HL structure, time-of-day,
+	// double-top / double-bottom). It exists because these signals are
+	// orthogonal to mean-reversion: they catch setups the mean-rev axis
+	// is structurally blind to (the 2026-06-23 ETH 1680 cascade case),
+	// and stacking them into a single Score blurred semantics.
+	//
+	// Side determination considers both axes — see Evaluate's tail logic.
+	// Each vote's Reason carries a [MR] or [MOM] tag so the trader / AI
+	// advisor can attribute confluence per axis.
+	MomentumScore int
+	Reasons       []string
+	Notes         []string // observations shown for context, do NOT vote (display-only patterns, etc.)
+	Warnings      []string // crowd/funding warnings — caller should size down or skip
+	Price         float64
+	Fib           indicator.FibRetracement
+	VP            indicator.VolumeProfile // chip-concentration map (籌碼密集區)
+	POCMig        indicator.POCMigration  // POC drift across 50/100/200 windows (display + validator only)
+	Opens         Opens                   // daily / weekly / monthly opening prices (display-only)
+	Plan          Plan                    // execution plan (entry/stop/TP)
 }
 
 // Context carries optional perpetual-market context (funding, OI) that the
@@ -149,7 +165,14 @@ func Evaluate(in Inputs) Signal {
 	}
 
 	sig := Signal{Symbol: in.Symbol, Timeframe: in.Timeframe, Price: price, Fib: fib, VP: vp, POCMig: pocMig, Opens: opens}
-	bullVotes, bearVotes := 0, 0
+	// Dual-axis vote accumulators. MR (mean-reversion) is the legacy axis:
+	// RSI extreme, MACD cross, BOLL band touch, Fib pullback, sweep, RSI/CVD
+	// divergence, range expansion. MOM (momentum) is the new axis for
+	// trend-/breakout-/pattern-style votes: volume anomaly, LH-LL/HH-HL
+	// structure, time-of-day, double-top/bottom. Side determination at the
+	// bottom of Evaluate combines both axes.
+	bullMR, bearMR := 0, 0
+	bullMOM, bearMOM := 0, 0
 
 	// Volume confirmation gate — METALS ONLY (per 2026-06-22 backtest A/B).
 	//
@@ -186,23 +209,23 @@ func Evaluate(in Inputs) Signal {
 	volumeConfirmed := !volumeConfirmEnabled || relVol >= volumeConfirmThreshold
 
 	if rsi[last] < 30 {
-		bullVotes++
+		bullMR++
 		sig.Reasons = append(sig.Reasons, "RSI oversold")
 	} else if rsi[last] > 70 {
-		bearVotes++
+		bearMR++
 		sig.Reasons = append(sig.Reasons, "RSI overbought")
 	}
 
 	if m := macd[last]; m.Histogram > 0 && macd[last-1].Histogram <= 0 {
 		if volumeConfirmed {
-			bullVotes++
+			bullMR++
 			sig.Reasons = append(sig.Reasons, fmt.Sprintf("MACD bullish cross (vol %.2fx)", relVol))
 		} else {
 			sig.Notes = append(sig.Notes, fmt.Sprintf("MACD bullish cross suppressed — low volume %.2fx (<%.1fx threshold)", relVol, volumeConfirmThreshold))
 		}
 	} else if m.Histogram < 0 && macd[last-1].Histogram >= 0 {
 		if volumeConfirmed {
-			bearVotes++
+			bearMR++
 			sig.Reasons = append(sig.Reasons, fmt.Sprintf("MACD bearish cross (vol %.2fx)", relVol))
 		} else {
 			sig.Notes = append(sig.Notes, fmt.Sprintf("MACD bearish cross suppressed — low volume %.2fx (<%.1fx threshold)", relVol, volumeConfirmThreshold))
@@ -211,10 +234,10 @@ func Evaluate(in Inputs) Signal {
 
 	if b := boll[last]; b.Lower != 0 {
 		if price <= b.Lower {
-			bullVotes++
+			bullMR++
 			sig.Reasons = append(sig.Reasons, "Price at lower Bollinger")
 		} else if price >= b.Upper {
-			bearVotes++
+			bearMR++
 			sig.Reasons = append(sig.Reasons, "Price at upper Bollinger")
 		}
 	}
@@ -222,10 +245,10 @@ func Evaluate(in Inputs) Signal {
 	for _, lvl := range fib.Levels {
 		if lvl.Ratio == 0.618 && nearPct(price, lvl.Price, 0.003) {
 			if fib.Uptrend {
-				bullVotes++
+				bullMR++
 				sig.Reasons = append(sig.Reasons, "Pullback to fib 0.618 in uptrend")
 			} else {
-				bearVotes++
+				bearMR++
 				sig.Reasons = append(sig.Reasons, "Pullback to fib 0.618 in downtrend")
 			}
 		}
@@ -256,13 +279,13 @@ func Evaluate(in Inputs) Signal {
 		}
 		if sw.Side == analyzer.SweepLow {
 			if !sweepBull {
-				bullVotes++
+				bullMR++
 				sweepBull = true
 			}
 			sig.Reasons = append(sig.Reasons, fmt.Sprintf("Liquidity grab at %.2f (low side, vol %.2fx)", sw.Level, relVol))
 		} else {
 			if !sweepBear {
-				bearVotes++
+				bearMR++
 				sweepBear = true
 			}
 			sig.Reasons = append(sig.Reasons, fmt.Sprintf("Liquidity grab at %.2f (high side, vol %.2fx)", sw.Level, relVol))
@@ -271,18 +294,18 @@ func Evaluate(in Inputs) Signal {
 
 	switch rsiDiv.Kind {
 	case analyzer.BullishRegular:
-		bullVotes++
+		bullMR++
 		sig.Reasons = append(sig.Reasons, "RSI bullish divergence")
 	case analyzer.BearishRegular:
-		bearVotes++
+		bearMR++
 		sig.Reasons = append(sig.Reasons, "RSI bearish divergence")
 	}
 	switch cvdDiv.Kind {
 	case analyzer.BullishRegular:
-		bullVotes++
+		bullMR++
 		sig.Reasons = append(sig.Reasons, "CVD bullish divergence")
 	case analyzer.BearishRegular:
-		bearVotes++
+		bearMR++
 		sig.Reasons = append(sig.Reasons, "CVD bearish divergence")
 	}
 
@@ -309,11 +332,11 @@ func Evaluate(in Inputs) Signal {
 		if a14 > 0 && avgVol > 0 && barRange > 1.5*a14 && bar.Volume > 1.5*avgVol {
 			switch {
 			case bar.Close > bar.Open:
-				bullVotes++
+				bullMR++
 				sig.Reasons = append(sig.Reasons,
 					fmt.Sprintf("Range expansion + volume bullish bar (range %.4f, vol %.0f)", barRange, bar.Volume))
 			case bar.Close < bar.Open:
-				bearVotes++
+				bearMR++
 				sig.Reasons = append(sig.Reasons,
 					fmt.Sprintf("Range expansion + volume bearish bar (range %.4f, vol %.0f)", barRange, bar.Volume))
 			}
@@ -353,13 +376,13 @@ func Evaluate(in Inputs) Signal {
 			ratio := bar.Volume / avgVol
 			switch {
 			case bar.Close > bar.Open:
-				bullVotes++
+				bullMOM++
 				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("Volume anomaly + bullish bar (vol %.1fx 20-bar avg)", ratio))
+					fmt.Sprintf("[MOM] Volume anomaly + bullish bar (vol %.1fx 20-bar avg)", ratio))
 			case bar.Close < bar.Open:
-				bearVotes++
+				bearMOM++
 				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("Volume anomaly + bearish bar (vol %.1fx 20-bar avg)", ratio))
+					fmt.Sprintf("[MOM] Volume anomaly + bearish bar (vol %.1fx 20-bar avg)", ratio))
 			}
 		}
 	}
@@ -390,17 +413,68 @@ func Evaluate(in Inputs) Signal {
 		if structure, tops, bots := ClassifyTrendStructure(in.Candles); structure != StructNeutral && len(tops) >= 3 && len(bots) >= 3 {
 			switch structure {
 			case StructUptrend:
-				bullVotes++
+				bullMOM++
 				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("HH-HL uptrend (highs %.4f→%.4f→%.4f, lows %.4f→%.4f→%.4f)",
+					fmt.Sprintf("[MOM] HH-HL uptrend (highs %.4f→%.4f→%.4f, lows %.4f→%.4f→%.4f)",
 						tops[0].Price, tops[1].Price, tops[2].Price,
 						bots[0].Price, bots[1].Price, bots[2].Price))
 			case StructDowntrend:
-				bearVotes++
+				bearMOM++
 				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("LH-LL downtrend (highs %.4f→%.4f→%.4f, lows %.4f→%.4f→%.4f)",
+					fmt.Sprintf("[MOM] LH-LL downtrend (highs %.4f→%.4f→%.4f, lows %.4f→%.4f→%.4f)",
 						tops[0].Price, tops[1].Price, tops[2].Price,
 						bots[0].Price, bots[1].Price, bots[2].Price))
+			}
+		}
+	}
+
+	// Time-of-day momentum vote — when the signal bar opens during the
+	// NY pre-market / active session (12:00-21:00 UTC, roughly 20:00 TPE
+	// to 05:00 TPE next day) AND the bar has clear directional body,
+	// vote in the bar direction.
+	//
+	// Hypothesis: crypto / metals see meaningful USD-correlated flow
+	// during NY session; bars with strong bodies in this window are more
+	// likely continuation rather than range noise. Captures the pattern
+	// the 2026-06-24 ETH 1650.7 short hit (user noted "rapidly pulled up
+	// to grab liquidity before New York times" — that exact regime).
+	//
+	// Thresholds (subject to backtest tuning):
+	//   body_pct  = |close - open| / open > 0.3%  (meaningful absolute move)
+	//   body_frac = |close - open| / (high - low) > 0.55  (mostly body, not wicks)
+	//
+	// Window inclusive of NY pre-market positioning (12:00 UTC = 08:00 EDT)
+	// through NY equity close (21:00 UTC = 17:00 EDT). Avoids the lower-
+	// liquidity Asia/Europe handover.
+	if last >= 1 && isTimeOfDaySymbol(in.Symbol) {
+		bar := in.Candles[last]
+		hourUTC := bar.OpenTime.UTC().Hour()
+		inNYWindow := hourUTC >= 12 && hourUTC < 21
+		if inNYWindow {
+			body := bar.Close - bar.Open
+			absBody := body
+			if absBody < 0 {
+				absBody = -absBody
+			}
+			barRange := bar.High - bar.Low
+			bodyPct := absBody / bar.Open
+			var bodyFrac float64
+			if barRange > 0 {
+				bodyFrac = absBody / barRange
+			}
+			if bodyPct > 0.003 && bodyFrac > 0.55 {
+				switch {
+				case body > 0:
+					bullMOM++
+					sig.Reasons = append(sig.Reasons,
+						fmt.Sprintf("[MOM] NY-session bullish body (%02d:00 UTC, %.2f%% body, %.0f%% of range)",
+							hourUTC, bodyPct*100, bodyFrac*100))
+				case body < 0:
+					bearMOM++
+					sig.Reasons = append(sig.Reasons,
+						fmt.Sprintf("[MOM] NY-session bearish body (%02d:00 UTC, %.2f%% body, %.0f%% of range)",
+							hourUTC, bodyPct*100, bodyFrac*100))
+				}
 			}
 		}
 	}
@@ -413,23 +487,85 @@ func Evaluate(in Inputs) Signal {
 		if !nearPct(price, p.Level, 0.005) {
 			continue
 		}
+		// Promoted from display-only Note → momentum vote 2026-06-25.
+		// Double top retest near price = bearish-reversal pattern;
+		// double bottom retest = bullish-reversal pattern. Per-symbol
+		// gate (isDoublePatternSymbol) will narrow after backtest A/B
+		// per the established precedent.
 		if p.Side == analyzer.DoubleTop && !seenTop {
 			seenTop = true
-			sig.Notes = append(sig.Notes, fmt.Sprintf("Double top @ %.4f being retested (bearish bias)", p.Level))
+			if isDoublePatternSymbol(in.Symbol) {
+				bearMOM++
+				sig.Reasons = append(sig.Reasons, fmt.Sprintf("[MOM] Double top @ %.4f retest (bearish pattern)", p.Level))
+			} else {
+				sig.Notes = append(sig.Notes, fmt.Sprintf("Double top @ %.4f retest (display-only, vote disabled for %s)", p.Level, in.Symbol))
+			}
 		}
 		if p.Side == analyzer.DoubleBottom && !seenBot {
 			seenBot = true
-			sig.Notes = append(sig.Notes, fmt.Sprintf("Double bottom @ %.4f being retested (bullish bias)", p.Level))
+			if isDoublePatternSymbol(in.Symbol) {
+				bullMOM++
+				sig.Reasons = append(sig.Reasons, fmt.Sprintf("[MOM] Double bottom @ %.4f retest (bullish pattern)", p.Level))
+			} else {
+				sig.Notes = append(sig.Notes, fmt.Sprintf("Double bottom @ %.4f retest (display-only, vote disabled for %s)", p.Level, in.Symbol))
+			}
 		}
 	}
 
+	// Per-axis sides + scores tracked for visibility (dashboard, AI advisor,
+	// journal). The axes are LABELING — they don't gate the trade.
+	var mrSide, momSide Side
 	switch {
-	case bullVotes > bearVotes:
+	case bullMR > bearMR:
+		mrSide = Long
+	case bearMR > bullMR:
+		mrSide = Short
+	}
+	switch {
+	case bullMOM > bearMOM:
+		momSide = Long
+	case bearMOM > bullMOM:
+		momSide = Short
+	}
+
+	// Side determination: SUM both axes — preserves the historical
+	// max(bullVotes, bearVotes) behavior that ship gates were tuned on.
+	// 2026-06-25 A/B test: conflict-suppression (Flat when axes disagree)
+	// cost −9.5R on ETH and −3R on BTC over 60/90/120d, because MR-vs-MOM
+	// disagreement at sweep-anchored RSI-extreme setups is actually the
+	// engine's bread and butter — RSI says oversold (long), LH-LL structure
+	// says downtrend (short), the LONG mean-rev play often wins. Don't
+	// gate it; surface the disagreement as a Warning so the trader / AI
+	// can size down or skip on judgment.
+	bullSum := bullMR + bullMOM
+	bearSum := bearMR + bearMOM
+	switch {
+	case bullSum > bearSum:
 		sig.Side = Long
-		sig.Score = bullVotes
-	case bearVotes > bullVotes:
+	case bearSum > bullSum:
 		sig.Side = Short
-		sig.Score = bearVotes
+	}
+
+	// Score = sum of winning-side votes across both axes — keeps the
+	// "score is total confluence" semantic that all existing thresholds
+	// (MIN_SCORE=3 in daemon, monitor) depend on. MomentumScore exposes
+	// the MOM-axis contribution separately for downstream visibility
+	// without changing the trade-selection contract.
+	switch sig.Side {
+	case Long:
+		sig.Score = bullSum
+		sig.MomentumScore = bullMOM
+	case Short:
+		sig.Score = bearSum
+		sig.MomentumScore = bearMOM
+	}
+
+	// Surface axis disagreement as a Warning so the AI advisor / trader
+	// can attribute confluence quality. Doesn't change trade direction.
+	if mrSide != Flat && momSide != Flat && mrSide != momSide {
+		sig.Warnings = append(sig.Warnings,
+			fmt.Sprintf("Axis disagreement: MR=%s (mr_votes %d/%d)  MOM=%s (mom_votes %d/%d) — sum-of-axes resolves to %s",
+				mrSide, bullMR, bearMR, momSide, bullMOM, bearMOM, sig.Side))
 	}
 
 	// MTF bias filter: suppress contra-bias signals before context filters
@@ -644,6 +780,31 @@ func isVolumeAnomalySymbol(s market.Symbol) bool {
 // the cascade direction even when oscillator votes were silent.
 func isStructureVoteSymbol(s market.Symbol) bool {
 	return s == market.ETHUSDT
+}
+
+// isTimeOfDaySymbol returns true for symbols where the NY-session
+// time-of-day vote is enabled. Initially open to all 4; backtest A/B
+// will narrow per asymmetric results per the established precedent.
+// isTimeOfDaySymbol gates the NY-session time-of-day momentum vote.
+// 2026-06-25 backtest A/B: enabling for all 4 symbols hurt BTC −35R
+// and XAG −15R across 60/90/120d windows, was neutral on ETH (≈0R),
+// and HELPED XAU +14.57R aggregate (especially 120d window with
+// +11.26R). Same vote also lifts XAU 60d from −5.89 → −0.45 (+5.44R).
+// Enable XAU only — matches the precedent of vol-anomaly (BTC-only)
+// and structure (ETH-only): each symbol has a different signal
+// signature that responds best to a different momentum vote.
+func isTimeOfDaySymbol(s market.Symbol) bool {
+	return s == market.XAUUSDT
+}
+
+// isDoublePatternSymbol gates the double-top/bottom retest momentum
+// vote. Per same 2026-06-25 A/B as time-of-day: bundled together,
+// the two new votes lifted XAU by +14.57R but hurt BTC/XAG. Enable
+// XAU only for now; if the user wants per-vote granularity later
+// (one vote alone may behave differently), we'll backtest each
+// independently.
+func isDoublePatternSymbol(s market.Symbol) bool {
+	return s == market.XAUUSDT
 }
 
 // shortName returns BTC / ETH / XAU / XAG for logging; falls back to the

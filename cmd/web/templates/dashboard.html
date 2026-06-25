@@ -155,6 +155,7 @@
       </span>
       <span class="{{sideClass .Signal.Side}} side-badge">{{sideText .Signal.Side}}</span>
       <span class="score {{scoreClass .Signal.Score $.MinTradeable}}">score {{.Signal.Score}}</span>
+      {{if gt .Signal.MomentumScore 0}}<span class="score score-mom" title="momentum-axis votes (volume anomaly, structure, time-of-day, double-pattern)">MOM {{.Signal.MomentumScore}}</span>{{end}}
     </div>
 
     {{if .Err}}

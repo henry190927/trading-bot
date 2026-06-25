@@ -158,6 +158,12 @@ main {
 .score.score-good { color: var(--green); background: var(--green-bg); font-weight: 600; }
 .score.score-borderline { color: var(--yellow); }
 .score.score-weak { color: var(--text-dim); }
+.score.score-mom {
+    color: var(--blue);
+    background: #0f1a2e;
+    border: 1px solid var(--blue);
+    margin-left: 0.3rem;
+}
 
 .meta {
     display: flex;
