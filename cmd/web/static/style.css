@@ -245,6 +245,28 @@ button.copy-btn.poc-drift {
     padding: 1px 6px;
 }
 
+/* "copy row" — single-tap whole-line snapshot for pasting into trade notes.
+   Distinct visual so it doesn't read as a per-value chip; muted by default,
+   highlights blue on tap (inheriting .copy-btn:active). */
+button.copy-btn.copy-row {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px dashed var(--border);
+    margin-left: 0.4rem;
+}
+button.copy-btn.copy-row:hover {
+    color: var(--blue);
+    border-color: var(--blue);
+    border-style: solid;
+}
+
 .meta {
     display: flex;
     align-items: center;

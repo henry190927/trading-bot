@@ -106,6 +106,10 @@
           <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.1f" .Diagnose.TotalMOM}}/10" title="momentum axis — tap to copy">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</button>
           <button type="button" class="copy-btn ot-ratio" data-copy="ratio {{printf "%.1f" .Diagnose.Total}}/10" title="combined total — tap to copy"><strong>{{printf "%.1f" .Diagnose.Total}}/10</strong></button>
           {{verdictShort .Diagnose.Verdict}}
+          <button type="button"
+                  class="copy-btn copy-row"
+                  data-copy="#{{.Trade.ID}} {{.Trade.Symbol}} {{or .Trade.TF "—"}} {{sideStr .Trade.Side}} entry {{fmtPrice .Trade.Entry}} mark {{fmtPrice .MarkPrice}} R {{fmtSigned1 .CurrentR}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.1f" .Diagnose.TotalMR}} MOM {{printf "%.1f" .Diagnose.TotalMOM}} ratio {{printf "%.1f" .Diagnose.Total}}/10 {{verdictShort .Diagnose.Verdict}}"
+                  title="copy whole-row snapshot for trade notes (id · symbol · TF · side · entry · mark · R · diagnose)">copy row</button>
           {{if .Diagnose.AtVAH}}<span class="ot-flag va">at VAH</span>
           {{else if .Diagnose.AtVAL}}<span class="ot-flag va">at VAL</span>
           {{else if .Diagnose.OutsideVAUp}}<span class="ot-flag va-out">above VA</span>
@@ -159,6 +163,10 @@
       <button type="button" class="copy-btn score score-mr" data-copy="MR {{.Signal.MRScore}}" title="mean-reversion votes (RSI / BOLL / Fib / sweep / divergence / MACD) — tap to copy">MR {{.Signal.MRScore}}</button>
       <button type="button" class="copy-btn score score-mom" data-copy="MOM {{.Signal.MomentumScore}}" title="momentum votes (volume anomaly / structure / time-of-day / double-pattern) — tap to copy">MOM {{.Signal.MomentumScore}}</button>
       <button type="button" class="copy-btn score {{scoreClass .Signal.Score $.MinTradeable}}" data-copy="total {{.Signal.Score}}" title="total = MR + MOM — tap to copy">total {{.Signal.Score}}</button>
+      <button type="button"
+              class="copy-btn copy-row"
+              data-copy="{{.Short}} {{$.TF}} {{sideText .Signal.Side}} @ {{fmtPrice .Signal.Price}} | MR {{.Signal.MRScore}} MOM {{.Signal.MomentumScore}} total {{.Signal.Score}}{{if .Signal.POCMig.POCShort}} | drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}{{end}}{{if .Diagnose}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.1f" .Diagnose.TotalMR}} MOM {{printf "%.1f" .Diagnose.TotalMOM}} ratio {{printf "%.1f" .Diagnose.Total}}/10 {{verdictShort .Diagnose.Verdict}}{{end}}"
+              title="copy the whole-row snapshot in one paste (symbol · TF · side · price · MR · MOM · total · drift · diagnose)">copy row</button>
     </div>
 
     {{if .Err}}
