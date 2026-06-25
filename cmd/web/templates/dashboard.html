@@ -102,6 +102,8 @@
         <div class="ot-diagnose {{verdictClass .Diagnose.Total}}">
           live diagnose:
           <span class="{{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
+          <span class="diag-score-axis diag-axis-mr" title="mean-reversion axis">MR {{printf "%.1f" .Diagnose.TotalMR}}</span>
+          <span class="diag-score-axis diag-axis-mom" title="momentum axis">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</span>
           <strong>{{printf "%.1f" .Diagnose.Total}}/10</strong>
           {{verdictShort .Diagnose.Verdict}}
           {{if .Diagnose.AtVAH}}<span class="ot-flag va">at VAH</span>
@@ -154,8 +156,9 @@
         {{end}}
       </span>
       <span class="{{sideClass .Signal.Side}} side-badge">{{sideText .Signal.Side}}</span>
-      <span class="score {{scoreClass .Signal.Score $.MinTradeable}}">score {{.Signal.Score}}</span>
-      {{if gt .Signal.MomentumScore 0}}<span class="score score-mom" title="momentum-axis votes (volume anomaly, structure, time-of-day, double-pattern)">MOM {{.Signal.MomentumScore}}</span>{{end}}
+      <span class="score score-mr" title="mean-reversion votes (RSI / BOLL / Fib / sweep / divergence / MACD)">MR {{.Signal.MRScore}}</span>
+      <span class="score score-mom" title="momentum votes (volume anomaly / structure / time-of-day / double-pattern)">MOM {{.Signal.MomentumScore}}</span>
+      <span class="score {{scoreClass .Signal.Score $.MinTradeable}}" title="total = MR + MOM">total {{.Signal.Score}}</span>
     </div>
 
     {{if .Err}}
@@ -204,7 +207,9 @@
     <div class="diagnose-row {{verdictClass .Diagnose.Total}}">
       <span class="diag-label">trade now?</span>
       <span class="diag-side {{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
-      <span class="diag-score">{{printf "%.1f" .Diagnose.Total}}/10</span>
+      <span class="diag-score-axis diag-axis-mr" title="mean-reversion axis (mr + shared factors)">MR {{printf "%.1f" .Diagnose.TotalMR}}</span>
+      <span class="diag-score-axis diag-axis-mom" title="momentum axis (mom + shared factors)">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</span>
+      <span class="diag-score" title="combined total — all factors">{{printf "%.1f" .Diagnose.Total}}/10</span>
       <span class="diag-verdict">{{verdictShort .Diagnose.Verdict}}</span>
       <a class="diag-link" href="{{diagnoseHref . $.TF}}" title="full validator breakdown">↗</a>
       {{if .Diagnose.AtVAH}}<span class="diag-flag va">at VAH</span>

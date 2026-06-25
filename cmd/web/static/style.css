@@ -158,12 +158,51 @@ main {
 .score.score-good { color: var(--green); background: var(--green-bg); font-weight: 600; }
 .score.score-borderline { color: var(--yellow); }
 .score.score-weak { color: var(--text-dim); }
+.score.score-mr {
+    color: #b388ff;
+    background: #1a0f2e;
+    border: 1px solid #b388ff;
+    margin-right: 0.3rem;
+}
 .score.score-mom {
     color: var(--blue);
     background: #0f1a2e;
     border: 1px solid var(--blue);
-    margin-left: 0.3rem;
+    margin-right: 0.3rem;
 }
+.diag-score-axis {
+    display: inline-block;
+    padding: 0 0.4rem;
+    border-radius: 0.25rem;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.85rem;
+    margin-right: 0.3rem;
+}
+.diag-axis-mr  { color: #b388ff;       background: #1a0f2e; }
+.diag-axis-mom { color: var(--blue);   background: #0f1a2e; }
+.score-axes {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+.factor-axis {
+    display: inline-block;
+    padding: 0 0.35rem;
+    border-radius: 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0.3rem;
+    min-width: 2.4rem;
+    text-align: center;
+}
+.factor-axis-mr   { color: #b388ff;     background: #1a0f2e; }
+.factor-axis-mom  { color: var(--blue); background: #0f1a2e; }
+.factor-axis-both { color: var(--text-dim); background: rgba(255,255,255,0.04); }
+.score-tag.score-tag-mr  { color: #b388ff;     background: #1a0f2e; }
+.score-tag.score-tag-mom { color: var(--blue); background: #0f1a2e; }
 
 .meta {
     display: flex;

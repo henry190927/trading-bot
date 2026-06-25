@@ -39,6 +39,10 @@
 <section class="score-card {{verdictClass $r.Total}}">
   <div class="score-num">{{printf "%.1f" $r.Total}}<span class="score-out">/10</span></div>
   <div class="verdict-text">{{$r.Verdict}}</div>
+  <div class="score-axes">
+    <span class="diag-score-axis diag-axis-mr" title="mean-reversion axis (mr + shared factors)">MR {{printf "%.1f" $r.TotalMR}}/10</span>
+    <span class="diag-score-axis diag-axis-mom" title="momentum axis (mom + shared factors)">MOM {{printf "%.1f" $r.TotalMOM}}/10</span>
+  </div>
 </section>
 
 <a href="{{validateRecordHref $r .Short}}" class="btn-primary btn-record-trade">+ record this trade</a>
@@ -50,6 +54,9 @@
     <span class="{{sideClassStr (sideStr $r.EngineSide.String)}} side-badge">{{sideStr $r.EngineSide.String}}</span>
     <span class="lbl">score</span>
     <span class="score-tag">{{$r.EngineScore}}</span>
+    <span class="lbl">breakdown</span>
+    <span class="score-tag score-tag-mr">MR {{$r.EngineMRScore}}</span>
+    <span class="score-tag score-tag-mom">MOM {{$r.EngineMomentumScore}}</span>
   </div>
   {{if $r.Reasons}}
   <ul class="reasons">
@@ -129,11 +136,12 @@
 {{end}}
 
 <section class="validate-block">
-  <h2>Factors <span class="hint">(sum = total score)</span></h2>
+  <h2>Factors <span class="hint">(sum = total score · axis = which sub-total it feeds)</span></h2>
   <ul class="factors">
     {{range $r.Factors}}
       <li class="{{factorClass .Points}}">
         <span class="factor-pts">{{factorSign .Points}}{{printf "%.1f" .Points}}</span>
+        <span class="factor-axis factor-axis-{{.Axis}}">{{.Axis}}</span>
         <span class="factor-name">{{.Name}}</span>
         <span class="factor-detail">— {{.Detail}}</span>
       </li>

@@ -34,18 +34,24 @@ type Signal struct {
 	Symbol    market.Symbol
 	Timeframe market.Timeframe
 	Side      Side
-	// Score is the MEAN-REVERSION confluence score — count of mean-rev
-	// votes that fired in the winning direction (RSI extreme, BOLL band
-	// touch, Fib pullback, sweep, divergence, MACD cross, range
-	// expansion). This is the legacy Score field; existing callers,
-	// thresholds, and journal rows continue to interpret it as before.
+	// Score is the TOTAL confluence score — count of all winning-side
+	// votes across both axes (MR + MOM). Existing thresholds
+	// (MIN_SCORE=3 in daemon/monitor) and journal rows interpret this
+	// as before; sub-scores below break it down by axis.
+	//
+	// Invariant: Score == MRScore + MomentumScore.
 	Score int
-	// MomentumScore is a PARALLEL axis tracking trend / breakout / pattern
-	// votes (volume anomaly, LH-LL / HH-HL structure, time-of-day,
-	// double-top / double-bottom). It exists because these signals are
-	// orthogonal to mean-reversion: they catch setups the mean-rev axis
-	// is structurally blind to (the 2026-06-23 ETH 1680 cascade case),
-	// and stacking them into a single Score blurred semantics.
+	// MRScore is the mean-reversion confluence sub-score — count of
+	// [MR]-tagged winning-side votes (RSI extreme, BOLL band touch,
+	// Fib pullback, sweep, divergence, MACD cross, range expansion).
+	MRScore int
+	// MomentumScore is the trend / breakout / pattern confluence
+	// sub-score — count of [MOM]-tagged winning-side votes (volume
+	// anomaly, LH-LL / HH-HL structure, time-of-day, double-top /
+	// double-bottom). It exists because these signals are orthogonal
+	// to mean-reversion: they catch setups the MR axis is structurally
+	// blind to (the 2026-06-23 ETH 1680 cascade case), and stacking
+	// them into a single Score blurred semantics.
 	//
 	// Side determination considers both axes — see Evaluate's tail logic.
 	// Each vote's Reason carries a [MR] or [MOM] tag so the trader / AI
@@ -554,9 +560,11 @@ func Evaluate(in Inputs) Signal {
 	switch sig.Side {
 	case Long:
 		sig.Score = bullSum
+		sig.MRScore = bullMR
 		sig.MomentumScore = bullMOM
 	case Short:
 		sig.Score = bearSum
+		sig.MRScore = bearMR
 		sig.MomentumScore = bearMOM
 	}
 

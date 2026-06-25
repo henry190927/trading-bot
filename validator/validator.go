@@ -13,11 +13,30 @@ import (
 	"myFirstGo/trading-bot/signal"
 )
 
+// Axis tags which scoring axis a factor contributes to. Used by the
+// per-axis sub-totals so the dashboard can render MR-only, MOM-only,
+// and combined /10 ratios.
+//
+//	AxisMR   — mean-reversion anchor (sweep, fib, BOLL, VA edges, HVN
+//	           chip levels, "fading" / "extension" labels)
+//	AxisMOM  — trend / momentum context (POC regime drift, "chasing
+//	           trend" labels, structure-aligned regime calls)
+//	AxisBoth — general factor that applies to both axes (engine
+//	           alignment, fees, market chase, recent flash bar)
+const (
+	AxisMR   = "mr"
+	AxisMOM  = "mom"
+	AxisBoth = "both"
+)
+
 // Factor is one line item contributing to the total validation score.
+// Axis tags whether this factor's points feed the MR sub-total, the
+// MOM sub-total, or both. The combined Total uses every factor.
 type Factor struct {
 	Name   string
 	Points float64
 	Detail string
+	Axis   string
 }
 
 // Result is the full scored validation, suitable for both terminal print
@@ -29,8 +48,10 @@ type Result struct {
 	Entry     float64
 	Price     float64
 
-	EngineSide  signal.Side
-	EngineScore int
+	EngineSide          signal.Side
+	EngineScore         int
+	EngineMRScore       int
+	EngineMomentumScore int
 	EnginePlan  signal.Plan
 	Reasons     []string
 	Notes       []string
@@ -76,8 +97,19 @@ type Result struct {
 	RecentFlashBarRange   float64 // for display
 
 	Factors []Factor
-	Total   float64
-	Verdict string
+	// Total is the combined confidence score (0-10), summed across all
+	// factors. This is the canonical "ratio /10" the dashboard has
+	// always displayed.
+	Total float64
+	// TotalMR is the mean-reversion sub-score (0-10), summed across
+	// AxisMR + AxisBoth factors. Use to judge a trade as a mean-rev
+	// setup ("how strong is the MR case?").
+	TotalMR float64
+	// TotalMOM is the momentum sub-score (0-10), summed across
+	// AxisMOM + AxisBoth factors. Use to judge a trade as a trend /
+	// breakout setup ("how strong is the MOM case?").
+	TotalMOM float64
+	Verdict  string
 }
 
 // Validate runs the engine + structural checks against a proposed entry
@@ -125,8 +157,10 @@ func Validate(sym market.Symbol, tf market.Timeframe, side signal.Side, entry, f
 		Side:        side,
 		Entry:       entry,
 		Price:       price,
-		EngineSide:  sig.Side,
-		EngineScore: sig.Score,
+		EngineSide:          sig.Side,
+		EngineScore:         sig.Score,
+		EngineMRScore:       sig.MRScore,
+		EngineMomentumScore: sig.MomentumScore,
 		EnginePlan:  sig.Plan,
 		Reasons:     sig.Reasons,
 		Notes:       sig.Notes,
@@ -243,15 +277,28 @@ func Validate(sym market.Symbol, tf market.Timeframe, side signal.Side, entry, f
 	r.Factors = scoreFactors(&r)
 	for _, f := range r.Factors {
 		r.Total += f.Points
+		if f.Axis == AxisMR || f.Axis == AxisBoth {
+			r.TotalMR += f.Points
+		}
+		if f.Axis == AxisMOM || f.Axis == AxisBoth {
+			r.TotalMOM += f.Points
+		}
 	}
-	if r.Total < 0 {
-		r.Total = 0
-	}
-	if r.Total > 10 {
-		r.Total = 10
-	}
+	r.Total = clamp10(r.Total)
+	r.TotalMR = clamp10(r.TotalMR)
+	r.TotalMOM = clamp10(r.TotalMOM)
 	r.Verdict = Verdict(r.Total)
 	return r
+}
+
+func clamp10(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 10 {
+		return 10
+	}
+	return v
 }
 
 // Verdict converts a total score into the human verdict string.
@@ -274,15 +321,15 @@ func scoreFactors(r *Result) []Factor {
 
 	switch {
 	case r.EngineSide == r.Side:
-		fs = append(fs, Factor{"direction aligned with engine", +2.0, fmt.Sprintf("engine: %s score %d", r.EngineSide, r.EngineScore)})
+		fs = append(fs, Factor{"direction aligned with engine", +2.0, fmt.Sprintf("engine: %s score %d", r.EngineSide, r.EngineScore), AxisBoth})
 	case r.EngineSide == signal.Flat:
-		fs = append(fs, Factor{"engine flat — neutral on direction", 0, "no engine confirmation"})
+		fs = append(fs, Factor{"engine flat — neutral on direction", 0, "no engine confirmation", AxisBoth})
 	default:
-		fs = append(fs, Factor{"direction opposes engine", -2.0, fmt.Sprintf("engine: %s, you: %s", r.EngineSide, r.Side)})
+		fs = append(fs, Factor{"direction opposes engine", -2.0, fmt.Sprintf("engine: %s, you: %s", r.EngineSide, r.Side), AxisBoth})
 	}
 
 	if r.EngineScore >= 3 && r.EngineSide == r.Side {
-		fs = append(fs, Factor{"engine has tradeable score", +1.0, fmt.Sprintf("score %d ≥ 3", r.EngineScore)})
+		fs = append(fs, Factor{"engine has tradeable score", +1.0, fmt.Sprintf("score %d ≥ 3", r.EngineScore), AxisBoth})
 	}
 
 	if r.NearestSweep != nil {
@@ -291,9 +338,9 @@ func scoreFactors(r *Result) []Factor {
 			dirOK := (r.Side == signal.Long && r.NearestSweep.Side == analyzer.SweepLow) ||
 				(r.Side == signal.Short && r.NearestSweep.Side == analyzer.SweepHigh)
 			if dirOK {
-				fs = append(fs, Factor{"entry at recent sweep level", +2.0, fmt.Sprintf("sweep %s @ %.4f", sweepStr(r.NearestSweep.Side), r.NearestSweep.Level)})
+				fs = append(fs, Factor{"entry at recent sweep level", +2.0, fmt.Sprintf("sweep %s @ %.4f", sweepStr(r.NearestSweep.Side), r.NearestSweep.Level), AxisMR})
 			} else {
-				fs = append(fs, Factor{"entry at sweep but wrong side", -0.5, fmt.Sprintf("sweep %s @ %.4f doesn't support %s", sweepStr(r.NearestSweep.Side), r.NearestSweep.Level, r.Side)})
+				fs = append(fs, Factor{"entry at sweep but wrong side", -0.5, fmt.Sprintf("sweep %s @ %.4f doesn't support %s", sweepStr(r.NearestSweep.Side), r.NearestSweep.Level, r.Side), AxisMR})
 			}
 		}
 	}
@@ -301,16 +348,16 @@ func scoreFactors(r *Result) []Factor {
 	if r.NearestFib != nil && math.Abs(r.NearestFib.Ratio-0.618) < 1e-9 {
 		d := math.Abs(r.NearestFib.Price-r.Entry) / r.Entry
 		if d <= 0.003 {
-			fs = append(fs, Factor{"entry at fib 0.618", +1.5, fmt.Sprintf("fib 0.618 @ %.4f", r.NearestFib.Price)})
+			fs = append(fs, Factor{"entry at fib 0.618", +1.5, fmt.Sprintf("fib 0.618 @ %.4f", r.NearestFib.Price), AxisMR})
 		}
 	}
 
 	if r.BollLower != 0 {
 		if r.Side == signal.Long && math.Abs(r.BollLower-r.Entry)/r.Entry <= 0.005 {
-			fs = append(fs, Factor{"entry at lower Bollinger", +0.5, fmt.Sprintf("BOLL lower @ %.4f", r.BollLower)})
+			fs = append(fs, Factor{"entry at lower Bollinger", +0.5, fmt.Sprintf("BOLL lower @ %.4f", r.BollLower), AxisMR})
 		}
 		if r.Side == signal.Short && math.Abs(r.BollUpper-r.Entry)/r.Entry <= 0.005 {
-			fs = append(fs, Factor{"entry at upper Bollinger", +0.5, fmt.Sprintf("BOLL upper @ %.4f", r.BollUpper)})
+			fs = append(fs, Factor{"entry at upper Bollinger", +0.5, fmt.Sprintf("BOLL upper @ %.4f", r.BollUpper), AxisMR})
 		}
 	}
 
@@ -318,14 +365,14 @@ func scoreFactors(r *Result) []Factor {
 		d := r.NearestHVNDist / r.Entry
 		if d <= 0.003 {
 			if r.IsHVNPOC {
-				fs = append(fs, Factor{"entry at POC", -1.0, fmt.Sprintf("POC @ %.4f — chop/equilibrium, weak mean-rev edge", r.NearestHVN)})
+				fs = append(fs, Factor{"entry at POC", -1.0, fmt.Sprintf("POC @ %.4f — chop/equilibrium, weak mean-rev edge", r.NearestHVN), AxisBoth})
 			} else {
 				if r.Side == signal.Long && r.Entry <= r.NearestHVN {
-					fs = append(fs, Factor{"entry below non-POC HVN (chip support)", +1.5, fmt.Sprintf("HVN @ %.4f acts as support", r.NearestHVN)})
+					fs = append(fs, Factor{"entry below non-POC HVN (chip support)", +1.5, fmt.Sprintf("HVN @ %.4f acts as support", r.NearestHVN), AxisMR})
 				} else if r.Side == signal.Short && r.Entry >= r.NearestHVN {
-					fs = append(fs, Factor{"entry above non-POC HVN (chip resistance)", +1.5, fmt.Sprintf("HVN @ %.4f acts as resistance", r.NearestHVN)})
+					fs = append(fs, Factor{"entry above non-POC HVN (chip resistance)", +1.5, fmt.Sprintf("HVN @ %.4f acts as resistance", r.NearestHVN), AxisMR})
 				} else {
-					fs = append(fs, Factor{"entry near HVN but wrong side for direction", -1.0, fmt.Sprintf("HVN @ %.4f fights the %s", r.NearestHVN, r.Side)})
+					fs = append(fs, Factor{"entry near HVN but wrong side for direction", -1.0, fmt.Sprintf("HVN @ %.4f fights the %s", r.NearestHVN, r.Side), AxisMR})
 				}
 			}
 		}
@@ -345,19 +392,19 @@ func scoreFactors(r *Result) []Factor {
 			fs = append(fs, Factor{"POC reachable as target",
 				+1.0,
 				fmt.Sprintf("POC %.4f is %.2f%% %s entry — natural TP for the %s",
-					r.VP.POC, absDist, sideOf(r.VP.POC, r.Entry), r.Side)})
+					r.VP.POC, absDist, sideOf(r.VP.POC, r.Entry), r.Side), AxisBoth})
 		case dirToPOC > 0.05:
 			fs = append(fs, Factor{"POC far in trade direction",
 				-0.5,
 				fmt.Sprintf("POC %.4f is %.1f%% away — long road to the target",
-					r.VP.POC, absDist)})
+					r.VP.POC, absDist), AxisBoth})
 		case dirToPOC < 0 && dirToPOC > -0.02:
 			// POC on wrong side of entry, but close — neutral
 		case dirToPOC <= -0.02:
 			fs = append(fs, Factor{"fading away from chip zone",
 				-0.5,
 				fmt.Sprintf("POC %.4f is %.2f%% %s entry — %s is pushing away from gravity",
-					r.VP.POC, absDist, sideOf(r.VP.POC, r.Entry), r.Side)})
+					r.VP.POC, absDist, sideOf(r.VP.POC, r.Entry), r.Side), AxisMR})
 		}
 	}
 
@@ -369,45 +416,45 @@ func scoreFactors(r *Result) []Factor {
 		case r.AtVAL && r.Side == signal.Long:
 			fs = append(fs, Factor{"entry at VAL — mean-rev long",
 				+0.5,
-				fmt.Sprintf("VAL %.4f acts as value-area floor; POC %.4f is the natural target", r.VAL, r.VP.POC)})
+				fmt.Sprintf("VAL %.4f acts as value-area floor; POC %.4f is the natural target", r.VAL, r.VP.POC), AxisMR})
 		case r.AtVAH && r.Side == signal.Short:
 			fs = append(fs, Factor{"entry at VAH — mean-rev short",
 				+0.5,
-				fmt.Sprintf("VAH %.4f acts as value-area ceiling; POC %.4f is the natural target", r.VAH, r.VP.POC)})
+				fmt.Sprintf("VAH %.4f acts as value-area ceiling; POC %.4f is the natural target", r.VAH, r.VP.POC), AxisMR})
 		case r.AtVAL && r.Side == signal.Short:
 			fs = append(fs, Factor{"entry at VAL fighting value-area floor",
 				-0.5,
-				fmt.Sprintf("VAL %.4f is buyers' value edge — shorting into it is low-edge", r.VAL)})
+				fmt.Sprintf("VAL %.4f is buyers' value edge — shorting into it is low-edge", r.VAL), AxisMR})
 		case r.AtVAH && r.Side == signal.Long:
 			fs = append(fs, Factor{"entry at VAH fighting value-area ceiling",
 				-0.5,
-				fmt.Sprintf("VAH %.4f is sellers' value edge — longing into it is low-edge", r.VAH)})
+				fmt.Sprintf("VAH %.4f is sellers' value edge — longing into it is low-edge", r.VAH), AxisMR})
 		case r.OutsideVAUp:
 			// Above value: trend mode (acceptance) candidate or fade-the-extension.
 			if r.Side == signal.Short {
 				fs = append(fs, Factor{"entry above VAH — extension short",
 					+0.3,
-					fmt.Sprintf("entry %.4f > VAH %.4f — price has rejected value; reversion candidate", r.Entry, r.VAH)})
+					fmt.Sprintf("entry %.4f > VAH %.4f — price has rejected value; reversion candidate", r.Entry, r.VAH), AxisMR})
 			} else {
 				fs = append(fs, Factor{"entry above VAH — chasing trend",
 					-0.3,
-					fmt.Sprintf("entry %.4f > VAH %.4f — late long into extension", r.Entry, r.VAH)})
+					fmt.Sprintf("entry %.4f > VAH %.4f — late long into extension", r.Entry, r.VAH), AxisMOM})
 			}
 		case r.OutsideVADn:
 			if r.Side == signal.Long {
 				fs = append(fs, Factor{"entry below VAL — extension long",
 					+0.3,
-					fmt.Sprintf("entry %.4f < VAL %.4f — price has rejected value; reversion candidate", r.Entry, r.VAL)})
+					fmt.Sprintf("entry %.4f < VAL %.4f — price has rejected value; reversion candidate", r.Entry, r.VAL), AxisMR})
 			} else {
 				fs = append(fs, Factor{"entry below VAL — chasing trend",
 					-0.3,
-					fmt.Sprintf("entry %.4f < VAL %.4f — late short into extension", r.Entry, r.VAL)})
+					fmt.Sprintf("entry %.4f < VAL %.4f — late short into extension", r.Entry, r.VAL), AxisMOM})
 			}
 		case r.InsideVA:
 			// Inside VA without being at an edge = chop / equilibrium.
 			fs = append(fs, Factor{"entry inside VA — chop zone",
 				-0.3,
-				fmt.Sprintf("entry %.4f within [VAL %.4f, VAH %.4f] — limited edge, mean-rev to POC", r.Entry, r.VAL, r.VAH)})
+				fmt.Sprintf("entry %.4f within [VAL %.4f, VAH %.4f] — limited edge, mean-rev to POC", r.Entry, r.VAL, r.VAH), AxisBoth})
 		}
 	}
 
@@ -423,38 +470,38 @@ func scoreFactors(r *Result) []Factor {
 			case r.Side == signal.Long && !priceAbovePOC:
 				fs = append(fs, Factor{"pullback long in rising POC regime",
 					+0.7,
-					fmt.Sprintf("POC drift %+.2f%% (rising), entry below POC %.4f — classic mean-rev long", driftPct, r.POCMig.POCShort)})
+					fmt.Sprintf("POC drift %+.2f%% (rising), entry below POC %.4f — classic mean-rev long", driftPct, r.POCMig.POCShort), AxisMOM})
 			case r.Side == signal.Long && priceAbovePOC:
 				fs = append(fs, Factor{"trend-follow long with rising POC",
 					+0.5,
-					fmt.Sprintf("POC drift %+.2f%%, entry above POC %.4f — trend-aligned", driftPct, r.POCMig.POCShort)})
+					fmt.Sprintf("POC drift %+.2f%%, entry above POC %.4f — trend-aligned", driftPct, r.POCMig.POCShort), AxisMOM})
 			case r.Side == signal.Short && priceAbovePOC:
 				fs = append(fs, Factor{"short fighting rising POC regime",
 					-0.5,
-					fmt.Sprintf("POC drift %+.2f%% (rising), entry above POC — counter-trend short", driftPct)})
+					fmt.Sprintf("POC drift %+.2f%% (rising), entry above POC — counter-trend short", driftPct), AxisMOM})
 			case r.Side == signal.Short && !priceAbovePOC:
 				fs = append(fs, Factor{"short below POC in rising regime",
 					-0.7,
-					fmt.Sprintf("POC drift %+.2f%% (rising), entry below POC %.4f — catching a falling knife in an uptrend", driftPct, r.POCMig.POCShort)})
+					fmt.Sprintf("POC drift %+.2f%% (rising), entry below POC %.4f — catching a falling knife in an uptrend", driftPct, r.POCMig.POCShort), AxisMOM})
 			}
 		case indicator.POCFalling:
 			switch {
 			case r.Side == signal.Short && priceAbovePOC:
 				fs = append(fs, Factor{"bounce short in falling POC regime",
 					+0.7,
-					fmt.Sprintf("POC drift %+.2f%% (falling), entry above POC %.4f — classic mean-rev short", driftPct, r.POCMig.POCShort)})
+					fmt.Sprintf("POC drift %+.2f%% (falling), entry above POC %.4f — classic mean-rev short", driftPct, r.POCMig.POCShort), AxisMOM})
 			case r.Side == signal.Short && !priceAbovePOC:
 				fs = append(fs, Factor{"trend-follow short with falling POC",
 					+0.5,
-					fmt.Sprintf("POC drift %+.2f%%, entry below POC %.4f — trend-aligned", driftPct, r.POCMig.POCShort)})
+					fmt.Sprintf("POC drift %+.2f%%, entry below POC %.4f — trend-aligned", driftPct, r.POCMig.POCShort), AxisMOM})
 			case r.Side == signal.Long && !priceAbovePOC:
 				fs = append(fs, Factor{"long fighting falling POC regime",
 					-0.5,
-					fmt.Sprintf("POC drift %+.2f%% (falling), entry below POC — counter-trend long", driftPct)})
+					fmt.Sprintf("POC drift %+.2f%% (falling), entry below POC — counter-trend long", driftPct), AxisMOM})
 			case r.Side == signal.Long && priceAbovePOC:
 				fs = append(fs, Factor{"long above POC in falling regime",
 					-0.7,
-					fmt.Sprintf("POC drift %+.2f%% (falling), entry above POC %.4f — chasing a bounce in a downtrend", driftPct, r.POCMig.POCShort)})
+					fmt.Sprintf("POC drift %+.2f%% (falling), entry above POC %.4f — chasing a bounce in a downtrend", driftPct, r.POCMig.POCShort), AxisMOM})
 			}
 		}
 	}
@@ -474,18 +521,21 @@ func scoreFactors(r *Result) []Factor {
 			"chasing market significantly",
 			-2.5,
 			fmt.Sprintf("entry %+.2f%% vs market — paying up for a move that already happened", chasePct),
+			AxisBoth,
 		})
 	case chase > 0.005:
 		fs = append(fs, Factor{
 			"chasing market",
 			-1.5,
 			fmt.Sprintf("entry %+.2f%% vs market — late on the move", chasePct),
+			AxisBoth,
 		})
 	case chase > 0.002:
 		fs = append(fs, Factor{
 			"mild market chase",
 			-0.5,
 			fmt.Sprintf("entry %+.2f%% vs market", chasePct),
+			AxisBoth,
 		})
 	}
 
@@ -497,6 +547,7 @@ func scoreFactors(r *Result) []Factor {
 			"fighting recent bearish range expansion",
 			-1.5,
 			fmt.Sprintf("range-expansion bearish bar %d bar(s) ago (range %.4f) — falling knife risk", r.RecentFlashBarAge, r.RecentFlashBarRange),
+			AxisBoth,
 		})
 	}
 	if r.RecentFlashBarBullish && r.Side == signal.Short {
@@ -504,18 +555,19 @@ func scoreFactors(r *Result) []Factor {
 			"fighting recent bullish range expansion",
 			-1.5,
 			fmt.Sprintf("range-expansion bullish bar %d bar(s) ago (range %.4f) — short-squeeze risk", r.RecentFlashBarAge, r.RecentFlashBarRange),
+			AxisBoth,
 		})
 	}
 
 	switch {
 	case r.FeeR < 0.15:
-		fs = append(fs, Factor{"fee math healthy", +1.0, fmt.Sprintf("fee_R = %.2fR", r.FeeR)})
+		fs = append(fs, Factor{"fee math healthy", +1.0, fmt.Sprintf("fee_R = %.2fR", r.FeeR), AxisBoth})
 	case r.FeeR < 0.30:
-		fs = append(fs, Factor{"fee math acceptable", +0.5, fmt.Sprintf("fee_R = %.2fR", r.FeeR)})
+		fs = append(fs, Factor{"fee math acceptable", +0.5, fmt.Sprintf("fee_R = %.2fR", r.FeeR), AxisBoth})
 	case r.FeeR < 0.50:
-		fs = append(fs, Factor{"fee math thin", 0, fmt.Sprintf("fee_R = %.2fR — needs sharp setup", r.FeeR)})
+		fs = append(fs, Factor{"fee math thin", 0, fmt.Sprintf("fee_R = %.2fR — needs sharp setup", r.FeeR), AxisBoth})
 	default:
-		fs = append(fs, Factor{"fee math fatal", -1.5, fmt.Sprintf("fee_R = %.2fR — fees will eat the edge", r.FeeR)})
+		fs = append(fs, Factor{"fee math fatal", -1.5, fmt.Sprintf("fee_R = %.2fR — fees will eat the edge", r.FeeR), AxisBoth})
 	}
 
 	return fs
