@@ -314,15 +314,34 @@
         <dd>Same but bullish; risky for shorts.</dd>
       </dl>
 
-      <h3>Two scores explained</h3>
+      <h3>Score pills (tri-axis)</h3>
       <dl class="legend-dl">
-        <dt>score N <span class="lg-meta">(meta row, integer 0–8)</span></dt>
-        <dd>Count of independent confluence votes from the engine: RSI extreme, MACD cross, BOLL touch, fib 0.618, sweep, RSI/CVD divergence, range expansion. <b>3</b> is the minimum tradeable threshold — a "did anything agree at all?" gate.</dd>
+        <dt><span class="score score-mr">MR N</span> <span class="lg-meta">(meta row, integer 0–6)</span></dt>
+        <dd><b>Mean-reversion votes</b>: RSI extreme, BOLL band touch, fib 0.618, sweep, RSI/CVD divergence, MACD cross, range expansion. Counter-trend / fade-the-extreme setups.</dd>
+        <dt><span class="score score-mom">MOM N</span> <span class="lg-meta">(meta row, integer 0–4)</span></dt>
+        <dd><b>Momentum / trend votes</b>: volume anomaly (BTC), LH-LL / HH-HL structure (ETH), NY-session bullish/bearish body (XAU), double-top / double-bottom retest (XAU). Per-symbol gating after backtest A/B — not every symbol enables every MOM vote.</dd>
+        <dt>total N <span class="lg-meta">(meta row, integer; total = MR + MOM)</span></dt>
+        <dd>Combined vote count. <b>3</b> is the engine's <code>MIN_SCORE</code> tradeable threshold (daemon + monitor filter on this). What the journal stores in the legacy <code>score</code> column.</dd>
         <dt>X.X/10 <span class="lg-meta">(diagnose row, float 0–10)</span></dt>
         <dd>Validator's <i>structural fit</i> for a specific entry at the current price. Weighted sum of ~20 factors: engine alignment (+2), sweep / fib / HVN proximity (+1.5–2), VA edge (+0.5), POC drift alignment (+0.5–0.7), minus penalties for entry chase, falling knife, counter-regime, inside-VA chop, etc.</dd>
-        <dt>Why they differ</dt>
-        <dd>A confluent setup (high <b>score</b>) can still be structurally weak (low <b>/10</b>) if it fights regime or is far from value. The <b>/10</b> is the better single number to act on — it integrates more context.</dd>
+        <dt><span class="diag-score-axis diag-axis-mr">MR x.x</span> <span class="diag-score-axis diag-axis-mom">MOM x.x</span> <span class="lg-meta">(diagnose row sub-totals)</span></dt>
+        <dd><b>MR sub-total</b> = MR-tagged + shared factors capped /10. <b>MOM sub-total</b> = MOM-tagged + shared factors capped /10. Shared factors (engine alignment, fees, market chase) count toward both — these sub-totals are NOT additive to the combined /10.</dd>
       </dl>
+
+      <h3>Sizing by axis (discretionary guide)</h3>
+      <p class="lg-meta">Use the tri-axis split to read what KIND of setup is firing, then size accordingly. Engine doesn't enforce these — they're a habit-formation aid.</p>
+      <table class="legend-table">
+        <thead>
+          <tr><th>Setup type</th><th>Reads as</th><th>Suggested size</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><b>MR high + MOM high</b></td><td>e.g. RSI oversold + LH-LL flipping to HH-HL</td><td>full size</td></tr>
+          <tr><td><b>MR high + MOM 0</b></td><td>pure mean-rev fade — backtest baseline scenario</td><td>default size</td></tr>
+          <tr><td><b>MR 0 + MOM high</b></td><td>XAU NY-session momentum, ETH structure flip</td><td>half size, tighter SL</td></tr>
+          <tr><td><b>⚠ Axis disagreement warning</b></td><td>MR says LONG, MOM says SHORT (or vice versa). Warning surfaces in Signal.Warnings.</td><td>skip, or fast scalp only</td></tr>
+          <tr><td><b>Both axes < 2</b></td><td>weak confluence, MIN_SCORE may not fire</td><td>skip</td></tr>
+        </tbody>
+      </table>
 
       <h3>Verdict colors</h3>
       <table class="legend-table">
