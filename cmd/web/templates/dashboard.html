@@ -102,9 +102,9 @@
         <div class="ot-diagnose {{verdictClass .Diagnose.Total}}">
           live diagnose:
           <span class="{{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
-          <span class="diag-score-axis diag-axis-mr" title="mean-reversion axis">MR {{printf "%.1f" .Diagnose.TotalMR}}</span>
-          <span class="diag-score-axis diag-axis-mom" title="momentum axis">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</span>
-          <strong>{{printf "%.1f" .Diagnose.Total}}/10</strong>
+          <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.1f" .Diagnose.TotalMR}}/10" title="mean-reversion axis — tap to copy">MR {{printf "%.1f" .Diagnose.TotalMR}}</button>
+          <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.1f" .Diagnose.TotalMOM}}/10" title="momentum axis — tap to copy">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</button>
+          <button type="button" class="copy-btn ot-ratio" data-copy="ratio {{printf "%.1f" .Diagnose.Total}}/10" title="combined total — tap to copy"><strong>{{printf "%.1f" .Diagnose.Total}}/10</strong></button>
           {{verdictShort .Diagnose.Verdict}}
           {{if .Diagnose.AtVAH}}<span class="ot-flag va">at VAH</span>
           {{else if .Diagnose.AtVAL}}<span class="ot-flag va">at VAL</span>
@@ -156,9 +156,9 @@
         {{end}}
       </span>
       <span class="{{sideClass .Signal.Side}} side-badge">{{sideText .Signal.Side}}</span>
-      <span class="score score-mr" title="mean-reversion votes (RSI / BOLL / Fib / sweep / divergence / MACD)">MR {{.Signal.MRScore}}</span>
-      <span class="score score-mom" title="momentum votes (volume anomaly / structure / time-of-day / double-pattern)">MOM {{.Signal.MomentumScore}}</span>
-      <span class="score {{scoreClass .Signal.Score $.MinTradeable}}" title="total = MR + MOM">total {{.Signal.Score}}</span>
+      <button type="button" class="copy-btn score score-mr" data-copy="MR {{.Signal.MRScore}}" title="mean-reversion votes (RSI / BOLL / Fib / sweep / divergence / MACD) — tap to copy">MR {{.Signal.MRScore}}</button>
+      <button type="button" class="copy-btn score score-mom" data-copy="MOM {{.Signal.MomentumScore}}" title="momentum votes (volume anomaly / structure / time-of-day / double-pattern) — tap to copy">MOM {{.Signal.MomentumScore}}</button>
+      <button type="button" class="copy-btn score {{scoreClass .Signal.Score $.MinTradeable}}" data-copy="total {{.Signal.Score}}" title="total = MR + MOM — tap to copy">total {{.Signal.Score}}</button>
     </div>
 
     {{if .Err}}
@@ -178,10 +178,12 @@
         <span>POC <button class="copy-btn small" data-copy="{{fmtPrice .Signal.VP.POC}}">{{fmtPrice .Signal.VP.POC}}</button></span>
       {{end}}
       {{if .Signal.POCMig.POCShort}}
-        <span class="poc-drift trend-{{.Signal.POCMig.Trend}}{{if .Signal.POCMig.Stacked}} stacked{{end}}"
-              title="POC migration — where the volume-weighted &#34;fair price&#34; has moved.&#10;POC50  {{fmtPrice .Signal.POCMig.POCShort}}&#10;POC100 {{fmtPrice .Signal.POCMig.POCMed}}&#10;POC200 {{fmtPrice .Signal.POCMig.POCLong}}&#10;drift = (POC50 − POC200) / POC200{{if .Signal.POCMig.Stacked}}&#10;Stacked: POC50 &gt; POC100 &gt; POC200 — strong regime confirmation{{end}}">
+        <button type="button"
+                class="copy-btn small poc-drift trend-{{.Signal.POCMig.Trend}}{{if .Signal.POCMig.Stacked}} stacked{{end}}"
+                data-copy="drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}"
+                title="POC migration — where the volume-weighted &#34;fair price&#34; has moved.&#10;POC50  {{fmtPrice .Signal.POCMig.POCShort}}&#10;POC100 {{fmtPrice .Signal.POCMig.POCMed}}&#10;POC200 {{fmtPrice .Signal.POCMig.POCLong}}&#10;drift = (POC50 − POC200) / POC200{{if .Signal.POCMig.Stacked}}&#10;Stacked: POC50 &gt; POC100 &gt; POC200 — strong regime confirmation{{end}}&#10;Tap to copy">
           drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}
-        </span>
+        </button>
       {{end}}
     </div>
 
@@ -207,9 +209,9 @@
     <div class="diagnose-row {{verdictClass .Diagnose.Total}}">
       <span class="diag-label">trade now?</span>
       <span class="diag-side {{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
-      <span class="diag-score-axis diag-axis-mr" title="mean-reversion axis (mr + shared factors)">MR {{printf "%.1f" .Diagnose.TotalMR}}</span>
-      <span class="diag-score-axis diag-axis-mom" title="momentum axis (mom + shared factors)">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</span>
-      <span class="diag-score" title="combined total — all factors">{{printf "%.1f" .Diagnose.Total}}/10</span>
+      <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.1f" .Diagnose.TotalMR}}/10" title="mean-reversion axis (mr + shared factors) — tap to copy">MR {{printf "%.1f" .Diagnose.TotalMR}}</button>
+      <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.1f" .Diagnose.TotalMOM}}/10" title="momentum axis (mom + shared factors) — tap to copy">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</button>
+      <button type="button" class="copy-btn diag-score" data-copy="ratio {{printf "%.1f" .Diagnose.Total}}/10" title="combined total — all factors — tap to copy">{{printf "%.1f" .Diagnose.Total}}/10</button>
       <span class="diag-verdict">{{verdictShort .Diagnose.Verdict}}</span>
       <a class="diag-link" href="{{diagnoseHref . $.TF}}" title="full validator breakdown">↗</a>
       {{if .Diagnose.AtVAH}}<span class="diag-flag va">at VAH</span>

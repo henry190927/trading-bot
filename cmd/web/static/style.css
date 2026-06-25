@@ -204,6 +204,47 @@ main {
 .score-tag.score-tag-mr  { color: #b388ff;     background: #1a0f2e; }
 .score-tag.score-tag-mom { color: var(--blue); background: #0f1a2e; }
 
+/* Copy-button overrides for score / diagnose pills — keep their colored
+   backgrounds instead of the default surface-2, while inheriting the
+   click-to-copy behavior from .copy-btn. */
+button.copy-btn.score {
+    min-height: 0;
+    min-width: 0;
+    font-size: 0.85rem;
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+button.copy-btn.score.score-mr   { background: #1a0f2e; color: #b388ff;     border-color: #b388ff; }
+button.copy-btn.score.score-mom  { background: #0f1a2e; color: var(--blue); border-color: var(--blue); }
+button.copy-btn.score.score-good       { background: var(--green-bg); color: var(--green); border-color: var(--green); font-weight: 600; }
+button.copy-btn.score.score-borderline { color: var(--yellow); }
+button.copy-btn.score.score-weak       { color: var(--text-dim); }
+button.copy-btn.score:active           { background: var(--blue); color: white; }
+button.copy-btn.diag-score-axis,
+button.copy-btn.diag-score-axis.diag-axis-mr,
+button.copy-btn.diag-score-axis.diag-axis-mom {
+    min-height: 0;
+    min-width: 0;
+    padding: 1px 6px;
+    font-size: 0.85rem;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+}
+button.copy-btn.diag-axis-mr  { background: #1a0f2e; color: #b388ff;     border-color: #b388ff; }
+button.copy-btn.diag-axis-mom { background: #0f1a2e; color: var(--blue); border-color: var(--blue); }
+button.copy-btn.diag-score, button.copy-btn.ot-ratio {
+    min-height: 0;
+    min-width: 0;
+    padding: 1px 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+button.copy-btn.poc-drift {
+    min-height: 0;
+    min-width: 0;
+    padding: 1px 6px;
+}
+
 .meta {
     display: flex;
     align-items: center;
