@@ -39,6 +39,12 @@ type server struct {
 	// edited or closed.
 	aiCacheMu sync.Mutex
 	aiCache   map[int]aiCacheEntry
+
+	// aiSymbolCache memoizes /ai/analyze/symbol responses keyed by
+	// "SHORT|TF|signalhash" — same signal hash skips re-billing on
+	// dashboard refreshes that didn't change the underlying setup.
+	aiSymbolCacheMu sync.Mutex
+	aiSymbolCache   map[string]aiCacheEntry
 }
 
 type aiCacheEntry struct {
@@ -84,6 +90,13 @@ type symbolView struct {
 	// the user can tell a swing-low from a falling knife at a glance
 	// without typing into /validate manually.
 	Diagnose *validator.Result
+
+	// Summary is the pure-function rule-based one-line description of
+	// this card's current state, built via signal.BuildSummary from
+	// Signal + Diagnose. Always populated (degrades gracefully when
+	// Diagnose is nil). The per-symbol AI Analyze button calls a
+	// separate endpoint for richer LLM-backed analysis.
+	Summary string
 }
 
 func shortSymbol(s market.Symbol) string {
@@ -645,6 +658,33 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 		} else {
 			v.Diagnose = &long
 		}
+	}
+	v.Summary = signal.BuildSummary(v.Signal, diagnoseView(v.Diagnose))
+	return v
+}
+
+// diagnoseView projects a validator.Result into signal.DiagnoseView so the
+// signal package can compose a card summary without importing validator
+// (which would be a cycle: validator already imports signal).
+func diagnoseView(d *validator.Result) signal.DiagnoseView {
+	if d == nil {
+		return signal.DiagnoseView{}
+	}
+	return signal.DiagnoseView{
+		Has:          true,
+		Side:         d.Side,
+		Total:        d.Total,
+		TotalMR:      d.TotalMR,
+		TotalMOM:     d.TotalMOM,
+		VerdictShort: verdictShortHelper(d.Verdict),
+	}
+}
+
+// verdictShortHelper trims a Verdict string like "STRONG TAKE — full size"
+// down to just "STRONG TAKE". Mirrors the verdictShort template helper.
+func verdictShortHelper(v string) string {
+	if i := strings.Index(v, " — "); i > 0 {
+		return v[:i]
 	}
 	return v
 }
@@ -2819,4 +2859,176 @@ func defaultStr(v, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+// handleAIAnalyzeSymbol is the dashboard-level AI advisor endpoint. POST
+// /ai/analyze/symbol/:short/:tf — packages the current signal + diagnose
+// + recent candles + macro + same-symbol journal history into a Quant
+// message, calls Anthropic (or returns the DRY_RUN stub).
+//
+// Cached by (short|tf|signal-hash) so repeat clicks on an unchanged
+// setup don't re-bill. Cache invalidates implicitly when score / side /
+// MR / MOM / verdict change between requests.
+func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
+	short := strings.ToUpper(strings.TrimSpace(c.Param("short")))
+	tfStr := strings.TrimSpace(c.Param("tf"))
+	if short == "" || tfStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "short and tf are required"})
+		return
+	}
+	sym, err := resolveWebSymbol(short)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	tf := market.Timeframe(tfStr)
+
+	if s.ai == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ai client not initialized"})
+		return
+	}
+	apiKey := ai.APIKeyFromEnv()
+	if apiKey == "" && !s.ai.DryRun {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ANTHROPIC_API_KEY not configured on server. Set it in .env or enable ANTHROPIC_DRY_RUN=true for stub responses."})
+		return
+	}
+
+	// Re-scan the symbol so we get the same Signal + Diagnose the
+	// dashboard's just rendered. Then build the cache key around the
+	// engine-output hash so repeated clicks against an unchanged
+	// setup return cached LLM output instantly.
+	view := s.scanOne(c.Request.Context(), sym, tf)
+	if view.Err != "" {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "scan failed: " + view.Err})
+		return
+	}
+	cacheKey := fmt.Sprintf("%s|%s|%d|%d|%d|%s", short, tfStr,
+		view.Signal.Score, view.Signal.MRScore, view.Signal.MomentumScore,
+		signalCacheTag(view))
+	s.aiSymbolCacheMu.Lock()
+	if cached, ok := s.aiSymbolCache[cacheKey]; ok {
+		s.aiSymbolCacheMu.Unlock()
+		c.JSON(http.StatusOK, gin.H{
+			"text":          cached.Text,
+			"input_tokens":  cached.InputTokens,
+			"output_tokens": cached.OutputTokens,
+			"cost_usd":      cached.CostUSD,
+			"generated_at":  cached.GeneratedAt.Format(time.RFC3339),
+			"cached":        true,
+		})
+		return
+	}
+	s.aiSymbolCacheMu.Unlock()
+
+	in := ai.SymbolAnalysisInputs{
+		Symbol:     sym,
+		Short:      short,
+		Timeframe:  tf,
+		Signal:     view.Signal,
+		Summary:    view.Summary,
+		MarkPrice:  view.MarkPrice,
+		RecentBars: view.Candles,
+	}
+	if view.Diagnose != nil {
+		d := view.Diagnose
+		sd := &ai.SymbolDiagnose{
+			Side:         d.Side,
+			Entry:        d.Entry,
+			Total:        d.Total,
+			TotalMR:      d.TotalMR,
+			TotalMOM:     d.TotalMOM,
+			Verdict:      d.Verdict,
+			AtVAH:        d.AtVAH,
+			AtVAL:        d.AtVAL,
+			InsideVA:     d.InsideVA,
+			OutsideVAUp:  d.OutsideVAUp,
+			OutsideVADn:  d.OutsideVADn,
+			POCTrend:    d.POCMig.Trend,
+			POCDriftPct: d.POCMig.DriftPct,
+			POCStacked:  d.POCMig.Stacked,
+			FallingKnife: d.RecentFlashBarBearish,
+			BlowOff:     d.RecentFlashBarBullish,
+		}
+		for _, f := range d.Factors {
+			sd.Factors = append(sd.Factors, ai.SymbolDiagnoseFactor{
+				Name: f.Name, Points: f.Points, Detail: f.Detail, Axis: f.Axis,
+			})
+		}
+		in.Diagnose = sd
+	}
+
+	// Same-symbol journal context (last 5 closed).
+	allTrades, _ := journal.ReadAll("")
+	for i := len(allTrades) - 1; i >= 0 && len(in.RecentSame) < 5; i-- {
+		r := allTrades[i]
+		if r.Symbol != short {
+			continue
+		}
+		if r.ClosedAt.IsZero() {
+			continue
+		}
+		in.RecentSame = append(in.RecentSame, r)
+	}
+
+	// Macro events within ±24h of NOW.
+	now := time.Now()
+	for _, e := range macro.All() {
+		delta := e.DatetimeUTC.Sub(now)
+		if delta < -24*time.Hour || delta > 24*time.Hour {
+			continue
+		}
+		in.MacroNear = append(in.MacroNear, e)
+	}
+
+	userMsg := ai.BuildSymbolAnalysisMessage(in)
+	resp, err := s.ai.Send(c.Request.Context(), ai.SendOptions{
+		APIKey:      apiKey,
+		System:      ai.SystemPromptQuantAdvisor,
+		Messages:    []ai.Message{{Role: "user", Content: userMsg}},
+		Temperature: 0.3,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "anthropic call failed: " + err.Error()})
+		return
+	}
+
+	cost := resp.EstimatedCostUSD()
+	nowT := time.Now().UTC()
+	s.aiSymbolCacheMu.Lock()
+	s.aiSymbolCache[cacheKey] = aiCacheEntry{
+		Text:         resp.Text,
+		InputTokens:  resp.InputTokens,
+		OutputTokens: resp.OutputTokens,
+		CostUSD:      cost,
+		GeneratedAt:  nowT,
+	}
+	s.aiSymbolCacheMu.Unlock()
+	log.Printf("ai.analyze symbol %s/%s: %d/%d tokens, est $%.4f, stop=%s, cache_key=%s",
+		short, tfStr, resp.InputTokens, resp.OutputTokens, cost, resp.StopReason, cacheKey)
+
+	c.JSON(http.StatusOK, gin.H{
+		"text":          resp.Text,
+		"input_tokens":  resp.InputTokens,
+		"output_tokens": resp.OutputTokens,
+		"cost_usd":      cost,
+		"generated_at":  nowT.Format(time.RFC3339),
+		"cached":        false,
+	})
+}
+
+// signalCacheTag derives a stable per-setup hash component so cache
+// keys turn over only on meaningful changes (verdict-band / anchor /
+// regime), not on every dashboard refresh's tiny price drift.
+func signalCacheTag(v symbolView) string {
+	verdict := ""
+	side := ""
+	if v.Diagnose != nil {
+		verdict = verdictShortHelper(v.Diagnose.Verdict)
+		side = v.Diagnose.Side.String()
+	}
+	anchor := ""
+	if v.Signal.Plan.Anchor != "" {
+		anchor = v.Signal.Plan.Anchor
+	}
+	return fmt.Sprintf("%s|%s|%s|%s", v.Signal.Side, side, verdict, anchor)
 }

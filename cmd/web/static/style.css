@@ -245,6 +245,62 @@ button.copy-btn.poc-drift {
     padding: 1px 6px;
 }
 
+/* Card summary — rule-based one-line read under the diagnose row. */
+.card-summary {
+    margin: 0.4rem 0 0.2rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--surface-2);
+    border-left: 3px solid var(--blue);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.card-summary-text { color: var(--text); flex: 1 1 auto; }
+.ai-analyze-btn {
+    background: transparent;
+    border: 1px solid var(--blue);
+    color: var(--blue);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: background 100ms ease, color 100ms ease;
+}
+.ai-analyze-btn:hover  { background: var(--blue); color: white; }
+.ai-analyze-btn:disabled { opacity: 0.5; cursor: wait; }
+.ai-result {
+    margin: 0.3rem 0 0.6rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.ai-result.hidden { display: none; }
+.ai-result .ai-loading { color: var(--text-dim); font-style: italic; }
+.ai-result .ai-error   { color: var(--red); }
+.ai-result .ai-meta {
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px dashed var(--border);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+.ai-result pre {
+    background: var(--bg);
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+}
+
 /* "copy row" — single-tap whole-line snapshot for pasting into trade notes.
    Distinct visual so it doesn't read as a per-value chip; muted by default,
    highlights blue on tap (inheriting .copy-btn:active). */

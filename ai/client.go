@@ -105,7 +105,10 @@ func (r Response) EstimatedCostUSD() float64 {
 // and token counts, or an error wrapping the HTTP status / Anthropic
 // error body for diagnosability.
 func (c *Client) Send(ctx context.Context, opts SendOptions) (*Response, error) {
-	if opts.APIKey == "" {
+	// DryRun mode skips the API key requirement so callers can exercise
+	// the full code path (context builders, response shaping, etc.) without
+	// configuring a real Anthropic key. Real network calls still require it.
+	if opts.APIKey == "" && !c.DryRun {
 		return nil, fmt.Errorf("ai: APIKey required (env ANTHROPIC_API_KEY or per-user override)")
 	}
 	if opts.System == "" {

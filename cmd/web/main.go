@@ -75,9 +75,10 @@ func main() {
 		log.Printf("[ai] ANTHROPIC_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable ANTHROPIC_DRY_RUN=true for testing.")
 	}
 	srv := &server{
-		client:  bxClient,
-		ai:      aiClient,
-		aiCache: make(map[int]aiCacheEntry),
+		client:        bxClient,
+		ai:            aiClient,
+		aiCache:       make(map[int]aiCacheEntry),
+		aiSymbolCache: make(map[string]aiCacheEntry),
 	}
 	r.GET("/", srv.handleDashboard)
 	r.GET("/journal", srv.handleJournalList)
@@ -90,6 +91,7 @@ func main() {
 	r.POST("/journal/:id/delete", srv.handleJournalDelete)
 	r.POST("/journal/:id/unwind", srv.handleJournalUnwind)
 	r.POST("/ai/analyze/:id", srv.handleAIAnalyzeTrade)
+	r.POST("/ai/analyze/symbol/:short/:tf", srv.handleAIAnalyzeSymbol)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
 	r.GET("/ops", srv.handleOpsPage)
