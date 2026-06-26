@@ -304,6 +304,29 @@ button.copy-btn.poc-drift {
     font-size: 0.85rem;
     padding: 6px 14px;
 }
+/* AI Analyze button inside the score-card — sits below the MR/MOM
+   sub-totals as a self-contained CTA bound to that verdict. Inherits
+   the card's verdict-color border for visual continuity. */
+.score-card .score-card-ai {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.6rem;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid currentColor;
+    color: inherit;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.score-card .score-card-ai:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+.score-card .score-card-ai:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
 .ai-result pre {
     background: var(--bg);
     padding: 0.4rem 0.6rem;

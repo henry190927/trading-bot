@@ -43,19 +43,17 @@
     <span class="diag-score-axis diag-axis-mr" title="mean-reversion axis (mr + shared factors)">MR {{printf "%.1f" $r.TotalMR}}/10</span>
     <span class="diag-score-axis diag-axis-mom" title="momentum axis (mom + shared factors)">MOM {{printf "%.1f" $r.TotalMOM}}/10</span>
   </div>
-</section>
-
-<div class="validate-actions">
-  <a href="{{validateRecordHref $r .Short}}" class="btn-primary btn-record-trade">+ record this trade</a>
   <button type="button"
-          class="ai-analyze-btn ai-analyze-validate"
+          class="ai-analyze-btn ai-analyze-validate score-card-ai"
           data-short="{{.Short}}"
           data-tf="{{.TF}}"
           data-side="{{$r.Side.String}}"
           data-entry="{{printf "%.4f" $r.Entry}}"
           title="LLM analysis of THIS proposed trade (not the engine's own plan)">AI analyze this trade ▸</button>
-</div>
+</section>
 <div class="ai-result hidden" data-result-for="validate"></div>
+
+<a href="{{validateRecordHref $r .Short}}" class="btn-primary btn-record-trade">+ record this trade</a>
 
 <section class="validate-block">
   <h2>Engine state</h2>
