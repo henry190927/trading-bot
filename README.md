@@ -1,10 +1,111 @@
-# trading
+# trading-bot — multi-strategy crypto signal engine in Go
 
-A confluence-based signal generator and backtester for **BTCUSDT, ETHUSDT, XAUUSDT, XAGUSDT** on BingX perpetuals.
+A confluence-based signal generator, backtester, and live-monitoring daemon for **BTCUSDT, ETHUSDT, XAUUSDT, XAGUSDT** on BingX perpetuals.
 
-It scans for setups where multiple independent technical signals agree (Fibonacci retracement, Bollinger bands, RSI, MACD, liquidity sweeps, RSI/CVD divergence) and emits an executable trade plan: limit entry, stop loss, and two take-profit targets.
+The engine scans for setups where multiple independent technical signals agree (Fibonacci retracement, Bollinger bands, RSI, MACD, liquidity sweeps, RSI/CVD divergence) and emits an executable trade plan: limit entry, stop loss, and two take-profit targets. Runs 24/7 on a $0/month Oracle Cloud VM, alerts to iPhone via ntfy push, exposes a mobile-first web dashboard on Tailscale.
 
-> **This is a research tool, not financial advice.** Backtest results below show thin net edge on some symbols and negative edge on others. Do not risk capital without independently verifying the strategy.
+> **This is a research tool, not financial advice.** Backtest results below show thin-but-positive net edge on 1h and 4h timeframes after a 2026-05-27 strategy fix (+83% netR improvement). Do not risk capital without independently verifying the strategy.
+
+---
+
+## 🎯 What this project demonstrates
+
+A personal portfolio project built to deepen Go expertise and showcase production-grade systems thinking. Beyond the trading domain, the codebase exercises patterns that come up directly in senior backend / quant-engineering interviews.
+
+### One-glance architecture
+
+```mermaid
+flowchart TB
+    subgraph Edge["📱 Edge (iPhone / Mac)"]
+        ntfy["ntfy push<br/>(iOS app)"]
+        terminal["Terminal# SSH<br/>(on-demand CLIs)"]
+        safari["Safari → /dashboard<br/>(Tailscale only)"]
+    end
+
+    subgraph VPS["☁️ Oracle Cloud Always Free VM ($0/mo)"]
+        daemon["serve daemon<br/>(systemd unit)"]
+        web["web UI daemon<br/>(Gin, html/template)"]
+        analyze["analyze · validate ·<br/>backtest · journal CLIs"]
+        csv[("journal.csv<br/>(18-col schema, v1→v3 auto-migrated)")]
+    end
+
+    subgraph Core["🧠 Engine Core (importable Go packages)"]
+        signal["signal/<br/>confluence voting"]
+        analyzer["analyzer/<br/>sweep · divergence · CVD"]
+        indicator["indicator/<br/>RSI · BOLL · MACD · ATR · HVN"]
+        bingx_pkg["bingx/<br/>REST client + paginated klines"]
+    end
+
+    subgraph External["🌐 External"]
+        bingx[(BingX public REST<br/>klines · funding · OI)]
+        ntfysh[ntfy.sh push gateway]
+    end
+
+    terminal -->|SSH/22| daemon
+    safari -->|HTTPS via Tailscale 100.x.x.x| web
+    daemon --> signal & analyzer & indicator
+    web --> signal & analyzer & indicator & csv
+    analyze --> signal & csv
+    signal --> bingx_pkg
+    bingx_pkg --> bingx
+    daemon -->|"score≥threshold + sweep-anchored"| ntfysh
+    ntfysh --> ntfy
+```
+
+### Engineering decisions & tradeoffs
+
+These are the choices that came out of building, breaking, and fixing the system — the kind of discussion that comes up in deep-dive interview rounds.
+
+| Decision | Why this not that |
+|---|---|
+| **Sweep close-confirmed invalidation, not just wick-pierced** | The original sweep detector fired on wick-pierce, then never re-evaluated. Backtest revealed it kept emitting LONG signals during the XAG −2.4% dump on 2026-05-27 (stale sweep from earlier bar). Fix: kill the sweep the moment any later candle closes through the swept level in the wrong direction. Result: aggregate **netR +10.91R → +19.97R (+83%)** across 60d on 1h. |
+| **HVN / Volume Profile as display-only, NOT a vote** | Intuition said "trade with the chip zone" — but backtest showed enforcing HVN as a confluence vote dropped net edge by diluting score thresholds with marginal setups (BTC −1R, Silver −5.8R). Kept HVN computed and surfaced as `·` lines for trader judgment; engine doesn't vote on it. The discipline of "let the backtest decide" beat the discipline of "trust the intuition." |
+| **MTF bias filter behind an opt-in flag (`-bias`)** | Same story: backtest showed enforcing higher-TF MACD direction hurt ETH mean-reversion edge (+6.5R → −2.4R). Made it opt-in for experimentation rather than removing it entirely — preserves the ability to A/B with future data. |
+| **Stop refinement (push past HVN clusters) opt-in via `-stop-refine`** | Backtest showed wider stops shrink R-multiples within the 24-bar hold (more timeouts at small loss, fewer 2R winners). BUT the simulator can't model real stop-hunt slippage. Opt-in flag preserves both schools of thought; live data via journal will decide. |
+| **Confluence VOTE model, not weighted sum** | Each factor casts ≤1 vote per direction per bar, score = max(bull, bear). Simpler than weighted-sum (fewer hyperparameters to tune, less curve-fitting risk on small samples), and the vote count is interpretable (`LONG(3)` = three independent factors agreed). |
+| **CSV journal, not SQLite/Postgres** | One process writing append-mostly rows, the operator hand-edits via `jupdate` aliases. SQLite would force schema migrations as a tool; with CSV I version the schema (v1→v3) and auto-migrate on first read. Tradeoff: no concurrent writers, no complex queries — but those don't apply here. |
+| **Web UI binds to Tailscale IP, NOT 0.0.0.0** | Three-layer defense (Tailscale CGNAT + ufw + bind-address) — any single breach still leaves two layers intact. No app-level auth needed because the network layer already enforces identity via Wireguard. Senior platform engineering: trust the network primitive when it's strong, don't bolt on weak auth as security theater. |
+| **Range expansion bars: voted, demoted, re-promoted** | Originally a vote; demoted to display-only after symbol-regime dependence showed up in one backtest; **re-promoted after an XAG case** where the engine gave a 9.0/10 LONG while a 3-ATR bearish range-expansion bar was being detected but ignored. Subsequent 60-day backtest validated: XAG flipped −8.65R → +0.66R. Lesson: a single backtest window is noisy; revisit decisions when new evidence shows up. |
+
+### Production learnings (the things you only learn by running it)
+
+| Issue | Diagnosis | Fix |
+|---|---|---|
+| **Daemon timestamps drifting 8h from systemd's** | Go binary defaulted to UTC for `log.Printf`, systemd's journal prefix was Taipei (after `timedatectl set-timezone`). Same line split across two timezones. | `Environment=TZ=Asia/Taipei` in the systemd unit — pass timezone into the process, not just system-wide. |
+| **Closing iPhone Terminal# killed the daemon** | `make serve` foreground inherits the SSH session's controlling terminal; SIGHUP propagates on disconnect. | Added `make serve-bg` target with `nohup` + `disown`; documented the "running from iPhone? always use serve-bg" rule. |
+| **Stale sweeps continuing to fire during structural breakdowns** | The `LONG score=2 on XAG during −2.4% dump` incident. Sweep detection didn't re-evaluate after the swept level got reclaimed in the wrong direction. | Sweep-invalidation logic: any later candle closing through the swept level in the wrong direction kills the sweep. Documented in [`signal/engine.go`](signal/engine.go) and validated by the +83% backtest improvement. |
+| **`journal.csv` lost web-write access after `sudo` edit on VPS** | Editing the file as root flipped ownership to `root:root`; the `ubuntu`-running web daemon could no longer append. | Reflex `chown journal.csv ubuntu:ubuntu` after any `sudo`-touched rewrite; a checklist item now. |
+| **Backtest reported edge that didn't appear live** | Look-ahead bias — early version used current-bar high/low for sweep detection (information not yet available at the alert moment). | Added "drop forming candle" helper so live and backtest both see identical inputs at the alert moment. |
+
+### Operational footprint
+
+- **24/7 uptime** on Oracle Cloud Always Free tier (E2.1.Micro, $0/month)
+- **systemd-managed** with `Restart=always`, scoped NOPASSWD sudoers for `tstart/tstop/trestart/tconfig`
+- **Three-layer security model** (Tailscale CGNAT + ufw + bind-address) for the web UI — see [Security model](#security-model)
+- **iPhone-first operator UX** — ntfy push for alerts, SSH aliases for on-demand commands, Tailscale-only web dashboard, partials calculator for multi-leg exits
+- **Configuration as data**: daemon TF / min-score live in `/opt/trading/.env`, the systemd unit reads them via `${TRADING_TF}` so `tconfig 15m 3` is the entire change-deploy loop (~1s)
+
+### Tech stack
+
+| Layer | Choice |
+|---|---|
+| Language | **Go 1.22** (single binary deploy, easy cross-compile to ARM/AMD64) |
+| Web framework | Gin + `html/template` (server-side render, no JS framework) |
+| Persistence | CSV (auto-migrated v1→v3) |
+| Push | ntfy.sh (free) |
+| Notifier | Pluggable `Notifier` interface (stdout / macOS Notification Center / ntfy) with `Multi` fan-out |
+| Network | Tailscale (Wireguard mesh, free tier) |
+| Hosting | Oracle Cloud Always Free (~$0/mo forever) |
+| Process supervision | systemd with `Restart=always` |
+| Embedded assets | `//go:embed` for templates + CSS — single-binary scp deploy |
+
+### What I'd build next if this were a paid product
+
+1. **Coinglass-style liquidation heatmap provider** (`analyzer/liq_heatmap.go` has the interface, no live provider yet) — bigger data signal than HVN for stop placement.
+2. **WebSocket streams** (`bingx/ws.go` stubbed) — sub-second reaction vs current TF-boundary polling.
+3. **Real position-size tracker** — leverage column shipped; full `position_size = account_risk / risk_price` calculator + per-symbol risk overrides.
+4. **Equity curve + R-distribution histogram** on `/journal` — visual edge tracking beyond the aggregate `jstats` table.
+5. **Per-symbol score thresholds** — backtested favorably (XAG=3 helps +11-15R/window across 60/90/120d), held pending live confirmation.
 
 ---
 
