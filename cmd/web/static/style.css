@@ -296,13 +296,37 @@ button.copy-btn.poc-drift {
 .validate-actions {
     display: flex;
     gap: 0.6rem;
-    align-items: center;
+    align-items: stretch;
     flex-wrap: wrap;
     margin: 0.6rem 0;
 }
-.ai-analyze-validate {
-    font-size: 0.85rem;
-    padding: 6px 14px;
+/* On the validate-actions row the AI button needs to match the
+   .btn-primary "record this trade" CTA dimensions exactly. Override
+   the small-chip defaults so the two buttons read as a paired action
+   row (primary action + secondary outline action), not chip + button. */
+.validate-actions .ai-analyze-validate {
+    flex: 1;
+    border-radius: 6px;
+    padding: 0.7rem 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--blue);
+    background: transparent;
+    color: var(--blue);
+}
+.validate-actions .ai-analyze-validate:hover {
+    background: var(--blue);
+    color: white;
+}
+.validate-actions .ai-analyze-validate:disabled {
+    opacity: 0.5;
+    cursor: wait;
 }
 .ai-result pre {
     background: var(--bg);
