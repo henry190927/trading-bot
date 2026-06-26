@@ -293,6 +293,17 @@ button.copy-btn.poc-drift {
     color: var(--text-dim);
     font-size: 0.75rem;
 }
+.validate-actions {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0.6rem 0;
+}
+.ai-analyze-validate {
+    font-size: 0.85rem;
+    padding: 6px 14px;
+}
 .ai-result pre {
     background: var(--bg);
     padding: 0.4rem 0.6rem;

@@ -3016,6 +3016,169 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 	})
 }
 
+// handleAIAnalyzeValidate is the validate-page sibling of
+// handleAIAnalyzeSymbol. POST /ai/analyze/validate with form params
+// (short, tf, side, entry) — analyzes the user's PROPOSED trade
+// hypothesis rather than the engine's own recommended setup. Same
+// Anthropic call, same Quant persona; only the Diagnose section in
+// the user message reflects the user's proposed side/entry instead
+// of the engine's auto-pick.
+//
+// Cached by (short|tf|side|entry@4dp|signal-hash) so re-clicking on
+// the same proposed trade doesn't re-bill.
+func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
+	short := strings.ToUpper(strings.TrimSpace(c.PostForm("short")))
+	tfStr := strings.TrimSpace(c.PostForm("tf"))
+	sideStr := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
+	entryStr := strings.TrimSpace(c.PostForm("entry"))
+	if short == "" || tfStr == "" || sideStr == "" || entryStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "short, tf, side, entry all required"})
+		return
+	}
+	sym, err := resolveWebSymbol(short)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	tf := market.Timeframe(tfStr)
+	var side signal.Side
+	switch sideStr {
+	case "long":
+		side = signal.Long
+	case "short":
+		side = signal.Short
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "side must be long or short"})
+		return
+	}
+	var entry float64
+	if _, err := fmt.Sscanf(entryStr, "%f", &entry); err != nil || entry <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "entry must be a positive number"})
+		return
+	}
+
+	if s.ai == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ai client not initialized"})
+		return
+	}
+	apiKey := ai.APIKeyFromEnv()
+	if apiKey == "" && !s.ai.DryRun {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ANTHROPIC_API_KEY not configured on server."})
+		return
+	}
+
+	ctx := c.Request.Context()
+	candles, err := s.client.Klines(ctx, sym, tf, 200)
+	if err != nil || len(candles) < 60 {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("klines fetch failed or insufficient bars: %v", err)})
+		return
+	}
+	var markPrice float64
+	if fr, ferr := s.client.FundingRate(ctx, sym); ferr == nil {
+		markPrice = fr.MarkPrice
+	}
+	const dashboardFeeBps = 6.0
+	d := validator.Validate(sym, tf, side, entry, dashboardFeeBps, candles, markPrice)
+
+	// Cache key includes user-proposed entry rounded to 4dp + engine
+	// signal hash so an unchanged proposal doesn't re-bill.
+	view := symbolView{Signal: signal.Evaluate(signal.Inputs{Symbol: sym, Timeframe: tf, Candles: candles, LiveMarkPrice: markPrice}), Diagnose: &d}
+	cacheKey := fmt.Sprintf("validate|%s|%s|%s|%.4f|%d|%s",
+		short, tfStr, sideStr, entry, view.Signal.Score, signalCacheTag(view))
+	s.aiSymbolCacheMu.Lock()
+	if cached, ok := s.aiSymbolCache[cacheKey]; ok {
+		s.aiSymbolCacheMu.Unlock()
+		c.JSON(http.StatusOK, gin.H{
+			"text":          cached.Text,
+			"input_tokens":  cached.InputTokens,
+			"output_tokens": cached.OutputTokens,
+			"cost_usd":      cached.CostUSD,
+			"generated_at":  cached.GeneratedAt.Format(time.RFC3339),
+			"cached":        true,
+		})
+		return
+	}
+	s.aiSymbolCacheMu.Unlock()
+
+	// Build the LLM context. Reuse SymbolAnalysisInputs but flag the
+	// rule-based summary to emphasize this is a USER hypothesis, not
+	// the engine's pick.
+	ruleSummary := signal.BuildSummary(view.Signal, diagnoseView(&d))
+	in := ai.SymbolAnalysisInputs{
+		Symbol:     sym,
+		Short:      short,
+		Timeframe:  tf,
+		Signal:     view.Signal,
+		Summary:    fmt.Sprintf("USER PROPOSAL — %s %s @ %.4f. (Engine's own read: %s)", sideStr, short, entry, ruleSummary),
+		MarkPrice:  markPrice,
+		RecentBars: candles,
+	}
+	sd := &ai.SymbolDiagnose{
+		Side: d.Side, Entry: d.Entry, Total: d.Total, TotalMR: d.TotalMR, TotalMOM: d.TotalMOM,
+		Verdict: d.Verdict,
+		AtVAH:   d.AtVAH, AtVAL: d.AtVAL, InsideVA: d.InsideVA,
+		OutsideVAUp: d.OutsideVAUp, OutsideVADn: d.OutsideVADn,
+		POCTrend:    d.POCMig.Trend, POCDriftPct: d.POCMig.DriftPct, POCStacked: d.POCMig.Stacked,
+		FallingKnife: d.RecentFlashBarBearish, BlowOff: d.RecentFlashBarBullish,
+	}
+	for _, f := range d.Factors {
+		sd.Factors = append(sd.Factors, ai.SymbolDiagnoseFactor{
+			Name: f.Name, Points: f.Points, Detail: f.Detail, Axis: f.Axis,
+		})
+	}
+	in.Diagnose = sd
+
+	allTrades, _ := journal.ReadAll("")
+	for i := len(allTrades) - 1; i >= 0 && len(in.RecentSame) < 5; i-- {
+		r := allTrades[i]
+		if r.Symbol != short || r.ClosedAt.IsZero() {
+			continue
+		}
+		in.RecentSame = append(in.RecentSame, r)
+	}
+	now := time.Now()
+	for _, e := range macro.All() {
+		delta := e.DatetimeUTC.Sub(now)
+		if delta < -24*time.Hour || delta > 24*time.Hour {
+			continue
+		}
+		in.MacroNear = append(in.MacroNear, e)
+	}
+
+	userMsg := ai.BuildSymbolAnalysisMessage(in)
+	resp, err := s.ai.Send(ctx, ai.SendOptions{
+		APIKey:      apiKey,
+		System:      ai.SystemPromptQuantAdvisor,
+		Messages:    []ai.Message{{Role: "user", Content: userMsg}},
+		Temperature: 0.3,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "anthropic call failed: " + err.Error()})
+		return
+	}
+	cost := resp.EstimatedCostUSD()
+	nowT := time.Now().UTC()
+	s.aiSymbolCacheMu.Lock()
+	s.aiSymbolCache[cacheKey] = aiCacheEntry{
+		Text:         resp.Text,
+		InputTokens:  resp.InputTokens,
+		OutputTokens: resp.OutputTokens,
+		CostUSD:      cost,
+		GeneratedAt:  nowT,
+	}
+	s.aiSymbolCacheMu.Unlock()
+	log.Printf("ai.analyze validate %s/%s %s @ %.4f: %d/%d tokens, est $%.4f",
+		short, tfStr, sideStr, entry, resp.InputTokens, resp.OutputTokens, cost)
+	c.JSON(http.StatusOK, gin.H{
+		"text":          resp.Text,
+		"input_tokens":  resp.InputTokens,
+		"output_tokens": resp.OutputTokens,
+		"cost_usd":      cost,
+		"generated_at":  nowT.Format(time.RFC3339),
+		"cached":        false,
+	})
+}
+
 // signalCacheTag derives a stable per-setup hash component so cache
 // keys turn over only on meaningful changes (verdict-band / anchor /
 // regime), not on every dashboard refresh's tiny price drift.

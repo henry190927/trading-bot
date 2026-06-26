@@ -92,6 +92,7 @@ func main() {
 	r.POST("/journal/:id/unwind", srv.handleJournalUnwind)
 	r.POST("/ai/analyze/:id", srv.handleAIAnalyzeTrade)
 	r.POST("/ai/analyze/symbol/:short/:tf", srv.handleAIAnalyzeSymbol)
+	r.POST("/ai/analyze/validate", srv.handleAIAnalyzeValidate)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
 	r.GET("/ops", srv.handleOpsPage)
