@@ -305,8 +305,9 @@ button.copy-btn.poc-drift {
     padding: 6px 14px;
 }
 /* AI Analyze button inside the score-card — sits below the MR/MOM
-   sub-totals as a self-contained CTA bound to that verdict. Inherits
-   the card's verdict-color border for visual continuity. */
+   sub-totals. Uses the same blue accent as every other AI-analyze
+   button across the app (dashboard cards, per-trade portfolio) so
+   the action reads consistently regardless of where it's invoked. */
 .score-card .score-card-ai {
     display: inline-flex;
     align-items: center;
@@ -314,14 +315,15 @@ button.copy-btn.poc-drift {
     padding: 4px 12px;
     font-size: 0.8rem;
     font-weight: 600;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid currentColor;
-    color: inherit;
+    background: transparent;
+    border: 1px solid var(--blue);
+    color: var(--blue);
     border-radius: 4px;
     cursor: pointer;
 }
 .score-card .score-card-ai:hover {
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--blue);
+    color: white;
 }
 .score-card .score-card-ai:disabled {
     opacity: 0.5;
