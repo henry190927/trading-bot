@@ -24,14 +24,13 @@ const (
 	// supports generateContent works.
 	DefaultGeminiModel = "gemini-2.5-flash"
 
-	// DefaultGeminiMaxTokens is intentionally 4× the shared
-	// DefaultMaxTokens because Gemini 2.5's internal reasoning tokens
-	// count against maxOutputTokens. With the 1200-token default the
-	// reasoning consumed the entire budget, leaving <100 tokens for
-	// visible text. 4800 gives ~3600-tok reasoning room + ~1200 tok
-	// visible response — the same effective output length Anthropic
-	// gets. Adjust when Gemini exposes a separate thinking budget.
-	DefaultGeminiMaxTokens = 4800
+	// DefaultGeminiMaxTokens accommodates 2.5's internal reasoning
+	// tokens (which count against maxOutputTokens) PLUS room for a
+	// thorough analysis. Empirical split at 8000: ~4000 tok reasoning
+	// + ~4000 tok visible response, enough for a full multi-section
+	// Quant analysis with tables and per-factor breakdown. Adjust down
+	// only if Gemini eventually exposes a separate thinkingBudget knob.
+	DefaultGeminiMaxTokens = 8000
 
 	geminiAPIBase        = "https://generativelanguage.googleapis.com/v1beta/models/"
 	geminiRequestTimeout = 90 * time.Second // reasoning models are slower — allow more headroom than the 60s used for Anthropic

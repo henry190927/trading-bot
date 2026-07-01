@@ -24,12 +24,24 @@ import (
 // recent candles when offline). The packager skips empty sections so
 // the LLM doesn't see "no data available" filler.
 type TradeAnalysisInputs struct {
-	Trade        journal.Trade        // the trade being analyzed (required)
-	LivePosition *bingx.Position      // current BingX position, nil if none / offline
-	MarkPrice    float64              // 0 if not fetched
-	RecentSame   []journal.Trade      // last 5 closed trades on same symbol (for context)
-	RecentBars   []market.Candle      // last 50 closed candles for the trade's TF (for path summary)
-	MacroNear    []macro.Event        // macro events within ±24h of trade.OpenedAt or now
+	Trade        journal.Trade   // the trade being analyzed (required)
+	LivePosition *bingx.Position // current BingX position, nil if none / offline
+	MarkPrice    float64         // 0 if not fetched
+	FundingRate  float64         // fractional (e.g. 0.00005); 0 = not fetched
+	RecentSame   []journal.Trade // last 5 closed trades on same symbol (for context)
+	RecentBars   []market.Candle // last 50 closed candles for the trade's TF (for path summary)
+	MacroNear    []macro.Event   // macro events within ±24h of trade.OpenedAt or now
+
+	// StructureNote is the LH-LL / HH-HL classifier read on the trade's
+	// TF at analysis time. Empty when unavailable.
+	StructureNote string
+
+	// TopHVNs are the top 5 high-volume nodes on the symbol's 200-bar
+	// profile, pre-formatted (e.g. "60245.34 (POC)", "59012.11").
+	TopHVNs []string
+
+	// HigherTFs — parent-TF summaries for multi-TF alignment view.
+	HigherTFs []HigherTFSummary
 }
 
 // BuildTradeAnalysisMessage formats the inputs into the user message
@@ -131,6 +143,47 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 		sb.WriteString("\n")
 	}
 
+	// --- Section: funding + structure + HVN + higher-TF context ---
+	if in.FundingRate != 0 || in.StructureNote != "" || len(in.TopHVNs) > 0 || len(in.HigherTFs) > 0 {
+		sb.WriteString("## Live market context\n\n")
+		if in.FundingRate != 0 {
+			annualized := in.FundingRate * 3 * 365 * 100
+			crowded := ""
+			switch {
+			case in.FundingRate >= 0.0010:
+				crowded = " ⚠ EXTREME long crowding — squeeze fuel"
+			case in.FundingRate >= 0.0005:
+				crowded = " ⚠ longs crowded"
+			case in.FundingRate <= -0.0010:
+				crowded = " ⚠ EXTREME short crowding — flush fuel"
+			case in.FundingRate <= -0.0005:
+				crowded = " ⚠ shorts crowded"
+			}
+			sb.WriteString(fmt.Sprintf("- funding: %+.5f%%/interval (~%+.2f%% annualized)%s\n",
+				in.FundingRate*100, annualized, crowded))
+		}
+		if in.StructureNote != "" {
+			sb.WriteString(fmt.Sprintf("- structure on %s: %s\n", t.TF, in.StructureNote))
+		}
+		if len(in.TopHVNs) > 0 {
+			sb.WriteString("- top HVNs (chip zones):\n")
+			for _, h := range in.TopHVNs {
+				sb.WriteString(fmt.Sprintf("    · %s\n", h))
+			}
+		}
+		if len(in.HigherTFs) > 0 {
+			sb.WriteString("- higher-TF context:\n\n")
+			sb.WriteString("  | TF | side | score | MR | MOM | POC drift | structure |\n")
+			sb.WriteString("  |---|---|---:|---:|---:|---|---|\n")
+			for _, h := range in.HigherTFs {
+				sb.WriteString(fmt.Sprintf("  | %s | %s | %d | %d | %d | %s %+.2f%% | %s |\n",
+					h.Timeframe, h.Side, h.Score, h.MRScore, h.MomentumScore,
+					h.POCTrend, h.POCDriftPct*100, h.StructureNote))
+			}
+		}
+		sb.WriteString("\n")
+	}
+
 	// --- Section: recent same-symbol journal entries ---
 	if len(in.RecentSame) > 0 {
 		sb.WriteString("## Recent ")
@@ -147,11 +200,24 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 			sb.WriteString(fmt.Sprintf("| %d | %s/%s | %s | %s | %+.2f | %s |\n",
 				r.ID, r.Side, r.TF, r.Score, r.Outcome, r.RRealized, dur))
 		}
+		sb.WriteString("\n**Notes excerpts** (patterns worth spotting across recent trades):\n\n")
+		for _, r := range in.RecentSame {
+			if r.OpenNotes == "" && r.CloseNotes == "" {
+				continue
+			}
+			sb.WriteString(fmt.Sprintf("*#%d %s (%s, R=%+.2f)*\n", r.ID, strings.ToUpper(r.Side), r.Outcome, r.RRealized))
+			if r.OpenNotes != "" {
+				sb.WriteString(fmt.Sprintf("- open: %s\n", truncateOneLine(r.OpenNotes, 220)))
+			}
+			if r.CloseNotes != "" {
+				sb.WriteString(fmt.Sprintf("- close: %s\n", truncateOneLine(r.CloseNotes, 220)))
+			}
+		}
 		sb.WriteString("\n")
 	}
 
 	sb.WriteString("---\n\n")
-	sb.WriteString("Analyze per the system prompt's output structure. End with one-line journal takeaway.\n")
+	sb.WriteString("Analyze per the system prompt's output structure (flavor A — Trade analysis). End with one-line journal takeaway.\n")
 	return sb.String()
 }
 

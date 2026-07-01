@@ -18,16 +18,40 @@ import (
 // signal + validator diagnose + recent context.
 type SymbolAnalysisInputs struct {
 	Symbol    market.Symbol
-	Short     string             // BTC / ETH / XAU / XAG header label
+	Short     string // BTC / ETH / XAU / XAG header label
 	Timeframe market.Timeframe
-	Signal    signal.Signal      // current engine output
-	Diagnose  *SymbolDiagnose    // current validator output, nil if absent
-	Summary   string             // the rule-based one-liner (provides anchor for LLM)
+	Signal    signal.Signal   // current engine output
+	Diagnose  *SymbolDiagnose // current validator output, nil if absent
+	Summary   string          // the rule-based one-liner (provides anchor for LLM)
 
-	MarkPrice  float64
-	RecentBars []market.Candle  // last N closed bars on the card's TF
-	RecentSame []journal.Trade  // last 5 closed trades on this symbol
-	MacroNear  []macro.Event    // macro events ±24h of now
+	MarkPrice   float64
+	FundingRate float64 // fractional (e.g. 0.00005 = 0.005%/interval)
+
+	RecentBars []market.Candle // last N closed bars on the card's TF
+	RecentSame []journal.Trade // last 5 closed trades on this symbol
+	MacroNear  []macro.Event   // macro events ±24h of now
+
+	// StructureNote is a human-readable read of the LH-LL / HH-HL
+	// fractal classification on this TF (from signal.ClassifyTrendStructure).
+	// Empty when not computable.
+	StructureNote string
+
+	// HigherTFs carries digested Signal + POC read from each parent TF
+	// the handler decided to fetch (typically 30m→[1h,4h] or 1h→[4h]).
+	// Empty when the handler skipped higher-TF fetch (e.g. failed API).
+	HigherTFs []HigherTFSummary
+}
+
+// HigherTFSummary is one parent-TF snapshot for multi-TF context.
+type HigherTFSummary struct {
+	Timeframe     market.Timeframe
+	Side          signal.Side
+	Score         int
+	MRScore       int
+	MomentumScore int
+	POCDriftPct   float64 // POC50→POC200 drift as fraction (0.01 = 1%)
+	POCTrend      string  // "rising" / "falling" / "flat"
+	StructureNote string  // LH-LL / HH-HL classifier on this TF
 }
 
 // SymbolDiagnose is the projection of validator.Result needed for symbol-
@@ -112,7 +136,71 @@ func BuildSymbolAnalysisMessage(in SymbolAnalysisInputs) string {
 	if sig.VP.POC > 0 {
 		sb.WriteString(fmt.Sprintf("POC / VA   : %.4f / [%.4f, %.4f]\n", sig.VP.POC, sig.VP.VAL, sig.VP.VAH))
 	}
+	if in.FundingRate != 0 {
+		annualized := in.FundingRate * 3 * 365 * 100 // 3 intervals/day × 365 × pct
+		crowded := ""
+		switch {
+		case in.FundingRate >= 0.0010:
+			crowded = " ⚠ EXTREME long crowding — squeeze fuel"
+		case in.FundingRate >= 0.0005:
+			crowded = " ⚠ longs crowded"
+		case in.FundingRate <= -0.0010:
+			crowded = " ⚠ EXTREME short crowding — flush fuel"
+		case in.FundingRate <= -0.0005:
+			crowded = " ⚠ shorts crowded"
+		}
+		sb.WriteString(fmt.Sprintf("funding    : %+.5f%%/interval (~%+.2f%% annualized)%s\n",
+			in.FundingRate*100, annualized, crowded))
+	}
+	if in.StructureNote != "" {
+		sb.WriteString(fmt.Sprintf("structure  : %s (this TF)\n", in.StructureNote))
+	}
 	sb.WriteString("```\n\n")
+
+	// --- Section: top HVNs (chip zones) ---
+	if len(sig.VP.HVN) > 0 {
+		sb.WriteString("**High-Volume Nodes** (chip zones — likely support/resistance):\n\n")
+		mark := in.MarkPrice
+		if mark == 0 {
+			mark = sig.Price
+		}
+		for i, h := range sig.VP.HVN {
+			if i >= 5 {
+				break
+			}
+			rel := "at"
+			if mark > 0 {
+				pct := (h - mark) / mark * 100
+				switch {
+				case pct > 0.05:
+					rel = fmt.Sprintf("%.2f%% above mark", pct)
+				case pct < -0.05:
+					rel = fmt.Sprintf("%.2f%% below mark", -pct)
+				default:
+					rel = "at mark"
+				}
+			}
+			mark2 := ""
+			if h == sig.VP.POC {
+				mark2 = " ← POC"
+			}
+			sb.WriteString(fmt.Sprintf("- %.4f (%s)%s\n", h, rel, mark2))
+		}
+		sb.WriteString("\n")
+	}
+
+	// --- Section: higher-TF context ---
+	if len(in.HigherTFs) > 0 {
+		sb.WriteString("**Higher-TF context** (parent-TF regime for alignment / disagreement check):\n\n")
+		sb.WriteString("| TF | side | score | MR | MOM | POC drift | structure |\n")
+		sb.WriteString("|---|---|---:|---:|---:|---|---|\n")
+		for _, h := range in.HigherTFs {
+			sb.WriteString(fmt.Sprintf("| %s | %s | %d | %d | %d | %s %+.2f%% | %s |\n",
+				h.Timeframe, h.Side, h.Score, h.MRScore, h.MomentumScore,
+				h.POCTrend, h.POCDriftPct*100, h.StructureNote))
+		}
+		sb.WriteString("\n")
+	}
 
 	if len(sig.Reasons) > 0 {
 		sb.WriteString("**Votes that fired** (engine confluence, [MR]/[MOM] tagged):\n\n")
@@ -224,12 +312,37 @@ func BuildSymbolAnalysisMessage(in SymbolAnalysisInputs) string {
 			sb.WriteString(fmt.Sprintf("| %d | %s/%s | %s | %s | %+.2f | %s |\n",
 				r.ID, r.Side, r.TF, r.Score, r.Outcome, r.RRealized, dur))
 		}
+		sb.WriteString("\n**Notes excerpts** (patterns worth spotting across recent trades):\n\n")
+		for _, r := range in.RecentSame {
+			if r.OpenNotes == "" && r.CloseNotes == "" {
+				continue
+			}
+			sb.WriteString(fmt.Sprintf("*#%d %s %s (%s, R=%+.2f)*\n", r.ID, r.Symbol, strings.ToUpper(r.Side), r.Outcome, r.RRealized))
+			if r.OpenNotes != "" {
+				sb.WriteString(fmt.Sprintf("- open: %s\n", truncateOneLine(r.OpenNotes, 220)))
+			}
+			if r.CloseNotes != "" {
+				sb.WriteString(fmt.Sprintf("- close: %s\n", truncateOneLine(r.CloseNotes, 220)))
+			}
+		}
 		sb.WriteString("\n")
 	}
 
 	sb.WriteString("---\n\n")
 	sb.WriteString("End with a one-line takeaway suitable for the dashboard summary (replace or refine the rule-based one-liner above).\n")
 	return sb.String()
+}
+
+// truncateOneLine collapses newlines to " · " and truncates to n chars
+// with an ellipsis. Used for journal-note excerpts so the LLM sees the
+// gist without the full multi-line notes bloating context.
+func truncateOneLine(s string, n int) string {
+	s = strings.ReplaceAll(s, "\n", " · ")
+	s = strings.ReplaceAll(s, "  ", " ")
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 // summarizeBarsAtMark is the no-trade variant of summarizeBars. Same

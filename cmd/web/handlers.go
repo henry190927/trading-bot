@@ -1660,25 +1660,39 @@ func (s *server) handleAIAnalyzeTrade(c *gin.Context) {
 	// means the LLM sees a smaller prompt, not an error.
 	inputs := ai.TradeAnalysisInputs{Trade: t}
 
-	// Live BingX position + mark price for the trade's symbol.
+	// Live BingX position + mark price + funding rate for the trade's symbol.
 	if sym, err := resolveWebSymbol(t.Symbol); err == nil && s.client != nil {
 		if pos, perr := s.client.FindOpenPosition(c.Request.Context(), sym, t.Side); perr == nil && pos != nil {
 			inputs.LivePosition = pos
 		}
 		if fr, ferr := s.client.FundingRate(c.Request.Context(), sym); ferr == nil {
 			inputs.MarkPrice = fr.MarkPrice
+			inputs.FundingRate = fr.Rate
 		}
 	}
 
 	// Recent candles for the trade's TF (skip if TF unparseable).
+	// Fetch 200 (not 50) so we can compute structure classifier + HVNs.
 	if sym, err := resolveWebSymbol(t.Symbol); err == nil && s.client != nil {
 		tfStr := t.TF
 		if j := strings.Index(tfStr, ","); j >= 0 {
 			tfStr = strings.TrimSpace(tfStr[:j])
 		}
 		if tfStr != "" {
-			if candles, cerr := s.client.Klines(c.Request.Context(), sym, market.Timeframe(tfStr), 50); cerr == nil {
-				inputs.RecentBars = candles
+			tf := market.Timeframe(tfStr)
+			if candles, cerr := s.client.Klines(c.Request.Context(), sym, tf, 200); cerr == nil && len(candles) >= 60 {
+				// Bar-path summary uses last 50 to stay compact.
+				start := len(candles) - 50
+				if start < 0 {
+					start = 0
+				}
+				inputs.RecentBars = candles[start:]
+
+				// Enrichment: structure state + HVN list + higher-TF context.
+				inputs.StructureNote = structureNoteFor(candles)
+				sig := signal.Evaluate(signal.Inputs{Symbol: sym, Timeframe: tf, Candles: candles})
+				inputs.TopHVNs = topHVNList(sig.VP.HVN, sig.VP.POC, inputs.MarkPrice)
+				inputs.HigherTFs = s.buildHigherTFSummaries(c.Request.Context(), sym, tf)
 			}
 		}
 	}
@@ -2923,14 +2937,22 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 	}
 	s.aiSymbolCacheMu.Unlock()
 
+	// Fetch funding rate for the "Live market context" section. Best-effort.
+	var fundingRate float64
+	if fr, ferr := s.client.FundingRate(c.Request.Context(), sym); ferr == nil {
+		fundingRate = fr.Rate
+	}
 	in := ai.SymbolAnalysisInputs{
-		Symbol:     sym,
-		Short:      short,
-		Timeframe:  tf,
-		Signal:     view.Signal,
-		Summary:    view.Summary,
-		MarkPrice:  view.MarkPrice,
-		RecentBars: view.Candles,
+		Symbol:        sym,
+		Short:         short,
+		Timeframe:     tf,
+		Signal:        view.Signal,
+		Summary:       view.Summary,
+		MarkPrice:     view.MarkPrice,
+		FundingRate:   fundingRate,
+		RecentBars:    view.Candles,
+		StructureNote: structureNoteFor(view.Candles),
+		HigherTFs:     s.buildHigherTFSummaries(c.Request.Context(), sym, tf),
 	}
 	if view.Diagnose != nil {
 		d := view.Diagnose
@@ -3107,14 +3129,21 @@ func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
 	// rule-based summary to emphasize this is a USER hypothesis, not
 	// the engine's pick.
 	ruleSummary := signal.BuildSummary(view.Signal, diagnoseView(&d))
+	var fundingRate float64
+	if fr, ferr := s.client.FundingRate(ctx, sym); ferr == nil {
+		fundingRate = fr.Rate
+	}
 	in := ai.SymbolAnalysisInputs{
-		Symbol:     sym,
-		Short:      short,
-		Timeframe:  tf,
-		Signal:     view.Signal,
-		Summary:    fmt.Sprintf("USER PROPOSAL — %s %s @ %.4f. (Engine's own read: %s)", sideStr, short, entry, ruleSummary),
-		MarkPrice:  markPrice,
-		RecentBars: candles,
+		Symbol:        sym,
+		Short:         short,
+		Timeframe:     tf,
+		Signal:        view.Signal,
+		Summary:       fmt.Sprintf("USER PROPOSAL — %s %s @ %.4f. (Engine's own read: %s)", sideStr, short, entry, ruleSummary),
+		MarkPrice:     markPrice,
+		FundingRate:   fundingRate,
+		RecentBars:    candles,
+		StructureNote: structureNoteFor(candles),
+		HigherTFs:     s.buildHigherTFSummaries(ctx, sym, tf),
 	}
 	sd := &ai.SymbolDiagnose{
 		Side: d.Side, Entry: d.Entry, Total: d.Total, TotalMR: d.TotalMR, TotalMOM: d.TotalMOM,
