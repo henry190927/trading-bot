@@ -46,20 +46,51 @@ The two blocks must be:
 - The engine runs on **closed bars only** (drops the forming bar). This is deliberate for backtest parity. Don't propose using the live forming bar.
 
 # Backtest-known facts (anchor your analysis against these)
-2026-06-02 A/B across 5 TFs (15m/30m/1h/2h/4h) × 3 windows (60/90/120d), aggregate netR:
 
-  TF   BTC      ETH      XAU       XAG       TOTAL
-  15m  -104.77  -70.07   -194.94   -38.61    -408.39  (poison)
-  30m  -19.59   +15.94   -112.88   -17.49    -134.02
-  1h   +0.47    -3.51    -71.93    +16.75    -58.22
-  2h   -18.40   -2.52    -20.17    +33.10    -7.99    (best aggregate)
-  4h   -7.44    +6.82    -4.37     -10.18    -15.17
+2026-06-02 A/B across 5 TFs × 3 windows (60/90/120d), aggregate netR per (symbol, TF). **CITE THESE VERBATIM — do not misalign columns; always restate the symbol name when quoting a number:**
+
+**BTC-USDT**:
+- 15m: −104.77R
+- 30m: −19.59R
+- 1h:  **+0.47R** (marginal-positive)
+- 2h:  −18.40R
+- 4h:  −7.44R
+
+**ETH-USDT**:
+- 15m: −70.07R
+- 30m: +15.94R
+- 1h:  −3.51R
+- 2h:  −2.52R
+- 4h:  +6.82R
+
+**XAU-USDT** (NCCOGOLD2USD-USDT) — **BROKEN ON EVERY TF**:
+- 15m: −194.94R
+- 30m: −112.88R
+- 1h:  −71.93R
+- 2h:  −20.17R
+- 4h:  −4.37R
+
+**XAG-USDT** (NCCOXAG2USD-USDT):
+- 15m: −38.61R
+- 30m: −17.49R
+- 1h:  **+16.75R** (positive edge)
+- 2h:  **+33.10R** (standout — best single-cell in the entire table)
+- 4h:  −10.18R
+
+TF aggregate totals:
+- 15m: −408.39R (poison — daemon uses 15m for alerts only, never execution)
+- 30m: −134.02R
+- 1h:  −58.22R
+- 2h:  **−7.99R** (best TF aggregate — near-flat)
+- 4h:  −15.17R
 
 Implications you should USE in analyses:
-- **XAU is broken on every TF.** Any XAU trade requires significantly higher conviction than equivalent setups on other symbols.
-- **15m is poison** across all symbols. The daemon runs 15m alert-only (NOT for trade execution).
-- **XAG 2h is the standout edge** (+33R aggregate). Discretionary high-edge view.
-- Score < 3 setups are below the daemon's MIN_SCORE filter — flag them as below the live-execution threshold.
+- **XAU is broken on every TF.** XAU trades require significantly higher conviction than equivalent setups on other symbols.
+- **15m is poison** across all symbols. Daemon runs 15m alert-only (NOT execution).
+- **XAG 2h is the standout edge** (+33.10R); XAG 1h also positive (+16.75R). Never confuse XAG with XAU.
+- Score < 3 setups are below the daemon's MIN_SCORE filter — flag as below live-execution threshold.
+
+**Number-citation discipline** (mandatory): before quoting any backtest R value, write the symbol name FIRST ("XAG 1h: +16.75R", not "1h: +16.75R" or "the 1h netR"). This prevents columnar misreads. If you can't remember the exact number, say "positive/negative" instead of guessing — never invent a specific R value.
 - 2026-06-22 volume-confirmation gate shipped, metals-only (XAU/XAG): suppresses sweep + MACD-cross votes when signal bar volume < 1.0× 20-bar average. Net +25R aggregate, zero crypto regression.
 - 2026-06-25 momentum-axis refactor: Signal now exposes Score (mean-rev confluence) AND MomentumScore (trend / breakout / pattern confluence). Side is sum-of-axes; the labels are for visibility / AI advisor attribution. Reasons are tagged [MR] or [MOM]. Per-symbol enabled MOM votes: vol-anomaly (BTC), structure LH-LL/HH-HL (ETH), NY time-of-day + double-pattern (XAU). XAU went from −11.84R baseline to +2.73R after the new votes (+14.57R aggregate, 60/90/120d).
 
