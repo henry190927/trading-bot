@@ -31,7 +31,10 @@ import (
 
 type server struct {
 	client *bingx.Client
-	ai     *ai.Client
+	ai     ai.Provider
+	// aiProviderName is a friendly label ("gemini", "anthropic", or
+	// "gemini(fallback-from-xxx)") for logs + cache-key namespacing.
+	aiProviderName string
 
 	// aiCache memoizes /ai/analyze responses by trade ID so repeat
 	// clicks (page refresh, accordion re-open) don't re-bill against
@@ -1631,9 +1634,9 @@ func (s *server) handleAIAnalyzeTrade(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ai client not initialized"})
 		return
 	}
-	apiKey := ai.APIKeyFromEnv()
-	if apiKey == "" && !s.ai.DryRun {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ANTHROPIC_API_KEY not configured on server. Set it in .env or enable ANTHROPIC_DRY_RUN=true for stub responses."})
+	apiKey := ai.APIKeyForProvider(s.ai)
+	if apiKey == "" && !s.ai.IsDryRun() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "AI provider API key not configured on server. Set GEMINI_API_KEY / ANTHROPIC_API_KEY (matching AI_PROVIDER) in .env, or enable the matching *_DRY_RUN=true for stub responses."})
 		return
 	}
 
@@ -2887,9 +2890,9 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ai client not initialized"})
 		return
 	}
-	apiKey := ai.APIKeyFromEnv()
-	if apiKey == "" && !s.ai.DryRun {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ANTHROPIC_API_KEY not configured on server. Set it in .env or enable ANTHROPIC_DRY_RUN=true for stub responses."})
+	apiKey := ai.APIKeyForProvider(s.ai)
+	if apiKey == "" && !s.ai.IsDryRun() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "AI provider API key not configured on server. Set GEMINI_API_KEY / ANTHROPIC_API_KEY (matching AI_PROVIDER) in .env, or enable the matching *_DRY_RUN=true for stub responses."})
 		return
 	}
 
@@ -3061,9 +3064,9 @@ func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ai client not initialized"})
 		return
 	}
-	apiKey := ai.APIKeyFromEnv()
-	if apiKey == "" && !s.ai.DryRun {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ANTHROPIC_API_KEY not configured on server."})
+	apiKey := ai.APIKeyForProvider(s.ai)
+	if apiKey == "" && !s.ai.IsDryRun() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "AI provider API key not configured on server (check AI_PROVIDER + matching GEMINI_API_KEY / ANTHROPIC_API_KEY in .env)."})
 		return
 	}
 

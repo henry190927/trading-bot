@@ -89,9 +89,22 @@ type Response struct {
 }
 
 // EstimatedCostUSD returns a rough cost in dollars for a response.
-// Pricing as of 2026-06: Sonnet $3/MTok in, $15/MTok out; Opus $15/$75.
+// Pricing tables:
+//
+//	Gemini free-tier (any 2.0 model)  → $0 (free within RPD limits)
+//	Anthropic Claude Sonnet           → $3/MTok in, $15/MTok out
+//	Anthropic Claude Opus             → $15/MTok in, $75/MTok out
+//
+// Model field is prefixed "gemini:" for Gemini responses (see
+// GeminiClient.Send) so we can dispatch without a separate Provider field.
 // Adjust constants here when pricing changes.
 func (r Response) EstimatedCostUSD() float64 {
+	// Gemini free tier — all Google-served 2.x models are $0 within
+	// the free RPM/RPD limits. If we later move to paid Gemini
+	// (2.5 Pro, etc.) add explicit branches here.
+	if strings.HasPrefix(r.Model, "gemini") {
+		return 0
+	}
 	inRate := 3.0 / 1e6
 	outRate := 15.0 / 1e6
 	if strings.Contains(r.Model, "opus") {

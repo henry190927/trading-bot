@@ -67,18 +67,22 @@ func main() {
 		bxClient.DryRun = true
 		log.Printf("[BINGX_DRY_RUN=true] all write endpoints will log + return mock orderIds — no real orders sent")
 	}
-	aiClient := ai.New()
-	if ai.DryRunFromEnv() {
-		aiClient.DryRun = true
-		log.Printf("[ANTHROPIC_DRY_RUN=true] AI advisor calls will log + return stub response — no real Anthropic API calls")
-	} else if ai.APIKeyFromEnv() == "" {
-		log.Printf("[ai] ANTHROPIC_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable ANTHROPIC_DRY_RUN=true for testing.")
+	aiProvider, providerName := ai.NewProvider()
+	log.Printf("[ai] provider=%s dry_run=%v", providerName, aiProvider.IsDryRun())
+	if !aiProvider.IsDryRun() && ai.APIKeyForProvider(aiProvider) == "" {
+		switch providerName {
+		case "anthropic":
+			log.Printf("[ai] ANTHROPIC_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable ANTHROPIC_DRY_RUN=true.")
+		default:
+			log.Printf("[ai] GEMINI_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable GEMINI_DRY_RUN=true.")
+		}
 	}
 	srv := &server{
-		client:        bxClient,
-		ai:            aiClient,
-		aiCache:       make(map[int]aiCacheEntry),
-		aiSymbolCache: make(map[string]aiCacheEntry),
+		client:         bxClient,
+		ai:             aiProvider,
+		aiProviderName: providerName,
+		aiCache:        make(map[int]aiCacheEntry),
+		aiSymbolCache:  make(map[string]aiCacheEntry),
 	}
 	r.GET("/", srv.handleDashboard)
 	r.GET("/journal", srv.handleJournalList)
