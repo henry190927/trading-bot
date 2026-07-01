@@ -24,6 +24,15 @@ const (
 	// supports generateContent works.
 	DefaultGeminiModel = "gemini-2.5-flash"
 
+	// DefaultGeminiMaxTokens is intentionally 4× the shared
+	// DefaultMaxTokens because Gemini 2.5's internal reasoning tokens
+	// count against maxOutputTokens. With the 1200-token default the
+	// reasoning consumed the entire budget, leaving <100 tokens for
+	// visible text. 4800 gives ~3600-tok reasoning room + ~1200 tok
+	// visible response — the same effective output length Anthropic
+	// gets. Adjust when Gemini exposes a separate thinking budget.
+	DefaultGeminiMaxTokens = 4800
+
 	geminiAPIBase        = "https://generativelanguage.googleapis.com/v1beta/models/"
 	geminiRequestTimeout = 90 * time.Second // reasoning models are slower — allow more headroom than the 60s used for Anthropic
 )
@@ -83,7 +92,7 @@ func (g *GeminiClient) Send(ctx context.Context, opts SendOptions) (*Response, e
 	}
 	maxTokens := opts.MaxTokens
 	if maxTokens == 0 {
-		maxTokens = DefaultMaxTokens
+		maxTokens = DefaultGeminiMaxTokens
 	}
 
 	if g.DryRun {
@@ -166,6 +175,7 @@ func (g *GeminiClient) Send(ctx context.Context, opts SendOptions) (*Response, e
 		UsageMetadata struct {
 			PromptTokenCount     int `json:"promptTokenCount"`
 			CandidatesTokenCount int `json:"candidatesTokenCount"`
+			ThoughtsTokenCount   int `json:"thoughtsTokenCount"` // 2.5+ reasoning tokens (billable against maxOutputTokens)
 			TotalTokenCount      int `json:"totalTokenCount"`
 		} `json:"usageMetadata"`
 		ModelVersion string `json:"modelVersion"`
@@ -186,10 +196,14 @@ func (g *GeminiClient) Send(ctx context.Context, opts SendOptions) (*Response, e
 	if modelStamped == "" {
 		modelStamped = model
 	}
+	// Roll reasoning tokens into OutputTokens so the caller sees the full
+	// billable output count (matters for future paid tiers + rate-limit
+	// awareness). Free tier bills nothing either way.
+	outTok := decoded.UsageMetadata.CandidatesTokenCount + decoded.UsageMetadata.ThoughtsTokenCount
 	return &Response{
 		Text:         text.String(),
 		InputTokens:  decoded.UsageMetadata.PromptTokenCount,
-		OutputTokens: decoded.UsageMetadata.CandidatesTokenCount,
+		OutputTokens: outTok,
 		Model:        "gemini:" + modelStamped, // prefix so EstimatedCostUSD can identify provider
 		StopReason:   decoded.Candidates[0].FinishReason,
 	}, nil
