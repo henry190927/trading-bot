@@ -329,6 +329,34 @@ button.copy-btn.poc-drift {
     opacity: 0.5;
     cursor: wait;
 }
+/* Bilingual toggle for AI responses — EN / 繁 chip pair rendered by
+   /static/ai-render.js. Sits above the analysis body. Muted when
+   inactive, blue-filled when active. Small — chip metaphor, not CTA. */
+.ai-lang-toggle {
+    display: inline-flex;
+    gap: 0;
+    margin-bottom: 0.4rem;
+    border: 1px solid var(--blue);
+    border-radius: 4px;
+    overflow: hidden;
+    background: transparent;
+}
+.ai-lang-btn {
+    background: transparent;
+    border: 0;
+    color: var(--blue);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 12px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+    transition: background 100ms ease, color 100ms ease;
+}
+.ai-lang-btn + .ai-lang-btn { border-left: 1px solid var(--blue); }
+.ai-lang-btn:hover  { background: rgba(56, 139, 253, 0.12); }
+.ai-lang-btn.active { background: var(--blue); color: white; }
+
 .ai-result pre {
     background: var(--bg);
     padding: 0.4rem 0.6rem;

@@ -95,6 +95,25 @@
 // covers modern browsers, this script handles the rest.
 (function () {
     var pills = document.querySelectorAll('.tf-pill');
+
+    // Reconcile .active with the actual checked radio. Needed on initial
+    // load AND after bfcache restore (browser back button): the DOM may
+    // return with `.active` from the previous session's JS click while
+    // the checked radio is now a different pill, resulting in both pills
+    // looking blue. Reconcile on both DOMContentLoaded and pageshow.
+    function reconcile() {
+        pills.forEach(function (p) {
+            var radio = p.querySelector('input[type="radio"]');
+            if (radio && radio.checked) {
+                p.classList.add('active');
+            } else {
+                p.classList.remove('active');
+            }
+        });
+    }
+    reconcile();
+    window.addEventListener('pageshow', reconcile);
+
     pills.forEach(function (p) {
         var radio = p.querySelector('input[type="radio"]');
         if (!radio) return;

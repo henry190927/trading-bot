@@ -342,6 +342,7 @@
 </footer>
 
 <script src="/static/copy.js"></script>
+<script src="/static/ai-render.js"></script>
 <script>
 // Performance-group tab switcher. Each tab data-tab="X" maps to a panel
 // data-panel="X" in the same .pf-group. Remembers last selection across
@@ -430,39 +431,26 @@
             var id = btn.dataset.tradeId;
             var pane = document.querySelector('[data-pane-for="' + id + '"]');
             var body = document.querySelector('[data-body-for="' + id + '"]');
-            var meta = document.querySelector('[data-meta-for="' + id + '"]');
             if (!pane || !body) return;
             if (!pane.hidden) { pane.hidden = true; return; }
             pane.hidden = false;
-            // If already loaded, just re-show.
             if (body.dataset.loaded === '1') return;
             body.innerHTML = '<em class="ai-loading">Querying Quant advisor…</em>';
-            meta.textContent = '';
             btn.disabled = true;
             fetch('/ai/analyze/' + id, { method: 'POST' })
-                .then(function (r) {
-                    return r.json().then(function (j) { return { ok: r.ok, body: j }; });
-                })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                 .then(function (res) {
                     if (!res.ok) {
-                        body.innerHTML = '<div class="ai-error">⚠ ' + (res.body.error || 'unknown error') + '</div>';
+                        window.aiRender.renderInto(body, { error: res.body.error || 'unknown error' });
                         return;
                     }
-                    body.innerHTML = renderMD(res.body.text);
+                    window.aiRender.renderInto(body, res.body);
                     body.dataset.loaded = '1';
-                    var costStr = fmtCost(res.body.cost_usd);
-                    var cachedStr = res.body.cached ? ' · cached' : '';
-                    var tokStr = (res.body.input_tokens + res.body.output_tokens) > 0
-                        ? (res.body.input_tokens + '+' + res.body.output_tokens + ' tok ')
-                        : '';
-                    meta.textContent = tokStr + costStr + cachedStr;
                 })
                 .catch(function (e) {
-                    body.innerHTML = '<div class="ai-error">⚠ network error: ' + e + '</div>';
+                    window.aiRender.renderInto(body, { error: 'network error: ' + e });
                 })
-                .finally(function () {
-                    btn.disabled = false;
-                });
+                .finally(function () { btn.disabled = false; });
         });
     });
     document.querySelectorAll('.ai-close-btn').forEach(function (b) {

@@ -394,6 +394,7 @@
 </footer>
 
 <script src="/static/copy.js"></script>
+<script src="/static/ai-render.js"></script>
 <script src="/static/uplot/uPlot.iife.min.js"></script>
 <script src="/static/mini-chart.js"></script>
 <script>
@@ -460,23 +461,6 @@ window.refreshMgr = (function () {
 // to /ai/analyze/symbol/:short/:tf, subsequent clicks toggle visibility.
 // Server-side cache by (short, tf, signal-hash) prevents re-billing.
 (function () {
-    function fmtCost(usd) {
-        if (usd === 0) return '(DRY-RUN, $0)';
-        if (!usd) return '';
-        return '($' + usd.toFixed(4) + ')';
-    }
-    function renderMD(s) {
-        s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        s = s.replace(/```([\s\S]*?)```/g, function (_, code) { return '<pre><code>' + code + '</code></pre>'; });
-        s = s.replace(/^### (.+)$/gm, '<h4>$1</h4>');
-        s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-        s = s.replace(/^# (.+)$/gm,  '<h2>$1</h2>');
-        s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-        s = s.replace(/\*([^*]+)\*/g,     '<em>$1</em>');
-        s = s.replace(/`([^`]+)`/g,       '<code>$1</code>');
-        return s.replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>');
-    }
-
     document.querySelectorAll('.ai-analyze-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var sym = btn.dataset.symbol;
@@ -497,21 +481,15 @@ window.refreshMgr = (function () {
                 .then(function (res) {
                     btn.disabled = false;
                     if (!res.ok) {
-                        pane.innerHTML = '<div class="ai-error">⚠ ' + (res.body.error || 'unknown error') + '</div>';
+                        window.aiRender.renderInto(pane, { error: res.body.error || 'unknown error' });
                         return;
                     }
-                    var meta = '';
-                    var tok = (res.body.input_tokens + res.body.output_tokens) > 0
-                        ? (res.body.input_tokens + '+' + res.body.output_tokens + ' tok ')
-                        : '';
-                    var cached = res.body.cached ? ' · cached' : '';
-                    meta = '<div class="ai-meta">' + tok + fmtCost(res.body.cost_usd) + cached + '</div>';
-                    pane.innerHTML = '<div class="ai-body">' + renderMD(res.body.text) + '</div>' + meta;
+                    window.aiRender.renderInto(pane, res.body);
                     pane.dataset.loaded = '1';
                 })
                 .catch(function (err) {
                     btn.disabled = false;
-                    pane.innerHTML = '<div class="ai-error">⚠ network error: ' + err.message + '</div>';
+                    window.aiRender.renderInto(pane, { error: 'network error: ' + err.message });
                 });
         });
     });
