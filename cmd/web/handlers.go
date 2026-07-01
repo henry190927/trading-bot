@@ -1736,7 +1736,7 @@ func (s *server) handleAIAnalyzeTrade(c *gin.Context) {
 		Temperature: 0.3, // analytical determinism — low temp, not creative writing
 	})
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "anthropic call failed: " + err.Error()})
+		c.JSON(http.StatusBadGateway, gin.H{"error": "AI provider call failed: " + err.Error()})
 		return
 	}
 
@@ -3013,7 +3013,7 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 		Temperature: 0.3,
 	})
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "anthropic call failed: " + err.Error()})
+		c.JSON(http.StatusBadGateway, gin.H{"error": "AI provider call failed: " + err.Error()})
 		return
 	}
 
@@ -3185,7 +3185,7 @@ func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
 		Temperature: 0.3,
 	})
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "anthropic call failed: " + err.Error()})
+		c.JSON(http.StatusBadGateway, gin.H{"error": "AI provider call failed: " + err.Error()})
 		return
 	}
 	cost := resp.EstimatedCostUSD()
