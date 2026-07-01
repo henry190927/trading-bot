@@ -461,6 +461,17 @@ window.refreshMgr = (function () {
 // to /ai/analyze/symbol/:short/:tf, subsequent clicks toggle visibility.
 // Server-side cache by (short, tf, signal-hash) prevents re-billing.
 (function () {
+    // Track which panes are currently open. When count > 0, we pause the
+    // 30s auto-refresh so it doesn't wipe an analysis mid-read. Resume
+    // once all panes are closed again. Uses refreshMgr's pause counter,
+    // so it composes correctly with legend / chart modals.
+    var openPanes = 0;
+    function panePaused() { openPanes++; window.refreshMgr.pause(); }
+    function paneResumed() {
+        if (openPanes > 0) openPanes--;
+        window.refreshMgr.resume();
+    }
+
     document.querySelectorAll('.ai-analyze-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var sym = btn.dataset.symbol;
@@ -470,9 +481,17 @@ window.refreshMgr = (function () {
             if (!pane) return;
             if (!pane.classList.contains('hidden')) {
                 pane.classList.add('hidden');
+                if (pane.dataset.wasPaused === '1') {
+                    pane.dataset.wasPaused = '0';
+                    paneResumed();
+                }
                 return;
             }
             pane.classList.remove('hidden');
+            if (pane.dataset.wasPaused !== '1') {
+                pane.dataset.wasPaused = '1';
+                panePaused();
+            }
             if (pane.dataset.loaded === '1') return;
             pane.innerHTML = '<em class="ai-loading">Querying Quant advisor for ' + sym + ' ' + tf + '…</em>';
             btn.disabled = true;
