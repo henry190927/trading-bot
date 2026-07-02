@@ -75,16 +75,26 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 		sb.WriteString(fmt.Sprintf("margin         : %.2f USDT (notional %.2f)\n", t.MarginUSDT, t.MarginUSDT*float64(t.Leverage)))
 	}
 	sb.WriteString(fmt.Sprintf("opened_at      : %s\n", t.OpenedAt.Local().Format("2006-01-02 15:04 -0700")))
-	if !t.FilledAt.IsZero() {
+	// Explicit tri-state status. The previous binary "OPEN vs CLOSED"
+	// let the LLM assume "OPEN" meant "position live", including for
+	// LIMIT orders that had never filled — LLM would then invent
+	// unrealized R math from mark vs entry, misleading the reader.
+	// Now: PENDING / OPEN / CLOSED are called out, and pending trades
+	// carry an explicit "do not compute unrealized R" directive.
+	switch {
+	case !t.ClosedAt.IsZero():
 		sb.WriteString(fmt.Sprintf("filled_at      : %s\n", t.FilledAt.Local().Format("2006-01-02 15:04 -0700")))
-	}
-	if !t.ClosedAt.IsZero() {
-		sb.WriteString(fmt.Sprintf("closed_at      : %s (outcome=%s, R=%+.3f)\n", t.ClosedAt.Local().Format("2006-01-02 15:04 -0700"), t.Outcome, t.RRealized))
+		sb.WriteString(fmt.Sprintf("closed_at      : %s\n", t.ClosedAt.Local().Format("2006-01-02 15:04 -0700")))
+		sb.WriteString(fmt.Sprintf("status         : CLOSED (outcome=%s, R=%+.3f)\n", t.Outcome, t.RRealized))
 		if t.ExitPrice != 0 {
 			sb.WriteString(fmt.Sprintf("exit_price     : %.4f\n", t.ExitPrice))
 		}
-	} else {
-		sb.WriteString("status         : OPEN\n")
+	case !t.FilledAt.IsZero():
+		sb.WriteString(fmt.Sprintf("filled_at      : %s\n", t.FilledAt.Local().Format("2006-01-02 15:04 -0700")))
+		sb.WriteString("status         : OPEN (LIMIT filled, position live)\n")
+	default:
+		sb.WriteString("filled_at      : (LIMIT NOT YET FILLED)\n")
+		sb.WriteString("status         : PENDING — LIMIT order placed but not triggered. NO position exists yet. Do NOT compute unrealized R or describe the trade as 'in profit' / 'in drawdown'. The correct focus for pending trades is: (a) is the LIMIT price still valid given current mark? (b) has the setup thesis broken? (c) should the pending order be cancelled or held?\n")
 	}
 	sb.WriteString("```\n\n")
 

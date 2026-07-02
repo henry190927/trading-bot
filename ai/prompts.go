@@ -110,14 +110,20 @@ Implications you should USE in analyses:
 
 The user message header signals which flavor this is; match its focus:
 
-**A. "# Trade analysis request" (Portfolio per-trade)** — analyzing a specific committed / closed trade.
-   Use this skeleton (adapt headings as data demands):
-   1. **Status snapshot** (table): plan vs current mark, distance to SL/TP, unrealized/realized R, time in trade.
-   2. **Setup quality** vs backtest table: where does this score/symbol/TF sit? Flag below-threshold combos.
-   3. **Path observation**: what actually happened since fill? Reference peak/trough R, TP/SL touch history.
-   4. **Regime context**: POC drift, VA position, HVN structure, higher-TF bias, macro window, funding regime.
-   5. **Honest verdict** for open trades ("I'd hold / cut / can't tell without X"), or **post-mortem lesson** for closed ones — pattern-name-able, actionable next time. NEVER compute "what-if-held" hindsight on closed trades.
-   Target length: **400–800 words** when data is rich; shorter is OK only if trade is trivial (score 0 + no fill).
+**A. "# Trade analysis request" (Portfolio per-trade)** — analyzing a specific trade. FIRST check the "status" field in the trade plan block — behavior depends on it:
+
+- **status: PENDING** (LIMIT not yet filled) — no position exists. NEVER compute unrealized R, NEVER say "in profit / drawdown / approaching TP". Focus: (a) is the LIMIT still on-thesis given current mark? (b) is the setup expiring / has anchor decayed? (c) should the pending order be cancelled, tweaked, or held? Length can be shorter (250–500 words) since there's no path history.
+- **status: OPEN** (filled, position live) — full skeleton below. Compute unrealized R from live mark.
+- **status: CLOSED** — post-mortem skeleton. Compute realized R from exit_price. NEVER compute "what-if-held" hindsight.
+
+Default skeleton for OPEN / CLOSED (adapt headings as data demands):
+1. **Status snapshot** (table): plan vs current/exit mark, distance to SL/TP, unrealized/realized R, time in trade.
+2. **Setup quality** vs backtest table: where does this score/symbol/TF sit? Flag below-threshold combos.
+3. **Path observation**: what actually happened since fill? Reference peak/trough R, TP/SL touch history.
+4. **Regime context**: POC drift, VA position, HVN structure, higher-TF bias, macro window, funding regime.
+5. **Honest verdict** for OPEN ("I'd hold / cut / can't tell without X"), or **post-mortem lesson** for CLOSED — pattern-name-able, actionable next time.
+
+Target length: **400–800 words** for OPEN/CLOSED when data is rich; shorter for PENDING or trivial cases.
 
 **B. "# Symbol analysis request" (Dashboard card)** — evaluating a live setup, no committed trade yet.
    Skeleton:
