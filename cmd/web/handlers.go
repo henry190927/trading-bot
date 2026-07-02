@@ -1642,8 +1642,9 @@ func (s *server) handleAIAnalyzeTrade(c *gin.Context) {
 
 	// Cache hit? Return immediately.
 	s.aiCacheMu.Lock()
-	if cached, ok := s.aiCache[t.ID]; ok {
-		s.aiCacheMu.Unlock()
+	entry, present := s.aiCache[t.ID]
+	s.aiCacheMu.Unlock()
+	if cached, ok := aiCacheHit(entry, present); ok {
 		c.JSON(http.StatusOK, gin.H{
 			"text":          cached.Text,
 			"input_tokens":  cached.InputTokens,
@@ -1654,7 +1655,6 @@ func (s *server) handleAIAnalyzeTrade(c *gin.Context) {
 		})
 		return
 	}
-	s.aiCacheMu.Unlock()
 
 	// Gather context. Each fetcher is best-effort; missing data just
 	// means the LLM sees a smaller prompt, not an error.
@@ -2919,12 +2919,14 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "scan failed: " + view.Err})
 		return
 	}
-	cacheKey := fmt.Sprintf("%s|%s|%d|%d|%d|%s", short, tfStr,
-		view.Signal.Score, view.Signal.MRScore, view.Signal.MomentumScore,
-		signalCacheTag(view))
+	// Relaxed cache key: signalCacheTag encodes verdict-band + score-band +
+	// side + anchor-type. No raw Score/MR/MOM ints — same-band bar wiggles
+	// share cache. See signalCacheTag comment for full inclusion list.
+	cacheKey := fmt.Sprintf("%s|%s|%s", short, tfStr, signalCacheTag(view))
 	s.aiSymbolCacheMu.Lock()
-	if cached, ok := s.aiSymbolCache[cacheKey]; ok {
-		s.aiSymbolCacheMu.Unlock()
+	entry, present := s.aiSymbolCache[cacheKey]
+	s.aiSymbolCacheMu.Unlock()
+	if cached, ok := aiCacheHit(entry, present); ok {
 		c.JSON(http.StatusOK, gin.H{
 			"text":          cached.Text,
 			"input_tokens":  cached.InputTokens,
@@ -2935,7 +2937,6 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 		})
 		return
 	}
-	s.aiSymbolCacheMu.Unlock()
 
 	// Fetch funding rate for the "Live market context" section. Best-effort.
 	var fundingRate float64
@@ -3105,14 +3106,17 @@ func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
 	const dashboardFeeBps = 6.0
 	d := validator.Validate(sym, tf, side, entry, dashboardFeeBps, candles, markPrice)
 
-	// Cache key includes user-proposed entry rounded to 4dp + engine
-	// signal hash so an unchanged proposal doesn't re-bill.
+	// Cache key: proposed side + entry (rounded to 3dp so tiny tweaks share)
+	// + signalCacheTag. Validate is user-hypothesis-driven so the proposed
+	// entry MUST stay in the key — same setup with a different proposed
+	// entry is a different question.
 	view := symbolView{Signal: signal.Evaluate(signal.Inputs{Symbol: sym, Timeframe: tf, Candles: candles, LiveMarkPrice: markPrice}), Diagnose: &d}
-	cacheKey := fmt.Sprintf("validate|%s|%s|%s|%.4f|%d|%s",
-		short, tfStr, sideStr, entry, view.Signal.Score, signalCacheTag(view))
+	cacheKey := fmt.Sprintf("validate|%s|%s|%s|%.3f|%s",
+		short, tfStr, sideStr, entry, signalCacheTag(view))
 	s.aiSymbolCacheMu.Lock()
-	if cached, ok := s.aiSymbolCache[cacheKey]; ok {
-		s.aiSymbolCacheMu.Unlock()
+	entry2, present := s.aiSymbolCache[cacheKey]
+	s.aiSymbolCacheMu.Unlock()
+	if cached, ok := aiCacheHit(entry2, present); ok {
 		c.JSON(http.StatusOK, gin.H{
 			"text":          cached.Text,
 			"input_tokens":  cached.InputTokens,
@@ -3123,7 +3127,6 @@ func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
 		})
 		return
 	}
-	s.aiSymbolCacheMu.Unlock()
 
 	// Build the LLM context. Reuse SymbolAnalysisInputs but flag the
 	// rule-based summary to emphasize this is a USER hypothesis, not
@@ -3212,8 +3215,23 @@ func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
 }
 
 // signalCacheTag derives a stable per-setup hash component so cache
-// keys turn over only on meaningful changes (verdict-band / anchor /
-// regime), not on every dashboard refresh's tiny price drift.
+// keys turn over only on meaningful changes (verdict-band / side flip
+// / score band crossing MIN_SCORE / anchor type), not on every dashboard
+// refresh's tiny price drift or single-bar score wiggle.
+//
+// Included in the hash:
+//   - Signal.Side           (Flat ↔ Long ↔ Short — direction flip)
+//   - Diagnose side          (validator's own pick)
+//   - Verdict band           (STRONG / TAKE / NEUTRAL / WEAK / AVOID)
+//   - Score band             ("below-min" <3, "min" 3-4, "strong" 5+)
+//   - Anchor type            (sweep_high / sweep_low / fib_618 / ...)
+//
+// Explicitly EXCLUDED (moved to relaxation vs the old key):
+//   - Exact Score / MRScore / MomentumScore ints — a 3→4 tick is noise
+//   - Exact Total /10 float — 7.4 vs 7.6 within same band is noise
+//   - POC drift %             — small % moves shouldn't bust cache
+//   - Precise Anchor price    — same anchor type, different price is
+//                                the same shape of setup
 func signalCacheTag(v symbolView) string {
 	verdict := ""
 	side := ""
@@ -3221,9 +3239,46 @@ func signalCacheTag(v symbolView) string {
 		verdict = verdictShortHelper(v.Diagnose.Verdict)
 		side = v.Diagnose.Side.String()
 	}
-	anchor := ""
-	if v.Signal.Plan.Anchor != "" {
-		anchor = v.Signal.Plan.Anchor
+	// Anchor is stored as "<type> @ <price>" — strip the price part
+	// so the same anchor type at slightly different price levels shares
+	// cache.
+	anchor := v.Signal.Plan.Anchor
+	if i := strings.Index(anchor, " @ "); i > 0 {
+		anchor = anchor[:i]
 	}
-	return fmt.Sprintf("%s|%s|%s|%s", v.Signal.Side, side, verdict, anchor)
+	scoreBand := "below-min"
+	switch {
+	case v.Signal.Score >= 5:
+		scoreBand = "strong"
+	case v.Signal.Score >= 3:
+		scoreBand = "min"
+	}
+	return fmt.Sprintf("%s|%s|%s|%s|%s", v.Signal.Side, side, verdict, scoreBand, anchor)
+}
+
+// aiCacheTTL is how long a cached AI response stays valid before the
+// next Analyze click triggers a fresh call, even if the signal hash
+// hasn't changed. Prevents overnight stale entries — 4h keeps intra-
+// session reuse tight while ensuring next-day sessions get fresh reads.
+// Override via AI_CACHE_TTL_MINUTES env var (0 = never expire).
+var aiCacheTTL = func() time.Duration {
+	if s := os.Getenv("AI_CACHE_TTL_MINUTES"); s != "" {
+		var m int
+		if _, err := fmt.Sscanf(s, "%d", &m); err == nil && m >= 0 {
+			return time.Duration(m) * time.Minute
+		}
+	}
+	return 4 * time.Hour
+}()
+
+// aiCacheHit checks whether an entry is present AND not expired per
+// aiCacheTTL. Returns (entry, true) on hit, zero + false on miss.
+func aiCacheHit(entry aiCacheEntry, ok bool) (aiCacheEntry, bool) {
+	if !ok {
+		return aiCacheEntry{}, false
+	}
+	if aiCacheTTL > 0 && time.Since(entry.GeneratedAt) > aiCacheTTL {
+		return aiCacheEntry{}, false
+	}
+	return entry, true
 }
