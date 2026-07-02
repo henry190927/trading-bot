@@ -901,6 +901,20 @@ footer {
     background: rgba(255,255,255,0.06);
     font-weight: 600;
 }
+/* AI markdown block spacing — tight but readable. Paragraphs, lists,
+   headers each carry a small margin. Adjacent block-level elements
+   collapse naturally through browser margin logic — no <br>s. */
+.ai-body p,
+.ai-analysis-body p    { margin: 0.4rem 0; }
+.ai-body h2, .ai-analysis-body h2 { margin: 0.7rem 0 0.3rem; font-size: 1.1rem; }
+.ai-body h3, .ai-analysis-body h3 { margin: 0.6rem 0 0.3rem; font-size: 1.0rem; }
+.ai-body h4, .ai-analysis-body h4 { margin: 0.5rem 0 0.25rem; font-size: 0.95rem; }
+.ai-body h5, .ai-analysis-body h5 { margin: 0.4rem 0 0.2rem; font-size: 0.9rem; }
+.ai-md-list {
+    margin: 0.3rem 0;
+    padding-left: 1.3rem;
+}
+.ai-md-list li { margin: 0.15rem 0; }
 .ai-loading { color: var(--muted, #8b949e); }
 .ai-error {
     color: var(--red);
