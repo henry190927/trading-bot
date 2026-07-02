@@ -139,6 +139,25 @@
 </section>
 
 <section class="ops-block">
+  <h2>AI advisor model <span class="hint">(applies to /ai/analyze/* endpoints)</span></h2>
+  <div class="field-row">
+    <div class="field">
+      <label for="ops-ai-model">Active model</label>
+      <select id="ops-ai-model" disabled>
+        <option value="">— loading —</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Provider</label>
+      <span class="ops-config-pill" id="ops-ai-provider">—</span>
+    </div>
+  </div>
+  <div class="hint" id="ops-ai-model-hint" style="margin-top: 0.4rem;">
+    Change takes effect immediately for new Analyze clicks. Choice persisted to <code>/opt/trading/ai_model.txt</code>, survives restart.
+  </div>
+</section>
+
+<section class="ops-block">
   <h2>Live log <span class="hint">(tailing <code>journalctl -u &lt;service&gt; -f</code>)</span></h2>
   <div class="ops-log-tabs" role="tablist">
     <button type="button" class="ops-log-tab active" data-log-service="trading-bot">trading-bot</button>
@@ -410,6 +429,68 @@
     });
 
     connectLogs();
+
+    // ─── AI advisor model selector ────────────────────────────────────
+    // GET current model + filtered available list, populate dropdown.
+    // On change, POST immediately; server validates + persists to file
+    // so restart preserves the choice. Toast confirms success.
+    var aiModelSel = document.getElementById('ops-ai-model');
+    var aiProvider = document.getElementById('ops-ai-provider');
+    var aiHint     = document.getElementById('ops-ai-model-hint');
+    function loadAIModel() {
+        fetch('/api/ai/model')
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (!res.ok) {
+                    aiModelSel.innerHTML = '<option value="">(error)</option>';
+                    aiHint.textContent = '⚠ ' + (res.body.error || 'failed to load models');
+                    return;
+                }
+                aiProvider.textContent = res.body.provider || '—';
+                var avail = res.body.available || [];
+                var cur = res.body.current || '';
+                if (!avail.length) {
+                    aiModelSel.innerHTML = '<option value="">' + (cur || '(no models)') + '</option>';
+                    aiModelSel.disabled = true;
+                    return;
+                }
+                var opts = avail.map(function (m) {
+                    return '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + m + '</option>';
+                }).join('');
+                aiModelSel.innerHTML = opts;
+                aiModelSel.disabled = false;
+            })
+            .catch(function (e) {
+                aiModelSel.innerHTML = '<option value="">(network error)</option>';
+                aiHint.textContent = '⚠ ' + e.message;
+            });
+    }
+    aiModelSel.addEventListener('change', function () {
+        var v = aiModelSel.value;
+        if (!v) return;
+        aiModelSel.disabled = true;
+        var fd = new URLSearchParams(); fd.append('model', v);
+        fetch('/api/ai/model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: fd.toString(),
+        })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+            aiModelSel.disabled = false;
+            if (!res.ok) {
+                showToast('⚠ ' + (res.body.error || 'save failed'), 'error');
+                loadAIModel(); // re-sync UI to server truth
+                return;
+            }
+            showToast('✓ Model set to ' + res.body.current, 'success');
+        })
+        .catch(function (e) {
+            aiModelSel.disabled = false;
+            showToast('⚠ network: ' + e.message, 'error');
+        });
+    });
+    loadAIModel();
 })();
 </script>
 </body>

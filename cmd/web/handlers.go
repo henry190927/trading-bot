@@ -36,6 +36,11 @@ type server struct {
 	// "gemini(fallback-from-xxx)") for logs + cache-key namespacing.
 	aiProviderName string
 
+	// aiModelPath is the on-disk file the /api/ai/model UI writes so
+	// the admin's model choice survives restarts. Read on boot (see
+	// main.go LoadPersistedModel), written on each POST.
+	aiModelPath string
+
 	// aiCache memoizes /ai/analyze responses by trade ID so repeat
 	// clicks (page refresh, accordion re-open) don't re-bill against
 	// the user's token budget. Invalidated when the trade row is
@@ -3226,4 +3231,71 @@ func signalCacheTag(v symbolView) string {
 		anchor = v.Signal.Plan.Anchor
 	}
 	return fmt.Sprintf("%s|%s|%s|%s", v.Signal.Side, side, verdict, anchor)
+}
+
+// handleAIModelGet returns the current AI model + the list of models
+// available on the configured provider. UI populates a dropdown from
+// this. Only meaningful when provider is Gemini — Anthropic doesn't
+// expose a ListModels equivalent for this purpose.
+func (s *server) handleAIModelGet(c *gin.Context) {
+	gc, ok := s.ai.(*ai.GeminiClient)
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{
+			"provider":  s.aiProviderName,
+			"current":   "(provider does not support runtime model switch)",
+			"available": []string{},
+		})
+		return
+	}
+	apiKey := ai.APIKeyForProvider(s.ai)
+	models, err := gc.ListModels(c.Request.Context(), apiKey)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "list models failed: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"provider":  s.aiProviderName,
+		"current":   gc.CurrentModel(),
+		"available": models,
+	})
+}
+
+// handleAIModelPost sets the active AI model. Validates against
+// ListModels' filtered list, updates in-memory + persists to
+// s.aiModelPath. Body: form field "model=<name>".
+func (s *server) handleAIModelPost(c *gin.Context) {
+	gc, ok := s.ai.(*ai.GeminiClient)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "provider does not support runtime model switch"})
+		return
+	}
+	name := strings.TrimSpace(c.PostForm("model"))
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model field required"})
+		return
+	}
+	apiKey := ai.APIKeyForProvider(s.ai)
+	models, err := gc.ListModels(c.Request.Context(), apiKey)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "list models failed: " + err.Error()})
+		return
+	}
+	// Validate: must be in the filtered available list.
+	valid := false
+	for _, m := range models {
+		if m == name {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model not in available list; refresh /api/ai/model"})
+		return
+	}
+	gc.SetModel(name)
+	if err := gc.PersistModel(s.aiModelPath); err != nil {
+		log.Printf("[ai] persist model failed (in-memory change still applied): %v", err)
+	}
+	log.Printf("[ai] runtime model changed to %s (persisted to %s)", name, s.aiModelPath)
+	c.JSON(http.StatusOK, gin.H{"current": name, "persisted": true})
 }

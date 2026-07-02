@@ -68,6 +68,13 @@ func main() {
 		log.Printf("[BINGX_DRY_RUN=true] all write endpoints will log + return mock orderIds — no real orders sent")
 	}
 	aiProvider, providerName := ai.NewProvider()
+	// If provider is Gemini, load any persisted model choice from disk.
+	// The UI's /api/ai/model POST writes here after each admin change.
+	const aiModelPath = "/opt/trading/ai_model.txt"
+	if gc, ok := aiProvider.(*ai.GeminiClient); ok {
+		gc.LoadPersistedModel(aiModelPath)
+		log.Printf("[ai] gemini active model: %s", gc.CurrentModel())
+	}
 	log.Printf("[ai] provider=%s dry_run=%v", providerName, aiProvider.IsDryRun())
 	if !aiProvider.IsDryRun() && ai.APIKeyForProvider(aiProvider) == "" {
 		switch providerName {
@@ -81,6 +88,7 @@ func main() {
 		client:         bxClient,
 		ai:             aiProvider,
 		aiProviderName: providerName,
+		aiModelPath:    aiModelPath,
 		aiCache:        make(map[int]aiCacheEntry),
 		aiSymbolCache:  make(map[string]aiCacheEntry),
 	}
@@ -97,6 +105,8 @@ func main() {
 	r.POST("/ai/analyze/:id", srv.handleAIAnalyzeTrade)
 	r.POST("/ai/analyze/symbol/:short/:tf", srv.handleAIAnalyzeSymbol)
 	r.POST("/ai/analyze/validate", srv.handleAIAnalyzeValidate)
+	r.GET("/api/ai/model", srv.handleAIModelGet)
+	r.POST("/api/ai/model", srv.handleAIModelPost)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
 	r.GET("/ops", srv.handleOpsPage)
