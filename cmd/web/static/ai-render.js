@@ -54,7 +54,14 @@
             }
         }
         if (inTable) out.push('</table>');
-        return out.join('\n').replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>');
+        var joined = out.join('\n').replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>');
+        // Block-level HTML (headers h2-h5, tables, pre) already carries its
+        // own vertical margin. Any <br>s we inserted next to them stack on
+        // top of that margin — the gap balloons. Strip <br>s immediately
+        // before or after block-level tags so spacing comes from CSS only.
+        return joined
+            .replace(/(<\/(?:h[2-5]|table|pre)>)(<br>)+/g, '$1')
+            .replace(/(<br>)+(<(?:h[2-5]|table|pre)[\s>])/g, '$2');
     }
 
     // Extract [EN]/[ZH-TW] blocks. Returns {en, zh, hasBoth}. If either
