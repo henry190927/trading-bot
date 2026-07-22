@@ -819,6 +819,78 @@ footer {
     border: 1px solid var(--yellow);
 }
 
+/* Tradeable-signals banner — renders when the current TF has any
+   symbol with side!=Flat AND score >= MIN_SCORE (i.e. the ntfy-worthy
+   condition). Row per signal, click jumps to the corresponding
+   symbol card via #card-XXX anchor. */
+.tradeable-banner {
+    background: linear-gradient(90deg, rgba(46,160,67,0.10), rgba(56,139,253,0.08));
+    border-left: 3px solid var(--green);
+    border-radius: 0 6px 6px 0;
+    padding: 0.6rem 0.9rem;
+    margin-bottom: 1rem;
+}
+.tradeable-banner-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+.tradeable-banner-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--green);
+}
+.tradeable-banner .hint { color: var(--text-dim); font-size: 0.8rem; }
+.tradeable-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.tradeable-chip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.7rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 4px 6px 6px 4px;
+    text-decoration: none;
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.85rem;
+    transition: background 100ms ease, border-color 100ms ease;
+}
+.tradeable-chip:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--blue);
+}
+.tradeable-chip.tradeable-long  { border-left-color: var(--green); }
+.tradeable-chip.tradeable-short { border-left-color: var(--red); }
+.tradeable-chip .tb-sym    { font-weight: 700; }
+.tradeable-chip .tb-side   { font-weight: 700; }
+.tradeable-chip.tradeable-long  .tb-side { color: var(--green); }
+.tradeable-chip.tradeable-short .tb-side { color: var(--red); }
+.tradeable-chip .tb-score  { color: var(--text-dim); font-size: 0.8rem; }
+.tradeable-chip .tb-ratio  { color: var(--blue); }
+.tradeable-chip .tb-anchor { color: var(--text-dim); font-size: 0.78rem; font-style: italic; }
+
+/* Small count badge in the Symbol scan section title */
+.tradeable-count-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    margin-left: 0.4rem;
+    background: rgba(46,160,67,0.15);
+    color: var(--green);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
 /* AI Analyze button + per-trade analysis pane. Lives inside .trade-card
    on /journal. Styled to read as an inline collapsible note, not a
    modal — the user is reviewing the trade alongside other journal rows. */

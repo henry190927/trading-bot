@@ -175,13 +175,53 @@ func (s *server) handleDashboard(c *gin.Context) {
 		}
 	}
 
+	const minTradeable = 3
+	// Tradeable signals summary for the top-of-page banner. Filters the
+	// 4 symbol views on the CURRENT TF down to just the ones that would
+	// fire ntfy (side != Flat AND score >= MIN_SCORE). Saves the user
+	// from scanning all four cards to find which one has an actionable
+	// setup — parallels the "ntfy pushed but I'm already on the page"
+	// use case.
+	type tradeableSummary struct {
+		Short    string
+		TF       string
+		Side     string
+		Score    int
+		MRScore  int
+		MOMScore int
+		Anchor   string
+		Ratio    float64
+		Verdict  string
+	}
+	var tradeable []tradeableSummary
+	for _, v := range views {
+		if v.Signal.Side == signal.Flat || v.Signal.Score < minTradeable {
+			continue
+		}
+		t := tradeableSummary{
+			Short:    v.Short,
+			TF:       tf,
+			Side:     v.Signal.Side.String(),
+			Score:    v.Signal.Score,
+			MRScore:  v.Signal.MRScore,
+			MOMScore: v.Signal.MomentumScore,
+			Anchor:   v.Signal.Plan.Anchor,
+		}
+		if v.Diagnose != nil {
+			t.Ratio = v.Diagnose.Total
+			t.Verdict = verdictShortHelper(v.Diagnose.Verdict)
+		}
+		tradeable = append(tradeable, t)
+	}
+
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"TF":              tf,
 		"Symbols":         views,
+		"Tradeable":       tradeable,
 		"OpenTrades":      openTrades,
 		"Now":             time.Now().Format("2006-01-02 15:04:05"),
 		"TFOptions":       []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
-		"MinTradeable":    3,
+		"MinTradeable":    minTradeable,
 		"MacroActive":     activeBO,
 		"MacroUpcoming":   upcomingBO,
 		"MacroUpcomingIn": upcomingIn,

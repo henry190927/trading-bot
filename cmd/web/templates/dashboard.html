@@ -50,6 +50,26 @@
   </div>
 {{end}}
 
+{{if .Tradeable}}
+<section class="tradeable-banner" role="status" aria-label="tradeable signals on this timeframe">
+  <div class="tradeable-banner-head">
+    <span class="tradeable-banner-title">⚡ Tradeable signals</span>
+    <span class="hint">TF {{.TF}} · engine score ≥ {{.MinTradeable}} · tap a row to jump to its card</span>
+  </div>
+  <div class="tradeable-list">
+    {{range .Tradeable}}
+      <a href="#card-{{.Short}}" class="tradeable-chip tradeable-{{if eq .Side "LONG"}}long{{else}}short{{end}}">
+        <span class="tb-sym">{{.Short}} {{.TF}}</span>
+        <span class="tb-side">{{.Side}}</span>
+        <span class="tb-score">MR {{.MRScore}} · MOM {{.MOMScore}} · total {{.Score}}</span>
+        {{if gt .Ratio 0.0}}<span class="tb-ratio">{{printf "%.1f" .Ratio}}/10 {{.Verdict}}</span>{{end}}
+        {{if .Anchor}}<span class="tb-anchor">{{.Anchor}}</span>{{end}}
+      </a>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
 {{if .OpenTrades}}
 <section class="dashboard-section open-trades-section">
   <h2 class="section-title">
@@ -141,6 +161,7 @@
     Symbol scan
     <button type="button" class="info-btn" aria-label="legend" title="What do these chips and lines mean?">i</button>
     <span class="section-meta">{{.TF}}</span>
+    {{if .Tradeable}}<span class="tradeable-count-badge" title="tradeable signals on this TF">{{len .Tradeable}} tradeable</span>{{end}}
     <div class="chart-style-toggle" role="group" aria-label="chart style">
       <button type="button" class="cs-btn" data-mode="line" aria-pressed="false">Line</button>
       <button type="button" class="cs-btn active" data-mode="candle" aria-pressed="true">Candles</button>
@@ -148,7 +169,7 @@
   </h2>
 
 {{range .Symbols}}
-  <section class="symbol-card {{if hasPlan .Signal}}has-plan{{end}}">
+  <section id="card-{{.Short}}" class="symbol-card {{if hasPlan .Signal}}has-plan{{end}}">
     <div class="card-head">
       <span class="sym">{{.Short}}</span>
       <span class="price-wrap">
