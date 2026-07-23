@@ -1,0 +1,59 @@
+[
+  { "chain": "bsc",  "address": "0x8894e0a0c962cb723c1976a4421c95949be2d4e3", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0xf977814e90da44bfa03b6295a0616a897441acec", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0x28c6c06298d514db089934071355e5743bf21d60", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be", "exchange": "Binance", "type": "cold" },
+  { "chain": "bsc",  "address": "0xdccf3b77da55107280bd850ea519df3705d1a75a", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0xe2fc31f816a9b94326492132018c3aecc4a93ae1", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0x9696f59e4d72e237be84ffd425dcad154bf96976", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0x515b72ed8a97f42c568d6a143232775018f133c8", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0x161ba15a5f335c9f06bb5bbb0a9ce14076fbb645", "exchange": "Binance", "type": "hot" },
+  { "chain": "bsc",  "address": "0xbe0eb53f46cd790cd13851d5eff43d12404d33e8", "exchange": "Binance", "type": "cold" },
+
+  { "chain": "eth",  "address": "0x28c6c06298d514db089934071355e5743bf21d60", "exchange": "Binance", "type": "hot" },
+  { "chain": "eth",  "address": "0xdfd5293d8e347dfe59e90efd55b2956a1343963d", "exchange": "Binance", "type": "hot" },
+  { "chain": "eth",  "address": "0x21a31ee1afc51d94c2efccaa2092ad1028285549", "exchange": "Binance", "type": "hot" },
+  { "chain": "eth",  "address": "0x56eddb7aa87536c09ccc2793473599fd21a8b17f", "exchange": "Binance", "type": "hot" },
+  { "chain": "eth",  "address": "0x9696f59e4d72e237be84ffd425dcad154bf96976", "exchange": "Binance", "type": "hot" },
+  { "chain": "eth",  "address": "0x4d9ff67fd748ec4f0090ce885dd18a2f6e0feb9e", "exchange": "Binance", "type": "hot" },
+  { "chain": "eth",  "address": "0xf977814e90da44bfa03b6295a0616a897441acec", "exchange": "Binance", "type": "hot" },
+  { "chain": "eth",  "address": "0xbe0eb53f46cd790cd13851d5eff43d12404d33e8", "exchange": "Binance", "type": "cold" },
+
+  { "chain": "bsc",  "address": "0x0d0707963952f2fba59dd06f2b425ace40b492fe", "exchange": "Gate.io", "type": "hot" },
+  { "chain": "eth",  "address": "0x1c4b70a3968436b9a0a9cf5205c787eb81bb558c", "exchange": "Gate.io", "type": "hot" },
+
+  { "chain": "bsc",  "address": "0xf89d7b9c864f589bbf53a82105107622b35eaa40", "exchange": "Bybit", "type": "hot" },
+  { "chain": "eth",  "address": "0xf89d7b9c864f589bbf53a82105107622b35eaa40", "exchange": "Bybit", "type": "hot" },
+  { "chain": "eth",  "address": "0xa7a93fd0a276fc1c0197a5b5623ed117786eed06", "exchange": "Bybit", "type": "hot" },
+
+  { "chain": "bsc",  "address": "0xa7f4441ad76aeaa2c5f36bd7d2c9139a99d78d92", "exchange": "OKX", "type": "hot" },
+  { "chain": "eth",  "address": "0x236f9f97e0e62388479bf9e5ba4889e46b0273c3", "exchange": "OKX", "type": "hot" },
+  { "chain": "eth",  "address": "0x6cc5f688a315f3dc28a7781717a9a798a59fda7b", "exchange": "OKX", "type": "hot" },
+  { "chain": "eth",  "address": "0x5041ed759dd4afc3a72b8192c143f72f4724081a", "exchange": "OKX", "type": "hot" },
+
+  { "chain": "bsc",  "address": "0x0681d8db095565fe8a346fa0277bffde9c0edbbf", "exchange": "Kraken", "type": "hot" },
+  { "chain": "eth",  "address": "0x2910543af39aba0cd09dbb2d50200b3e800a63d2", "exchange": "Kraken", "type": "hot" },
+  { "chain": "eth",  "address": "0xae2d4617c862309a3d75a0ffb358c7a5009c673f", "exchange": "Kraken", "type": "hot" },
+
+  { "chain": "eth",  "address": "0x71660c4005ba85c37ccec55d0c4493e66fe775d3", "exchange": "Coinbase", "type": "hot" },
+  { "chain": "eth",  "address": "0x503828976d22510aad0201ac7ec88293211d23da", "exchange": "Coinbase", "type": "hot" },
+  { "chain": "eth",  "address": "0xa090e606e30bd747d4e6245a1517ebe430f0057e", "exchange": "Coinbase", "type": "hot" },
+  { "chain": "eth",  "address": "0x77696bb39917c91a0c3908d577d5e322095425ca", "exchange": "Coinbase", "type": "hot" },
+
+  { "chain": "bsc",  "address": "0x515b72ed8a97f42c568d6a143232775018f133c8", "exchange": "BingX", "type": "hot" },
+  { "chain": "bsc",  "address": "0x3a24123bd76abd8f22b8f60d5a4d0a1e5c2b7876", "exchange": "BingX", "type": "hot" },
+  { "chain": "eth",  "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "exchange": "BingX", "type": "hot" },
+
+  { "chain": "bsc",  "address": "0x2f0b23f53734252bda2277357e97e1517d6b042a", "exchange": "MEXC", "type": "hot" },
+  { "chain": "eth",  "address": "0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88", "exchange": "MEXC", "type": "hot" },
+
+  { "chain": "bsc",  "address": "0xc36442b4a4522e871399cd717abdd847ab11fe88", "exchange": "Bitget", "type": "hot" },
+  { "chain": "eth",  "address": "0x0d0707963952f2fba59dd06f2b425ace40b492fe", "exchange": "Bitget", "type": "hot" },
+
+  { "chain": "eth",  "address": "0xdc76cd25977e0a5ae17155770273ad58648900d3", "exchange": "Huobi", "type": "hot" },
+  { "chain": "eth",  "address": "0xab5c66752a9e8167967685f1450532fb96d5d24f", "exchange": "Huobi", "type": "hot" },
+  { "chain": "eth",  "address": "0xe93381fb4c4f14bda253907b18fad305d799241a", "exchange": "Huobi", "type": "hot" },
+
+  { "chain": "base", "address": "0x2b1055f66d3776a6b06fdcd60063cb572b7ab24c", "exchange": "Coinbase", "type": "hot" },
+  { "chain": "base", "address": "0x3cd751e6b0078be393132286c442345e5dc49699", "exchange": "Coinbase", "type": "hot" }
+]

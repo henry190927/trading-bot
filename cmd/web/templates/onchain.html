@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>on-chain · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal">Portfolio</a>
+    <a href="/validate">Validate</a>
+    <a href="/onchain" class="active">On-chain</a>
+    <a href="/ops">Ops</a>
+  </nav>
+</header>
+
+<main>
+
+<h1 class="page-title">On-chain — top holders + dump-signal lookup</h1>
+
+<p class="page-hint">
+  Discretionary tool — type a ticker (e.g. <code>AKE</code>) or CoinGecko id
+  (e.g. <code>lorenzo-protocol</code>). Returns the top 20 holders and flags
+  any recent transfer to a known CEX hot wallet (last 48h) as a dump signal.
+  Data: CoinGecko + Moralis + BscScan / Etherscan / Basescan.
+</p>
+
+<form id="onchain-form" class="trade-form" onsubmit="return false;">
+  <div class="field-row">
+    <div class="field field-grow">
+      <label for="onchain-symbol">Ticker / CoinGecko ID</label>
+      <input type="text" id="onchain-symbol" name="symbol" value="{{.Prefill}}" placeholder="AKE, BANK, VELVET, lorenzo-protocol..." autocomplete="off" required>
+    </div>
+    <div class="field">
+      <label for="onchain-chain">Chain</label>
+      <select id="onchain-chain" name="chain">
+        <option value="">— auto (BSC > ETH > Base) —</option>
+        <option value="bsc">BSC</option>
+        <option value="eth">Ethereum</option>
+        <option value="base">Base</option>
+      </select>
+    </div>
+    <div class="field field-btn">
+      <button type="submit" class="btn-primary" id="onchain-lookup-btn">Lookup</button>
+    </div>
+  </div>
+</form>
+
+<div id="onchain-status" class="onchain-status hidden"></div>
+<div id="onchain-result" class="onchain-result hidden"></div>
+
+</main>
+
+<footer>
+  <span>free-tier data — 5–15min delayed · discretionary observation only, not engine input</span>
+</footer>
+
+<script src="/static/copy.js"></script>
+<script>
+(function () {
+    var form   = document.getElementById('onchain-form');
+    var symIn  = document.getElementById('onchain-symbol');
+    var chIn   = document.getElementById('onchain-chain');
+    var btn    = document.getElementById('onchain-lookup-btn');
+    var status = document.getElementById('onchain-status');
+    var result = document.getElementById('onchain-result');
+
+    function showStatus(msg, kind) {
+        status.className = 'onchain-status onchain-status-' + (kind || 'info');
+        status.textContent = msg;
+        status.classList.remove('hidden');
+    }
+    function hideStatus() { status.classList.add('hidden'); }
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function truncAddr(a) {
+        if (!a) return '';
+        return a.slice(0, 8) + '…' + a.slice(-6);
+    }
+    function fmtBalance(x) {
+        if (x >= 1e9) return (x / 1e9).toFixed(2) + 'B';
+        if (x >= 1e6) return (x / 1e6).toFixed(2) + 'M';
+        if (x >= 1e3) return (x / 1e3).toFixed(2) + 'K';
+        return x.toFixed(2);
+    }
+    function fmtWhen(iso) {
+        var t = new Date(iso).getTime();
+        var diff = (Date.now() - t) / 1000;
+        if (diff < 60) return Math.round(diff) + 's ago';
+        if (diff < 3600) return Math.round(diff / 60) + 'm ago';
+        if (diff < 86400) return (diff / 3600).toFixed(1) + 'h ago';
+        return (diff / 86400).toFixed(1) + 'd ago';
+    }
+    function explorerTx(chain, hash) {
+        var host = chain === 'bsc' ? 'bscscan.com' : (chain === 'base' ? 'basescan.org' : 'etherscan.io');
+        return 'https://' + host + '/tx/' + hash;
+    }
+    function explorerAddr(chain, addr) {
+        var host = chain === 'bsc' ? 'bscscan.com' : (chain === 'base' ? 'basescan.org' : 'etherscan.io');
+        return 'https://' + host + '/address/' + addr;
+    }
+
+    function renderResult(r) {
+        var chain = r.Chain;
+        var html = '';
+        html += '<section class="onchain-header">';
+        html += '<div class="onchain-title">' + esc(r.Name) + ' <span class="onchain-ticker">(' + esc(r.Symbol) + ')</span></div>';
+        html += '<div class="onchain-meta">';
+        html += '<span>Chain: <strong>' + esc(chain.toUpperCase()) + '</strong></span>';
+        html += '<span>Contract: <a href="' + explorerAddr(chain, r.Contract) + '" target="_blank" rel="noopener">' + truncAddr(r.Contract) + '</a></span>';
+        html += '<span>Fetched: ' + fmtWhen(r.FetchedAt) + (r.CacheHit ? ' <em>(cached)</em>' : '') + '</span>';
+        html += '</div></section>';
+
+        if (r.PartialErrors && r.PartialErrors.length) {
+            html += '<section class="onchain-partial-errors"><strong>⚠ Partial data:</strong><ul>';
+            r.PartialErrors.forEach(function (e) { html += '<li>' + esc(e) + '</li>'; });
+            html += '</ul></section>';
+        }
+
+        // Dump signals section — most important, render first.
+        html += '<section class="onchain-block">';
+        html += '<h2>Dump signals (last 48h)</h2>';
+        if (!r.DumpSignals || r.DumpSignals.length === 0) {
+            html += '<p class="hint">No top-holder → CEX transfers detected in the lookback window. This is common; absence is not confirmation of anything, just no red flag from this signal.</p>';
+        } else {
+            html += '<table class="onchain-table dump-table"><thead><tr>';
+            html += '<th>#</th><th>From holder</th><th>→ Exchange</th><th>Amount</th><th>When</th><th>Tx</th>';
+            html += '</tr></thead><tbody>';
+            r.DumpSignals.forEach(function (d) {
+                html += '<tr>';
+                html += '<td>' + d.HolderRank + '</td>';
+                html += '<td><a href="' + explorerAddr(chain, d.FromAddress) + '" target="_blank" rel="noopener">' + truncAddr(d.FromAddress) + '</a></td>';
+                html += '<td class="dump-cex">🔴 ' + esc(d.ToExchange) + '</td>';
+                html += '<td class="mono">' + fmtBalance(d.AmountTokens) + ' ' + esc(r.Symbol) + '</td>';
+                html += '<td>' + fmtWhen(d.Timestamp) + '</td>';
+                html += '<td><a href="' + explorerTx(chain, d.TxHash) + '" target="_blank" rel="noopener">↗</a></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+        }
+        html += '</section>';
+
+        // Top holders section.
+        html += '<section class="onchain-block">';
+        html += '<h2>Top ' + (r.Holders ? r.Holders.length : 0) + ' holders</h2>';
+        if (!r.Holders || r.Holders.length === 0) {
+            html += '<p class="hint">No holders returned (Moralis quota / provider error).</p>';
+        } else {
+            html += '<table class="onchain-table holder-table"><thead><tr>';
+            html += '<th>#</th><th>Address</th><th>Balance</th><th>% Supply</th><th>Label</th>';
+            html += '</tr></thead><tbody>';
+            r.Holders.forEach(function (h) {
+                var rowCls = '';
+                if (h.IsCEX) rowCls = ' class="holder-cex"';
+                else if (h.IsContract) rowCls = ' class="holder-contract"';
+                html += '<tr' + rowCls + '>';
+                html += '<td>' + h.Rank + '</td>';
+                html += '<td><a href="' + explorerAddr(chain, h.Address) + '" target="_blank" rel="noopener">' + truncAddr(h.Address) + '</a></td>';
+                html += '<td class="mono">' + fmtBalance(h.Balance) + '</td>';
+                html += '<td class="mono">' + (h.PctSupply ? h.PctSupply.toFixed(2) + '%' : '—') + '</td>';
+                html += '<td>' + esc(h.Label || (h.IsContract ? '[contract]' : '')) + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+        }
+        html += '</section>';
+
+        result.innerHTML = html;
+        result.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', function () {
+        var sym = symIn.value.trim();
+        if (!sym) return;
+        var ch  = chIn.value;
+        result.classList.add('hidden');
+        showStatus('Looking up ' + sym + '…', 'loading');
+        btn.disabled = true;
+        var url = '/api/onchain/lookup?symbol=' + encodeURIComponent(sym);
+        if (ch) url += '&chain=' + encodeURIComponent(ch);
+        fetch(url, { method: 'GET' })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                btn.disabled = false;
+                if (!res.ok) {
+                    showStatus('⚠ ' + (res.body.error || 'unknown error'), 'error');
+                    return;
+                }
+                hideStatus();
+                renderResult(res.body);
+            })
+            .catch(function (e) {
+                btn.disabled = false;
+                showStatus('⚠ network error: ' + e.message, 'error');
+            });
+    });
+
+    // Auto-submit if page loaded with a prefill.
+    if (symIn.value.trim() !== '') {
+        form.dispatchEvent(new Event('submit'));
+    }
+})();
+</script>
+</body>
+</html>

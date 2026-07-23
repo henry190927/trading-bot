@@ -22,6 +22,7 @@ import (
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/onchain"
 )
 
 //go:embed templates/*.html static
@@ -84,6 +85,10 @@ func main() {
 			log.Printf("[ai] GEMINI_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable GEMINI_DRY_RUN=true.")
 		}
 	}
+	onchainSvc := onchain.NewService()
+	if count, _, source, _ := onchainSvc.CEX.Stats(); count > 0 {
+		log.Printf("[onchain] CEX registry seeded from %s: %d addresses", source, count)
+	}
 	srv := &server{
 		client:         bxClient,
 		ai:             aiProvider,
@@ -91,6 +96,7 @@ func main() {
 		aiModelPath:    aiModelPath,
 		aiCache:        make(map[int]aiCacheEntry),
 		aiSymbolCache:  make(map[string]aiCacheEntry),
+		onchain:        onchainSvc,
 	}
 	r.GET("/", srv.handleDashboard)
 	r.GET("/journal", srv.handleJournalList)
@@ -109,6 +115,8 @@ func main() {
 	r.POST("/api/ai/model", srv.handleAIModelPost)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
+	r.GET("/onchain", srv.handleOnchainPage)
+	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/logs", srv.handleOpsLogs)

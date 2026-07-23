@@ -819,6 +819,99 @@ footer {
     border: 1px solid var(--yellow);
 }
 
+/* On-chain lookup page — /onchain */
+.page-hint {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    max-width: 720px;
+    margin-bottom: 1rem;
+}
+.field-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+.field-grow { flex: 1 1 240px; }
+.field-btn { align-self: flex-end; }
+.field-btn .btn-primary { min-height: 42px; padding: 0 1.4rem; }
+
+.onchain-status {
+    padding: 0.6rem 0.9rem;
+    border-radius: 4px;
+    margin: 0.8rem 0;
+    font-size: 0.9rem;
+}
+.onchain-status.hidden { display: none; }
+.onchain-status-loading { background: rgba(56,139,253,0.10); color: var(--blue); border: 1px solid var(--blue); }
+.onchain-status-error   { background: var(--red-bg);          color: var(--red);   border: 1px solid var(--red); }
+
+.onchain-result { margin-top: 1rem; }
+.onchain-result.hidden { display: none; }
+.onchain-header {
+    padding: 0.6rem 0.9rem;
+    background: var(--surface-2);
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+.onchain-title { font-size: 1.1rem; font-weight: 700; }
+.onchain-ticker { color: var(--text-dim); font-weight: 400; }
+.onchain-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+}
+.onchain-meta a { color: var(--blue); }
+
+.onchain-partial-errors {
+    background: rgba(251,191,36,0.10);
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+    padding: 0.5rem 0.8rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+}
+.onchain-partial-errors ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+
+.onchain-block { margin-bottom: 1.5rem; }
+.onchain-block h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+
+.onchain-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+}
+.onchain-table th, .onchain-table td {
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+}
+.onchain-table th {
+    background: rgba(255,255,255,0.04);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-dim);
+}
+.onchain-table td.mono { font-family: ui-monospace, monospace; }
+.onchain-table a { color: var(--blue); text-decoration: none; }
+.onchain-table a:hover { text-decoration: underline; }
+
+.dump-table .dump-cex { color: var(--red); font-weight: 600; }
+.dump-table tr:hover  { background: rgba(255,255,255,0.03); }
+
+.holder-cex      { background: rgba(255, 90, 95, 0.08); }
+.holder-cex td   { color: var(--red); }
+.holder-contract { color: var(--text-dim); }
+
 /* Tradeable-signals banner — renders when the current TF has any
    symbol with side!=Flat AND score >= MIN_SCORE (i.e. the ntfy-worthy
    condition). Row per signal, click jumps to the corresponding
