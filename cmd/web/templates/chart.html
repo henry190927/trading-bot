@@ -124,6 +124,21 @@
     // Volume sub-pane at bottom 25% of chart area.
     chart.priceScale('').applyOptions({ scaleMargins: { top: 0.80, bottom: 0 } });
 
+    // ── Lazy history load ──────────────────────────────────────────
+    // Track the earliest loaded bar so we can fetch older data when
+    // the user pans left. `earliestTime` is unix seconds of the leftmost
+    // bar currently on chart. `loading` gates concurrent requests.
+    // `allCandles` / `allUpper` / `allMid` / `allLower` are our
+    // authoritative copies (LWC series setData wipes anything not passed).
+    var earliestTime = null;
+    var loadingHistory = false;
+    var noMoreHistory = false;
+    var allCandles = [];
+    var allUpper = [];
+    var allMid = [];
+    var allLower = [];
+    var allVol = [];
+
     // Track plan price lines so we can clear them when data reloads.
     var planLines = [];
     function clearPlanLines() {
@@ -177,23 +192,30 @@
         aiBtn.dataset.tf     = data.tf;
     }
 
-    function applyChart(data) {
-        candleSeries.setData(data.candles || []);
-        var bb = data.bollinger || {};
-        upperSeries.setData(bb.upper || []);
-        midSeries.setData(bb.mid || []);
-        lowerSeries.setData(bb.lower || []);
-
-        // Colored volume bars matching candle direction.
-        var candles = data.candles || [];
-        var volData = candles.map(function (c) {
+    function volFrom(candles) {
+        return candles.map(function (c) {
             return {
                 time: c.time,
                 value: c.volume,
                 color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
             };
         });
-        volSeries.setData(volData);
+    }
+
+    function applyChart(data) {
+        allCandles = data.candles || [];
+        var bb = data.bollinger || {};
+        allUpper = bb.upper || [];
+        allMid   = bb.mid   || [];
+        allLower = bb.lower || [];
+        allVol   = volFrom(allCandles);
+        candleSeries.setData(allCandles);
+        upperSeries.setData(allUpper);
+        midSeries.setData(allMid);
+        lowerSeries.setData(allLower);
+        volSeries.setData(allVol);
+        earliestTime = allCandles.length ? allCandles[0].time : null;
+        noMoreHistory = false;
 
         clearPlanLines();
         var p = data.plan;
@@ -205,6 +227,56 @@
         }
         chart.timeScale().fitContent();
     }
+
+    // Fetch and prepend an older batch. Called when user pans near the
+    // left edge. Deduped by time so repeated calls with same `before`
+    // don't double-insert.
+    function loadMoreHistory() {
+        if (loadingHistory || noMoreHistory || !earliestTime) return;
+        loadingHistory = true;
+        var url = '/api/chart/data?symbol=' + encodeURIComponent(currentSym())
+                + '&tf=' + encodeURIComponent(currentTF())
+                + '&limit=1000&before=' + earliestTime;
+        fetch(url)
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                loadingHistory = false;
+                if (!res.ok || !res.body.candles || res.body.candles.length === 0) {
+                    noMoreHistory = true;
+                    return;
+                }
+                // Prepend older candles that predate earliestTime.
+                var newer = res.body.candles.filter(function (c) { return c.time < earliestTime; });
+                if (newer.length === 0) { noMoreHistory = true; return; }
+                allCandles  = newer.concat(allCandles);
+                allVol      = volFrom(newer).concat(allVol);
+                var bb = res.body.bollinger || {};
+                allUpper = (bb.upper || []).filter(function (b) { return b.time < earliestTime; }).concat(allUpper);
+                allMid   = (bb.mid   || []).filter(function (b) { return b.time < earliestTime; }).concat(allMid);
+                allLower = (bb.lower || []).filter(function (b) { return b.time < earliestTime; }).concat(allLower);
+                candleSeries.setData(allCandles);
+                upperSeries.setData(allUpper);
+                midSeries.setData(allMid);
+                lowerSeries.setData(allLower);
+                volSeries.setData(allVol);
+                earliestTime = allCandles[0].time;
+            })
+            .catch(function (e) {
+                loadingHistory = false;
+                console.warn('history load failed', e);
+            });
+    }
+
+    // Subscribe to visible-range changes so we know when the user pans
+    // close to the left edge (within the leftmost 5 bars of loaded data).
+    chart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
+        if (!range || earliestTime == null) return;
+        // range.from is the logical bar index of the leftmost visible bar.
+        // Negative or near-zero means we're near the left edge of data.
+        if (range.from < 5) {
+            loadMoreHistory();
+        }
+    });
 
     function load() {
         linerEl.textContent = 'Loading ' + currentSym() + ' ' + currentTF() + '…';

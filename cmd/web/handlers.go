@@ -3382,6 +3382,36 @@ func (s *server) handleAIModelPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"current": name, "persisted": true})
 }
 
+// tfDurationSeconds returns the bar duration for a supported timeframe.
+// Used by handleChartData to estimate the start-time window for
+// KlinesRange when the user requests deep historical data. Mirror of
+// bingx.tfDuration (package-private there).
+func tfDurationSeconds(tf market.Timeframe) time.Duration {
+	switch tf {
+	case "1m":
+		return time.Minute
+	case "5m":
+		return 5 * time.Minute
+	case "15m":
+		return 15 * time.Minute
+	case "30m":
+		return 30 * time.Minute
+	case "1h":
+		return time.Hour
+	case "2h":
+		return 2 * time.Hour
+	case "4h":
+		return 4 * time.Hour
+	case "6h":
+		return 6 * time.Hour
+	case "12h":
+		return 12 * time.Hour
+	case "1d":
+		return 24 * time.Hour
+	}
+	return time.Hour
+}
+
 // handleChartPage renders /chart — the full-page interactive candlestick
 // view backed by TradingView Lightweight Charts. Server-side just emits
 // the shell + hydrates via /api/chart/data. Symbol / TF chosen client-
@@ -3409,31 +3439,70 @@ func (s *server) handleChartData(c *gin.Context) {
 	}
 	tf := market.Timeframe(tfStr)
 
-	limit := 500
+	limit := 1000
 	if v := c.Query("limit"); v != "" {
 		fmt.Sscanf(v, "%d", &limit)
 		if limit < 60 {
 			limit = 60
 		}
-		if limit > 1000 {
-			limit = 1000
+		if limit > 5000 {
+			limit = 5000
 		}
 	}
+	// `before` (unix seconds) — lazy-load pagination. When the chart JS
+	// detects the user has panned near the left edge of loaded data, it
+	// calls back with before=<earliest_loaded_time>. We return the batch
+	// ending just before that timestamp so the client can prepend.
+	var beforeSec int64
+	if v := c.Query("before"); v != "" {
+		fmt.Sscanf(v, "%d", &beforeSec)
+	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	view := s.scanOne(ctx, sym, tf)
-	if view.Err != "" {
-		c.JSON(http.StatusBadGateway, gin.H{"error": view.Err})
-		return
-	}
-	// scanOne fetches 200 candles by default via Klines call; if user
-	// asked for more, fetch again with the requested limit.
-	candles := view.Candles
-	if limit > len(candles) && s.client != nil {
-		if more, err := s.client.Klines(ctx, sym, tf, limit); err == nil && len(more) > len(candles) {
-			candles = more
+	// Two paths:
+	//  - "before" set (pagination): fetch older-only via KlinesRange from
+	//    (before - limit * TF_duration) to before-1. Signal/Diagnose are
+	//    not recomputed for historical requests — they'd be stale by
+	//    definition. Return candles + bollinger only.
+	//  - No "before" (initial load): full scanOne pipeline for
+	//    Signal/Diagnose + Klines(limit) for the OHLCV window.
+	var candles []market.Candle
+	var view symbolView
+	historicalOnly := beforeSec > 0
+
+	if historicalOnly {
+		endT := time.Unix(beforeSec-1, 0)
+		startT := endT.Add(-time.Duration(limit) * tfDurationSeconds(tf))
+		got, err := s.client.KlinesRange(ctx, sym, tf, startT, endT)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "klines range: " + err.Error()})
+			return
+		}
+		candles = got
+	} else {
+		view = s.scanOne(ctx, sym, tf)
+		if view.Err != "" {
+			c.JSON(http.StatusBadGateway, gin.H{"error": view.Err})
+			return
+		}
+		candles = view.Candles
+		// scanOne fetches ~200 candles by default; if user wants more,
+		// use Klines with the requested limit (single-request, BingX cap
+		// is 1440) or KlinesRange for beyond that.
+		if limit > len(candles) && s.client != nil {
+			if limit <= 1440 {
+				if more, err := s.client.Klines(ctx, sym, tf, limit); err == nil && len(more) > len(candles) {
+					candles = more
+				}
+			} else {
+				endT := time.Now()
+				startT := endT.Add(-time.Duration(limit) * tfDurationSeconds(tf))
+				if more, err := s.client.KlinesRange(ctx, sym, tf, startT, endT); err == nil && len(more) > len(candles) {
+					candles = more
+				}
+			}
 		}
 	}
 
@@ -3474,6 +3543,21 @@ func (s *server) handleChartData(c *gin.Context) {
 		upper = append(upper, band{Time: t, Value: b.Upper})
 		mid = append(mid, band{Time: t, Value: b.Mid})
 		lower = append(lower, band{Time: t, Value: b.Lower})
+	}
+
+	// Historical-only paginated requests: skip signal/diagnose/plan
+	// derivation — the caller only wants OHLCV + Bollinger for the older
+	// window to render on the left side of the chart.
+	if historicalOnly {
+		c.Header("Cache-Control", "no-store")
+		c.JSON(http.StatusOK, gin.H{
+			"symbol":    short,
+			"tf":        tfStr,
+			"candles":   ohlcArr,
+			"bollinger": gin.H{"upper": upper, "mid": mid, "lower": lower},
+			"paginated": true,
+		})
+		return
 	}
 
 	// Plan levels — only emit when engine has a plan.
