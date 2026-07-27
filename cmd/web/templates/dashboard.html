@@ -312,10 +312,15 @@
   <div class="legend-modal-card">
     <div class="legend-modal-head">
       <span class="legend-modal-title">Dashboard legend</span>
+      <div class="ai-lang-toggle info-lang-toggle" role="group" aria-label="language">
+        <button type="button" class="ai-lang-btn" data-lang="zh-tw">繁</button>
+        <button type="button" class="ai-lang-btn" data-lang="en">EN</button>
+      </div>
       <button type="button" class="legend-modal-close" aria-label="close">×</button>
     </div>
     <div class="legend-modal-body">
 
+      <div class="info-lang-view" data-lang-view="en">
       <h3>Chart lines</h3>
       <table class="legend-table">
         <tbody>
@@ -406,6 +411,100 @@
         <dt>Live diagnose</dt>
         <dd>Re-runs the validator at the trade's <i>own</i> side, not the engine's preferred side — answers "is MY trade still good?", not "what's the best trade now?".</dd>
       </dl>
+      </div><!-- /data-lang-view="en" -->
+
+      <div class="info-lang-view" data-lang-view="zh-tw" hidden>
+      <h3>圖表線條</h3>
+      <table class="legend-table">
+        <tbody>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc200"></span><b>POC200</b></td><td>長期 Point of Control（1h 上約 8 天）。累積成交量最集中的價位。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc100"></span><b>POC100</b></td><td>中期 POC（約 4 天）。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc50"></span><b>POC50</b></td><td>近期 ~2 天 POC。通常最接近當下價格。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-va"></span><b>VAH / VAL</b></td><td>Value Area 上緣 / 下緣 — 包住 70% 成交量的區間。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-mark"></span><b>mark</b></td><td>BingX 即時標記價。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-entry"></span><b>entry</b></td><td>Engine 規劃的進場點。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-stop"></span><b>stop</b></td><td>Engine 規劃的停損點。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-tp"></span><b>TP1 / TP2</b></td><td>1R / 2R 停利目標。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Meta-row 標籤</h3>
+      <dl class="legend-dl">
+        <dt>POC</dt>
+        <dd>主要的 200-bar POC 價；點擊複製。</dd>
+        <dt>VA</dt>
+        <dd>VAL ↔ VAH 複製按鈕（70% 成交量區間的兩端）。</dd>
+        <dt>HVN</dt>
+        <dd>200-bar 分佈內 top-5 次要籌碼區（high-volume nodes）。</dd>
+        <dt>drift ↗ / ↘ / →</dt>
+        <dd>POC 在 50/100/200-bar 三個窗中的漂移。<code>(POC50 − POC200) / POC200</code> 百分比。<i>上升</i> = 看多、<i>下降</i> = 看空、<i>平</i> = 盤整。<b>粗邊框</b> = 疊態（POC50 &gt; POC100 &gt; POC200）= 強確認。</dd>
+      </dl>
+
+      <h3>Diagnose 標籤</h3>
+      <dl class="legend-dl">
+        <dt>at VAH / at VAL</dt>
+        <dd>Entry 在 value-area 邊緣 0.3% 內。最佳均值回歸型 setup（目標 = POC）。</dd>
+        <dt>inside VA</dt>
+        <dd>Entry 在 [VAL, VAH] 內但不在邊緣。盤整區 / 平衡；兩邊都沒 edge。</dd>
+        <dt>above VA / below VA</dt>
+        <dd>Entry 在 value area 之外。可能是接受期（新 regime 形成）或延伸過遠（反轉候選）。</dd>
+        <dt>POC ↗ / ↘</dt>
+        <dd>目前的 POC 漂移 regime。</dd>
+        <dt><span class="lg-swatch lg-knife"></span>⚠ falling knife</dt>
+        <dd>最近 3 根 K 線有一根大陰線範圍擴張。追這方向做多是接刀風險。</dd>
+        <dt><span class="lg-swatch lg-squeeze"></span>⚠ blow-off risk</dt>
+        <dd>同上但方向相反；做空的軋空風險。</dd>
+      </dl>
+
+      <h3>Score pills（三軸)</h3>
+      <dl class="legend-dl">
+        <dt><span class="score score-mr">MR N</span> <span class="lg-meta">(meta row, 整數 0–6)</span></dt>
+        <dd><b>Mean-reversion 票</b>：RSI 極值、BOLL 觸帶、fib 0.618、sweep、RSI/CVD 背離、MACD 交叉、range expansion。逆勢 / fade-extreme 型 setup。</dd>
+        <dt><span class="score score-mom">MOM N</span> <span class="lg-meta">(meta row, 整數 0–4)</span></dt>
+        <dd><b>Momentum / trend 票</b>：vol anomaly (BTC)、LH-LL / HH-HL 結構 (ETH)、NY 盤陽陰體 (XAU)、雙頂 / 雙底回測 (XAU)。經 backtest A/B 過的 per-symbol 開關，不是每個 symbol 都啟用每個 MOM vote。</dd>
+        <dt>total N <span class="lg-meta">(meta row, 整數；total = MR + MOM)</span></dt>
+        <dd>合計票數。<b>3</b> 是 engine 的 <code>MIN_SCORE</code> 執行門檻（daemon + monitor 都以此過濾)。Journal 舊 <code>score</code> 欄位存的值。</dd>
+        <dt>X.X/10 <span class="lg-meta">(diagnose row, 浮點 0–10)</span></dt>
+        <dd>Validator 對「這個 entry」的<i>結構適合度</i>。~20 個 factor 的加權合：engine 一致 (+2)、sweep/fib/HVN 近距 (+1.5–2)、VA 邊緣 (+0.5)、POC 漂移一致 (+0.5–0.7)，減去追市、接刀、逆 regime、內盤整等扣分。</dd>
+        <dt><span class="diag-score-axis diag-axis-mr">MR x.x</span> <span class="diag-score-axis diag-axis-mom">MOM x.x</span> <span class="lg-meta">(diagnose row 分軸小計)</span></dt>
+        <dd><b>MR 小計</b> = MR-tagged + 共用 factor，capped /10。<b>MOM 小計</b> = MOM-tagged + 共用 factor，capped /10。共用 factor（engine 一致、fee、追市）算兩邊 — 因此小計不是總分的線性加總。</dd>
+      </dl>
+
+      <h3>依軸調整倉位（discretionary 指南)</h3>
+      <p class="lg-meta">用三軸分佈判斷這是<b>哪一類</b> setup 觸發，據此調整倉位大小。Engine 不強制執行 — 只是幫忙養成習慣。</p>
+      <table class="legend-table">
+        <thead>
+          <tr><th>Setup 類型</th><th>解讀</th><th>建議倉位</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><b>MR 高 + MOM 高</b></td><td>例：RSI 超賣 + LH-LL 翻 HH-HL</td><td>全倉</td></tr>
+          <tr><td><b>MR 高 + MOM 0</b></td><td>純均值回歸 fade — backtest 基線場景</td><td>預設倉</td></tr>
+          <tr><td><b>MR 0 + MOM 高</b></td><td>XAU NY 盤動能、ETH 結構翻轉</td><td>半倉、停損收緊</td></tr>
+          <tr><td><b>⚠ 軸線分歧警告</b></td><td>MR 說 LONG、MOM 說 SHORT（或反之）。警告寫在 Signal.Warnings。</td><td>跳過、或只做快 scalp</td></tr>
+          <tr><td><b>兩軸都 &lt; 2</b></td><td>confluence 弱，可能連 MIN_SCORE 都達不到</td><td>跳過</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Verdict 顏色</h3>
+      <table class="legend-table">
+        <tbody>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 7.5/10 — 進場。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>5.5 – 7.5 — setup 尚可。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>3.5 – 5.5 — 邊際、猶豫。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 3.5 — 跳過。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Open-trade 卡片</h3>
+      <dl class="legend-dl">
+        <dt>邊框顏色</dt>
+        <dd>反映當下 R：<span class="lg-swatch lg-rpos"></span> 綠 = 獲利、<span class="lg-swatch lg-rneg"></span> 紅 = 回吐。</dd>
+        <dt>進度條</dt>
+        <dd>顯示位置介於 stop（左、紅）、entry（中）、TP2（右、綠）之間。</dd>
+        <dt>Live diagnose</dt>
+        <dd>Validator 以「這筆單自己的方向」重新評估，而非 engine 當下偏好的方向 — 回答的是「我這筆單還好嗎」而不是「現在最好的 trade 是什麼」。</dd>
+      </dl>
+      </div><!-- /data-lang-view="zh-tw" -->
 
     </div>
   </div>
@@ -454,15 +553,42 @@ window.refreshMgr = (function () {
     return { pause: pause, resume: resume };
 })();
 
-// ── Legend modal open/close (uses refreshMgr to pause) ──────────────
+// ── Legend modal open/close + EN/繁 toggle (uses refreshMgr to pause) ──
 (function () {
     var modal = document.getElementById('legend-modal');
     var btn = document.querySelector('.info-btn');
     if (!modal || !btn) return;
+
+    // Shared language key with AI analysis + /onchain info modal — one
+    // preference propagates across the whole app.
+    var LS_KEY = 'ai-lang';
+    function preferredLang() {
+        try { var v = localStorage.getItem(LS_KEY); if (v === 'en' || v === 'zh-tw') return v; } catch (e) {}
+        return 'zh-tw';
+    }
+    function saveLang(v) { try { localStorage.setItem(LS_KEY, v); } catch (e) {} }
+    function applyLang(lang) {
+        modal.querySelectorAll('[data-lang-view]').forEach(function (v) {
+            v.hidden = (v.getAttribute('data-lang-view') !== lang);
+        });
+        modal.querySelectorAll('.info-lang-toggle .ai-lang-btn').forEach(function (b) {
+            b.classList.toggle('active', b.dataset.lang === lang);
+        });
+    }
+    applyLang(preferredLang());
+    modal.querySelectorAll('.info-lang-toggle .ai-lang-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var target = b.dataset.lang;
+            saveLang(target);
+            applyLang(target);
+        });
+    });
+
     function open()  {
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         window.refreshMgr.pause();
+        applyLang(preferredLang()); // re-sync in case pref changed elsewhere while modal was closed
     }
     function close() {
         if (modal.classList.contains('hidden')) return;
