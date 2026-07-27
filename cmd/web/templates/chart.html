@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>chart · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal">Portfolio</a>
+    <a href="/validate">Validate</a>
+    <a href="/chart" class="active">Chart</a>
+    <a href="/onchain">On-chain</a>
+    <a href="/ops">Ops</a>
+  </nav>
+</header>
+
+<main class="chart-main">
+
+  <div class="chart-toolbar">
+    <div class="chart-sym-group">
+      <select id="chart-symbol" class="chart-select">
+        {{$cs := .Symbol}}
+        {{range .Symbols}}<option value="{{.}}" {{if eq . $cs}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <div class="chart-tf-pills" role="radiogroup" aria-label="timeframe">
+        {{$ct := .TF}}
+        {{range .TFs}}
+          <button type="button" class="tf-pill{{if eq . $ct}} active{{end}}" data-tf="{{.}}">{{.}}</button>
+        {{end}}
+      </div>
+    </div>
+
+    <div class="chart-summary" id="chart-summary">
+      <span class="side-badge side-flat" id="chart-side">—</span>
+      <span class="score score-mr" id="chart-mr">MR —</span>
+      <span class="score score-mom" id="chart-mom">MOM —</span>
+      <span class="score" id="chart-total">total —</span>
+      <span class="diag-score-axis" id="chart-ratio">— /10</span>
+      <span class="chart-verdict" id="chart-verdict">—</span>
+    </div>
+
+    <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
+            data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
+  </div>
+
+  <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
+
+  <div id="chart-container" class="chart-canvas"></div>
+
+  <div class="chart-legend-row" id="chart-legend">
+    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL upper</span>
+    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#adb5bd"></span>BOLL mid</span>
+    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL lower</span>
+    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#f59f00"></span>entry</span>
+    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#e03131"></span>stop</span>
+    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#2f9e44"></span>TP1</span>
+    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#0ca678"></span>TP2</span>
+  </div>
+
+  <div id="chart-ai-result" class="ai-result hidden" data-result-for="chart"></div>
+
+</main>
+
+<footer>
+  <span>on-demand refresh · <button type="button" id="chart-refresh" class="chart-refresh-btn">refresh</button></span>
+</footer>
+
+<script src="/static/copy.js"></script>
+<script src="/static/ai-render.js"></script>
+<script src="/static/lightweight-charts.standalone.production.js"></script>
+<script>
+(function () {
+    var symSel = document.getElementById('chart-symbol');
+    var tfPills = document.querySelectorAll('.chart-tf-pills .tf-pill');
+    var container = document.getElementById('chart-container');
+    var sideEl   = document.getElementById('chart-side');
+    var mrEl     = document.getElementById('chart-mr');
+    var momEl    = document.getElementById('chart-mom');
+    var totalEl  = document.getElementById('chart-total');
+    var ratioEl  = document.getElementById('chart-ratio');
+    var verdEl   = document.getElementById('chart-verdict');
+    var linerEl  = document.getElementById('chart-oneliner');
+    var aiBtn    = document.getElementById('chart-ai-btn');
+    var aiPane   = document.getElementById('chart-ai-result');
+    var refreshBtn = document.getElementById('chart-refresh');
+
+    // ── Chart construction ──────────────────────────────────────────
+    var chart = LightweightCharts.createChart(container, {
+        layout: {
+            background: { type: 'solid', color: '#0d1117' },
+            textColor:  '#c9d1d9',
+        },
+        grid: {
+            vertLines: { color: 'rgba(255,255,255,0.04)' },
+            horzLines: { color: 'rgba(255,255,255,0.04)' },
+        },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)' },
+        timeScale:       { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false },
+        crosshair:       { mode: 1 /* magnet */ },
+        autoSize: true,
+    });
+
+    var candleSeries = chart.addCandlestickSeries({
+        upColor: '#26a69a', downColor: '#ef5350',
+        borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+        wickUpColor: '#26a69a',   wickDownColor: '#ef5350',
+    });
+    var upperSeries = chart.addLineSeries({ color: '#4c6ef5', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    var midSeries   = chart.addLineSeries({ color: '#adb5bd', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+    var lowerSeries = chart.addLineSeries({ color: '#4c6ef5', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+
+    var volSeries = chart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+        color: 'rgba(180,180,180,0.4)',
+    });
+    // Volume sub-pane at bottom 25% of chart area.
+    chart.priceScale('').applyOptions({ scaleMargins: { top: 0.80, bottom: 0 } });
+
+    // Track plan price lines so we can clear them when data reloads.
+    var planLines = [];
+    function clearPlanLines() {
+        planLines.forEach(function (l) { candleSeries.removePriceLine(l); });
+        planLines = [];
+    }
+    function addPlanLine(price, color, title) {
+        if (!price) return;
+        planLines.push(candleSeries.createPriceLine({
+            price: price, color: color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: title,
+        }));
+    }
+
+    // ── State + fetch ──────────────────────────────────────────────
+    function currentSym() { return symSel.value; }
+    function currentTF()  {
+        var active = document.querySelector('.chart-tf-pills .tf-pill.active');
+        return active ? active.dataset.tf : '1h';
+    }
+
+    function scoreClass(total) {
+        if (!total || total <= 0) return '';
+        if (total >= 5) return 'score-good';
+        if (total >= 3) return 'score-borderline';
+        return 'score-weak';
+    }
+    function sideClass(side) {
+        if (side === 'LONG')  return 'side-long';
+        if (side === 'SHORT') return 'side-short';
+        return 'side-flat';
+    }
+
+    function applyHeader(data) {
+        var sig = data.signal || {};
+        var diag = data.diagnose || {};
+        sideEl.className = 'side-badge ' + sideClass(sig.side);
+        sideEl.textContent = sig.side || '—';
+        mrEl.textContent    = 'MR ' + (sig.mrScore   != null ? sig.mrScore   : '—');
+        momEl.textContent   = 'MOM ' + (sig.momScore != null ? sig.momScore  : '—');
+        totalEl.textContent = 'total ' + (sig.score  != null ? sig.score     : '—');
+        totalEl.className   = 'score ' + scoreClass(sig.score);
+        if (diag.total != null) {
+            ratioEl.textContent = diag.total.toFixed(1) + '/10';
+            verdEl.textContent  = diag.verdict || '';
+        } else {
+            ratioEl.textContent = '—/10';
+            verdEl.textContent  = '';
+        }
+        linerEl.textContent = data.summary || '';
+        aiBtn.dataset.symbol = data.symbol;
+        aiBtn.dataset.tf     = data.tf;
+    }
+
+    function applyChart(data) {
+        candleSeries.setData(data.candles || []);
+        var bb = data.bollinger || {};
+        upperSeries.setData(bb.upper || []);
+        midSeries.setData(bb.mid || []);
+        lowerSeries.setData(bb.lower || []);
+
+        // Colored volume bars matching candle direction.
+        var candles = data.candles || [];
+        var volData = candles.map(function (c) {
+            return {
+                time: c.time,
+                value: c.volume,
+                color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
+            };
+        });
+        volSeries.setData(volData);
+
+        clearPlanLines();
+        var p = data.plan;
+        if (p) {
+            addPlanLine(p.entry, '#f59f00', 'entry');
+            addPlanLine(p.stop,  '#e03131', 'stop');
+            addPlanLine(p.tp1,   '#2f9e44', 'TP1');
+            addPlanLine(p.tp2,   '#0ca678', 'TP2');
+        }
+        chart.timeScale().fitContent();
+    }
+
+    function load() {
+        linerEl.textContent = 'Loading ' + currentSym() + ' ' + currentTF() + '…';
+        fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym()) + '&tf=' + encodeURIComponent(currentTF()))
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (!res.ok) {
+                    linerEl.textContent = '⚠ ' + (res.body.error || 'load failed');
+                    return;
+                }
+                applyHeader(res.body);
+                applyChart(res.body);
+            })
+            .catch(function (e) {
+                linerEl.textContent = '⚠ network: ' + e.message;
+            });
+    }
+
+    // ── Wiring ─────────────────────────────────────────────────────
+    symSel.addEventListener('change', function () {
+        history.replaceState({}, '', '/chart?symbol=' + currentSym() + '&tf=' + currentTF());
+        aiPane.classList.add('hidden');
+        aiPane.dataset.loaded = '';
+        load();
+    });
+    tfPills.forEach(function (p) {
+        p.addEventListener('click', function () {
+            tfPills.forEach(function (x) { x.classList.remove('active'); });
+            p.classList.add('active');
+            history.replaceState({}, '', '/chart?symbol=' + currentSym() + '&tf=' + currentTF());
+            aiPane.classList.add('hidden');
+            aiPane.dataset.loaded = '';
+            load();
+        });
+    });
+    if (refreshBtn) refreshBtn.addEventListener('click', load);
+
+    // AI Analyze — reuses shared aiRender helper (bilingual output).
+    aiBtn.addEventListener('click', function () {
+        if (!aiPane.classList.contains('hidden')) { aiPane.classList.add('hidden'); return; }
+        aiPane.classList.remove('hidden');
+        if (aiPane.dataset.loaded === '1') return;
+        aiPane.innerHTML = '<em class="ai-loading">Querying Quant advisor for ' + aiBtn.dataset.symbol + ' ' + aiBtn.dataset.tf + '…</em>';
+        aiBtn.disabled = true;
+        fetch('/ai/analyze/symbol/' + aiBtn.dataset.symbol + '/' + aiBtn.dataset.tf, { method: 'POST' })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                aiBtn.disabled = false;
+                if (!res.ok) {
+                    window.aiRender.renderInto(aiPane, { error: res.body.error || 'unknown error' });
+                    return;
+                }
+                window.aiRender.renderInto(aiPane, res.body);
+                aiPane.dataset.loaded = '1';
+            })
+            .catch(function (err) {
+                aiBtn.disabled = false;
+                window.aiRender.renderInto(aiPane, { error: 'network error: ' + err.message });
+            });
+    });
+
+    load();
+})();
+</script>
+</body>
+</html>

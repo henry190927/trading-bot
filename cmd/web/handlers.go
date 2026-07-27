@@ -3381,3 +3381,155 @@ func (s *server) handleAIModelPost(c *gin.Context) {
 	log.Printf("[ai] runtime model changed to %s (persisted to %s)", name, s.aiModelPath)
 	c.JSON(http.StatusOK, gin.H{"current": name, "persisted": true})
 }
+
+// handleChartPage renders /chart — the full-page interactive candlestick
+// view backed by TradingView Lightweight Charts. Server-side just emits
+// the shell + hydrates via /api/chart/data. Symbol / TF chosen client-
+// side so switching doesn't require a full page reload.
+func (s *server) handleChartPage(c *gin.Context) {
+	c.HTML(http.StatusOK, "chart.html", gin.H{
+		"Symbol":  strings.ToUpper(defaultStr(c.Query("symbol"), "BTC")),
+		"TF":      defaultStr(c.Query("tf"), "1h"),
+		"Symbols": []string{"BTC", "ETH", "XAU", "XAG"},
+		"TFs":     []string{"15m", "30m", "1h", "2h", "4h", "1d"},
+	})
+}
+
+// handleChartData — GET /api/chart/data?symbol=X&tf=Y&limit=N
+// Returns OHLCV candles + Bollinger arrays + current Signal / Diagnose /
+// rule-based summary in one payload. Called by the /chart page JS on
+// load AND on every symbol/TF change. Cached briefly via HTTP headers.
+func (s *server) handleChartData(c *gin.Context) {
+	short := strings.ToUpper(strings.TrimSpace(c.DefaultQuery("symbol", "BTC")))
+	tfStr := strings.TrimSpace(c.DefaultQuery("tf", "1h"))
+	sym, err := resolveWebSymbol(short)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	tf := market.Timeframe(tfStr)
+
+	limit := 500
+	if v := c.Query("limit"); v != "" {
+		fmt.Sscanf(v, "%d", &limit)
+		if limit < 60 {
+			limit = 60
+		}
+		if limit > 1000 {
+			limit = 1000
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+
+	view := s.scanOne(ctx, sym, tf)
+	if view.Err != "" {
+		c.JSON(http.StatusBadGateway, gin.H{"error": view.Err})
+		return
+	}
+	// scanOne fetches 200 candles by default via Klines call; if user
+	// asked for more, fetch again with the requested limit.
+	candles := view.Candles
+	if limit > len(candles) && s.client != nil {
+		if more, err := s.client.Klines(ctx, sym, tf, limit); err == nil && len(more) > len(candles) {
+			candles = more
+		}
+	}
+
+	// Format candles for LWC: { time: unix, open, high, low, close, volume }
+	// LWC v4 accepts either businessDay or unix (seconds). We emit unix seconds.
+	type ohlc struct {
+		Time   int64   `json:"time"`
+		Open   float64 `json:"open"`
+		High   float64 `json:"high"`
+		Low    float64 `json:"low"`
+		Close  float64 `json:"close"`
+		Volume float64 `json:"volume"`
+	}
+	type band struct {
+		Time  int64   `json:"time"`
+		Value float64 `json:"value"`
+	}
+	ohlcArr := make([]ohlc, 0, len(candles))
+	closes := make([]float64, 0, len(candles))
+	for _, k := range candles {
+		ohlcArr = append(ohlcArr, ohlc{
+			Time: k.OpenTime.Unix(), Open: k.Open, High: k.High, Low: k.Low, Close: k.Close, Volume: k.Volume,
+		})
+		closes = append(closes, k.Close)
+	}
+
+	// Bollinger (20, 2) matches engine's canonical params. Emit three
+	// aligned arrays offset by 19 bars (BB needs 20-bar warm-up).
+	bb := indicator.Bollinger(closes, 20, 2)
+	upper := make([]band, 0, len(bb))
+	mid := make([]band, 0, len(bb))
+	lower := make([]band, 0, len(bb))
+	for i, b := range bb {
+		if b.Mid == 0 {
+			continue
+		}
+		t := candles[i].OpenTime.Unix()
+		upper = append(upper, band{Time: t, Value: b.Upper})
+		mid = append(mid, band{Time: t, Value: b.Mid})
+		lower = append(lower, band{Time: t, Value: b.Lower})
+	}
+
+	// Plan levels — only emit when engine has a plan.
+	var plan map[string]any
+	if view.Signal.Plan.Entry > 0 {
+		p := view.Signal.Plan
+		plan = map[string]any{
+			"entry":  p.Entry,
+			"stop":   p.StopLoss,
+			"anchor": p.Anchor,
+			"side":   view.Signal.Side.String(),
+		}
+		if len(p.TakeProfit) >= 1 {
+			plan["tp1"] = p.TakeProfit[0]
+		}
+		if len(p.TakeProfit) >= 2 {
+			plan["tp2"] = p.TakeProfit[1]
+		}
+	}
+
+	// Compact Signal + Diagnose projection.
+	sig := map[string]any{
+		"side":       view.Signal.Side.String(),
+		"score":      view.Signal.Score,
+		"mrScore":    view.Signal.MRScore,
+		"momScore":   view.Signal.MomentumScore,
+		"reasons":    view.Signal.Reasons,
+		"notes":      view.Signal.Notes,
+		"warnings":   view.Signal.Warnings,
+	}
+	var diag map[string]any
+	if view.Diagnose != nil {
+		d := view.Diagnose
+		diag = map[string]any{
+			"side":     d.Side.String(),
+			"total":    d.Total,
+			"totalMR":  d.TotalMR,
+			"totalMOM": d.TotalMOM,
+			"verdict":  verdictShortHelper(d.Verdict),
+			"atVAH":    d.AtVAH,
+			"atVAL":    d.AtVAL,
+			"insideVA": d.InsideVA,
+		}
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{
+		"symbol":    short,
+		"tf":        tfStr,
+		"contract":  string(sym),
+		"candles":   ohlcArr,
+		"bollinger": gin.H{"upper": upper, "mid": mid, "lower": lower},
+		"plan":      plan,
+		"signal":    sig,
+		"diagnose":  diag,
+		"summary":   view.Summary,
+		"markPrice": view.MarkPrice,
+	})
+}

@@ -819,6 +819,100 @@ footer {
     border: 1px solid var(--yellow);
 }
 
+/* /chart — full-page interactive Lightweight Charts view */
+.chart-main {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0.8rem 1rem;
+}
+.chart-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    align-items: center;
+    margin-bottom: 0.4rem;
+}
+.chart-sym-group { display: flex; gap: 0.5rem; align-items: center; }
+.chart-select {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-weight: 700;
+}
+.chart-tf-pills { display: flex; gap: 0.25rem; }
+.chart-tf-pills .tf-pill {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.chart-tf-pills .tf-pill.active {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+}
+.chart-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    margin-left: auto;
+}
+.chart-verdict {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.chart-one-liner {
+    color: var(--text);
+    font-size: 0.9rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--surface-2);
+    border-left: 3px solid var(--blue);
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 0.5rem;
+}
+.chart-canvas {
+    width: 100%;
+    height: 620px;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+.chart-legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    margin-top: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+.chart-legend-item { display: inline-flex; gap: 0.35rem; align-items: center; }
+.chart-legend-sw {
+    display: inline-block;
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+}
+.chart-refresh-btn {
+    background: transparent;
+    color: var(--blue);
+    border: 1px solid var(--blue);
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
 /* On-chain lookup page — /onchain */
 .page-hint {
     color: var(--text-dim);

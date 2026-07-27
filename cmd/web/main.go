@@ -117,6 +117,8 @@ func main() {
 	r.POST("/validate", srv.handleValidatePost)
 	r.GET("/onchain", srv.handleOnchainPage)
 	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
+	r.GET("/chart", srv.handleChartPage)
+	r.GET("/api/chart/data", srv.handleChartData)
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/logs", srv.handleOpsLogs)
