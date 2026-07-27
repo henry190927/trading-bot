@@ -63,10 +63,15 @@
   <div class="legend-modal-card">
     <div class="legend-modal-head">
       <span class="legend-modal-title">How to interpret this page</span>
+      <div class="ai-lang-toggle info-lang-toggle" role="group" aria-label="language">
+        <button type="button" class="ai-lang-btn" data-lang="zh-tw">繁</button>
+        <button type="button" class="ai-lang-btn" data-lang="en">EN</button>
+      </div>
       <button type="button" class="legend-modal-close" aria-label="close">×</button>
     </div>
     <div class="legend-modal-body">
 
+      <div class="info-lang-view" data-lang-view="en">
       <h3>Read the two sections top-down</h3>
       <p>Dump-signals first (the "any red flag right now?" answer), then top-holders for concentration context.</p>
 
@@ -167,6 +172,111 @@
 
       <h3>Framing</h3>
       <p><b>This is a "check for red flags before entering" tool, not a "predict the pump" tool.</b> Absence of dump signals ≠ bullish edge; presence of them ≠ certain top. Feed it into your discretionary judgement alongside price / structure / narrative.</p>
+      </div><!-- /data-lang-view="en" -->
+
+      <div class="info-lang-view" data-lang-view="zh-tw" hidden>
+      <h3>兩個 section 由上而下讀</h3>
+      <p>先看 dump signals（「當下有沒有紅旗」的判斷），再看 top-20 holders 抓集中度風險。</p>
+
+      <h3>1. Dump signals — 每一列怎麼讀</h3>
+      <table class="legend-table">
+        <thead><tr><th>欄位</th><th>意義</th><th>怎麼讀</th></tr></thead>
+        <tbody>
+          <tr><td><code>#</code>（rank）</td><td>是第幾大戶</td><td><b>#1-3 = 強訊號</b>；#15-20 是背景噪音</td></tr>
+          <tr><td>→ Exchange</td><td>收貨的 CEX</td><td>單一 exchange = 常規；<b>多個 exchange 同時收貨 = 協調式分佈</b></td></tr>
+          <tr><td>Amount</td><td>送多少 tokens</td><td>對照他的總持倉：<b>送 &gt;20% 自己餘額 = 明顯減倉</b>；&lt;5% = 常規操作</td></tr>
+          <tr><td>When</td><td>多久以前</td><td><b>&lt;6h = 新鮮</b>；24-48h 已是 stale evidence</td></tr>
+        </tbody>
+      </table>
+
+      <h3>強 dump signal（紅旗）</h3>
+      <ul>
+        <li>Top 3 holder 在 6h 內大量出貨（單筆 &gt; 他持倉 20%）</li>
+        <li>多個 top-10 holder 在同一 24h 窗內同時往 CEX 走</li>
+        <li>單筆金額 &gt; 全流通供給 1-3%</li>
+      </ul>
+
+      <h3>弱訊號 / 通常忽略</h3>
+      <ul>
+        <li>只有 #15-20 這種小持倉戶動作</li>
+        <li>單筆是他持倉的 &lt;1%（rebalance 不是 exit)</li>
+        <li>只有一筆、金額對整體流通量微不足道</li>
+      </ul>
+
+      <h3>2. Top-20 holders — 集中度指標</h3>
+      <h4>Top 1 佔比 — 單點風險</h4>
+      <table class="legend-table">
+        <tbody>
+          <tr><td><b>&gt; 30%</b></td><td>極危險 — 一個人 dump 市場撐不住</td></tr>
+          <tr><td>10-30%</td><td>可控但要警覺</td></tr>
+          <tr><td><b>&lt; 10%</b></td><td>健康分佈</td></tr>
+        </tbody>
+      </table>
+      <h4>Top 20 合計 — 整體集中度</h4>
+      <table class="legend-table">
+        <tbody>
+          <tr><td><b>&gt; 80%</b></td><td>可操縱、~10 個人可以合力砸盤</td></tr>
+          <tr><td>50-80%</td><td>low-float alt 常見區間（AKE / BANK 都在此）</td></tr>
+          <tr><td><b>&lt; 50%</b></td><td>分散良好</td></tr>
+        </tbody>
+      </table>
+
+      <h3>加分項（集中度風險減輕)</h3>
+      <ul>
+        <li>前幾名是 labeled <b>contract</b>（LP / staking / vesting / burn）→ 這些不會主動 dump</li>
+        <li>標 <b>CEX</b> 的（紅底列）→ 是交易所託管、跟「whale accumulation」意義不同</li>
+      </ul>
+
+      <h3>扣分項（集中度風險放大)</h3>
+      <ul>
+        <li>Top 5 有多個 <b>unlabeled EOA</b>、大小接近 → 可能是同一實體用多地址（cluster 風險)</li>
+        <li>Top 1 是 unlabeled EOA 且 &gt;20% → 單點崩盤風險</li>
+      </ul>
+
+      <h3>決策框架</h3>
+      <h4>A. 進 alt X 之前</h4>
+      <ul>
+        <li>Dump signals section 有沒有東西？
+          <ul>
+            <li>Top-3 holder 剛送 CEX = <b>強紅旗，跳過或減倉</b></li>
+            <li>只有 #15-20 小額 = 可接受</li>
+            <li>完全空 = 無 immediate 紅旗（不等於有 edge，只是沒地雷)</li>
+          </ul>
+        </li>
+        <li>集中度 healthy？Top 1 &lt; 15%、Top 20 &lt; 70% = OK</li>
+        <li>加分：contract label 覆蓋率高（LP + treasury）= 可信浮動供給</li>
+      </ul>
+
+      <h4>B. 已持倉、要不要退場</h4>
+      <ul>
+        <li>每 1-2 天重看：
+          <ul>
+            <li>有沒有新 dump signal、rank 逐次往前（#8 → #5 → #3）= 大戶排隊出貨</li>
+            <li>多個 CEX 同時被 hit = 分佈加速</li>
+          </ul>
+        </li>
+        <li>訊號出現 → 出。無訊號 + 價穩 → 續持。</li>
+      </ul>
+
+      <h4>C. 兩個候選 alt 比較</h4>
+      <p>技術面類似時，<b>沒有 dump signal 的那個優先</b>。</p>
+
+      <h3>限制 — 這工具做不到</h3>
+      <table class="legend-table">
+        <tbody>
+          <tr><td>判斷「為何送 CEX」</td><td>可能是 OTC 中繼、staking 路由、treasury，不只賣壓準備</td></tr>
+          <tr><td>追跨鏈動作</td><td>bridge 出去 → 另一鏈 → CEX：這條 flow 追不到</td></tr>
+          <tr><td>抓 OTC / 場外</td><td>大戶 A 直接轉大戶 B、沒經 CEX = 完全隱形</td></tr>
+          <tr><td>分辨 accumulation vs distribution 的 intent</td><td>只看方向、不看動機</td></tr>
+          <tr><td>Real-time</td><td>Moralis free tier lag 5-15 min</td></tr>
+          <tr><td>Top 21+</td><td>只看前 20；#21 可能正在做動作</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Framing</h3>
+      <p><b>這是「進場前檢查紅旗」的工具，不是「預測 pump」的工具。</b>沒 dump signal 不等於有 bullish edge、有 dump signal 不等於一定見頂。搭配你的價格 / 結構 / 敘事判斷用。</p>
+      </div><!-- /data-lang-view="zh-tw" -->
+
     </div>
   </div>
 </div>
@@ -322,13 +432,37 @@
         form.dispatchEvent(new Event('submit'));
     }
 
-    // Info modal — opens the "how to interpret" guide.
+    // Info modal — opens the "how to interpret" guide with EN/zh toggle.
     var modal = document.getElementById('onchain-info-modal');
     var infoBtn = document.querySelector('.info-btn');
     if (modal && infoBtn) {
+        var LS_KEY = 'ai-lang'; // shared with AI analysis toggle for a unified language preference
+        function preferredLang() {
+            try { var v = localStorage.getItem(LS_KEY); if (v === 'en' || v === 'zh-tw') return v; } catch (e) {}
+            return 'zh-tw';
+        }
+        function saveLang(v) { try { localStorage.setItem(LS_KEY, v); } catch (e) {} }
+        function applyLang(lang) {
+            modal.querySelectorAll('[data-lang-view]').forEach(function (v) {
+                v.hidden = (v.getAttribute('data-lang-view') !== lang);
+            });
+            modal.querySelectorAll('.info-lang-toggle .ai-lang-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.lang === lang);
+            });
+        }
+        applyLang(preferredLang());
+        modal.querySelectorAll('.info-lang-toggle .ai-lang-btn').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var target = b.dataset.lang;
+                saveLang(target);
+                applyLang(target);
+            });
+        });
+
         function openInfo() {
             modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
+            applyLang(preferredLang()); // re-sync in case AI toggle changed pref while modal was closed
         }
         function closeInfo() {
             if (modal.classList.contains('hidden')) return;
