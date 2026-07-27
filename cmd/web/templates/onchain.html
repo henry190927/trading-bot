@@ -22,13 +22,16 @@
 
 <main>
 
-<h1 class="page-title">On-chain — top holders + dump-signal lookup</h1>
+<h1 class="page-title">
+  On-chain — top holders + dump-signal lookup
+  <button type="button" class="info-btn" aria-label="how to interpret" title="How to interpret this page">i</button>
+</h1>
 
 <p class="page-hint">
   Discretionary tool — type a ticker (e.g. <code>AKE</code>) or CoinGecko id
   (e.g. <code>lorenzo-protocol</code>). Returns the top 20 holders and flags
   any recent transfer to a known CEX hot wallet (last 48h) as a dump signal.
-  Data: CoinGecko + Moralis + BscScan / Etherscan / Basescan.
+  Data: CoinGecko + Moralis.
 </p>
 
 <form id="onchain-form" class="trade-form" onsubmit="return false;">
@@ -54,6 +57,119 @@
 
 <div id="onchain-status" class="onchain-status hidden"></div>
 <div id="onchain-result" class="onchain-result hidden"></div>
+
+<div class="legend-modal hidden" id="onchain-info-modal">
+  <div class="legend-modal-backdrop"></div>
+  <div class="legend-modal-card">
+    <div class="legend-modal-head">
+      <span class="legend-modal-title">How to interpret this page</span>
+      <button type="button" class="legend-modal-close" aria-label="close">×</button>
+    </div>
+    <div class="legend-modal-body">
+
+      <h3>Read the two sections top-down</h3>
+      <p>Dump-signals first (the "any red flag right now?" answer), then top-holders for concentration context.</p>
+
+      <h3>1. Dump signals — how to read each row</h3>
+      <table class="legend-table">
+        <thead><tr><th>Column</th><th>Meaning</th><th>How to read</th></tr></thead>
+        <tbody>
+          <tr><td><code>#</code> (rank)</td><td>which top-holder position</td><td><b>#1-3 = strong signal</b>; #15-20 = background noise</td></tr>
+          <tr><td>→ Exchange</td><td>which CEX received</td><td>single exchange = normal; <b>multiple exchanges in same window = coordinated distribution</b></td></tr>
+          <tr><td>Amount</td><td>tokens sent</td><td>compare to their total holding: <b>&gt;20% of their balance = clear reduction</b>; &lt;5% = routine</td></tr>
+          <tr><td>When</td><td>time since transfer</td><td><b>&lt;6h = fresh</b>; 24-48h = stale evidence</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Strong dump signal (red flag)</h3>
+      <ul>
+        <li>Top 3 holder dumping &gt;20% of their balance within 6h</li>
+        <li>Multiple top-10 holders hitting CEX in the same 24h window</li>
+        <li>Single transfer &gt; 1-3% of total supply</li>
+      </ul>
+
+      <h3>Weak / noise (usually ignore)</h3>
+      <ul>
+        <li>Only #15-20 rank moving small amounts</li>
+        <li>Transfer &lt; 1% of that holder's balance (rebalance, not exit)</li>
+        <li>Single isolated transaction, tiny relative to float</li>
+      </ul>
+
+      <h3>2. Top-20 holders — concentration metrics</h3>
+      <h4>Top 1 % — single-point risk</h4>
+      <table class="legend-table">
+        <tbody>
+          <tr><td><b>&gt; 30%</b></td><td>extreme — one dump can crush the market</td></tr>
+          <tr><td>10-30%</td><td>manageable but watch closely</td></tr>
+          <tr><td><b>&lt; 10%</b></td><td>healthy distribution</td></tr>
+        </tbody>
+      </table>
+      <h4>Top 20 combined — total concentration</h4>
+      <table class="legend-table">
+        <tbody>
+          <tr><td><b>&gt; 80%</b></td><td>manipulable, ~10 wallets can move the market</td></tr>
+          <tr><td>50-80%</td><td>common for low-float alts (AKE / BANK sit here)</td></tr>
+          <tr><td><b>&lt; 50%</b></td><td>well distributed</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Green flags (concentration risk reduced)</h3>
+      <ul>
+        <li>Top positions labeled as <b>contracts</b> (LP / staking / vesting / burn) — these don't actively dump</li>
+        <li>CEX-labeled rows (red-tinted) — exchange custodial; separate from "whale accumulation"</li>
+      </ul>
+
+      <h3>Red flags (concentration amplified)</h3>
+      <ul>
+        <li>Multiple <b>unlabeled EOAs</b> in top 5 with similar sizes — possible cluster (one entity in many wallets)</li>
+        <li>Top 1 unlabeled EOA &gt; 20% — single-point risk</li>
+      </ul>
+
+      <h3>Decision frameworks</h3>
+      <h4>A. Before going LONG on alt X</h4>
+      <ul>
+        <li>Any dump signal in last 48h?
+          <ul>
+            <li>Top-3 holder hit CEX = <b>strong red flag, skip or halve size</b></li>
+            <li>Only #15-20 small amounts = tolerable</li>
+            <li>None = no immediate landmine (does NOT confirm bullish edge, just no red flag)</li>
+          </ul>
+        </li>
+        <li>Concentration healthy? Top 1 &lt; 15%, top 20 &lt; 70% = OK</li>
+        <li>Bonus: high contract-label coverage (LP + treasury) = trustable float</li>
+      </ul>
+
+      <h4>B. Already holding — when to exit</h4>
+      <ul>
+        <li>Recheck every 1-2 days:
+          <ul>
+            <li>New dump signals appearing AND rank moving forward (#8 → #5 → #3) = whales queuing up to exit</li>
+            <li>Multiple CEX hit simultaneously = accelerating distribution</li>
+          </ul>
+        </li>
+        <li>Signal appears → exit. Silent + price rising → hold.</li>
+      </ul>
+
+      <h4>C. Comparing two alt candidates</h4>
+      <p>Technicals similar? <b>Prefer the one WITHOUT dump signals</b>.</p>
+
+      <h3>Limitations — what this tool CANNOT tell you</h3>
+      <table class="legend-table">
+        <tbody>
+          <tr><td>The <i>why</i> behind a CEX transfer</td><td>could be OTC facilitation, staking route, treasury, not just sell prep</td></tr>
+          <tr><td>Cross-chain flows</td><td>bridge out → sell elsewhere is invisible here</td></tr>
+          <tr><td>OTC / off-chain sales</td><td>whale-to-whale direct transfers show but don't tag as dump</td></tr>
+          <tr><td>Intent (accum vs distrib)</td><td>we see direction, not motive</td></tr>
+          <tr><td>Real-time</td><td>Moralis free tier lags 5-15 min</td></tr>
+          <tr><td>Beyond top 20</td><td>#21+ could be doing worse; we don't see them</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Framing</h3>
+      <p><b>This is a "check for red flags before entering" tool, not a "predict the pump" tool.</b> Absence of dump signals ≠ bullish edge; presence of them ≠ certain top. Feed it into your discretionary judgement alongside price / structure / narrative.</p>
+    </div>
+  </div>
+</div>
 
 </main>
 
@@ -204,6 +320,27 @@
     // Auto-submit if page loaded with a prefill.
     if (symIn.value.trim() !== '') {
         form.dispatchEvent(new Event('submit'));
+    }
+
+    // Info modal — opens the "how to interpret" guide.
+    var modal = document.getElementById('onchain-info-modal');
+    var infoBtn = document.querySelector('.info-btn');
+    if (modal && infoBtn) {
+        function openInfo() {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeInfo() {
+            if (modal.classList.contains('hidden')) return;
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        infoBtn.addEventListener('click', openInfo);
+        modal.querySelector('.legend-modal-close').addEventListener('click', closeInfo);
+        modal.querySelector('.legend-modal-backdrop').addEventListener('click', closeInfo);
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape' && !modal.classList.contains('hidden')) closeInfo();
+        });
     }
 })();
 </script>
