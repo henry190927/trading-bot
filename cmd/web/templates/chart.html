@@ -451,19 +451,29 @@
         if (v >= 1e3) return (v/1e3).toFixed(1) + 'K';
         return v.toFixed(0);
     }
-    // Compute 24h window stats from allCandles: latest close vs candle
-    // ~24h ago; high/low/volume aggregated over the 24h span. Works
-    // across TFs (finds closest bar to now - 86400).
-    function apply24hStats(currentPrice) {
-        if (!allCandles || allCandles.length === 0 || currentPrice == null) return;
-        var lastTs = allCandles[allCandles.length - 1].time;
-        var cutoff = lastTs - 86400;
-        // Find index of first candle with time >= cutoff.
-        var startIdx = 0;
-        for (var i = allCandles.length - 1; i >= 0; i--) {
-            if (allCandles[i].time <= cutoff) { startIdx = i; break; }
+    // Compute 24h stats: latest close vs the bar ~24h ago; high/low
+    // /volume aggregated over the 24h span. Works across TFs by
+    // finding the bar closest to now-86400.
+    //
+    // Sources: prefer allCandles (populated by applyChart after the
+    // first load — has full history) over the payload's candles (in
+    // pollTick this is only 30 bars, which is <24h on TFs < 1h).
+    // On the FIRST load applyHeader runs BEFORE applyChart, so
+    // allCandles is still empty — that's why we also accept
+    // payloadCandles as a fallback.
+    function apply24hStats(currentPrice, payloadCandles) {
+        var candles = (allCandles && allCandles.length > 0) ? allCandles : (payloadCandles || []);
+        if (payloadCandles && payloadCandles.length > candles.length) {
+            candles = payloadCandles;
         }
-        var slice = allCandles.slice(startIdx);
+        if (!candles.length || currentPrice == null) return;
+        var lastTs = candles[candles.length - 1].time;
+        var cutoff = lastTs - 86400;
+        var startIdx = 0;
+        for (var i = candles.length - 1; i >= 0; i--) {
+            if (candles[i].time <= cutoff) { startIdx = i; break; }
+        }
+        var slice = candles.slice(startIdx);
         if (slice.length === 0) return;
         var refPrice = slice[0].open;
         var hi = slice[0].high, lo = slice[0].low, vol = 0;
@@ -475,7 +485,8 @@
         var chgAbs = currentPrice - refPrice;
         var chgPct = refPrice > 0 ? (chgAbs / refPrice) * 100 : 0;
         headerChange.className = 'chart-header-change ' + (chgAbs >= 0 ? 'up' : 'down');
-        headerChange.textContent = (chgAbs >= 0 ? '+' : '') + fmtPrice(chgAbs) + ' (' + (chgAbs >= 0 ? '+' : '') + chgPct.toFixed(2) + '%)';
+        headerChange.textContent = (chgAbs >= 0 ? '+' : '') + fmtPrice(chgAbs)
+            + ' (' + (chgAbs >= 0 ? '+' : '') + chgPct.toFixed(2) + '%)';
         h24High.textContent = fmtPrice(hi);
         h24Low.textContent  = fmtPrice(lo);
         h24Vol.textContent  = fmtVolAbs(vol);
@@ -491,7 +502,7 @@
         var lastCandle = (data.candles && data.candles.length) ? data.candles[data.candles.length - 1] : null;
         var currentPrice = data.markPrice || (lastCandle ? lastCandle.close : null);
         headerPrice.textContent = fmtPrice(currentPrice);
-        apply24hStats(currentPrice);
+        apply24hStats(currentPrice, data.candles);
 
         sideEl.className = 'side-badge ' + sideClass(sig.side);
         sideEl.textContent = sig.side || '—';
@@ -843,6 +854,24 @@
                         color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
                     });
                 });
+                // Merge poll tail into allCandles so downstream calcs
+                // (24h stats, VRVP) see fresh data. Match by time; if
+                // the ts already exists we replace, otherwise append
+                // to the end while preserving ascending order.
+                if (allCandles.length > 0) {
+                    var byTime = {};
+                    for (var mi = Math.max(0, allCandles.length - 60); mi < allCandles.length; mi++) {
+                        byTime[allCandles[mi].time] = mi;
+                    }
+                    candles.forEach(function (c) {
+                        var idx = byTime[c.time];
+                        if (idx != null) {
+                            allCandles[idx] = c;
+                        } else if (c.time > allCandles[allCandles.length - 1].time) {
+                            allCandles.push(c);
+                        }
+                    });
+                }
                 // Update tail Bollinger too.
                 var bb = data.bollinger || {};
                 (bb.upper || []).slice(-30).forEach(function (b) { upperSeries.update(b); });
