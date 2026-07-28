@@ -884,12 +884,6 @@
     // forming bar without redrawing the whole chart.
     var pollTimer = null;
     function pollTick() {
-        // Note: intentionally do NOT gate on loadingHistory. The two
-        // fetches touch different ends of allCandles (older prefix vs
-        // newer tail) and LWC's synchronous setData/update calls can't
-        // race with each other. Previously the guard let a chaining
-        // left-edge pagination starve the poll indefinitely, freezing
-        // the header/last-bar price on the UI.
         if (window.__chartDebug) console.log('[chart poll] tick', new Date().toISOString());
         fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym())
               + '&tf=' + encodeURIComponent(currentTF())
@@ -902,7 +896,21 @@
                 // handles either a new bar or a replacement of the
                 // latest bar (matched by time key).
                 var candles = data.candles;
+                // LWC's series.update() only accepts bars with time >=
+                // the series' current last time. The poll returns 60
+                // bars in ascending order, so calling update() on the
+                // OLDEST first throws "Cannot update oldest data" and
+                // aborts the entire .then chain — which is exactly why
+                // the header/last-bar price never ticked.
+                //
+                // Closed bars in the response never change, so we only
+                // need to push the forming bar (last one) plus any
+                // brand-new bar that appeared since our last poll.
+                var seriesLastTime = candleSeries.data().length > 0
+                    ? candleSeries.data()[candleSeries.data().length - 1].time
+                    : 0;
                 candles.forEach(function (c) {
+                    if (c.time < seriesLastTime) return; // silently skip stale
                     candleSeries.update(c);
                     volSeries.update({
                         time: c.time, value: c.volume,
@@ -927,11 +935,18 @@
                         }
                     });
                 }
-                // Update tail Bollinger too.
+                // Update tail Bollinger — same "time >= last" constraint
+                // as candle/vol series.
                 var bb = data.bollinger || {};
-                (bb.upper || []).slice(-30).forEach(function (b) { upperSeries.update(b); });
-                (bb.mid   || []).slice(-30).forEach(function (b) { midSeries.update(b); });
-                (bb.lower || []).slice(-30).forEach(function (b) { lowerSeries.update(b); });
+                function updateBBSeries(series, arr) {
+                    if (!arr || arr.length === 0) return;
+                    var d = series.data();
+                    var last = d.length > 0 ? d[d.length - 1].time : 0;
+                    arr.forEach(function (b) { if (b.time >= last) series.update(b); });
+                }
+                updateBBSeries(upperSeries, bb.upper);
+                updateBBSeries(midSeries,   bb.mid);
+                updateBBSeries(lowerSeries, bb.lower);
                 // Header + summary refresh so score/verdict stay live.
                 applyHeader(data);
                 if (window.__chartDebug) {
