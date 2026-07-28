@@ -2816,6 +2816,18 @@ func templateFuncs() template.FuncMap {
 // ?side=, ?entry=, ?tf= query params pre-fill the inputs (so users can
 // re-validate a slightly tweaked entry by adjusting URL bookmarks).
 func (s *server) handleValidateForm(c *gin.Context) {
+	// auto=1 (used by the /chart quick-action modal) skips the form
+	// and runs validation directly — the query params ARE the input,
+	// so making the user click "Validate" again would be one extra
+	// click for no gained information. Fall back to normal form
+	// rendering if any required field is missing.
+	if c.Query("auto") == "1" &&
+		c.Query("symbol") != "" && c.Query("side") != "" && c.Query("entry") != "" {
+		s.runValidate(c, c.Query("symbol"), c.Query("side"), c.Query("entry"),
+			defaultStr(c.Query("tf"), "1h"),
+			defaultStr(c.Query("fee_bps"), "6"))
+		return
+	}
 	c.HTML(http.StatusOK, "validate_form.html", gin.H{
 		"Symbol":    strings.ToUpper(c.Query("symbol")),
 		"Side":      strings.ToLower(c.Query("side")),
@@ -2831,9 +2843,23 @@ func (s *server) handleValidateForm(c *gin.Context) {
 // renders the scored result. Falls back to rerendering the form with an
 // error banner on bad inputs / fetch failures.
 func (s *server) handleValidatePost(c *gin.Context) {
-	symStr := strings.ToUpper(strings.TrimSpace(c.PostForm("symbol")))
-	sideStr := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
-	tfStr := strings.TrimSpace(c.PostForm("tf"))
+	s.runValidate(c,
+		c.PostForm("symbol"),
+		c.PostForm("side"),
+		c.PostForm("entry"),
+		defaultStr(c.PostForm("tf"), "1h"),
+		defaultStr(c.PostForm("fee_bps"), "6"),
+	)
+}
+
+// runValidate executes the validation logic and renders either the
+// result page (success) or the form with an error banner (bad input /
+// fetch failure). Shared by the POST form handler and the auto=1 GET
+// short-circuit used by /chart's quick-action modal.
+func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn string) {
+	symStr := strings.ToUpper(strings.TrimSpace(symIn))
+	sideStr := strings.ToLower(strings.TrimSpace(sideIn))
+	tfStr := strings.TrimSpace(tfIn)
 	if tfStr == "" {
 		tfStr = "1h"
 	}
@@ -2842,9 +2868,9 @@ func (s *server) handleValidatePost(c *gin.Context) {
 		c.HTML(http.StatusOK, "validate_form.html", gin.H{
 			"Symbol":    symStr,
 			"Side":      sideStr,
-			"Entry":     c.PostForm("entry"),
+			"Entry":     entryIn,
 			"TF":        tfStr,
-			"FeeBps":    defaultStr(c.PostForm("fee_bps"), "6"),
+			"FeeBps":    defaultStr(feeIn, "6"),
 			"Symbols":   []string{"BTC", "ETH", "XAU", "XAG"},
 			"TFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 			"Error":     errMsg,
@@ -2866,12 +2892,12 @@ func (s *server) handleValidatePost(c *gin.Context) {
 		rerender("side must be long or short")
 		return
 	}
-	entry, err := parseFloatPositive(c.PostForm("entry"), "entry")
+	entry, err := parseFloatPositive(entryIn, "entry")
 	if err != nil {
 		rerender(err.Error())
 		return
 	}
-	feeBps, err := parseFloatPositive(defaultStr(c.PostForm("fee_bps"), "6"), "fee_bps")
+	feeBps, err := parseFloatPositive(defaultStr(feeIn, "6"), "fee_bps")
 	if err != nil {
 		rerender(err.Error())
 		return
@@ -2890,9 +2916,6 @@ func (s *server) handleValidatePost(c *gin.Context) {
 		return
 	}
 
-	// Fetch live mark price so the validator's "current market" reference
-	// matches what the dashboard shows. Best-effort: on failure, validator
-	// falls back to closed-bar close internally.
 	var markPrice float64
 	if fr, err := s.client.FundingRate(ctx, sym); err == nil {
 		markPrice = fr.MarkPrice

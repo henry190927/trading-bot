@@ -1107,6 +1107,31 @@ footer {
     border-color: var(--blue);
 }
 .chart-layers-actions { margin-left: auto; }
+.layer-count {
+    display: inline-block;
+    min-width: 1.4em;
+    text-align: center;
+    padding: 0 4px;
+    margin-left: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 8px;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+.layer-chip.active .layer-count {
+    background: rgba(255,255,255,0.22);
+    color: #fff;
+}
+.layer-count.is-zero { opacity: 0.35; }
+.layer-chip.layer-reset {
+    color: var(--text-dim);
+    border-color: var(--border);
+}
+.layer-chip.layer-reset:hover {
+    color: var(--text);
+    background: var(--surface);
+}
 .layer-chip.layer-eye {
     color: var(--text-dim);
     border-color: var(--border);
@@ -1180,7 +1205,10 @@ footer {
    the chart. */
 .chart-price-marker {
     position: absolute;
-    right: 62px;
+    /* Sit well inside the plot area — the LWC price scale + drag
+       handle live in the last ~60px on the right. Keeping the marker
+       further in avoids capturing scale-drag clicks. */
+    right: 120px;
     top: 0;
     transform: translateY(-50%);
     display: flex;
