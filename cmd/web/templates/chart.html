@@ -500,7 +500,12 @@
         headerSym.textContent = (data.symbol || '?') + '-USDT';
         headerTf.textContent = data.tf || '?';
         var lastCandle = (data.candles && data.candles.length) ? data.candles[data.candles.length - 1] : null;
-        var currentPrice = data.markPrice || (lastCandle ? lastCandle.close : null);
+        // Prefer the last candle's close so the big header price matches
+        // what the user sees on the chart itself. data.markPrice is the
+        // perp mark from /premiumIndex — related but not identical to
+        // the last trade tick (index ± basis). Falls back to markPrice
+        // only if candles are missing.
+        var currentPrice = (lastCandle ? lastCandle.close : null) || data.markPrice || null;
         headerPrice.textContent = fmtPrice(currentPrice);
         apply24hStats(currentPrice, data.candles);
 
