@@ -929,6 +929,74 @@ footer {
     color: var(--text-dim);
     font-family: ui-monospace, monospace;
 }
+.chart-banner-ctx {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.3rem;
+}
+.ctx-chip {
+    display: inline-block;
+    padding: 1px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+.ctx-chip.ctx-warn-soft {
+    color: var(--yellow);
+    border-color: var(--yellow);
+    background: rgba(251,191,36,0.08);
+}
+.ctx-chip.ctx-warn {
+    color: var(--red);
+    border-color: var(--red);
+    background: rgba(224,49,49,0.08);
+}
+
+/* Layer toggle chips — one row above chart, click to show/hide
+   each analysis layer. State persisted via localStorage. */
+.chart-layers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.4rem 0.1rem;
+    margin-bottom: 0.4rem;
+}
+.chart-layers-label {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+.chart-layers-group {
+    display: inline-flex;
+    gap: 0.3rem;
+    padding-right: 0.6rem;
+    border-right: 1px dashed var(--border);
+}
+.chart-layers-group:last-child { border-right: 0; padding-right: 0; }
+.layer-chip {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-family: ui-monospace, "SF Mono", monospace;
+    cursor: pointer;
+    transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.layer-chip:hover { color: var(--text); }
+.layer-chip.active {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+}
 
 .chart-one-liner {
     color: var(--text);

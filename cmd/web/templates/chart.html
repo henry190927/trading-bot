@@ -55,6 +55,7 @@
       <div class="chart-banner-label">當下行動建議 · Action</div>
       <div class="chart-banner-action-text" id="chart-banner-action-text">Loading…</div>
       <div class="chart-banner-note" id="chart-banner-note"></div>
+      <div class="chart-banner-ctx" id="chart-banner-ctx"></div>
     </div>
     <div class="chart-banner-score" id="chart-banner-score">
       <div class="chart-banner-label">評分</div>
@@ -62,6 +63,24 @@
       <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
       <div class="chart-banner-score-tf" id="chart-banner-score-tf">—</div>
     </div>
+  </div>
+
+  <div class="chart-layers" role="group" aria-label="chart layers">
+    <span class="chart-layers-label">Layers:</span>
+    <span class="chart-layers-group">
+      <button type="button" class="layer-chip active" data-layer="boll">BOLL</button>
+      <button type="button" class="layer-chip active" data-layer="vol">VOL</button>
+      <button type="button" class="layer-chip active" data-layer="vp">VP</button>
+      <button type="button" class="layer-chip active" data-layer="plan">plan</button>
+    </span>
+    <span class="chart-layers-group">
+      <button type="button" class="layer-chip active" data-layer="sweep">sweep</button>
+      <button type="button" class="layer-chip active" data-layer="double">2× top/bot</button>
+      <button type="button" class="layer-chip active" data-layer="div">RSI div</button>
+      <button type="button" class="layer-chip active" data-layer="volx">vol×</button>
+      <button type="button" class="layer-chip active" data-layer="bb-events">BB touch/break</button>
+      <button type="button" class="layer-chip active" data-layer="flags">⚑ flags</button>
+    </span>
   </div>
 
   <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
@@ -211,6 +230,87 @@
     var bannerActionEl  = document.getElementById('chart-banner-action');
     var bannerActText   = document.getElementById('chart-banner-action-text');
     var bannerActNote   = document.getElementById('chart-banner-note');
+    var bannerCtxEl     = document.getElementById('chart-banner-ctx');
+
+    // ── Layer toggle state (persisted to localStorage) ─────────────
+    // Each entry maps layer name → bool (true = visible).
+    // Layer keys align with data-layer attrs on the chip buttons AND
+    // with marker.kind categories from the backend.
+    var LAYERS_KEY = 'chart-layers';
+    var DEFAULT_LAYERS = {
+        boll: true, vol: true, vp: true, plan: true,
+        sweep: true, double: true, div: true, volx: true,
+        'bb-events': true, flags: true,
+    };
+    function loadLayers() {
+        try {
+            var v = JSON.parse(localStorage.getItem(LAYERS_KEY) || '{}');
+            return Object.assign({}, DEFAULT_LAYERS, v);
+        } catch (e) { return Object.assign({}, DEFAULT_LAYERS); }
+    }
+    function saveLayers() { try { localStorage.setItem(LAYERS_KEY, JSON.stringify(layers)); } catch (e) {} }
+    var layers = loadLayers();
+    // Cache the last-loaded markers so filter re-applies without refetch.
+    var allMarkers = [];
+
+    // Map a marker's `kind` to a layer key.
+    function markerLayerKind(m) {
+        var k = m.kind || '';
+        if (k === 'sweep_high' || k === 'sweep_low') return 'sweep';
+        if (k === 'double_top' || k === 'double_bottom') return 'double';
+        if (k === 'rsi_bear_div' || k === 'rsi_bull_div') return 'div';
+        if (k === 'vol_anomaly') return 'volx';
+        if (k.indexOf('bb_') === 0) return 'bb-events';
+        if (k === 'flag_long' || k === 'flag_short') return 'flags';
+        return null;
+    }
+
+    // Rebuild the visible marker list from allMarkers according to
+    // current toggle state.
+    function refreshMarkers() {
+        if (!allMarkers.length) { candleSeries.setMarkers([]); return; }
+        var visible = allMarkers.filter(function (m) {
+            var layer = markerLayerKind(m);
+            return !layer || layers[layer];
+        });
+        candleSeries.setMarkers(visible);
+    }
+    // Apply visibility to non-marker layers (series-level).
+    function refreshLayerVisibility() {
+        upperSeries.applyOptions({ visible: layers.boll });
+        midSeries.applyOptions({ visible: layers.boll });
+        lowerSeries.applyOptions({ visible: layers.boll });
+        volSeries.applyOptions({ visible: layers.vol });
+        if (vpSvg) vpSvg.style.display = layers.vp ? '' : 'none';
+        // Plan lines: we redraw them from scratch on data load, but here
+        // we also need to hide/show. Cheapest = re-apply on toggle.
+        applyPlanLinesVisibility();
+    }
+    // Track plan visibility separately since planLines are recreated
+    // on each data load.
+    var lastPlan = null;
+    function applyPlanLinesVisibility() {
+        clearPlanLines();
+        if (!layers.plan || !lastPlan) return;
+        addPlanLine(lastPlan.entry, '#f59f00', 'entry');
+        addPlanLine(lastPlan.stop,  '#e03131', 'stop');
+        addPlanLine(lastPlan.tp1,   '#2f9e44', 'TP1');
+        addPlanLine(lastPlan.tp2,   '#0ca678', 'TP2');
+    }
+
+    // Wire chip buttons.
+    document.querySelectorAll('.layer-chip').forEach(function (chip) {
+        var name = chip.dataset.layer;
+        if (!layers[name]) chip.classList.remove('active');
+        else chip.classList.add('active');
+        chip.addEventListener('click', function () {
+            layers[name] = !layers[name];
+            chip.classList.toggle('active', layers[name]);
+            saveLayers();
+            refreshMarkers();
+            refreshLayerVisibility();
+        });
+    });
 
     function verdictBandClass(t) {
         if (t == null) return 'band-none';
@@ -280,6 +380,29 @@
         var act = actionText(sig, diag);
         bannerActText.textContent = act.text;
         bannerActNote.textContent = act.note;
+
+        // Live-market context chips (funding + OI). Historical OI is
+        // unavailable on BingX free tier — see ROADMAP OI-delta note.
+        // We only show the current snapshot here.
+        var ctxParts = [];
+        var mc = data.marketCtx || {};
+        if (mc.fundingRate != null && mc.fundingRate !== 0) {
+            var pct = (mc.fundingRate * 100).toFixed(4);
+            var annualized = (mc.fundingRate * 3 * 365 * 100).toFixed(1);
+            var fCls = '';
+            if      (mc.fundingRate >=  0.0010) fCls = ' ctx-warn';
+            else if (mc.fundingRate >=  0.0005) fCls = ' ctx-warn-soft';
+            else if (mc.fundingRate <= -0.0010) fCls = ' ctx-warn';
+            else if (mc.fundingRate <= -0.0005) fCls = ' ctx-warn-soft';
+            ctxParts.push('<span class="ctx-chip' + fCls + '">funding ' + pct + '% (~' + annualized + '% APR)</span>');
+        }
+        if (mc.openInterest && mc.openInterest > 0) {
+            var oiFmt = mc.openInterest >= 1e9 ? (mc.openInterest/1e9).toFixed(2) + 'B'
+                       : mc.openInterest >= 1e6 ? (mc.openInterest/1e6).toFixed(1) + 'M'
+                       : (mc.openInterest/1e3).toFixed(1) + 'K';
+            ctxParts.push('<span class="ctx-chip">OI ' + oiFmt + '</span>');
+        }
+        bannerCtxEl.innerHTML = ctxParts.join('');
     }
 
     function volFrom(candles) {
@@ -435,14 +558,10 @@
         earliestTime = allCandles.length ? allCandles[0].time : null;
         noMoreHistory = false;
 
-        // Event markers on the candlestick series (sweeps, double
-        // patterns, divergences, vol anomalies). LWC's setMarkers
-        // requires ascending-by-time — backend already sorts.
-        if (data.markers && data.markers.length) {
-            candleSeries.setMarkers(data.markers);
-        } else {
-            candleSeries.setMarkers([]);
-        }
+        // Event markers on the candlestick series — cached so toggles
+        // can filter without re-fetching. Backend already sorts by time.
+        allMarkers = (data.markers || []).slice();
+        refreshMarkers();
 
         // VP is now computed client-side from the visible range so we
         // ignore data.volumeProfile from the backend. Defer one tick
@@ -452,14 +571,12 @@
             drawVP();
         }, 0);
 
-        clearPlanLines();
-        var p = data.plan;
-        if (p) {
-            addPlanLine(p.entry, '#f59f00', 'entry');
-            addPlanLine(p.stop,  '#e03131', 'stop');
-            addPlanLine(p.tp1,   '#2f9e44', 'TP1');
-            addPlanLine(p.tp2,   '#0ca678', 'TP2');
-        }
+        lastPlan = data.plan || null;
+        applyPlanLinesVisibility();
+        // Ensure current layer visibility is applied for series-level
+        // toggles too (BOLL/vol/vp) — on initial load if user had
+        // toggled off, LWC would still draw them.
+        refreshLayerVisibility();
         chart.timeScale().fitContent();
     }
 

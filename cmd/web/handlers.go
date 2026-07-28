@@ -3628,6 +3628,15 @@ func (s *server) handleChartData(c *gin.Context) {
 	}
 
 	c.Header("Cache-Control", "no-store")
+	// Live market context — funding rate + OI snapshot for the banner
+	// chips. Historical OI series is not available on BingX free/public
+	// endpoints (per ROADMAP OI-delta note), so we only show the CURRENT
+	// values; no historical OI markers can be computed.
+	ctxSnap := map[string]any{
+		"fundingRate":  view.Context.FundingRate,
+		"openInterest": view.Context.OpenInterest,
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"symbol":        short,
 		"tf":            tfStr,
@@ -3641,6 +3650,7 @@ func (s *server) handleChartData(c *gin.Context) {
 		"diagnose":      diag,
 		"summary":       view.Summary,
 		"markPrice":     view.MarkPrice,
+		"marketCtx":     ctxSnap,
 	})
 }
 
@@ -3758,6 +3768,7 @@ func computeChartMarkers(candles []market.Candle) []map[string]any {
 	// range > 1.5× ATR. Mirrors engine's BTC MOM vote criteria but we
 	// mark all such bars on chart regardless of symbol (visual only).
 	atr := indicator.ATR(candles, 14)
+	volAnomalyByIdx := map[int]bool{}
 	for i := 20; i < len(candles); i++ {
 		bar := candles[i]
 		barRange := bar.High - bar.Low
@@ -3772,6 +3783,7 @@ func computeChartMarkers(candles []market.Candle) []map[string]any {
 		if avgVol <= 0 || bar.Volume < 3.0*avgVol {
 			continue
 		}
+		volAnomalyByIdx[i] = true
 		markers = append(markers, map[string]any{
 			"time":     bar.OpenTime.Unix(),
 			"position": "aboveBar",
@@ -3780,6 +3792,147 @@ func computeChartMarkers(candles []market.Candle) []map[string]any {
 			"text":     "vol×",
 			"kind":     "vol_anomaly",
 		})
+	}
+
+	// Bollinger band touch / break events. Bar High piercing upper band
+	// = potential mean-rev SHORT setup; Bar Low piercing lower band =
+	// potential mean-rev LONG. "Break" (close outside band) is rarer +
+	// more significant than "touch" (wick outside, close inside).
+	// Track per-bar hits so the turning-point flag pass below can
+	// cross-reference confluence.
+	bb := indicator.Bollinger(closes, 20, 2)
+	bbUpperByIdx := map[int]bool{}
+	bbLowerByIdx := map[int]bool{}
+	for i, b := range bb {
+		if b.Mid == 0 {
+			continue
+		}
+		bar := candles[i]
+		// Upper band: high > upper (touch) or close > upper (break).
+		if bar.High >= b.Upper {
+			bbUpperByIdx[i] = true
+			kind := "bb_touch_upper"
+			text := "BB↑"
+			color := "#e8590c"
+			if bar.Close > b.Upper {
+				kind = "bb_break_upper"
+				text = "BB!↑"
+				color = "#d9480f"
+			}
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "aboveBar",
+				"color":    color,
+				"shape":    "arrowDown",
+				"text":     text,
+				"kind":     kind,
+			})
+		}
+		if bar.Low <= b.Lower {
+			bbLowerByIdx[i] = true
+			kind := "bb_touch_lower"
+			text := "BB↓"
+			color := "#1971c2"
+			if bar.Close < b.Lower {
+				kind = "bb_break_lower"
+				text = "BB!↓"
+				color = "#1864ab"
+			}
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "belowBar",
+				"color":    color,
+				"shape":    "arrowUp",
+				"text":     text,
+				"kind":     kind,
+			})
+		}
+	}
+
+	// RSI extremes — track for confluence check (not emitted as own
+	// markers, since the RSI divergence marker already covers the
+	// interesting cases).
+	rsiOversoldByIdx := map[int]bool{}
+	rsiOverboughtByIdx := map[int]bool{}
+	for i := 14; i < len(candles); i++ {
+		if i >= len(rsi) {
+			break
+		}
+		if rsi[i] < 30 {
+			rsiOversoldByIdx[i] = true
+		} else if rsi[i] > 70 {
+			rsiOverboughtByIdx[i] = true
+		}
+	}
+
+	// Sweep-by-index maps for confluence check.
+	sweepHighByIdx := map[int]bool{}
+	sweepLowByIdx := map[int]bool{}
+	for _, sw := range sweeps {
+		if !sw.ReclaimOK || sw.SweepIdx < 0 || sw.SweepIdx >= len(candles) {
+			continue
+		}
+		if sw.Side == analyzer.SweepHigh {
+			sweepHighByIdx[sw.SweepIdx] = true
+		} else {
+			sweepLowByIdx[sw.SweepIdx] = true
+		}
+	}
+
+	// Turning-point flags — bars with ≥2 concurrent bullish OR ≥2
+	// concurrent bearish confluences from {BB touch, sweep, RSI
+	// extreme, vol anomaly}. These are the setups the engine considers
+	// tradeable, rendered as bigger flag markers so they pop out of the
+	// smaller event markers.
+	for i := 20; i < len(candles); i++ {
+		bull := 0
+		bear := 0
+		if bbLowerByIdx[i] {
+			bull++
+		}
+		if bbUpperByIdx[i] {
+			bear++
+		}
+		if sweepLowByIdx[i] {
+			bull++
+		}
+		if sweepHighByIdx[i] {
+			bear++
+		}
+		if rsiOversoldByIdx[i] {
+			bull++
+		}
+		if rsiOverboughtByIdx[i] {
+			bear++
+		}
+		if volAnomalyByIdx[i] {
+			bar := candles[i]
+			if bar.Close >= bar.Open {
+				bull++
+			} else {
+				bear++
+			}
+		}
+		bar := candles[i]
+		if bull >= 2 && bear < 2 {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "belowBar",
+				"color":    "#2f9e44",
+				"shape":    "arrowUp",
+				"text":     "⚑ LONG",
+				"kind":     "flag_long",
+			})
+		} else if bear >= 2 && bull < 2 {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "aboveBar",
+				"color":    "#e03131",
+				"shape":    "arrowDown",
+				"text":     "⚑ SHORT",
+				"kind":     "flag_short",
+			})
+		}
 	}
 
 	// Sort ascending by time (LWC requires it) + dedup by (time, kind).
