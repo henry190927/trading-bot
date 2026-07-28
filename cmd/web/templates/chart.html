@@ -884,7 +884,13 @@
     // forming bar without redrawing the whole chart.
     var pollTimer = null;
     function pollTick() {
-        if (loadingHistory) return; // don't clash with pagination fetch
+        // Note: intentionally do NOT gate on loadingHistory. The two
+        // fetches touch different ends of allCandles (older prefix vs
+        // newer tail) and LWC's synchronous setData/update calls can't
+        // race with each other. Previously the guard let a chaining
+        // left-edge pagination starve the poll indefinitely, freezing
+        // the header/last-bar price on the UI.
+        if (window.__chartDebug) console.log('[chart poll] tick', new Date().toISOString());
         fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym())
               + '&tf=' + encodeURIComponent(currentTF())
               + '&limit=30&_=' + Date.now(),
