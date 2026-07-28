@@ -112,6 +112,49 @@
   <div class="chart-wrap">
     <div id="chart-container" class="chart-canvas"></div>
     <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <!-- Floating "+" marker that tracks the crosshair Y. Click opens
+         the quick-action modal with the price prefilled. Hidden until
+         the user hovers the chart. -->
+    <div class="chart-price-marker" id="chart-price-marker" hidden>
+      <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
+      <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
+    </div>
+  </div>
+
+  <!-- Quick-action modal — Record Trade / Validate at a chosen price.
+       Fields mirror /journal/new + /validate; on submit we open those
+       pages in a new tab with the fields prefilled via query params so
+       the flow is identical to entering them manually. -->
+  <div class="modal-backdrop hidden" id="quick-modal-backdrop">
+    <div class="modal quick-modal" role="dialog" aria-labelledby="quick-modal-title">
+      <div class="modal-head">
+        <h3 id="quick-modal-title">Quick action</h3>
+        <button type="button" class="modal-x" id="quick-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="quick-row">
+          <label>Symbol</label>
+          <span id="quick-sym">—</span>
+          <span class="quick-tf" id="quick-tf">—</span>
+        </div>
+        <div class="quick-row">
+          <label for="quick-price">Price</label>
+          <input type="number" step="any" id="quick-price">
+        </div>
+        <div class="quick-row">
+          <label>Side</label>
+          <div class="quick-side-group">
+            <button type="button" class="quick-side-btn" data-side="long">LONG</button>
+            <button type="button" class="quick-side-btn" data-side="short">SHORT</button>
+          </div>
+        </div>
+        <div class="quick-actions">
+          <button type="button" class="btn-primary quick-go" id="quick-go-record">Record Trade →</button>
+          <button type="button" class="btn-secondary quick-go" id="quick-go-validate">Validate →</button>
+        </div>
+        <p class="quick-hint">Opens the matching form in a new tab with fields prefilled.</p>
+      </div>
+    </div>
   </div>
 
   <div class="chart-legend-row" id="chart-legend">
@@ -844,7 +887,8 @@
         if (loadingHistory) return; // don't clash with pagination fetch
         fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym())
               + '&tf=' + encodeURIComponent(currentTF())
-              + '&limit=30')
+              + '&limit=30&_=' + Date.now(),
+              {cache: 'no-store'})
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) {
                 if (!data || !data.candles || data.candles.length === 0) return;
@@ -884,11 +928,17 @@
                 (bb.lower || []).slice(-30).forEach(function (b) { lowerSeries.update(b); });
                 // Header + summary refresh so score/verdict stay live.
                 applyHeader(data);
+                if (window.__chartDebug) {
+                    var lc = candles[candles.length - 1];
+                    console.log('[chart poll] applied', {sym: currentSym(), close: lc.close, markPrice: data.markPrice, ts: lc.time});
+                }
                 // Volume profile — small tail doesn't change overall shape much;
                 // skip redraw to avoid flicker. Full VP updates only on symbol/
                 // TF switch or manual refresh.
             })
-            .catch(function () { /* silent — poll again next tick */ });
+            .catch(function (e) {
+                console.error('[chart poll] error', e);
+            });
     }
     function startPoll() {
         stopPoll();
@@ -926,6 +976,113 @@
                 window.aiRender.renderInto(aiPane, { error: 'network error: ' + err.message });
             });
     });
+
+    // ── "+ at price" quick action ──────────────────────────────────
+    // Floating + marker tracks the crosshair Y position on the right
+    // edge of the chart. Clicking opens a modal with the price
+    // prefilled; from there the user can jump to /journal/new or
+    // /validate with all fields prepopulated via query params.
+    (function initQuickAction() {
+        var wrap        = document.querySelector('.chart-wrap');
+        var marker      = document.getElementById('chart-price-marker');
+        var markerLabel = document.getElementById('chart-price-marker-label');
+        var plusBtn     = document.getElementById('chart-price-plus');
+        var backdrop    = document.getElementById('quick-modal-backdrop');
+        var closeBtn    = document.getElementById('quick-modal-close');
+        var symOut      = document.getElementById('quick-sym');
+        var tfOut       = document.getElementById('quick-tf');
+        var priceIn     = document.getElementById('quick-price');
+        var sideBtns    = document.querySelectorAll('.quick-side-btn');
+        var recordBtn   = document.getElementById('quick-go-record');
+        var validateBtn = document.getElementById('quick-go-validate');
+        if (!wrap || !marker || !plusBtn || !backdrop) return;
+
+        var lastPrice = null;
+        function fmtPriceInput(v) {
+            if (v == null || isNaN(v)) return '';
+            // More precision than the header — user can trim manually.
+            if (v >= 1000) return v.toFixed(2);
+            if (v >= 10)   return v.toFixed(3);
+            if (v >= 1)    return v.toFixed(4);
+            return v.toFixed(6);
+        }
+
+        // LWC's crosshair callback fires whenever the cursor moves
+        // inside the chart area. param.point is {x, y} relative to the
+        // chart container; when null, the cursor has left.
+        chart.subscribeCrosshairMove(function (param) {
+            if (!param || !param.point) { marker.hidden = true; return; }
+            var y = param.point.y;
+            var price = candleSeries.coordinateToPrice(y);
+            if (price == null || isNaN(price)) { marker.hidden = true; return; }
+            lastPrice = price;
+            marker.style.top = y + 'px';
+            markerLabel.textContent = fmtPriceInput(price);
+            marker.hidden = false;
+        });
+
+        function selectedSide() {
+            var active = document.querySelector('.quick-side-btn.active');
+            return active ? active.dataset.side : '';
+        }
+        function updateGoState() {
+            var hasSide = !!selectedSide();
+            recordBtn.disabled   = !hasSide;
+            validateBtn.disabled = !hasSide;
+        }
+        sideBtns.forEach(function (b) {
+            b.addEventListener('click', function () {
+                sideBtns.forEach(function (x) { x.classList.remove('active'); });
+                b.classList.add('active');
+                updateGoState();
+            });
+        });
+
+        function openModal(price) {
+            symOut.textContent = currentSym();
+            tfOut.textContent  = currentTF();
+            priceIn.value = fmtPriceInput(price);
+            sideBtns.forEach(function (x) { x.classList.remove('active'); });
+            updateGoState();
+            backdrop.classList.remove('hidden');
+            setTimeout(function () { priceIn.focus(); priceIn.select(); }, 30);
+        }
+        function closeModal() { backdrop.classList.add('hidden'); }
+
+        plusBtn.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            if (lastPrice == null) return;
+            openModal(lastPrice);
+        });
+        closeBtn.addEventListener('click', closeModal);
+        backdrop.addEventListener('click', function (ev) {
+            if (ev.target === backdrop) closeModal();
+        });
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape' && !backdrop.classList.contains('hidden')) closeModal();
+        });
+
+        function buildQs(path) {
+            var side = selectedSide();
+            var price = parseFloat(priceIn.value);
+            if (!side || isNaN(price) || price <= 0) return null;
+            var q = 'symbol=' + encodeURIComponent(currentSym())
+                  + '&side='  + encodeURIComponent(side)
+                  + '&entry=' + encodeURIComponent(price)
+                  + '&tf='    + encodeURIComponent(currentTF());
+            return path + '?' + q;
+        }
+        recordBtn.addEventListener('click', function () {
+            var url = buildQs('/journal/new');
+            if (!url) return;
+            window.open(url, '_blank', 'noopener');
+        });
+        validateBtn.addEventListener('click', function () {
+            var url = buildQs('/validate');
+            if (!url) return;
+            window.open(url, '_blank', 'noopener');
+        });
+    })();
 
     load();
 })();

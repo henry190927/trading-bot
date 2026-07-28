@@ -1174,6 +1174,186 @@ footer {
     border: 1px solid var(--border);
     border-radius: 6px;
 }
+/* Floating price marker on the chart right edge — tracks the cursor
+   crosshair. The + button opens the quick-action modal so the user
+   can record a trade / validate at the hovered price without leaving
+   the chart. */
+.chart-price-marker {
+    position: absolute;
+    right: 62px;
+    top: 0;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px 2px 8px;
+    background: rgba(13,17,23,0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.75rem;
+    color: var(--text);
+    pointer-events: auto;
+    z-index: 5;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.chart-price-marker[hidden] { display: none; }
+.chart-price-marker-label { min-width: 60px; text-align: right; }
+.chart-price-plus {
+    background: var(--blue);
+    color: #fff;
+    border: 0;
+    border-radius: 3px;
+    width: 20px;
+    height: 20px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+.chart-price-plus:hover { background: #1971c2; }
+
+/* Quick-action modal — used for "Record Trade / Validate at price". */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.modal-backdrop.hidden { display: none; }
+.modal.quick-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-width: 340px;
+    max-width: 92vw;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+}
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+.modal-head h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text);
+}
+.modal-x {
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.modal-x:hover { color: var(--text); }
+.modal-body { padding: 1rem; }
+.quick-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+    font-size: 0.9rem;
+}
+.quick-row label {
+    color: var(--text-dim);
+    min-width: 60px;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+.quick-row input[type="number"] {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.35rem 0.5rem;
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.95rem;
+}
+.quick-row input[type="number"]:focus {
+    outline: none;
+    border-color: var(--blue);
+}
+.quick-tf {
+    color: var(--text-dim);
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+.quick-side-group { display: flex; gap: 0.4rem; }
+.quick-side-btn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 4px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: ui-monospace, monospace;
+}
+.quick-side-btn:hover { color: var(--text); }
+.quick-side-btn.active[data-side="long"] {
+    background: var(--green);
+    color: #fff;
+    border-color: var(--green);
+}
+.quick-side-btn.active[data-side="short"] {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+}
+.quick-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+.quick-go {
+    flex: 1;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+}
+.quick-go:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.quick-go.btn-primary {
+    background: var(--blue);
+    color: #fff;
+    border-color: var(--blue);
+}
+.quick-go.btn-primary:hover:not(:disabled)   { background: #1971c2; }
+.quick-go.btn-secondary {
+    background: var(--surface-2);
+    color: var(--text);
+}
+.quick-go.btn-secondary:hover:not(:disabled) { background: var(--surface); }
+.quick-hint {
+    margin: 0.8rem 0 0;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-align: center;
+}
 /* Volume-by-price SVG overlay — anchored to the right edge of the
    chart just inside the price scale. Purely decorative; pointer
    events off so it doesn't intercept chart drag/zoom. */
