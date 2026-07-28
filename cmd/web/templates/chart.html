@@ -52,7 +52,10 @@
 
   <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
 
-  <div id="chart-container" class="chart-canvas"></div>
+  <div class="chart-wrap">
+    <div id="chart-container" class="chart-canvas"></div>
+    <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+  </div>
 
   <div class="chart-legend-row" id="chart-legend">
     <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL upper</span>
@@ -138,6 +141,7 @@
     var allMid = [];
     var allLower = [];
     var allVol = [];
+    var currentVP = null; // last-received volumeProfile buckets
 
     // Track plan price lines so we can clear them when data reloads.
     var planLines = [];
@@ -202,6 +206,71 @@
         });
     }
 
+    // ── Volume-by-price overlay drawing ────────────────────────────
+    // SVG-based vertical histogram anchored to the right edge of the
+    // chart. Each bucket is a horizontal bar; buy volume (green) and
+    // sell volume (red) stacked. POC bucket highlighted brighter.
+    // Positioned via LWC priceScale.priceToCoordinate to stay in sync
+    // with candle prices during zoom/pan.
+    var vpSvg = document.getElementById('chart-vp-overlay');
+    function drawVP() {
+        if (!vpSvg || !currentVP || currentVP.length === 0) {
+            if (vpSvg) vpSvg.innerHTML = '';
+            return;
+        }
+        var rect = container.getBoundingClientRect();
+        var svgWidth = 96; // right-side band width in px
+        var svgHeight = rect.height;
+        vpSvg.setAttribute('width',  svgWidth);
+        vpSvg.setAttribute('height', svgHeight);
+        vpSvg.style.height = svgHeight + 'px';
+        vpSvg.style.width  = svgWidth + 'px';
+
+        // Compute max bucket total to scale bar widths.
+        var maxTotal = 0;
+        currentVP.forEach(function (b) {
+            var t = (b.buy || 0) + (b.sell || 0);
+            if (t > maxTotal) maxTotal = t;
+        });
+        if (maxTotal <= 0) { vpSvg.innerHTML = ''; return; }
+
+        var maxBarW = svgWidth - 6; // leave 6px right-margin against price scale
+        var parts = [];
+        currentVP.forEach(function (b) {
+            // Map bucket midpoint price to Y using LWC's price scale.
+            var midPrice = (b.priceLow + b.priceHigh) / 2;
+            var y = candleSeries.priceToCoordinate(midPrice);
+            if (y == null) return;
+            var yLow  = candleSeries.priceToCoordinate(b.priceLow);
+            var yHigh = candleSeries.priceToCoordinate(b.priceHigh);
+            if (yLow == null || yHigh == null) return;
+            var barH = Math.max(1, Math.abs(yLow - yHigh) - 0.5);
+            var barY = Math.min(yLow, yHigh);
+            var total = (b.buy || 0) + (b.sell || 0);
+            var totalW = maxBarW * (total / maxTotal);
+            var buyFrac = total > 0 ? (b.buy || 0) / total : 0;
+            var buyW  = totalW * buyFrac;
+            var sellW = totalW - buyW;
+            var xRight = svgWidth - 2;
+            // Buy portion (blue, drawn from right edge leftward for the FIRST slice)
+            // then sell portion (yellow/orange), stacked leftward.
+            var opacity = b.isPOC ? 0.85 : 0.45;
+            if (buyW > 0) {
+                parts.push('<rect x="' + (xRight - buyW) + '" y="' + barY + '" width="' + buyW + '" height="' + barH + '" fill="#4c6ef5" opacity="' + opacity + '" />');
+            }
+            if (sellW > 0) {
+                parts.push('<rect x="' + (xRight - buyW - sellW) + '" y="' + barY + '" width="' + sellW + '" height="' + barH + '" fill="#f59f00" opacity="' + opacity + '" />');
+            }
+        });
+        vpSvg.innerHTML = parts.join('');
+    }
+
+    // Redraw VP whenever the visible range or size changes so the
+    // bars stay aligned with the moving price scale.
+    chart.timeScale().subscribeVisibleTimeRangeChange(function () { drawVP(); });
+    var resizeObs = new ResizeObserver(function () { drawVP(); });
+    resizeObs.observe(container);
+
     function applyChart(data) {
         allCandles = data.candles || [];
         var bb = data.bollinger || {};
@@ -216,6 +285,11 @@
         volSeries.setData(allVol);
         earliestTime = allCandles.length ? allCandles[0].time : null;
         noMoreHistory = false;
+        currentVP = data.volumeProfile || null;
+        // Volume profile aligns with LWC's price scale — must draw
+        // AFTER series data lands (so priceToCoordinate returns
+        // real numbers, not null). Defer one tick.
+        setTimeout(drawVP, 0);
 
         clearPlanLines();
         var p = data.plan;
@@ -260,6 +334,12 @@
                 lowerSeries.setData(allLower);
                 volSeries.setData(allVol);
                 earliestTime = allCandles[0].time;
+                // Refresh VP with the wider dataset — backend recomputes
+                // from every-candle-it-was-given so the older-batch VP
+                // is over just those older bars. Update the overlay to
+                // reflect the newly-received distribution.
+                currentVP = res.body.volumeProfile || currentVP;
+                setTimeout(drawVP, 0);
             })
             .catch(function (e) {
                 loadingHistory = false;
@@ -313,6 +393,56 @@
         });
     });
     if (refreshBtn) refreshBtn.addEventListener('click', load);
+
+    // ── Auto-refresh: poll every 20s for a fresh forming bar ──────
+    // Uses a small fetch (limit=30) that returns the tail of the
+    // series — enough to update the last few closed bars + the
+    // forming bar without redrawing the whole chart.
+    var pollTimer = null;
+    function pollTick() {
+        if (loadingHistory) return; // don't clash with pagination fetch
+        fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym())
+              + '&tf=' + encodeURIComponent(currentTF())
+              + '&limit=30')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (!data || !data.candles || data.candles.length === 0) return;
+                // Update last-known candles by time. LWC series.update()
+                // handles either a new bar or a replacement of the
+                // latest bar (matched by time key).
+                var candles = data.candles;
+                candles.forEach(function (c) {
+                    candleSeries.update(c);
+                    volSeries.update({
+                        time: c.time, value: c.volume,
+                        color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
+                    });
+                });
+                // Update tail Bollinger too.
+                var bb = data.bollinger || {};
+                (bb.upper || []).slice(-30).forEach(function (b) { upperSeries.update(b); });
+                (bb.mid   || []).slice(-30).forEach(function (b) { midSeries.update(b); });
+                (bb.lower || []).slice(-30).forEach(function (b) { lowerSeries.update(b); });
+                // Header + summary refresh so score/verdict stay live.
+                applyHeader(data);
+                // Volume profile — small tail doesn't change overall shape much;
+                // skip redraw to avoid flicker. Full VP updates only on symbol/
+                // TF switch or manual refresh.
+            })
+            .catch(function () { /* silent — poll again next tick */ });
+    }
+    function startPoll() {
+        stopPoll();
+        pollTimer = setInterval(pollTick, 20000);
+    }
+    function stopPoll() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+    // Pause polling when tab hidden (browsers throttle intervals anyway).
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) stopPoll(); else startPoll();
+    });
+    startPoll();
 
     // AI Analyze — reuses shared aiRender helper (bilingual output).
     aiBtn.addEventListener('click', function () {

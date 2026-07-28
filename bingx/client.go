@@ -111,6 +111,60 @@ func (c *Client) Klines(ctx context.Context, sym market.Symbol, tf market.Timefr
 	return out, nil
 }
 
+// KlinesWithForming returns the same OHLCV as Klines but does NOT drop
+// the forming bar. Used ONLY for the /chart display so the current
+// candle stays fresh in real-time (matching what BingX's own web UI
+// shows). Engine paths must keep using Klines (closed-only) per
+// feedback-engine-closed-bar-only.
+func (c *Client) KlinesWithForming(ctx context.Context, sym market.Symbol, tf market.Timeframe, limit int) ([]market.Candle, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+	if limit > 1440 {
+		limit = 1440
+	}
+	q := url.Values{}
+	q.Set("symbol", string(sym))
+	q.Set("interval", string(tf))
+	q.Set("limit", strconv.Itoa(limit))
+
+	var env struct {
+		Code int             `json:"code"`
+		Msg  string          `json:"msg"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := c.getJSON(ctx, PathKlines, q, &env); err != nil {
+		return nil, fmt.Errorf("bingx klines(forming): %w", err)
+	}
+	if env.Code != 0 {
+		return nil, fmt.Errorf("bingx klines(forming): api code %d: %s", env.Code, env.Msg)
+	}
+	var raw []RawKline
+	if err := json.Unmarshal(env.Data, &raw); err != nil {
+		return nil, fmt.Errorf("bingx klines(forming): decode data: %w", err)
+	}
+	dur := tfDuration(tf)
+	out := make([]market.Candle, len(raw))
+	for i, r := range raw {
+		openT := time.UnixMilli(r.OpenTime)
+		closeT := time.UnixMilli(r.CloseTime)
+		if r.CloseTime == 0 && dur > 0 {
+			closeT = openT.Add(dur - time.Millisecond)
+		}
+		out[i] = market.Candle{
+			OpenTime:  openT,
+			CloseTime: closeT,
+			Open:      r.Open, High: r.High, Low: r.Low, Close: r.Close, Volume: r.Volume,
+		}
+	}
+	if len(out) > 1 && out[0].OpenTime.After(out[len(out)-1].OpenTime) {
+		for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+			out[i], out[j] = out[j], out[i]
+		}
+	}
+	return out, nil // NO dropForming — that's the whole point.
+}
+
 // Depth returns the top `limit` levels of the order book. Max 1000 per docs.
 func (c *Client) Depth(ctx context.Context, sym market.Symbol, limit int) (market.Depth, error) {
 	if limit <= 0 {

@@ -880,12 +880,26 @@ footer {
     border-radius: 0 4px 4px 0;
     margin-bottom: 0.5rem;
 }
+.chart-wrap {
+    position: relative;
+    width: 100%;
+}
 .chart-canvas {
     width: 100%;
     height: 620px;
     background: #0d1117;
     border: 1px solid var(--border);
     border-radius: 6px;
+}
+/* Volume-by-price SVG overlay — anchored to the right edge of the
+   chart just inside the price scale. Purely decorative; pointer
+   events off so it doesn't intercept chart drag/zoom. */
+.chart-vp-overlay {
+    position: absolute;
+    top: 0;
+    right: 62px; /* leave room for LWC's own price axis on the right */
+    pointer-events: none;
+    z-index: 2;
 }
 .chart-legend-row {
     display: flex;

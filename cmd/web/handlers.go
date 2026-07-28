@@ -3487,22 +3487,30 @@ func (s *server) handleChartData(c *gin.Context) {
 			c.JSON(http.StatusBadGateway, gin.H{"error": view.Err})
 			return
 		}
-		candles = view.Candles
-		// scanOne fetches ~200 candles by default; if user wants more,
-		// use Klines with the requested limit (single-request, BingX cap
-		// is 1440) or KlinesRange for beyond that.
-		if limit > len(candles) && s.client != nil {
-			if limit <= 1440 {
-				if more, err := s.client.Klines(ctx, sym, tf, limit); err == nil && len(more) > len(candles) {
-					candles = more
-				}
+		// Chart display uses KlinesWithForming to include the current
+		// forming bar so the chart matches what BingX's own web UI
+		// shows in real-time. Engine paths (view.Signal/Diagnose) still
+		// use closed-only candles from scanOne — those stay canonical.
+		if s.client != nil {
+			fetch := limit
+			if fetch > 1440 {
+				fetch = 1440
+			}
+			if fresh, err := s.client.KlinesWithForming(ctx, sym, tf, fetch); err == nil && len(fresh) > 0 {
+				candles = fresh
 			} else {
-				endT := time.Now()
-				startT := endT.Add(-time.Duration(limit) * tfDurationSeconds(tf))
-				if more, err := s.client.KlinesRange(ctx, sym, tf, startT, endT); err == nil && len(more) > len(candles) {
-					candles = more
+				candles = view.Candles
+			}
+			// If user requested > 1440, extend with older bars via KlinesRange.
+			if limit > 1440 && len(candles) > 0 {
+				endT := candles[0].OpenTime.Add(-time.Second)
+				startT := endT.Add(-time.Duration(limit-1440) * tfDurationSeconds(tf))
+				if older, err := s.client.KlinesRange(ctx, sym, tf, startT, endT); err == nil && len(older) > 0 {
+					candles = append(older, candles...)
 				}
 			}
+		} else {
+			candles = view.Candles
 		}
 	}
 
@@ -3529,6 +3537,15 @@ func (s *server) handleChartData(c *gin.Context) {
 		closes = append(closes, k.Close)
 	}
 
+	// Volume-by-price profile for the right-side vertical histogram
+	// (matches BingX-style "chip distribution" overlay). Splits each
+	// candle's volume into buy (green candles: close >= open) vs sell
+	// (red candles: close < open) at every price level the candle
+	// touched. Backend gives raw buckets; frontend positions bars via
+	// LWC priceScale.priceToCoordinate.
+	const vpBins = 60
+	vpBuckets := volumeByPrice(candles, vpBins)
+
 	// Bollinger (20, 2) matches engine's canonical params. Emit three
 	// aligned arrays offset by 19 bars (BB needs 20-bar warm-up).
 	bb := indicator.Bollinger(closes, 20, 2)
@@ -3551,11 +3568,12 @@ func (s *server) handleChartData(c *gin.Context) {
 	if historicalOnly {
 		c.Header("Cache-Control", "no-store")
 		c.JSON(http.StatusOK, gin.H{
-			"symbol":    short,
-			"tf":        tfStr,
-			"candles":   ohlcArr,
-			"bollinger": gin.H{"upper": upper, "mid": mid, "lower": lower},
-			"paginated": true,
+			"symbol":        short,
+			"tf":            tfStr,
+			"candles":       ohlcArr,
+			"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
+			"volumeProfile": vpBuckets,
+			"paginated":     true,
 		})
 		return
 	}
@@ -3605,15 +3623,89 @@ func (s *server) handleChartData(c *gin.Context) {
 
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{
-		"symbol":    short,
-		"tf":        tfStr,
-		"contract":  string(sym),
-		"candles":   ohlcArr,
-		"bollinger": gin.H{"upper": upper, "mid": mid, "lower": lower},
-		"plan":      plan,
-		"signal":    sig,
-		"diagnose":  diag,
-		"summary":   view.Summary,
-		"markPrice": view.MarkPrice,
+		"symbol":        short,
+		"tf":            tfStr,
+		"contract":      string(sym),
+		"candles":       ohlcArr,
+		"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
+		"volumeProfile": vpBuckets,
+		"plan":          plan,
+		"signal":        sig,
+		"diagnose":      diag,
+		"summary":       view.Summary,
+		"markPrice":     view.MarkPrice,
 	})
+}
+
+// volumeByPrice builds a per-price-bucket buy/sell volume histogram
+// suitable for a right-side "chip distribution" overlay. Each candle's
+// volume is uniformly attributed across its [low, high] range and
+// classified buy (close >= open) or sell (close < open). Mirrors the
+// existing indicator.BuildVolumeProfile shape but splits by direction.
+func volumeByPrice(candles []market.Candle, bins int) []map[string]any {
+	if len(candles) < 2 || bins < 2 {
+		return nil
+	}
+	minP, maxP := candles[0].Low, candles[0].High
+	for _, c := range candles {
+		if c.Low < minP {
+			minP = c.Low
+		}
+		if c.High > maxP {
+			maxP = c.High
+		}
+	}
+	if maxP <= minP {
+		return nil
+	}
+	binWidth := (maxP - minP) / float64(bins)
+	buy := make([]float64, bins)
+	sell := make([]float64, bins)
+	for _, c := range candles {
+		if c.Volume <= 0 || c.High <= c.Low {
+			continue
+		}
+		sb := int((c.Low - minP) / binWidth)
+		eb := int((c.High - minP) / binWidth)
+		if sb < 0 {
+			sb = 0
+		}
+		if eb >= bins {
+			eb = bins - 1
+		}
+		if eb < sb {
+			eb = sb
+		}
+		n := eb - sb + 1
+		per := c.Volume / float64(n)
+		bull := c.Close >= c.Open
+		for i := sb; i <= eb; i++ {
+			if bull {
+				buy[i] += per
+			} else {
+				sell[i] += per
+			}
+		}
+	}
+	out := make([]map[string]any, bins)
+	// Find POC (bin with highest total volume) for a UI callout.
+	pocIdx := 0
+	pocMax := 0.0
+	for i := 0; i < bins; i++ {
+		total := buy[i] + sell[i]
+		if total > pocMax {
+			pocMax = total
+			pocIdx = i
+		}
+	}
+	for i := 0; i < bins; i++ {
+		out[i] = map[string]any{
+			"priceLow":  minP + float64(i)*binWidth,
+			"priceHigh": minP + float64(i+1)*binWidth,
+			"buy":       buy[i],
+			"sell":      sell[i],
+			"isPOC":     i == pocIdx,
+		}
+	}
+	return out
 }
