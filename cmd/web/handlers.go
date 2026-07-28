@@ -3791,6 +3791,47 @@ func computeChartMarkers(candles []market.Candle) []map[string]any {
 		}
 	}
 
+	// MACD 12/26/9 crossovers. Bullish cross = MACD line moves from
+	// below the signal line to at-or-above; bearish is the mirror.
+	// Zero-line crosses are omitted here — they're derivable and
+	// tend to lag the signal-line cross by several bars.
+	macd := indicator.MACD(closes, 12, 26, 9)
+	for i := 1; i < len(macd); i++ {
+		prev, cur := macd[i-1], macd[i]
+		// Skip warm-up rows where either side is still zero-value.
+		if prev.MACD == 0 && prev.Signal == 0 {
+			continue
+		}
+		if cur.MACD == 0 && cur.Signal == 0 {
+			continue
+		}
+		bull := prev.MACD < prev.Signal && cur.MACD >= cur.Signal
+		bear := prev.MACD > prev.Signal && cur.MACD <= cur.Signal
+		if !bull && !bear {
+			continue
+		}
+		bar := candles[i]
+		if bull {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "belowBar",
+				"color":    "#20c997",
+				"shape":    "arrowUp",
+				"text":     "MACD",
+				"kind":     "macd_bull_cross",
+			})
+		} else {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "aboveBar",
+				"color":    "#f76707",
+				"shape":    "arrowDown",
+				"text":     "MACD",
+				"kind":     "macd_bear_cross",
+			})
+		}
+	}
+
 	// Volume anomaly bars — signal-bar volume > 3× 20-bar avg AND
 	// range > 1.5× ATR. Mirrors engine's BTC MOM vote criteria but we
 	// mark all such bars on chart regardless of symbol (visual only).

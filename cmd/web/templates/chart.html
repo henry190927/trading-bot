@@ -95,6 +95,7 @@
       <button type="button" class="layer-chip" data-layer="div">RSI div <span class="layer-count" data-layer-count="div">0</span></button>
       <button type="button" class="layer-chip" data-layer="volx">vol× <span class="layer-count" data-layer-count="volx">0</span></button>
       <button type="button" class="layer-chip" data-layer="bb-events">BB touch/break <span class="layer-count" data-layer-count="bb-events">0</span></button>
+      <button type="button" class="layer-chip" data-layer="macd">MACD × <span class="layer-count" data-layer-count="macd">0</span></button>
       <button type="button" class="layer-chip" data-layer="flags">⚑ flags <span class="layer-count" data-layer-count="flags">0</span></button>
     </span>
     <span class="chart-layers-group chart-layers-actions">
@@ -198,6 +199,9 @@
           <dt><span class="glossary-tag">BB touch/break</span></dt>
           <dd><b>Bollinger interaction events</b> — bar closed touching or breaking the outer band. Touch = mean-reversion candidate at the band edge. Break = trend continuation candidate outside the band. Colored by side.</dd>
 
+          <dt><span class="glossary-tag">MACD ×</span></dt>
+          <dd><b>MACD signal-line crossovers (12/26/9)</b> — <span class="glossary-arrow up">▲</span> teal = bullish cross (MACD line crossed above signal, momentum turning up). <span class="glossary-arrow down">▼</span> orange = bearish cross. Zero-line crosses are omitted (they lag). Best used as confluence with structure — a cross alone is not a signal in a range.</dd>
+
           <dt><span class="glossary-tag">⚑ flags</span></dt>
           <dd><b>Long/short flags</b> — anchored to the last bar of a confirmed setup (e.g., completed sweep + reclaim, or double + trigger). Signals the engine's take-a-position moment.</dd>
         </dl>
@@ -223,6 +227,8 @@
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#ae3ec9">●</span>double top/bot</span>
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#adb5bd">■</span>RSI div</span>
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#fab005">●</span>vol×</span>
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#20c997">▲</span>MACD bull ×</span>
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#f76707">▼</span>MACD bear ×</span>
     </span>
     <span class="chart-legend-group chart-legend-vp">
       <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>VP buy</span>
@@ -361,7 +367,7 @@
     var DEFAULT_LAYERS = {
         boll: false, vol: false, vp: false, plan: false,
         sweep: false, double: false, div: false, volx: false,
-        'bb-events': false, flags: false,
+        'bb-events': false, macd: false, flags: false,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     // Master visibility override — when true, all layers render as
@@ -396,6 +402,7 @@
         if (k === 'rsi_bear_div' || k === 'rsi_bull_div') return 'div';
         if (k === 'vol_anomaly') return 'volx';
         if (k.indexOf('bb_') === 0) return 'bb-events';
+        if (k === 'macd_bull_cross' || k === 'macd_bear_cross') return 'macd';
         if (k === 'flag_long' || k === 'flag_short') return 'flags';
         return null;
     }
