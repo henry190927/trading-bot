@@ -956,6 +956,115 @@ footer {
     background: rgba(224,49,49,0.08);
 }
 
+/* New TradingView-style chart header. Left tile shows big current
+   price + 24h stats; right tile condenses the recommendation
+   (score/verdict/action) so the chart itself keeps the visual
+   focus. */
+.chart-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.6rem 0.9rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2);
+    flex-wrap: wrap;
+}
+.chart-header-left {
+    flex: 1 1 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 240px;
+}
+.chart-header-right {
+    flex: 0 1 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    min-width: 220px;
+}
+.chart-header-symrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+.chart-header-symrow #chart-header-tf {
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.8rem;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+.chart-header-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+.chart-header-price {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 2.1rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+}
+.chart-header-change {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+.chart-header-change.up   { color: var(--green); }
+.chart-header-change.down { color: var(--red); }
+.chart-header-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+.chart-header-stats em {
+    font-style: normal;
+    color: var(--text);
+    margin-left: 0.3rem;
+}
+.chart-header-scores {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.chart-header .chart-banner-score {
+    min-width: 0;
+    align-items: flex-end;
+}
+.chart-header .chart-banner-action {
+    text-align: right;
+    align-items: flex-end;
+}
+.chart-header .chart-banner-action-text { font-size: 0.95rem; }
+.chart-header .chart-banner-score-num   { font-size: 1.6rem; }
+/* Verdict-band coloring on the right tile (no dedicated .chart-banner
+   wrapper anymore — apply the band class to .chart-header instead). */
+.chart-header.band-strong  { border-left: 3px solid var(--green); }
+.chart-header.band-take    { border-left: 3px solid var(--blue); }
+.chart-header.band-neutral { border-left: 3px solid var(--yellow); }
+.chart-header.band-avoid   { border-left: 3px solid var(--red); }
+.chart-header.band-strong  .chart-banner-score-num { color: var(--green); }
+.chart-header.band-take    .chart-banner-score-num { color: var(--blue); }
+.chart-header.band-neutral .chart-banner-score-num { color: var(--yellow); }
+.chart-header.band-avoid   .chart-banner-score-num { color: var(--red); }
+.hidden { display: none !important; }
+
 /* Layer toggle chips — one row above chart, click to show/hide
    each analysis layer. State persisted via localStorage. */
 .chart-layers {
@@ -996,6 +1105,23 @@ footer {
     background: var(--blue);
     color: white;
     border-color: var(--blue);
+}
+.chart-layers-actions { margin-left: auto; }
+.layer-chip.layer-clear {
+    color: var(--red);
+    border-color: rgba(224,49,49,0.45);
+}
+.layer-chip.layer-clear:hover {
+    background: rgba(224,49,49,0.10);
+    color: var(--red);
+}
+.layer-chip.layer-all {
+    color: var(--green);
+    border-color: rgba(46,160,67,0.45);
+}
+.layer-chip.layer-all:hover {
+    background: rgba(46,160,67,0.10);
+    color: var(--green);
 }
 
 .chart-one-liner {

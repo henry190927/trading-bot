@@ -36,50 +36,70 @@
         {{end}}
       </div>
     </div>
-
-    <div class="chart-summary" id="chart-summary">
-      <span class="side-badge side-flat" id="chart-side">—</span>
-      <span class="score score-mr" id="chart-mr">MR —</span>
-      <span class="score score-mom" id="chart-mom">MOM —</span>
-      <span class="score" id="chart-total">total —</span>
-      <span class="diag-score-axis" id="chart-ratio">— /10</span>
-      <span class="chart-verdict" id="chart-verdict">—</span>
-    </div>
-
     <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
             data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
   </div>
 
-  <div class="chart-banner" id="chart-banner">
-    <div class="chart-banner-action" id="chart-banner-action">
-      <div class="chart-banner-label">當下行動建議 · Action</div>
-      <div class="chart-banner-action-text" id="chart-banner-action-text">Loading…</div>
-      <div class="chart-banner-note" id="chart-banner-note"></div>
-      <div class="chart-banner-ctx" id="chart-banner-ctx"></div>
+  <div class="chart-header" id="chart-header">
+    <div class="chart-header-left">
+      <div class="chart-header-symrow">
+        <span class="chart-header-sym" id="chart-header-sym">{{.Symbol}}-USDT</span>
+        <span class="side-badge side-flat" id="chart-side">—</span>
+        <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
+      </div>
+      <div class="chart-header-price-row">
+        <span class="chart-header-price" id="chart-header-price">—</span>
+        <span class="chart-header-change" id="chart-header-change">—</span>
+      </div>
+      <div class="chart-header-stats" id="chart-header-stats">
+        <span>24h H <em id="chart-h24-high">—</em></span>
+        <span>L <em id="chart-h24-low">—</em></span>
+        <span>Vol <em id="chart-h24-vol">—</em></span>
+      </div>
+      <div class="chart-header-ctx" id="chart-banner-ctx"></div>
     </div>
-    <div class="chart-banner-score" id="chart-banner-score">
-      <div class="chart-banner-label">評分</div>
-      <div class="chart-banner-score-num" id="chart-banner-score-num">—</div>
-      <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
-      <div class="chart-banner-score-tf" id="chart-banner-score-tf">—</div>
+    <div class="chart-header-right">
+      <div class="chart-header-scores">
+        <span class="score score-mr" id="chart-mr">MR —</span>
+        <span class="score score-mom" id="chart-mom">MOM —</span>
+        <span class="score" id="chart-total">total —</span>
+      </div>
+      <div class="chart-banner-score" id="chart-banner-score">
+        <div class="chart-banner-label">評分</div>
+        <div class="chart-banner-score-num" id="chart-banner-score-num">—</div>
+        <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
+      </div>
+      <div class="chart-banner-action" id="chart-banner-action">
+        <div class="chart-banner-action-text" id="chart-banner-action-text">Loading…</div>
+        <div class="chart-banner-note" id="chart-banner-note"></div>
+      </div>
     </div>
   </div>
+
+  <!-- Hidden compat: preserve nodes referenced by legacy JS paths -->
+  <span class="hidden" id="chart-ratio">—</span>
+  <span class="hidden" id="chart-verdict">—</span>
+  <span class="hidden" id="chart-banner-score-tf">—</span>
 
   <div class="chart-layers" role="group" aria-label="chart layers">
     <span class="chart-layers-label">Layers:</span>
     <span class="chart-layers-group">
-      <button type="button" class="layer-chip active" data-layer="boll">BOLL</button>
-      <button type="button" class="layer-chip active" data-layer="vol">VOL</button>
-      <button type="button" class="layer-chip active" data-layer="vp">VP</button>
-      <button type="button" class="layer-chip active" data-layer="plan">plan</button>
+      <button type="button" class="layer-chip" data-layer="boll">BOLL</button>
+      <button type="button" class="layer-chip" data-layer="vol">VOL</button>
+      <button type="button" class="layer-chip" data-layer="vp">VP</button>
+      <button type="button" class="layer-chip" data-layer="plan">plan</button>
     </span>
     <span class="chart-layers-group">
-      <button type="button" class="layer-chip active" data-layer="sweep">sweep</button>
-      <button type="button" class="layer-chip active" data-layer="double">2× top/bot</button>
-      <button type="button" class="layer-chip active" data-layer="div">RSI div</button>
-      <button type="button" class="layer-chip active" data-layer="volx">vol×</button>
-      <button type="button" class="layer-chip active" data-layer="bb-events">BB touch/break</button>
-      <button type="button" class="layer-chip active" data-layer="flags">⚑ flags</button>
+      <button type="button" class="layer-chip" data-layer="sweep">sweep</button>
+      <button type="button" class="layer-chip" data-layer="double">2× top/bot</button>
+      <button type="button" class="layer-chip" data-layer="div">RSI div</button>
+      <button type="button" class="layer-chip" data-layer="volx">vol×</button>
+      <button type="button" class="layer-chip" data-layer="bb-events">BB touch/break</button>
+      <button type="button" class="layer-chip" data-layer="flags">⚑ flags</button>
+    </span>
+    <span class="chart-layers-group chart-layers-actions">
+      <button type="button" class="layer-chip layer-clear" id="layers-clear" title="hide all layers">× clear</button>
+      <button type="button" class="layer-chip layer-all" id="layers-all" title="enable all layers">all</button>
     </span>
   </div>
 
@@ -222,8 +242,10 @@
         return 'side-flat';
     }
 
-    // Banner elements (score + action tile).
-    var bannerEl        = document.getElementById('chart-banner');
+    // Banner elements (score + action tile). The band class now lives
+    // on the new .chart-header wrapper (the old .chart-banner div was
+    // removed in the header restructure), so bannerEl points there.
+    var bannerEl        = document.getElementById('chart-header');
     var bannerScoreNum  = document.getElementById('chart-banner-score-num');
     var bannerScoreBand = document.getElementById('chart-banner-score-band');
     var bannerScoreTf   = document.getElementById('chart-banner-score-tf');
@@ -237,11 +259,15 @@
     // Layer keys align with data-layer attrs on the chip buttons AND
     // with marker.kind categories from the backend.
     var LAYERS_KEY = 'chart-layers';
+    // Default: everything OFF for a clean initial view. User opts in
+    // per layer. Preferences persist in localStorage so they stick
+    // across visits.
     var DEFAULT_LAYERS = {
-        boll: true, vol: true, vp: true, plan: true,
-        sweep: true, double: true, div: true, volx: true,
-        'bb-events': true, flags: true,
+        boll: false, vol: false, vp: false, plan: false,
+        sweep: false, double: false, div: false, volx: false,
+        'bb-events': false, flags: false,
     };
+    var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     function loadLayers() {
         try {
             var v = JSON.parse(localStorage.getItem(LAYERS_KEY) || '{}');
@@ -299,7 +325,7 @@
     }
 
     // Wire chip buttons.
-    document.querySelectorAll('.layer-chip').forEach(function (chip) {
+    document.querySelectorAll('.layer-chip[data-layer]').forEach(function (chip) {
         var name = chip.dataset.layer;
         if (!layers[name]) chip.classList.remove('active');
         else chip.classList.add('active');
@@ -310,6 +336,27 @@
             refreshMarkers();
             refreshLayerVisibility();
         });
+    });
+    function syncChipsFromState() {
+        document.querySelectorAll('.layer-chip[data-layer]').forEach(function (chip) {
+            chip.classList.toggle('active', !!layers[chip.dataset.layer]);
+        });
+    }
+    var clearBtn = document.getElementById('layers-clear');
+    var allBtn   = document.getElementById('layers-all');
+    if (clearBtn) clearBtn.addEventListener('click', function () {
+        ALL_LAYER_KEYS.forEach(function (k) { layers[k] = false; });
+        saveLayers();
+        syncChipsFromState();
+        refreshMarkers();
+        refreshLayerVisibility();
+    });
+    if (allBtn) allBtn.addEventListener('click', function () {
+        ALL_LAYER_KEYS.forEach(function (k) { layers[k] = true; });
+        saveLayers();
+        syncChipsFromState();
+        refreshMarkers();
+        refreshLayerVisibility();
     });
 
     function verdictBandClass(t) {
@@ -346,15 +393,79 @@
         return { text: 'WAIT — ' + sideZh + ' lean 太薄', note: 'below MIN_SCORE=3 且 /10 < 5.5' };
     }
 
+    // Header DOM refs for the new left-tile (big price + 24h stats).
+    var headerSym    = document.getElementById('chart-header-sym');
+    var headerTf     = document.getElementById('chart-header-tf');
+    var headerPrice  = document.getElementById('chart-header-price');
+    var headerChange = document.getElementById('chart-header-change');
+    var h24High      = document.getElementById('chart-h24-high');
+    var h24Low       = document.getElementById('chart-h24-low');
+    var h24Vol       = document.getElementById('chart-h24-vol');
+
+    function fmtPrice(v) {
+        if (v == null || isNaN(v)) return '—';
+        if (v >= 1000)  return v.toFixed(2);
+        if (v >= 10)    return v.toFixed(3);
+        if (v >= 1)     return v.toFixed(4);
+        return v.toFixed(6);
+    }
+    function fmtVolAbs(v) {
+        if (!v) return '—';
+        if (v >= 1e9) return (v/1e9).toFixed(2) + 'B';
+        if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
+        if (v >= 1e3) return (v/1e3).toFixed(1) + 'K';
+        return v.toFixed(0);
+    }
+    // Compute 24h window stats from allCandles: latest close vs candle
+    // ~24h ago; high/low/volume aggregated over the 24h span. Works
+    // across TFs (finds closest bar to now - 86400).
+    function apply24hStats(currentPrice) {
+        if (!allCandles || allCandles.length === 0 || currentPrice == null) return;
+        var lastTs = allCandles[allCandles.length - 1].time;
+        var cutoff = lastTs - 86400;
+        // Find index of first candle with time >= cutoff.
+        var startIdx = 0;
+        for (var i = allCandles.length - 1; i >= 0; i--) {
+            if (allCandles[i].time <= cutoff) { startIdx = i; break; }
+        }
+        var slice = allCandles.slice(startIdx);
+        if (slice.length === 0) return;
+        var refPrice = slice[0].open;
+        var hi = slice[0].high, lo = slice[0].low, vol = 0;
+        for (var j = 0; j < slice.length; j++) {
+            if (slice[j].high > hi) hi = slice[j].high;
+            if (slice[j].low  < lo) lo = slice[j].low;
+            vol += slice[j].volume;
+        }
+        var chgAbs = currentPrice - refPrice;
+        var chgPct = refPrice > 0 ? (chgAbs / refPrice) * 100 : 0;
+        headerChange.className = 'chart-header-change ' + (chgAbs >= 0 ? 'up' : 'down');
+        headerChange.textContent = (chgAbs >= 0 ? '+' : '') + fmtPrice(chgAbs) + ' (' + (chgAbs >= 0 ? '+' : '') + chgPct.toFixed(2) + '%)';
+        h24High.textContent = fmtPrice(hi);
+        h24Low.textContent  = fmtPrice(lo);
+        h24Vol.textContent  = fmtVolAbs(vol);
+    }
+
     function applyHeader(data) {
         var sig = data.signal || {};
         var diag = data.diagnose || {};
+
+        // Left-tile: big price + 24h stats.
+        headerSym.textContent = (data.symbol || '?') + '-USDT';
+        headerTf.textContent = data.tf || '?';
+        var lastCandle = (data.candles && data.candles.length) ? data.candles[data.candles.length - 1] : null;
+        var currentPrice = data.markPrice || (lastCandle ? lastCandle.close : null);
+        headerPrice.textContent = fmtPrice(currentPrice);
+        apply24hStats(currentPrice);
+
         sideEl.className = 'side-badge ' + sideClass(sig.side);
         sideEl.textContent = sig.side || '—';
         mrEl.textContent    = 'MR ' + (sig.mrScore   != null ? sig.mrScore   : '—');
         momEl.textContent   = 'MOM ' + (sig.momScore != null ? sig.momScore  : '—');
         totalEl.textContent = 'total ' + (sig.score  != null ? sig.score     : '—');
         totalEl.className   = 'score ' + scoreClass(sig.score);
+        // Legacy hidden nodes — kept for older code paths that may
+        // still read them; header no longer displays these directly.
         if (diag.total != null) {
             ratioEl.textContent = diag.total.toFixed(1) + '/10';
             verdEl.textContent  = diag.verdict || '';
@@ -366,9 +477,10 @@
         aiBtn.dataset.symbol = data.symbol;
         aiBtn.dataset.tf     = data.tf;
 
-        // Banner (big score + action tile).
+        // Banner (big score + action tile). The band class colors the
+        // left border on .chart-header — keep base classes intact.
         var band = verdictBandClass(diag.total);
-        bannerEl.className = 'chart-banner ' + band;
+        bannerEl.className = 'chart-header ' + band;
         if (diag.total != null) {
             bannerScoreNum.textContent = diag.total.toFixed(1);
             bannerScoreBand.textContent = diag.verdict || '';
