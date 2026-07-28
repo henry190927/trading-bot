@@ -50,6 +50,20 @@
             data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
   </div>
 
+  <div class="chart-banner" id="chart-banner">
+    <div class="chart-banner-action" id="chart-banner-action">
+      <div class="chart-banner-label">當下行動建議 · Action</div>
+      <div class="chart-banner-action-text" id="chart-banner-action-text">Loading…</div>
+      <div class="chart-banner-note" id="chart-banner-note"></div>
+    </div>
+    <div class="chart-banner-score" id="chart-banner-score">
+      <div class="chart-banner-label">評分</div>
+      <div class="chart-banner-score-num" id="chart-banner-score-num">—</div>
+      <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
+      <div class="chart-banner-score-tf" id="chart-banner-score-tf">—</div>
+    </div>
+  </div>
+
   <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
 
   <div class="chart-wrap">
@@ -58,13 +72,27 @@
   </div>
 
   <div class="chart-legend-row" id="chart-legend">
-    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL upper</span>
-    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#adb5bd"></span>BOLL mid</span>
-    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL lower</span>
-    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#f59f00"></span>entry</span>
-    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#e03131"></span>stop</span>
-    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#2f9e44"></span>TP1</span>
-    <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#0ca678"></span>TP2</span>
+    <span class="chart-legend-group">
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL</span>
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#adb5bd"></span>mid</span>
+    </span>
+    <span class="chart-legend-group">
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#f59f00"></span>entry</span>
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#e03131"></span>stop</span>
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#2f9e44"></span>TP1</span>
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#0ca678"></span>TP2</span>
+    </span>
+    <span class="chart-legend-group chart-legend-markers">
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#e03131">▼</span>sweep-high</span>
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#2f9e44">▲</span>sweep-low</span>
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#ae3ec9">●</span>double top/bot</span>
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#adb5bd">■</span>RSI div</span>
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#fab005">●</span>vol×</span>
+    </span>
+    <span class="chart-legend-group chart-legend-vp">
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>VP buy</span>
+      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#f59f00"></span>VP sell</span>
+    </span>
   </div>
 
   <div id="chart-ai-result" class="ai-result hidden" data-result-for="chart"></div>
@@ -175,6 +203,49 @@
         return 'side-flat';
     }
 
+    // Banner elements (score + action tile).
+    var bannerEl        = document.getElementById('chart-banner');
+    var bannerScoreNum  = document.getElementById('chart-banner-score-num');
+    var bannerScoreBand = document.getElementById('chart-banner-score-band');
+    var bannerScoreTf   = document.getElementById('chart-banner-score-tf');
+    var bannerActionEl  = document.getElementById('chart-banner-action');
+    var bannerActText   = document.getElementById('chart-banner-action-text');
+    var bannerActNote   = document.getElementById('chart-banner-note');
+
+    function verdictBandClass(t) {
+        if (t == null) return 'band-none';
+        if (t >= 7.5) return 'band-strong';
+        if (t >= 5.5) return 'band-take';
+        if (t >= 3.5) return 'band-neutral';
+        return 'band-avoid';
+    }
+    // Derive a short imperative action phrase from side + verdict + score.
+    // Mirrors signal.BuildSummary's suggestionFragment but formatted for
+    // the big banner (2-line max). Chinese-leaning phrasing to match
+    // the reference screenshot's style.
+    function actionText(sig, diag) {
+        if (!sig || !sig.side || sig.side === 'FLAT') {
+            return { text: 'NO TRADE — 觀望', note: 'engine flat, no confluence' };
+        }
+        var side = sig.side;
+        var sideZh = side === 'LONG' ? '多頭' : '空頭';
+        var total = diag && diag.total != null ? diag.total : 0;
+        var score = sig.score || 0;
+        if (score >= 4 && total >= 7.5) {
+            return { text: '全倉 ' + sideZh + '進場 · STRONG', note: 'MR ' + sig.mrScore + ' + MOM ' + sig.momScore + ' · ' + diag.verdict };
+        }
+        if (score >= 3 && total >= 5.5) {
+            return { text: '預設倉 ' + sideZh + ' · TAKE band', note: 'MR ' + sig.mrScore + ' + MOM ' + sig.momScore };
+        }
+        if (score >= 3) {
+            return { text: sideZh + '訊號但 validator 較弱', note: 'score OK, /10 = ' + total.toFixed(1) };
+        }
+        if (total >= 5.5) {
+            return { text: '低信心 ' + sideZh + ' · discretionary', note: 'validator 撐著、engine 不夠' };
+        }
+        return { text: 'WAIT — ' + sideZh + ' lean 太薄', note: 'below MIN_SCORE=3 且 /10 < 5.5' };
+    }
+
     function applyHeader(data) {
         var sig = data.signal || {};
         var diag = data.diagnose || {};
@@ -194,6 +265,21 @@
         linerEl.textContent = data.summary || '';
         aiBtn.dataset.symbol = data.symbol;
         aiBtn.dataset.tf     = data.tf;
+
+        // Banner (big score + action tile).
+        var band = verdictBandClass(diag.total);
+        bannerEl.className = 'chart-banner ' + band;
+        if (diag.total != null) {
+            bannerScoreNum.textContent = diag.total.toFixed(1);
+            bannerScoreBand.textContent = diag.verdict || '';
+        } else {
+            bannerScoreNum.textContent = '—';
+            bannerScoreBand.textContent = '—';
+        }
+        bannerScoreTf.textContent = '(' + (data.tf || '?') + ')';
+        var act = actionText(sig, diag);
+        bannerActText.textContent = act.text;
+        bannerActNote.textContent = act.note;
     }
 
     function volFrom(candles) {
@@ -348,6 +434,16 @@
         volSeries.setData(allVol);
         earliestTime = allCandles.length ? allCandles[0].time : null;
         noMoreHistory = false;
+
+        // Event markers on the candlestick series (sweeps, double
+        // patterns, divergences, vol anomalies). LWC's setMarkers
+        // requires ascending-by-time — backend already sorts.
+        if (data.markers && data.markers.length) {
+            candleSeries.setMarkers(data.markers);
+        } else {
+            candleSeries.setMarkers([]);
+        }
+
         // VP is now computed client-side from the visible range so we
         // ignore data.volumeProfile from the backend. Defer one tick
         // so LWC has painted and priceToCoordinate returns real values.

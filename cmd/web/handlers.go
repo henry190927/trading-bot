@@ -3546,6 +3546,11 @@ func (s *server) handleChartData(c *gin.Context) {
 	const vpBins = 60
 	vpBuckets := volumeByPrice(candles, vpBins)
 
+	// Chart markers: sweep events + double-top/bottom + divergences +
+	// range-expansion flash bars. Each entry maps to an LWC
+	// series.setMarkers([]) item. Client picks color/shape via `kind`.
+	chartMarkers := computeChartMarkers(candles)
+
 	// Bollinger (20, 2) matches engine's canonical params. Emit three
 	// aligned arrays offset by 19 bars (BB needs 20-bar warm-up).
 	bb := indicator.Bollinger(closes, 20, 2)
@@ -3573,6 +3578,7 @@ func (s *server) handleChartData(c *gin.Context) {
 			"candles":       ohlcArr,
 			"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
 			"volumeProfile": vpBuckets,
+			"markers":       chartMarkers,
 			"paginated":     true,
 		})
 		return
@@ -3629,12 +3635,174 @@ func (s *server) handleChartData(c *gin.Context) {
 		"candles":       ohlcArr,
 		"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
 		"volumeProfile": vpBuckets,
+		"markers":       chartMarkers,
 		"plan":          plan,
 		"signal":        sig,
 		"diagnose":      diag,
 		"summary":       view.Summary,
 		"markPrice":     view.MarkPrice,
 	})
+}
+
+// computeChartMarkers derives event markers for the LWC candlestick
+// series overlay: sweep events (from analyzer.DetectSweeps), double
+// tops/bottoms, RSI/CVD divergence pivots, range-expansion flash bars.
+//
+// Each returned map matches LWC's setMarkers([]) format:
+//   time     — unix seconds (matches candle time)
+//   position — "aboveBar" | "belowBar" | "inBar"
+//   color    — CSS color string
+//   shape    — "circle" | "arrowUp" | "arrowDown" | "square"
+//   text     — short label (e.g. "sweep", "2×top", "div")
+//   kind     — internal category so frontend can filter/style further
+//
+// All input candles must be in ascending time order (as returned by
+// bingx.Klines / KlinesWithForming). Marker times MUST also be sorted
+// ascending for LWC — we sort at the end.
+func computeChartMarkers(candles []market.Candle) []map[string]any {
+	if len(candles) < 20 {
+		return nil
+	}
+	var markers []map[string]any
+
+	// Sweeps — analyzer.DetectSweeps is directional & already close-
+	// confirmed. Only include confirmed ones (ReclaimOK) — the wick-
+	// pierce-only ones are noise.
+	sweeps := analyzer.DetectSweeps(candles, 0.0008, 2)
+	for _, sw := range sweeps {
+		if !sw.ReclaimOK {
+			continue
+		}
+		if sw.SweepIdx < 0 || sw.SweepIdx >= len(candles) {
+			continue
+		}
+		bar := candles[sw.SweepIdx]
+		if sw.Side == analyzer.SweepHigh {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "aboveBar",
+				"color":    "#e03131",
+				"shape":    "arrowDown",
+				"text":     "sweep",
+				"kind":     "sweep_high",
+			})
+		} else {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "belowBar",
+				"color":    "#2f9e44",
+				"shape":    "arrowUp",
+				"text":     "sweep",
+				"kind":     "sweep_low",
+			})
+		}
+	}
+
+	// Double top / bottom patterns.
+	dps := analyzer.DetectDoublePatterns(candles, 100, 2, 5, 5, 0.003, 0.01)
+	for _, dp := range dps {
+		if dp.PivotBIdx < 0 || dp.PivotBIdx >= len(candles) {
+			continue
+		}
+		bar := candles[dp.PivotBIdx]
+		if dp.Side == analyzer.DoubleTop {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "aboveBar",
+				"color":    "#ae3ec9",
+				"shape":    "circle",
+				"text":     "2×top",
+				"kind":     "double_top",
+			})
+		} else {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "belowBar",
+				"color":    "#ae3ec9",
+				"shape":    "circle",
+				"text":     "2×bot",
+				"kind":     "double_bottom",
+			})
+		}
+	}
+
+	// RSI divergence — pivot at the LATER of the two divergence points.
+	closes := market.Closes(candles)
+	rsi := indicator.RSI(closes, 14)
+	div := analyzer.Detect(closes, rsi, 60, 2)
+	if div.Kind != analyzer.NoDivergence && div.PivotB >= 0 && div.PivotB < len(candles) {
+		bar := candles[div.PivotB]
+		bearish := div.Kind == analyzer.BearishRegular || div.Kind == analyzer.BearishHidden
+		if bearish {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "aboveBar",
+				"color":    "#adb5bd",
+				"shape":    "square",
+				"text":     "div-",
+				"kind":     "rsi_bear_div",
+			})
+		} else {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "belowBar",
+				"color":    "#adb5bd",
+				"shape":    "square",
+				"text":     "div+",
+				"kind":     "rsi_bull_div",
+			})
+		}
+	}
+
+	// Volume anomaly bars — signal-bar volume > 3× 20-bar avg AND
+	// range > 1.5× ATR. Mirrors engine's BTC MOM vote criteria but we
+	// mark all such bars on chart regardless of symbol (visual only).
+	atr := indicator.ATR(candles, 14)
+	for i := 20; i < len(candles); i++ {
+		bar := candles[i]
+		barRange := bar.High - bar.Low
+		if barRange <= 1.5*atr[i] {
+			continue
+		}
+		var avgVol float64
+		for j := i - 20; j < i; j++ {
+			avgVol += candles[j].Volume
+		}
+		avgVol /= 20.0
+		if avgVol <= 0 || bar.Volume < 3.0*avgVol {
+			continue
+		}
+		markers = append(markers, map[string]any{
+			"time":     bar.OpenTime.Unix(),
+			"position": "aboveBar",
+			"color":    "#fab005",
+			"shape":    "circle",
+			"text":     "vol×",
+			"kind":     "vol_anomaly",
+		})
+	}
+
+	// Sort ascending by time (LWC requires it) + dedup by (time, kind).
+	sort.Slice(markers, func(i, j int) bool {
+		ti, _ := markers[i]["time"].(int64)
+		tj, _ := markers[j]["time"].(int64)
+		return ti < tj
+	})
+	// Simple dedup — same time+kind combo (e.g. two sweep_high computations
+	// hitting the same bar) collapses to first.
+	seen := map[string]bool{}
+	out := markers[:0]
+	for _, m := range markers {
+		t, _ := m["time"].(int64)
+		k, _ := m["kind"].(string)
+		key := fmt.Sprintf("%d|%s", t, k)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, m)
+	}
+	return out
 }
 
 // volumeByPrice builds a per-price-bucket buy/sell volume histogram

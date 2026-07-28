@@ -871,6 +871,65 @@ footer {
     font-size: 0.85rem;
     font-weight: 600;
 }
+/* Score + Action banner at top of /chart — mirrors reference screenshot's
+   big score tile + action-recommendation tile pair. Colored by verdict
+   band (green STRONG / blue TAKE / yellow NEUTRAL / red AVOID). */
+.chart-banner {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+}
+.chart-banner.band-strong  { border-color: var(--green);  background: linear-gradient(90deg, rgba(46,160,67,0.12), var(--surface-2)); }
+.chart-banner.band-take    { border-color: var(--blue);   background: linear-gradient(90deg, rgba(56,139,253,0.10), var(--surface-2)); }
+.chart-banner.band-neutral { border-color: var(--yellow); background: linear-gradient(90deg, rgba(251,191,36,0.10), var(--surface-2)); }
+.chart-banner.band-avoid   { border-color: var(--red);    background: linear-gradient(90deg, rgba(224,49,49,0.12), var(--surface-2)); }
+.chart-banner-action { flex: 1 1 60%; display: flex; flex-direction: column; gap: 0.15rem; }
+.chart-banner-score  { flex: 0 0 auto; text-align: right; min-width: 160px; display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
+.chart-banner-label {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+.chart-banner-action-text {
+    color: var(--text);
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+.chart-banner-note {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    font-family: ui-monospace, "SF Mono", monospace;
+}
+.chart-banner-score-num {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", monospace;
+}
+.chart-banner.band-strong  .chart-banner-score-num { color: var(--green); }
+.chart-banner.band-take    .chart-banner-score-num { color: var(--blue); }
+.chart-banner.band-neutral .chart-banner-score-num { color: var(--yellow); }
+.chart-banner.band-avoid   .chart-banner-score-num { color: var(--red); }
+.chart-banner-score-band {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+}
+.chart-banner-score-tf {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-family: ui-monospace, monospace;
+}
+
 .chart-one-liner {
     color: var(--text);
     font-size: 0.9rem;
@@ -916,6 +975,22 @@ footer {
     width: 14px;
     height: 3px;
     border-radius: 2px;
+}
+.chart-legend-group {
+    display: inline-flex;
+    gap: 0.55rem;
+    align-items: center;
+    padding-right: 0.6rem;
+    border-right: 1px dashed var(--border);
+}
+.chart-legend-group:last-child { border-right: 0; padding-right: 0; }
+.chart-legend-mk {
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1;
+    margin-right: 0.15rem;
 }
 .chart-refresh-btn {
     background: transparent;
