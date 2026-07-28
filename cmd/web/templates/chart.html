@@ -206,12 +206,72 @@
         });
     }
 
-    // ── Volume-by-price overlay drawing ────────────────────────────
-    // SVG-based vertical histogram anchored to the right edge of the
-    // chart. Each bucket is a horizontal bar; buy volume (green) and
-    // sell volume (red) stacked. POC bucket highlighted brighter.
-    // Positioned via LWC priceScale.priceToCoordinate to stay in sync
-    // with candle prices during zoom/pan.
+    // ── Volume-by-price (VRVP: Visible Range Volume Profile) ───────
+    // Client-side recomputation of buy/sell buckets over the CURRENTLY
+    // VISIBLE candle range. Mirrors backend volumeByPrice() logic so
+    // profile stays honest with what you're looking at — zoom into
+    // 50 bars → see 50-bar distribution, zoom out → see full window.
+    //
+    // Kept lightweight (60 buckets × ~500 candles typical = ~30k ops
+    // per compute) and throttled via rAF so wheel-zoom doesn't spam.
+    var VP_BINS = 60;
+    function computeVPFromCandles(candles) {
+        if (!candles || candles.length < 2) return [];
+        var minP = candles[0].low, maxP = candles[0].high;
+        for (var i = 0; i < candles.length; i++) {
+            if (candles[i].low  < minP) minP = candles[i].low;
+            if (candles[i].high > maxP) maxP = candles[i].high;
+        }
+        if (maxP <= minP) return [];
+        var w = (maxP - minP) / VP_BINS;
+        var buy = new Array(VP_BINS).fill(0);
+        var sell = new Array(VP_BINS).fill(0);
+        for (var j = 0; j < candles.length; j++) {
+            var c = candles[j];
+            if (c.volume <= 0 || c.high <= c.low) continue;
+            var sb = Math.max(0, Math.floor((c.low  - minP) / w));
+            var eb = Math.min(VP_BINS - 1, Math.floor((c.high - minP) / w));
+            if (eb < sb) eb = sb;
+            var per = c.volume / (eb - sb + 1);
+            var bull = c.close >= c.open;
+            for (var k = sb; k <= eb; k++) {
+                if (bull) buy[k] += per; else sell[k] += per;
+            }
+        }
+        var pocIdx = 0, pocMax = 0;
+        for (var m = 0; m < VP_BINS; m++) {
+            var t = buy[m] + sell[m];
+            if (t > pocMax) { pocMax = t; pocIdx = m; }
+        }
+        var out = [];
+        for (var n = 0; n < VP_BINS; n++) {
+            out.push({
+                priceLow:  minP + n * w,
+                priceHigh: minP + (n + 1) * w,
+                buy:  buy[n],
+                sell: sell[n],
+                isPOC: n === pocIdx,
+            });
+        }
+        return out;
+    }
+
+    // Filter allCandles to visible time range + recompute VP.
+    function recomputeVPForVisibleRange() {
+        if (!allCandles || allCandles.length === 0) { currentVP = null; return; }
+        var range = chart.timeScale().getVisibleRange();
+        var slice;
+        if (range && range.from != null && range.to != null) {
+            slice = allCandles.filter(function (c) { return c.time >= range.from && c.time <= range.to; });
+            // Fallback: if visible slice is somehow empty (e.g. edge case
+            // during initial paint), use full window so overlay isn't blank.
+            if (slice.length < 2) slice = allCandles;
+        } else {
+            slice = allCandles;
+        }
+        currentVP = computeVPFromCandles(slice);
+    }
+
     var vpSvg = document.getElementById('chart-vp-overlay');
     function drawVP() {
         if (!vpSvg || !currentVP || currentVP.length === 0) {
@@ -219,14 +279,13 @@
             return;
         }
         var rect = container.getBoundingClientRect();
-        var svgWidth = 96; // right-side band width in px
+        var svgWidth = 96;
         var svgHeight = rect.height;
         vpSvg.setAttribute('width',  svgWidth);
         vpSvg.setAttribute('height', svgHeight);
         vpSvg.style.height = svgHeight + 'px';
         vpSvg.style.width  = svgWidth + 'px';
 
-        // Compute max bucket total to scale bar widths.
         var maxTotal = 0;
         currentVP.forEach(function (b) {
             var t = (b.buy || 0) + (b.sell || 0);
@@ -234,13 +293,9 @@
         });
         if (maxTotal <= 0) { vpSvg.innerHTML = ''; return; }
 
-        var maxBarW = svgWidth - 6; // leave 6px right-margin against price scale
+        var maxBarW = svgWidth - 6;
         var parts = [];
         currentVP.forEach(function (b) {
-            // Map bucket midpoint price to Y using LWC's price scale.
-            var midPrice = (b.priceLow + b.priceHigh) / 2;
-            var y = candleSeries.priceToCoordinate(midPrice);
-            if (y == null) return;
             var yLow  = candleSeries.priceToCoordinate(b.priceLow);
             var yHigh = candleSeries.priceToCoordinate(b.priceHigh);
             if (yLow == null || yHigh == null) return;
@@ -252,8 +307,6 @@
             var buyW  = totalW * buyFrac;
             var sellW = totalW - buyW;
             var xRight = svgWidth - 2;
-            // Buy portion (blue, drawn from right edge leftward for the FIRST slice)
-            // then sell portion (yellow/orange), stacked leftward.
             var opacity = b.isPOC ? 0.85 : 0.45;
             if (buyW > 0) {
                 parts.push('<rect x="' + (xRight - buyW) + '" y="' + barY + '" width="' + buyW + '" height="' + barH + '" fill="#4c6ef5" opacity="' + opacity + '" />');
@@ -265,10 +318,20 @@
         vpSvg.innerHTML = parts.join('');
     }
 
-    // Redraw VP whenever the visible range or size changes so the
-    // bars stay aligned with the moving price scale.
-    chart.timeScale().subscribeVisibleTimeRangeChange(function () { drawVP(); });
-    var resizeObs = new ResizeObserver(function () { drawVP(); });
+    // rAF-throttled recompute+redraw so continuous wheel-zoom doesn't
+    // burn CPU on every event tick.
+    var vpFrame = null;
+    function scheduleVPUpdate() {
+        if (vpFrame != null) return;
+        vpFrame = requestAnimationFrame(function () {
+            vpFrame = null;
+            recomputeVPForVisibleRange();
+            drawVP();
+        });
+    }
+
+    chart.timeScale().subscribeVisibleTimeRangeChange(scheduleVPUpdate);
+    var resizeObs = new ResizeObserver(scheduleVPUpdate);
     resizeObs.observe(container);
 
     function applyChart(data) {
@@ -285,11 +348,13 @@
         volSeries.setData(allVol);
         earliestTime = allCandles.length ? allCandles[0].time : null;
         noMoreHistory = false;
-        currentVP = data.volumeProfile || null;
-        // Volume profile aligns with LWC's price scale — must draw
-        // AFTER series data lands (so priceToCoordinate returns
-        // real numbers, not null). Defer one tick.
-        setTimeout(drawVP, 0);
+        // VP is now computed client-side from the visible range so we
+        // ignore data.volumeProfile from the backend. Defer one tick
+        // so LWC has painted and priceToCoordinate returns real values.
+        setTimeout(function () {
+            recomputeVPForVisibleRange();
+            drawVP();
+        }, 0);
 
         clearPlanLines();
         var p = data.plan;
@@ -334,12 +399,12 @@
                 lowerSeries.setData(allLower);
                 volSeries.setData(allVol);
                 earliestTime = allCandles[0].time;
-                // Refresh VP with the wider dataset — backend recomputes
-                // from every-candle-it-was-given so the older-batch VP
-                // is over just those older bars. Update the overlay to
-                // reflect the newly-received distribution.
-                currentVP = res.body.volumeProfile || currentVP;
-                setTimeout(drawVP, 0);
+                // Older candles are now in allCandles — VP recomputes
+                // from the currently-visible slice automatically on
+                // the next scheduleVPUpdate. Also fire immediately in
+                // case the visible range didn't change (loading older
+                // data while user was already parked at the left edge).
+                scheduleVPUpdate();
             })
             .catch(function (e) {
                 loadingHistory = false;
