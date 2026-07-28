@@ -948,7 +948,13 @@
     }
     function startPoll() {
         stopPoll();
-        pollTimer = setInterval(pollTick, 20000);
+        // DEX-like feel: 3s interval. handleChartData is cheap when
+        // called with limit=30 (one Klines + one FundingRate roundtrip
+        // to BingX), and Cache-Control: no-store on the response keeps
+        // it fresh. Fire once immediately so the header doesn't feel
+        // stuck for the first 3s after a symbol/TF switch.
+        pollTick();
+        pollTimer = setInterval(pollTick, 3000);
     }
     function stopPoll() {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

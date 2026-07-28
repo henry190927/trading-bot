@@ -3417,6 +3417,10 @@ func tfDurationSeconds(tf market.Timeframe) time.Duration {
 // the shell + hydrates via /api/chart/data. Symbol / TF chosen client-
 // side so switching doesn't require a full page reload.
 func (s *server) handleChartPage(c *gin.Context) {
+	// Force browsers to re-fetch the page HTML every visit — the
+	// embedded JS is where the live-price polling lives, so a
+	// user with a cached shell will silently run last-week's code.
+	c.Header("Cache-Control", "no-store, must-revalidate")
 	c.HTML(http.StatusOK, "chart.html", gin.H{
 		"Symbol":  strings.ToUpper(defaultStr(c.Query("symbol"), "BTC")),
 		"TF":      defaultStr(c.Query("tf"), "1h"),
