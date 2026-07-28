@@ -98,6 +98,7 @@
       <button type="button" class="layer-chip" data-layer="flags">⚑ flags <span class="layer-count" data-layer-count="flags">0</span></button>
     </span>
     <span class="chart-layers-group chart-layers-actions">
+      <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?">ⓘ</button>
       <button type="button" class="layer-chip layer-reset" id="layers-reset" title="Reset chart zoom to fit all data">⟲ fit</button>
       <button type="button" class="layer-chip layer-eye" id="layers-eye" title="toggle display without clearing selections" aria-label="Toggle indicator visibility">
         <svg class="icon-eye-open"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -154,6 +155,53 @@
           <button type="button" class="btn-secondary quick-go" id="quick-go-validate">Validate →</button>
         </div>
         <p class="quick-hint">Opens the matching form in a new tab with fields prefilled.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicator glossary modal — opened by the ⓘ button next to the
+       reset button. Explains every layer chip. Kept short: what it
+       is, how it's drawn on the chart, and the trade signal to look
+       for. -->
+  <div class="modal-backdrop hidden" id="glossary-backdrop">
+    <div class="modal glossary-modal" role="dialog" aria-labelledby="glossary-title">
+      <div class="modal-head">
+        <h3 id="glossary-title">Indicator glossary</h3>
+        <button type="button" class="modal-x" id="glossary-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body glossary-body">
+        <dl class="glossary-list">
+          <dt><span class="glossary-tag">BOLL</span></dt>
+          <dd><b>Bollinger Bands 20/2</b> — 20-bar SMA (mid) ± 2σ. Price touching the outer band = statistically stretched; break through = trend expansion. Middle band often acts as dynamic support/resistance.</dd>
+
+          <dt><span class="glossary-tag">VOL</span></dt>
+          <dd><b>Volume histogram</b> — colored by candle direction (green=up close, red=down). Anchored to the price axis via a separate scale so it never distorts the candles.</dd>
+
+          <dt><span class="glossary-tag">VP</span></dt>
+          <dd><b>Visible-Range Volume Profile (VRVP)</b> — buy/sell volume distribution across price levels in the currently visible range. Recomputes on pan/zoom. The <b>POC</b> (point of control) is the highest-volume level; <b>HVN/LVN</b> are high/low-volume nodes = magnet / air-gap zones.</dd>
+
+          <dt><span class="glossary-tag">plan</span></dt>
+          <dd><b>Current trade plan</b> — entry (orange), stop (red), TP1 (green), TP2 (teal) drawn as horizontal price lines when the signal engine has produced a valid plan for the visible symbol/TF.</dd>
+
+          <dt><span class="glossary-tag">sweep</span></dt>
+          <dd><b>Liquidity sweep</b> — a wick that pierced a prior swing high/low then closed back inside, indicating stop-hunt behavior. <span class="glossary-arrow up">▲</span> at swing-low reclaims (long bias); <span class="glossary-arrow down">▼</span> at swing-high failures (short bias).</dd>
+
+          <dt><span class="glossary-tag">2× top/bot</span></dt>
+          <dd><b>Double top / double bottom</b> — two peaks (or valleys) at roughly the same price with a lower/higher middle. Classic reversal setup. Marker sits at the second peak/valley confirming the pattern.</dd>
+
+          <dt><span class="glossary-tag">RSI div</span></dt>
+          <dd><b>Regular RSI(14) divergence</b> — price makes a new extreme but RSI doesn't (bearish: higher-high in price + lower-high in RSI; bullish: lower-low in price + higher-low in RSI). Marker at the second pivot where divergence completes, signalling momentum exhaustion.</dd>
+
+          <dt><span class="glossary-tag">vol×</span></dt>
+          <dd><b>Volume anomaly</b> — a bar with volume ≥ 2.5× the 20-bar SMA. Often marks a real reaction bar (breakout, capitulation, or absorption) worth investigating.</dd>
+
+          <dt><span class="glossary-tag">BB touch/break</span></dt>
+          <dd><b>Bollinger interaction events</b> — bar closed touching or breaking the outer band. Touch = mean-reversion candidate at the band edge. Break = trend continuation candidate outside the band. Colored by side.</dd>
+
+          <dt><span class="glossary-tag">⚑ flags</span></dt>
+          <dd><b>Long/short flags</b> — anchored to the last bar of a confirmed setup (e.g., completed sweep + reclaim, or double + trigger). Signals the engine's take-a-position moment.</dd>
+        </dl>
+        <p class="glossary-hint">Marker count next to each chip shows how many were detected in the current window. Empty (dim <em>0</em>) just means no matching pattern in the loaded range.</p>
       </div>
     </div>
   </div>
@@ -428,6 +476,31 @@
         // bar; also reset the price scale to auto-fit vertically.
         chart.timeScale().fitContent();
         chart.priceScale('right').applyOptions({ autoScale: true });
+    });
+    // Glossary modal (ⓘ button).
+    var glossaryBackdrop = document.getElementById('glossary-backdrop');
+    var glossaryCloseBtn = document.getElementById('glossary-close');
+    var infoBtn          = document.getElementById('layers-info');
+    if (infoBtn && glossaryBackdrop) {
+        infoBtn.addEventListener('click', function () {
+            glossaryBackdrop.classList.remove('hidden');
+        });
+    }
+    if (glossaryCloseBtn) {
+        glossaryCloseBtn.addEventListener('click', function () {
+            glossaryBackdrop.classList.add('hidden');
+        });
+    }
+    if (glossaryBackdrop) {
+        glossaryBackdrop.addEventListener('click', function (ev) {
+            if (ev.target === glossaryBackdrop) glossaryBackdrop.classList.add('hidden');
+        });
+    }
+    // Reuse the existing Escape-key handler? Simpler: add a scoped one.
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && glossaryBackdrop && !glossaryBackdrop.classList.contains('hidden')) {
+            glossaryBackdrop.classList.add('hidden');
+        }
     });
     function syncEyeButton() {
         if (!eyeBtn) return;
