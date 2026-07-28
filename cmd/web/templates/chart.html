@@ -883,7 +883,12 @@
     // series — enough to update the last few closed bars + the
     // forming bar without redrawing the whole chart.
     var pollTimer = null;
+    var pollInFlight = false;
     function pollTick() {
+        // If a previous poll is still resolving, skip this tick so we
+        // don't stack requests during transient network slowness.
+        if (pollInFlight) return;
+        pollInFlight = true;
         if (window.__chartDebug) console.log('[chart poll] tick', new Date().toISOString());
         fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym())
               + '&tf=' + encodeURIComponent(currentTF())
@@ -959,17 +964,19 @@
             })
             .catch(function (e) {
                 console.error('[chart poll] error', e);
-            });
+            })
+            .then(function () { pollInFlight = false; });
     }
     function startPoll() {
         stopPoll();
-        // DEX-like feel: 3s interval. handleChartData is cheap when
-        // called with limit=30 (one Klines + one FundingRate roundtrip
-        // to BingX), and Cache-Control: no-store on the response keeps
-        // it fresh. Fire once immediately so the header doesn't feel
-        // stuck for the first 3s after a symbol/TF switch.
+        // 5s interval — 3s overwhelmed the render pipeline (each tick
+        // rebuilds ctx-chip innerHTML, updates 3 Bollinger series, and
+        // forces LWC to re-lay-out). 5s stays snappy enough to feel
+        // live while letting one paint finish before the next fetch
+        // lands. Fire once immediately so the header doesn't feel
+        // stuck after a symbol/TF switch.
         pollTick();
-        pollTimer = setInterval(pollTick, 3000);
+        pollTimer = setInterval(pollTick, 5000);
     }
     function stopPoll() {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
