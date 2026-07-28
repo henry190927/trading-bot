@@ -1107,6 +1107,36 @@ footer {
     border-color: var(--blue);
 }
 .chart-layers-actions { margin-left: auto; }
+.layer-chip.layer-eye {
+    color: var(--text-dim);
+    border-color: var(--border);
+    padding: 2px 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.layer-chip.layer-eye svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
+/* Default: show the "eye open" (layers currently visible → click to
+   hide). When .is-hidden is on the button, show the "eye off" icon
+   instead (layers currently hidden → click to reveal). */
+.layer-chip.layer-eye .icon-eye-off  { display: none; }
+.layer-chip.layer-eye.is-hidden .icon-eye-open { display: none; }
+.layer-chip.layer-eye.is-hidden .icon-eye-off  { display: block; }
+.layer-chip.layer-eye:hover {
+    color: var(--text);
+    background: var(--surface);
+}
+.layer-chip.layer-eye.is-hidden {
+    color: var(--yellow);
+    border-color: rgba(251,191,36,0.55);
+    background: rgba(251,191,36,0.08);
+}
 .layer-chip.layer-clear {
     color: var(--red);
     border-color: rgba(224,49,49,0.45);

@@ -98,7 +98,11 @@
       <button type="button" class="layer-chip" data-layer="flags">⚑ flags</button>
     </span>
     <span class="chart-layers-group chart-layers-actions">
-      <button type="button" class="layer-chip layer-clear" id="layers-clear" title="hide all layers">× clear</button>
+      <button type="button" class="layer-chip layer-eye" id="layers-eye" title="toggle display without clearing selections" aria-label="Toggle indicator visibility">
+        <svg class="icon-eye-open"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="icon-eye-off"   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+      </button>
+      <button type="button" class="layer-chip layer-clear" id="layers-clear" title="clear all layer selections">× clear</button>
       <button type="button" class="layer-chip layer-all" id="layers-all" title="enable all layers">all</button>
     </span>
   </div>
@@ -268,6 +272,19 @@
         'bb-events': false, flags: false,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
+    // Master visibility override — when true, all layers render as
+    // hidden regardless of individual chip state. Chip .active states
+    // are preserved so toggling back reveals the same selection. This
+    // is the "eye" button; distinct from × clear which actually wipes
+    // the selection.
+    var HIDE_KEY = 'chart-layers-hidden';
+    var layersHidden = false;
+    try { layersHidden = localStorage.getItem(HIDE_KEY) === '1'; } catch (e) {}
+    function saveHidden() { try { localStorage.setItem(HIDE_KEY, layersHidden ? '1' : '0'); } catch (e) {} }
+    // layerOn(name) — the ONLY function refresh code should consult
+    // when deciding whether to render a layer. Combines individual
+    // chip state with the master hide toggle.
+    function layerOn(name) { return !layersHidden && !!layers[name]; }
     function loadLayers() {
         try {
             var v = JSON.parse(localStorage.getItem(LAYERS_KEY) || '{}');
@@ -297,17 +314,17 @@
         if (!allMarkers.length) { candleSeries.setMarkers([]); return; }
         var visible = allMarkers.filter(function (m) {
             var layer = markerLayerKind(m);
-            return !layer || layers[layer];
+            return !layer || layerOn(layer);
         });
         candleSeries.setMarkers(visible);
     }
     // Apply visibility to non-marker layers (series-level).
     function refreshLayerVisibility() {
-        upperSeries.applyOptions({ visible: layers.boll });
-        midSeries.applyOptions({ visible: layers.boll });
-        lowerSeries.applyOptions({ visible: layers.boll });
-        volSeries.applyOptions({ visible: layers.vol });
-        if (vpSvg) vpSvg.style.display = layers.vp ? '' : 'none';
+        upperSeries.applyOptions({ visible: layerOn('boll') });
+        midSeries.applyOptions({ visible: layerOn('boll') });
+        lowerSeries.applyOptions({ visible: layerOn('boll') });
+        volSeries.applyOptions({ visible: layerOn('vol') });
+        if (vpSvg) vpSvg.style.display = layerOn('vp') ? '' : 'none';
         // Plan lines: we redraw them from scratch on data load, but here
         // we also need to hide/show. Cheapest = re-apply on toggle.
         applyPlanLinesVisibility();
@@ -317,7 +334,7 @@
     var lastPlan = null;
     function applyPlanLinesVisibility() {
         clearPlanLines();
-        if (!layers.plan || !lastPlan) return;
+        if (!layerOn('plan') || !lastPlan) return;
         addPlanLine(lastPlan.entry, '#f59f00', 'entry');
         addPlanLine(lastPlan.stop,  '#e03131', 'stop');
         addPlanLine(lastPlan.tp1,   '#2f9e44', 'TP1');
@@ -344,6 +361,16 @@
     }
     var clearBtn = document.getElementById('layers-clear');
     var allBtn   = document.getElementById('layers-all');
+    var eyeBtn   = document.getElementById('layers-eye');
+    function syncEyeButton() {
+        if (!eyeBtn) return;
+        // CSS swaps which SVG shows based on this class.
+        eyeBtn.classList.toggle('is-hidden', layersHidden);
+        eyeBtn.setAttribute('title', layersHidden
+            ? 'Show indicators (selections preserved)'
+            : 'Hide indicators (keep selections)');
+    }
+    syncEyeButton();
     if (clearBtn) clearBtn.addEventListener('click', function () {
         ALL_LAYER_KEYS.forEach(function (k) { layers[k] = false; });
         saveLayers();
@@ -355,6 +382,14 @@
         ALL_LAYER_KEYS.forEach(function (k) { layers[k] = true; });
         saveLayers();
         syncChipsFromState();
+        refreshMarkers();
+        refreshLayerVisibility();
+    });
+    if (eyeBtn) eyeBtn.addEventListener('click', function () {
+        layersHidden = !layersHidden;
+        saveHidden();
+        syncEyeButton();
+        // Chip .active states stay as-is — the eye only affects render.
         refreshMarkers();
         refreshLayerVisibility();
     });
