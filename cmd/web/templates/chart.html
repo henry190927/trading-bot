@@ -88,6 +88,7 @@
       <button type="button" class="layer-chip" data-layer="vol">VOL</button>
       <button type="button" class="layer-chip" data-layer="vp">VP</button>
       <button type="button" class="layer-chip" data-layer="plan">plan</button>
+      <button type="button" class="layer-chip" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
     </span>
     <span class="chart-layers-group">
       <button type="button" class="layer-chip" data-layer="sweep">sweep <span class="layer-count" data-layer-count="sweep">0</span></button>
@@ -273,6 +274,18 @@
             <div class="lang-zh">
               <b>引擎當前計畫</b> — 入場（橘）、止損（紅）、TP1（綠）、TP2（青綠）水平線。
               <p class="glossary-how"><b>方向解讀：</b>單獨不成訊號。需結合結構（多單看下方 HVN 支撐，空單看上方壓力）與評分驗證。線距代表引擎給出的盈虧比。</p>
+            </div>
+          </dd>
+
+          <dt><span class="glossary-tag">positions</span></dt>
+          <dd>
+            <div class="lang-en">
+              <b>Your open positions on this symbol</b> — sourced from journal.csv. Each open trade draws entry / stop / TP1 / TP2 as price lines, prefixed with <b>#ID L/S</b> so multiple concurrent positions stay distinguishable.
+              <p class="glossary-how"><b>Reading:</b> LONG entry line is blue, SHORT is red; stop/TP colors match the plan layer. The entry line label shows live unrealized R (<span class="dir-long">+0.42R</span> etc.) refreshed every 5s against mark price. Externally-opened positions won't show up until you record them here (via the <b>+</b> price marker → Record Trade, or /journal/new).</p>
+            </div>
+            <div class="lang-zh">
+              <b>當前開倉部位</b> — 由 journal.csv 提供。每筆開倉繪製入場 / 止損 / TP1 / TP2 水平線，前綴 <b>#ID L/S</b> 以區分多筆並存部位。
+              <p class="glossary-how"><b>解讀：</b>多單入場藍色、空單紅色；止損 / TP 顏色與 plan 一致。入場線標籤顯示即時未實現 R 值（<span class="dir-long">+0.42R</span> 等），每 5 秒依標記價更新。若在 BingX 外部開倉未記錄於此，圖上不會顯示 — 需透過 <b>+</b> 標記或 /journal/new 補記。</p>
             </div>
           </dd>
 
@@ -524,7 +537,7 @@
     // per layer. Preferences persist in localStorage so they stick
     // across visits.
     var DEFAULT_LAYERS = {
-        boll: false, vol: false, vp: false, plan: false,
+        boll: false, vol: false, vp: false, plan: false, positions: true,
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
     };
@@ -586,6 +599,7 @@
             var k = markerLayerKind(m);
             if (k) counts[k] = (counts[k] || 0) + 1;
         });
+        counts['positions'] = (lastPositions || []).length;
         document.querySelectorAll('[data-layer-count]').forEach(function (span) {
             var k = span.dataset.layerCount;
             span.textContent = counts[k] || 0;
@@ -599,9 +613,11 @@
         lowerSeries.applyOptions({ visible: layerOn('boll') });
         volSeries.applyOptions({ visible: layerOn('vol') });
         if (vpSvg) vpSvg.style.display = layerOn('vp') ? '' : 'none';
-        // Plan lines: we redraw them from scratch on data load, but here
-        // we also need to hide/show. Cheapest = re-apply on toggle.
+        // Plan + position lines: we redraw them from scratch on data
+        // load, but here we also need to hide/show. Cheapest = re-
+        // apply on toggle.
         applyPlanLinesVisibility();
+        applyPositionLinesVisibility();
     }
     // Track plan visibility separately since planLines are recreated
     // on each data load.
@@ -613,6 +629,48 @@
         addPlanLine(lastPlan.stop,  '#e03131', 'stop');
         addPlanLine(lastPlan.tp1,   '#2f9e44', 'TP1');
         addPlanLine(lastPlan.tp2,   '#0ca678', 'TP2');
+    }
+
+    // ── Open positions overlay ─────────────────────────────────────
+    // Journal-driven: /api/chart/data returns openPositions for the
+    // current symbol; we render each as a set of price lines
+    // (entry / stop / TP1 / TP2) with a per-position label prefix so
+    // multiple concurrent positions stay distinguishable. Long
+    // positions use blue-ish entry, short uses red-ish, so the
+    // color-coding differs from the engine plan (which uses orange
+    // regardless of side).
+    var positionLines = [];
+    var lastPositions = [];
+    function clearPositionLines() {
+        positionLines.forEach(function (l) { candleSeries.removePriceLine(l); });
+        positionLines = [];
+    }
+    function addPositionLine(price, color, title, style) {
+        if (!price || isNaN(price)) return;
+        positionLines.push(candleSeries.createPriceLine({
+            price: price, color: color,
+            lineWidth: 1,
+            lineStyle: (style == null ? 0 : style), // 0 solid, 2 dashed
+            axisLabelVisible: true,
+            title: title,
+        }));
+    }
+    function applyPositionLinesVisibility() {
+        clearPositionLines();
+        if (!layerOn('positions') || !lastPositions.length) return;
+        lastPositions.forEach(function (p) {
+            var isLong = (p.side === 'long');
+            var entryColor = isLong ? '#339af0' : '#ff6b6b';
+            var pnlBadge = '';
+            if (p.unrealR != null && !isNaN(p.unrealR) && p.unrealR !== 0) {
+                pnlBadge = ' ' + (p.unrealR >= 0 ? '+' : '') + p.unrealR.toFixed(2) + 'R';
+            }
+            var prefix = '#' + p.id + (isLong ? ' L' : ' S');
+            addPositionLine(p.entry, entryColor, prefix + ' entry' + pnlBadge, 0);
+            addPositionLine(p.stop,  '#e03131',  prefix + ' stop',  2);
+            addPositionLine(p.tp1,   '#2f9e44',  prefix + ' TP1',   2);
+            addPositionLine(p.tp2,   '#0ca678',  prefix + ' TP2',   2);
+        });
     }
 
     // Wire chip buttons.
@@ -1064,6 +1122,8 @@
 
         lastPlan = data.plan || null;
         applyPlanLinesVisibility();
+        lastPositions = data.openPositions || [];
+        applyPositionLinesVisibility();
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
         // toggled off, LWC would still draw them.
@@ -1239,6 +1299,14 @@
                 updateBBSeries(lowerSeries, bb.lower);
                 // Header + summary refresh so score/verdict stay live.
                 applyHeader(data);
+                // Refresh position PnL badges — unrealR is computed
+                // server-side against the poll's mark price, so every
+                // tick nudges the "+0.42R" label on the entry line.
+                if (Array.isArray(data.openPositions)) {
+                    lastPositions = data.openPositions;
+                    applyPositionLinesVisibility();
+                    updateLayerCounts();
+                }
                 if (window.__chartDebug) {
                     var lc = candles[candles.length - 1];
                     console.log('[chart poll] applied', {sym: currentSym(), close: lc.close, markPrice: data.markPrice, ts: lc.time});

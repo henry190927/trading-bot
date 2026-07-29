@@ -3664,6 +3664,13 @@ func (s *server) handleChartData(c *gin.Context) {
 		"openInterest": view.Context.OpenInterest,
 	}
 
+	// Open positions on THIS symbol from the journal — drawn as
+	// horizontal price lines on the chart via the frontend
+	// `positions` layer. Journal is the source of truth; live
+	// BingX positions are not polled here to keep chart data
+	// requests cheap.
+	openPositions := collectOpenPositionsForChart(short, view.MarkPrice)
+
 	c.JSON(http.StatusOK, gin.H{
 		"symbol":        short,
 		"tf":            tfStr,
@@ -3678,7 +3685,60 @@ func (s *server) handleChartData(c *gin.Context) {
 		"summary":       view.Summary,
 		"markPrice":     view.MarkPrice,
 		"marketCtx":     ctxSnap,
+		"openPositions": openPositions,
 	})
+}
+
+// collectOpenPositionsForChart reads the journal, filters to open
+// trades on the given short symbol, and returns a slim payload for
+// the /chart frontend to draw as price lines. Errors are swallowed —
+// the layer simply renders empty if the journal can't be read.
+func collectOpenPositionsForChart(short string, markPrice float64) []map[string]any {
+	trades, err := journal.ReadAll("")
+	if err != nil {
+		return nil
+	}
+	out := make([]map[string]any, 0, 4)
+	for _, t := range trades {
+		if !t.IsOpen() {
+			continue
+		}
+		if !strings.EqualFold(t.Symbol, short) {
+			continue
+		}
+		// Running unrealized R vs. the entry/stop distance. Uses
+		// mark price when available, else the entry (0R). Fine to
+		// be approximate — the frontend renders it as an info
+		// badge next to the entry line.
+		var unrealR float64
+		if markPrice > 0 && t.Entry > 0 && t.Stop != t.Entry {
+			risk := t.Entry - t.Stop
+			if strings.EqualFold(t.Side, "short") {
+				risk = t.Stop - t.Entry
+			}
+			if risk > 0 {
+				moved := markPrice - t.Entry
+				if strings.EqualFold(t.Side, "short") {
+					moved = t.Entry - markPrice
+				}
+				unrealR = moved / risk
+			}
+		}
+		filled := t.FilledAt.IsZero() == false
+		out = append(out, map[string]any{
+			"id":         t.ID,
+			"side":       strings.ToLower(t.Side),
+			"entry":      t.Entry,
+			"stop":       t.Stop,
+			"tp1":        t.TP1,
+			"tp2":        t.TP2,
+			"tf":         t.TF,
+			"filled":     filled,
+			"unrealR":    unrealR,
+			"openedAt":   t.OpenedAt.Unix(),
+		})
+	}
+	return out
 }
 
 // computeChartMarkers derives event markers for the LWC candlestick
