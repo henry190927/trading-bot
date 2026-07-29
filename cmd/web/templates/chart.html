@@ -98,6 +98,12 @@
       <button type="button" class="layer-chip" data-layer="macd">MACD × <span class="layer-count" data-layer-count="macd">0</span></button>
       <button type="button" class="layer-chip" data-layer="flags">⚑ flags <span class="layer-count" data-layer-count="flags">0</span></button>
     </span>
+    <span class="chart-layers-group chart-tools-group" aria-label="drawing tools">
+      <button type="button" class="tool-chip" data-tool="hline" title="Horizontal line — 1 click">─ hline</button>
+      <button type="button" class="tool-chip" data-tool="tline" title="Trend line — 2 clicks">╱ tline</button>
+      <button type="button" class="tool-chip" data-tool="rect"  title="Rectangle — 2 clicks">▭ rect</button>
+      <button type="button" class="tool-chip tool-clear"  id="draw-clear" title="Remove all drawings for this symbol/TF">🗑 clear</button>
+    </span>
     <span class="chart-layers-group chart-layers-actions">
       <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?">ⓘ</button>
       <button type="button" class="layer-chip layer-reset" id="layers-reset" title="Reset chart zoom to fit all data">⟲ fit</button>
@@ -115,6 +121,10 @@
   <div class="chart-wrap">
     <div id="chart-container" class="chart-canvas"></div>
     <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <!-- User-drawings SVG overlay: horizontal lines, trend lines,
+         rectangles. Pointer-events off by default so chart pan/zoom
+         still works; toggled on only while a tool is active. -->
+    <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
     <!-- Floating "+" marker that tracks the crosshair Y. Click opens
          the quick-action modal with the price prefilled. Hidden until
          the user hovers the chart. -->
@@ -1382,6 +1392,235 @@
             // click but still same-page.
             window.location.href = url + '&auto=1';
         });
+    })();
+
+    // ── Drawing tools ──────────────────────────────────────────────
+    // Custom SVG overlay on top of the chart. Three tools:
+    //   - horizontal line: 1 click captures {price}
+    //   - trend line:      2 clicks capture {t1,p1},{t2,p2}
+    //   - rectangle:       2 clicks capture two corners
+    // Drawings are persisted to localStorage per (symbol, TF) key so
+    // they follow the chart across reloads and are separated per
+    // scope. Re-drawn on any visible-range change and on resize.
+    (function initDrawTools() {
+        var overlay = document.getElementById('chart-draw-overlay');
+        var wrap    = document.querySelector('.chart-wrap');
+        var canvas  = document.getElementById('chart-container');
+        var clearBtn = document.getElementById('draw-clear');
+        var toolBtns = document.querySelectorAll('.tool-chip[data-tool]');
+        if (!overlay || !wrap || !canvas) return;
+
+        var activeTool = null;   // null | 'hline' | 'tline' | 'rect'
+        var pending    = [];     // in-progress click points for multi-click tools
+        var drawings   = [];     // {id, type, points: [{time, price}], color}
+        var SVG_NS = 'http://www.w3.org/2000/svg';
+
+        function drawingsKey() { return 'chart-drawings-' + currentSym() + '-' + currentTF(); }
+        function loadDrawings() {
+            try {
+                var raw = localStorage.getItem(drawingsKey());
+                drawings = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(drawings)) drawings = [];
+            } catch (e) { drawings = []; }
+        }
+        function saveDrawings() {
+            try { localStorage.setItem(drawingsKey(), JSON.stringify(drawings)); } catch (e) {}
+        }
+
+        // Convert chart-container coords → {time, price}. Returns
+        // nulls when outside the plot area.
+        function coordToTP(x, y) {
+            var time  = chart.timeScale().coordinateToTime(x);
+            var price = candleSeries.coordinateToPrice(y);
+            return { time: time, price: price };
+        }
+        function tpToCoord(tp) {
+            var x = chart.timeScale().timeToCoordinate(tp.time);
+            var y = candleSeries.priceToCoordinate(tp.price);
+            return { x: x, y: y };
+        }
+
+        function sizeOverlay() {
+            var w = canvas.clientWidth;
+            var h = canvas.clientHeight;
+            overlay.setAttribute('width', w);
+            overlay.setAttribute('height', h);
+            overlay.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        }
+
+        function renderAll() {
+            sizeOverlay();
+            // Wipe and re-emit every drawing. Cheap for <100 drawings;
+            // if we ever need more we can diff, but not yet.
+            while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+
+            var w = parseFloat(overlay.getAttribute('width'));
+            drawings.forEach(function (d) {
+                if (d.type === 'hline') {
+                    var y = candleSeries.priceToCoordinate(d.points[0].price);
+                    if (y == null) return;
+                    var ln = document.createElementNS(SVG_NS, 'line');
+                    ln.setAttribute('x1', 0);
+                    ln.setAttribute('x2', w);
+                    ln.setAttribute('y1', y);
+                    ln.setAttribute('y2', y);
+                    ln.setAttribute('stroke', d.color || '#4dabf7');
+                    ln.setAttribute('stroke-width', '1.4');
+                    ln.setAttribute('stroke-dasharray', '4 3');
+                    overlay.appendChild(ln);
+                    // Price label at right
+                    var lbl = document.createElementNS(SVG_NS, 'text');
+                    lbl.setAttribute('x', w - 4);
+                    lbl.setAttribute('y', y - 4);
+                    lbl.setAttribute('text-anchor', 'end');
+                    lbl.setAttribute('fill', d.color || '#4dabf7');
+                    lbl.setAttribute('font-family', 'ui-monospace, monospace');
+                    lbl.setAttribute('font-size', '11');
+                    lbl.textContent = d.points[0].price.toFixed(2);
+                    overlay.appendChild(lbl);
+                } else if (d.type === 'tline') {
+                    var a = tpToCoord(d.points[0]);
+                    var b = tpToCoord(d.points[1]);
+                    if (a.x == null || b.x == null || a.y == null || b.y == null) return;
+                    var ln2 = document.createElementNS(SVG_NS, 'line');
+                    ln2.setAttribute('x1', a.x); ln2.setAttribute('y1', a.y);
+                    ln2.setAttribute('x2', b.x); ln2.setAttribute('y2', b.y);
+                    ln2.setAttribute('stroke', d.color || '#20c997');
+                    ln2.setAttribute('stroke-width', '1.6');
+                    overlay.appendChild(ln2);
+                } else if (d.type === 'rect') {
+                    var a2 = tpToCoord(d.points[0]);
+                    var b2 = tpToCoord(d.points[1]);
+                    if (a2.x == null || b2.x == null || a2.y == null || b2.y == null) return;
+                    var x1 = Math.min(a2.x, b2.x), y1 = Math.min(a2.y, b2.y);
+                    var x2 = Math.max(a2.x, b2.x), y2 = Math.max(a2.y, b2.y);
+                    var r = document.createElementNS(SVG_NS, 'rect');
+                    r.setAttribute('x', x1); r.setAttribute('y', y1);
+                    r.setAttribute('width', x2 - x1); r.setAttribute('height', y2 - y1);
+                    r.setAttribute('fill', 'rgba(76,110,245,0.10)');
+                    r.setAttribute('stroke', d.color || '#4c6ef5');
+                    r.setAttribute('stroke-width', '1.2');
+                    overlay.appendChild(r);
+                }
+            });
+
+            // In-progress preview for 2-click tools.
+            if (pending.length === 1 && (activeTool === 'tline' || activeTool === 'rect')) {
+                var p = tpToCoord(pending[0]);
+                if (p.x != null && p.y != null) {
+                    var dot = document.createElementNS(SVG_NS, 'circle');
+                    dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
+                    dot.setAttribute('r', '4');
+                    dot.setAttribute('fill', activeTool === 'tline' ? '#20c997' : '#4c6ef5');
+                    overlay.appendChild(dot);
+                }
+            }
+        }
+
+        function setActiveTool(name) {
+            if (activeTool === name) name = null; // toggle off
+            activeTool = name;
+            pending = [];
+            toolBtns.forEach(function (b) {
+                b.classList.toggle('is-active', b.dataset.tool === activeTool);
+            });
+            // Only capture clicks when a tool is armed. Otherwise the
+            // overlay is fully transparent to mouse events so LWC gets
+            // pan/zoom back.
+            overlay.style.pointerEvents = activeTool ? 'auto' : 'none';
+            wrap.classList.toggle('is-drawing', !!activeTool);
+            renderAll();
+        }
+
+        toolBtns.forEach(function (b) {
+            b.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                setActiveTool(b.dataset.tool);
+            });
+        });
+        if (clearBtn) clearBtn.addEventListener('click', function () {
+            if (!drawings.length) return;
+            if (!confirm('Remove all drawings on ' + currentSym() + ' ' + currentTF() + '?')) return;
+            drawings = [];
+            saveDrawings();
+            renderAll();
+        });
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape' && activeTool) setActiveTool(null);
+        });
+
+        // Chart-space click handler: converts to (time, price) and
+        // either finishes a drawing or records the first anchor.
+        overlay.addEventListener('click', function (ev) {
+            if (!activeTool) return;
+            var rect = canvas.getBoundingClientRect();
+            var x = ev.clientX - rect.left;
+            var y = ev.clientY - rect.top;
+            var tp = coordToTP(x, y);
+            if (tp.time == null || tp.price == null || isNaN(tp.price)) return;
+
+            if (activeTool === 'hline') {
+                drawings.push({ id: 'd' + drawings.length + '_' + Math.floor(tp.price*100),
+                                type: 'hline', points: [tp], color: '#4dabf7' });
+                saveDrawings();
+                setActiveTool(null);
+            } else if (activeTool === 'tline' || activeTool === 'rect') {
+                pending.push(tp);
+                if (pending.length === 2) {
+                    drawings.push({ id: 'd' + drawings.length + '_' + Math.floor(tp.price*100),
+                                    type: activeTool, points: pending.slice(),
+                                    color: activeTool === 'tline' ? '#20c997' : '#4c6ef5' });
+                    pending = [];
+                    saveDrawings();
+                    setActiveTool(null);
+                } else {
+                    renderAll();
+                }
+            }
+        });
+
+        // Redraw whenever the chart moves. subscribeVisibleTimeRangeChange
+        // fires on pan/zoom; also throttle via rAF so we're not
+        // recomputing during every mousemove-driven range tick.
+        var pending_raf = 0;
+        function scheduleRedraw() {
+            if (pending_raf) return;
+            pending_raf = requestAnimationFrame(function () {
+                pending_raf = 0;
+                renderAll();
+            });
+        }
+        chart.timeScale().subscribeVisibleTimeRangeChange(scheduleRedraw);
+        chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleRedraw);
+        new ResizeObserver(scheduleRedraw).observe(canvas);
+
+        // Reload drawings whenever symbol/TF changes so we don't show
+        // BTC 1h drawings while looking at ETH 4h. symSel change + tf
+        // pill clicks already trigger load(), which will end up calling
+        // reloadForCurrentScope indirectly via applyChart — the cheapest
+        // hook is to just re-load in load()'s success path. Here we
+        // patch it lightly by watching for symbol/TF changes with a
+        // MutationObserver on the header symbol span (updated in
+        // applyHeader).
+        var lastScope = null;
+        function reloadForCurrentScope() {
+            var scope = currentSym() + '/' + currentTF();
+            if (scope === lastScope) return;
+            lastScope = scope;
+            loadDrawings();
+            renderAll();
+        }
+        // Hook after each poll's applyHeader by observing changes to
+        // the header symbol/TF text.
+        var headerSym = document.getElementById('chart-header-sym');
+        var headerTfEl = document.getElementById('chart-header-tf');
+        [headerSym, headerTfEl].forEach(function (el) {
+            if (!el) return;
+            new MutationObserver(reloadForCurrentScope).observe(el, {characterData: true, childList: true, subtree: true});
+        });
+
+        // Initial load once the chart has painted at least one bar.
+        setTimeout(function () { reloadForCurrentScope(); renderAll(); }, 500);
     })();
 
     load();
