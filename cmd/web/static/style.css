@@ -1139,6 +1139,66 @@ footer {
     padding: 1px 8px;
 }
 
+/* Bilingual visibility: only one .lang-en / .lang-zh block shows
+   at a time, driven by the data-lang attribute on the modal root.
+   `lang-en` and `lang-zh` may live on inline <span>s (title / hint)
+   or on block <div>s inside a <dd>, so we handle both display
+   defaults via a rule per attribute value. */
+.glossary-modal[data-lang="en"] .lang-zh,
+.glossary-modal[data-lang="zh"] .lang-en { display: none; }
+.glossary-modal[data-lang="en"] .lang-en,
+.glossary-modal[data-lang="zh"] .lang-zh { display: block; }
+/* But inline spans in the header title should stay inline when shown */
+.glossary-modal .modal-head .lang-en,
+.glossary-modal .modal-head .lang-zh {
+    display: none;
+}
+.glossary-modal[data-lang="en"] .modal-head .lang-en,
+.glossary-modal[data-lang="zh"] .modal-head .lang-zh {
+    display: inline;
+}
+.glossary-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.lang-switch {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--surface-2);
+}
+.lang-btn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 0;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-family: ui-monospace, "SF Mono", monospace;
+    cursor: pointer;
+    line-height: 1.4;
+}
+.lang-btn + .lang-btn { border-left: 1px solid var(--border); }
+.lang-btn:hover { color: var(--text); }
+.lang-btn.is-active {
+    background: var(--blue);
+    color: #fff;
+}
+.glossary-how {
+    margin: 0.4rem 0 0;
+    padding: 0.5rem 0.6rem;
+    background: var(--surface-2);
+    border-left: 2px solid var(--blue);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--text);
+}
+.glossary-how b { color: var(--text); }
+.dir-long  { color: var(--green); font-weight: 600; }
+.dir-short { color: var(--red);   font-weight: 600; }
+
 /* Indicator glossary modal — bigger than the quick-action modal
    because it holds real reading material. Two-column dt/dd list. */
 .modal.glossary-modal {

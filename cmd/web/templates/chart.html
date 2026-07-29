@@ -165,47 +165,157 @@
        is, how it's drawn on the chart, and the trade signal to look
        for. -->
   <div class="modal-backdrop hidden" id="glossary-backdrop">
-    <div class="modal glossary-modal" role="dialog" aria-labelledby="glossary-title">
+    <div class="modal glossary-modal" role="dialog" aria-labelledby="glossary-title" data-lang="en">
       <div class="modal-head">
-        <h3 id="glossary-title">Indicator glossary</h3>
-        <button type="button" class="modal-x" id="glossary-close" aria-label="Close">&times;</button>
+        <h3 id="glossary-title"><span class="lang-en">Indicator glossary</span><span class="lang-zh">指標說明</span></h3>
+        <div class="glossary-controls">
+          <div class="lang-switch" role="group" aria-label="Language">
+            <button type="button" class="lang-btn is-active" data-lang="en">EN</button>
+            <button type="button" class="lang-btn" data-lang="zh">中</button>
+          </div>
+          <button type="button" class="modal-x" id="glossary-close" aria-label="Close">&times;</button>
+        </div>
       </div>
       <div class="modal-body glossary-body">
         <dl class="glossary-list">
+
           <dt><span class="glossary-tag">BOLL</span></dt>
-          <dd><b>Bollinger Bands 20/2</b> — 20-bar SMA (mid) ± 2σ. Price touching the outer band = statistically stretched; break through = trend expansion. Middle band often acts as dynamic support/resistance.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Bollinger Bands 20/2</b> — 20-bar SMA (mid) ± 2σ.
+              <p class="glossary-how"><b>Direction:</b> upper touch = stretched → mean-revert SHORT candidate (needs bearish confluence e.g. RSI overbought / bear div). Lower touch = mean-revert LONG candidate. <b>Close outside</b> the band = trend expansion, do NOT fade. Narrow band width (squeeze) = compression before an expansion; direction of the eventual break tells you the side.</p>
+            </div>
+            <div class="lang-zh">
+              <b>布林通道 20/2</b> — 20 期均線 ± 2 標準差。
+              <p class="glossary-how"><b>方向解讀：</b>上軌觸及 = 過度拉伸，若伴隨 RSI 超買或頂背離可考慮均值回歸<span class="dir-short">做空</span>；下軌觸及反之考慮<span class="dir-long">做多</span>。<b>收盤在外</b> = 趨勢延續，不可逆勢。窄軌（壓縮） = 波動即將擴張，破位方向決定操作邊。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">VOL</span></dt>
-          <dd><b>Volume histogram</b> — colored by candle direction (green=up close, red=down). Anchored to the price axis via a separate scale so it never distorts the candles.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Volume histogram</b> — colored by candle direction (green up, red down).
+              <p class="glossary-how"><b>Direction:</b> price rising with expanding volume = healthy trend continuation. Price making new high but volume shrinking = distribution warning (likely top ahead). Green volume clusters &gt; red = buyer pressure; opposite = seller pressure.</p>
+            </div>
+            <div class="lang-zh">
+              <b>成交量柱狀</b> — 依 K 棒方向著色（綠漲紅跌）。
+              <p class="glossary-how"><b>方向解讀：</b>價漲量增 = 健康趨勢延續。新高但量縮 = 分批出貨，警惕頂部。綠量密集 &gt; 紅量 = 買方壓力占優，反之則賣方主導。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">VP</span></dt>
-          <dd><b>Visible-Range Volume Profile (VRVP)</b> — buy/sell volume distribution across price levels in the currently visible range. Recomputes on pan/zoom. The <b>POC</b> (point of control) is the highest-volume level; <b>HVN/LVN</b> are high/low-volume nodes = magnet / air-gap zones.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Visible-Range Volume Profile (VRVP)</b> — buy/sell volume across price levels in the visible window; recomputes on pan/zoom.
+              <p class="glossary-how"><b>Direction:</b> <b>POC</b> (highest-vol row) acts as a magnet — price often reverts there. <b>HVN</b> = strong support (below current price) / resistance (above). <b>LVN</b> = air gap, price moves fast through. Blue &gt; orange on a level = absorption at that price → likely reversal from that side; reverse = distribution.</p>
+            </div>
+            <div class="lang-zh">
+              <b>可視範圍成交量分佈 (VRVP)</b> — 視窗內各價位的買賣量，隨移動/縮放重新計算。
+              <p class="glossary-how"><b>方向解讀：</b><b>POC</b>（最大量價位）為磁吸點，價格常回歸此處。<b>HVN</b>（高量區） = 現價下方為支撐、上方為壓力。<b>LVN</b>（低量區） = 真空帶，快速穿越。藍色 &gt; 橘色 = 該價位有吸籌，可能自此反轉<span class="dir-long">做多</span>；反之則有派發風險。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">plan</span></dt>
-          <dd><b>Current trade plan</b> — entry (orange), stop (red), TP1 (green), TP2 (teal) drawn as horizontal price lines when the signal engine has produced a valid plan for the visible symbol/TF.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Current engine plan</b> — entry (orange), stop (red), TP1 (green), TP2 (teal) drawn as price lines.
+              <p class="glossary-how"><b>Direction:</b> not a signal by itself. Cross-check with structure (HVN below entry for longs, above for shorts) and with score/verdict. The line spacing tells you the R:R the engine is offering.</p>
+            </div>
+            <div class="lang-zh">
+              <b>引擎當前計畫</b> — 入場（橘）、止損（紅）、TP1（綠）、TP2（青綠）水平線。
+              <p class="glossary-how"><b>方向解讀：</b>單獨不成訊號。需結合結構（多單看下方 HVN 支撐，空單看上方壓力）與評分驗證。線距代表引擎給出的盈虧比。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">sweep</span></dt>
-          <dd><b>Liquidity sweep</b> — a wick that pierced a prior swing high/low then closed back inside, indicating stop-hunt behavior. <span class="glossary-arrow up">▲</span> at swing-low reclaims (long bias); <span class="glossary-arrow down">▼</span> at swing-high failures (short bias).</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Liquidity sweep + reclaim</b> — wick pierced a prior swing then closed back inside.
+              <p class="glossary-how"><b>Direction:</b> <span class="glossary-arrow up">▲</span> at swing-low = stops taken below → <span class="dir-long">LONG</span> bias (stop just under the wick's low). <span class="glossary-arrow down">▼</span> at swing-high = <span class="dir-short">SHORT</span> bias (stop above the wick). <b>Failure mode:</b> if the next bar closes back through the swing, the "sweep" was actually a genuine break — flip the thesis.</p>
+            </div>
+            <div class="lang-zh">
+              <b>掃流動性 + 回收</b> — 影線刺破前高/低但收回內部。
+              <p class="glossary-how"><b>方向解讀：</b><span class="glossary-arrow up">▲</span> 掃低回收 = 洗掉多單止損後反轉 →<span class="dir-long">做多</span>偏好（止損置於影線最低下方）。<span class="glossary-arrow down">▼</span> 掃高回收 =<span class="dir-short">做空</span>偏好（止損置於影線最高上方）。<b>失敗訊號：</b>下一根若再度收破前高/低，即為真突破，需反向操作。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">2× top/bot</span></dt>
-          <dd><b>Double top / double bottom</b> — two peaks (or valleys) at roughly the same price with a lower/higher middle. Classic reversal setup. Marker sits at the second peak/valley confirming the pattern.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Double top / double bottom</b> — two peaks/valleys at ≈ same price with a lower/higher middle. Marker sits on the second pivot.
+              <p class="glossary-how"><b>Direction:</b> double-top → <span class="dir-short">SHORT</span> bias after neckline break; stop above the higher peak. Double-bottom → <span class="dir-long">LONG</span> bias after neckline reclaim; stop below the lower valley. <b>Failure mode:</b> neckline reclaimed against the direction → pattern invalidated, exit immediately.</p>
+            </div>
+            <div class="lang-zh">
+              <b>雙頂 / 雙底</b> — 兩個相近價位的峰/谷，中間有較低/較高的回撤。標記位於第二個轉折點。
+              <p class="glossary-how"><b>方向解讀：</b>雙頂 → 跌破頸線後<span class="dir-short">做空</span>，止損置於較高頂之上。雙底 → 突破頸線後<span class="dir-long">做多</span>，止損置於較低底之下。<b>失敗訊號：</b>頸線被反向奪回即為型態失效，立即出場。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">RSI div</span></dt>
-          <dd><b>Regular RSI(14) divergence</b> — price makes a new extreme but RSI doesn't (bearish: higher-high in price + lower-high in RSI; bullish: lower-low in price + higher-low in RSI). Marker at the second pivot where divergence completes, signalling momentum exhaustion.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Regular RSI(14) divergence</b> — price and momentum disagree.
+              <p class="glossary-how"><b>Direction:</b> <b>bearish reg-div</b> (higher price high + lower RSI high) → momentum weakening at highs → <span class="dir-short">SHORT</span> bias, but wait for a structural break (BOS or trendline) before entering. <b>Bullish reg-div</b> mirror → <span class="dir-long">LONG</span> bias. <b>Failure mode:</b> divergence can extend across many bars — don't front-run. Absent a break, it's just a warning, not a trigger.</p>
+            </div>
+            <div class="lang-zh">
+              <b>常規 RSI(14) 背離</b> — 價格與動能不一致。
+              <p class="glossary-how"><b>方向解讀：</b><b>頂背離</b>（價創新高、RSI 未創新高）= 高位動能衰竭 →<span class="dir-short">做空</span>偏好，但需等結構破位（BOS 或趨勢線）再進場。<b>底背離</b>反之 →<span class="dir-long">做多</span>偏好。<b>失敗訊號：</b>背離可延續多根 K 棒，切勿搶反轉。無結構破位僅為警訊，不是觸發訊號。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">vol×</span></dt>
-          <dd><b>Volume anomaly</b> — a bar with volume ≥ 2.5× the 20-bar SMA. Often marks a real reaction bar (breakout, capitulation, or absorption) worth investigating.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Volume anomaly</b> — bar with vol ≥ 3× 20-SMA AND range &gt; 1.5× ATR. Signals a real reaction bar.
+              <p class="glossary-how"><b>Direction:</b> green close + high vol on breakout = <span class="dir-long">accumulation / trend continuation LONG</span>. Red close + high vol on breakdown = <span class="dir-short">distribution / continuation SHORT</span>. High vol with a small close body = absorption / reversal candidate — check WHERE the close sits (upper half → bullish rejection; lower → bearish).</p>
+            </div>
+            <div class="lang-zh">
+              <b>成交量異常</b> — 該根量 ≥ 20MA × 3 且振幅 &gt; ATR × 1.5，代表真實反應。
+              <p class="glossary-how"><b>方向解讀：</b>綠 K 大量突破 =<span class="dir-long">吸籌 / 趨勢延續做多</span>。紅 K 大量破位 =<span class="dir-short">派發 / 延續做空</span>。若量大但實體小 = 吸收/反轉徵兆，看收盤位於上半 =<span class="dir-long">多方拒絕下跌</span>，下半 =<span class="dir-short">空方拒絕上漲</span>。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">BB touch/break</span></dt>
-          <dd><b>Bollinger interaction events</b> — bar closed touching or breaking the outer band. Touch = mean-reversion candidate at the band edge. Break = trend continuation candidate outside the band. Colored by side.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Bollinger interaction events</b> — wick or close relative to the outer band.
+              <p class="glossary-how"><b>Direction:</b> <b>Touch</b> at upper (wick out, close in) → mean-rev <span class="dir-short">SHORT</span> candidate. Touch at lower → <span class="dir-long">LONG</span> candidate. <b>Break</b> (close outside) → trend continuation on that side; do NOT fade — the band is failing as resistance/support.</p>
+            </div>
+            <div class="lang-zh">
+              <b>布林通道觸碰 / 突破</b> — 影線或收盤相對外軌的位置。
+              <p class="glossary-how"><b>方向解讀：</b><b>觸碰</b>（影線出但收盤內）：上軌 → 均值回歸<span class="dir-short">做空</span>；下軌 → <span class="dir-long">做多</span>。<b>突破</b>（收盤在外） → 趨勢延續，不可逆勢，因外軌已失守。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">MACD ×</span></dt>
-          <dd><b>MACD signal-line crossovers (12/26/9)</b> — <span class="glossary-arrow up">▲</span> teal = bullish cross (MACD line crossed above signal, momentum turning up). <span class="glossary-arrow down">▼</span> orange = bearish cross. Zero-line crosses are omitted (they lag). Best used as confluence with structure — a cross alone is not a signal in a range.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>MACD signal-line crossovers (12/26/9)</b>.
+              <p class="glossary-how"><b>Direction:</b> <span class="glossary-arrow up">▲</span> teal = <b>bullish cross</b> (MACD line moves above signal) → <span class="dir-long">LONG</span> bias. <span class="glossary-arrow down">▼</span> orange = <b>bearish cross</b> → <span class="dir-short">SHORT</span> bias. <b>Strong when:</b> cross happens ABOVE zero for bullish (already in uptrend, adding); histogram is expanding (widening gap between lines); confluence with sweep/BOS. <b>Weak when:</b> MACD & signal are very close (whipsaw risk); price in tight range; cross against the higher-TF trend.</p>
+            </div>
+            <div class="lang-zh">
+              <b>MACD 訊號線交叉 (12/26/9)</b>。
+              <p class="glossary-how"><b>方向解讀：</b><span class="glossary-arrow up">▲</span> 青綠 = <b>金叉</b>（MACD 線上穿訊號線）→ <span class="dir-long">做多</span>偏好。<span class="glossary-arrow down">▼</span> 橘 = <b>死叉</b> → <span class="dir-short">做空</span>偏好。<b>強訊號：</b>零軸上方金叉（趨勢已多，順勢加倉）、柱狀圖擴大（兩線差距拉開）、伴隨掃盤或結構破位。<b>弱訊號：</b>MACD 與訊號線過度靠近（易假交叉）、價格在窄幅盤整、與更高週期趨勢相反的交叉。死叉反之亦然。</p>
+            </div>
+          </dd>
 
           <dt><span class="glossary-tag">⚑ flags</span></dt>
-          <dd><b>Long/short flags</b> — anchored to the last bar of a confirmed setup (e.g., completed sweep + reclaim, or double + trigger). Signals the engine's take-a-position moment.</dd>
+          <dd>
+            <div class="lang-en">
+              <b>Engine's take-position moment</b> — anchored to the last bar of a confirmed setup.
+              <p class="glossary-how"><b>Direction:</b> <span class="glossary-arrow up">▲ long flag</span> = engine votes <span class="dir-long">LONG</span>; <span class="glossary-arrow down">▼ short flag</span> = <span class="dir-short">SHORT</span>. Cross-check the header score/verdict — a flag with STRONG verdict is high-conviction; NEUTRAL/AVOID means the engine wants to enter but the surrounding evidence is thin.</p>
+            </div>
+            <div class="lang-zh">
+              <b>引擎進場點</b> — 標記於確認訊號的最後一根 K 棒。
+              <p class="glossary-how"><b>方向解讀：</b><span class="glossary-arrow up">▲ 多單旗</span> = 引擎判定<span class="dir-long">做多</span>；<span class="glossary-arrow down">▼ 空單旗</span> =<span class="dir-short">做空</span>。需結合頂部評分/裁決 — STRONG 為高信心進場；NEUTRAL/AVOID 表示引擎想進場但周邊佐證不足，建議跳過。</p>
+            </div>
+          </dd>
+
         </dl>
-        <p class="glossary-hint">Marker count next to each chip shows how many were detected in the current window. Empty (dim <em>0</em>) just means no matching pattern in the loaded range.</p>
+        <p class="glossary-hint">
+          <span class="lang-en">Marker count next to each chip = detected in current window. Dim <em>0</em> means no matching pattern in the loaded range. Direction hints are guidelines; always confirm with your own structural read.</span>
+          <span class="lang-zh">每個按鈕旁的數字 = 當前視窗中偵測到的數量。淡色 <em>0</em> 代表載入範圍內無該型態。方向提示僅為指引，仍需自行結合結構判斷。</span>
+        </p>
       </div>
     </div>
   </div>
@@ -488,6 +598,27 @@
     var glossaryBackdrop = document.getElementById('glossary-backdrop');
     var glossaryCloseBtn = document.getElementById('glossary-close');
     var infoBtn          = document.getElementById('layers-info');
+    var glossaryModal    = glossaryBackdrop ? glossaryBackdrop.querySelector('.glossary-modal') : null;
+    // Language: share the same localStorage key ai-render.js uses so
+    // switching lang in one modal follows through to AI analysis text
+    // and vice versa.
+    var GLOSS_LANG_KEY = 'ai-lang';
+    function currentGlossLang() {
+        try { var v = localStorage.getItem(GLOSS_LANG_KEY); if (v === 'en' || v === 'zh') return v; } catch (e) {}
+        return 'en';
+    }
+    function setGlossLang(lang) {
+        if (lang !== 'en' && lang !== 'zh') lang = 'en';
+        try { localStorage.setItem(GLOSS_LANG_KEY, lang); } catch (e) {}
+        if (glossaryModal) glossaryModal.setAttribute('data-lang', lang);
+        document.querySelectorAll('#glossary-backdrop .lang-btn').forEach(function (b) {
+            b.classList.toggle('is-active', b.dataset.lang === lang);
+        });
+    }
+    setGlossLang(currentGlossLang());
+    document.querySelectorAll('#glossary-backdrop .lang-btn').forEach(function (b) {
+        b.addEventListener('click', function () { setGlossLang(b.dataset.lang); });
+    });
     if (infoBtn && glossaryBackdrop) {
         infoBtn.addEventListener('click', function () {
             glossaryBackdrop.classList.remove('hidden');
