@@ -118,9 +118,27 @@
          the bottom of the same group so all drawing actions stay
          together. -->
     <div class="chart-draw-sidebar" id="draw-sidebar" role="toolbar" aria-label="drawing tools">
-      <button type="button" class="draw-btn" data-tool="hline" title="Horizontal line (1 click)">─</button>
-      <button type="button" class="draw-btn" data-tool="tline" title="Trend line (2 clicks)">╱</button>
-      <button type="button" class="draw-btn" data-tool="rect"  title="Rectangle (2 clicks)">▭</button>
+      <!-- Aggregate "marker" toggle. Clicking it opens the flyout
+           (draw-tools-menu) that reveals the three drawing tools;
+           picking one arms the tool and closes the flyout. Keeps
+           the sidebar visually compact — TradingView-style. -->
+      <button type="button" class="draw-btn draw-tools-toggle" id="draw-tools-toggle" title="Drawing tools" aria-haspopup="menu" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+      </button>
+      <div class="draw-tools-menu hidden" id="draw-tools-menu" role="menu">
+        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="hline" title="Horizontal line (1 click)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" x2="21" y1="12" y2="12"/></svg>
+          <span class="draw-menuitem-label">Horizontal line</span>
+        </button>
+        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="tline" title="Trend line (2 clicks)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" x2="20" y1="20" y2="4"/></svg>
+          <span class="draw-menuitem-label">Trend line</span>
+        </button>
+        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="rect"  title="Rectangle (2 clicks)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>
+          <span class="draw-menuitem-label">Rectangle</span>
+        </button>
+      </div>
       <div class="draw-sep"></div>
       <button type="button" class="draw-btn draw-btn-hide"  id="draw-hide"  title="Hide / show drawings" aria-label="Toggle drawings visibility">
         <svg class="icon-eye-open"  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1439,6 +1457,8 @@
         var clearBtn = document.getElementById('draw-clear');
         var hideBtn  = document.getElementById('draw-hide');
         var toolBtns = document.querySelectorAll('.draw-btn[data-tool]');
+        var toolsToggle = document.getElementById('draw-tools-toggle');
+        var toolsMenu   = document.getElementById('draw-tools-menu');
         if (!overlay || !wrap || !canvas) return;
 
         var activeTool = null;   // null | 'hline' | 'tline' | 'rect'
@@ -1583,6 +1603,17 @@
             }
         }
 
+        function closeToolsMenu() {
+            if (toolsMenu) toolsMenu.classList.add('hidden');
+            if (toolsToggle) toolsToggle.setAttribute('aria-expanded', 'false');
+        }
+        function toggleToolsMenu() {
+            if (!toolsMenu) return;
+            var willOpen = toolsMenu.classList.contains('hidden');
+            toolsMenu.classList.toggle('hidden', !willOpen);
+            if (toolsToggle) toolsToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        }
+
         function setActiveTool(name) {
             if (activeTool === name) name = null; // toggle off
             activeTool = name;
@@ -1591,6 +1622,8 @@
             toolBtns.forEach(function (b) {
                 b.classList.toggle('is-active', b.dataset.tool === activeTool);
             });
+            // Aggregate marker button reflects "any tool armed".
+            if (toolsToggle) toolsToggle.classList.toggle('is-active', !!activeTool);
             // Overlay pointer-events strategy:
             //   Tool armed → auto (capture clicks anywhere on plot)
             //   No tool     → none (LWC pan/zoom works). Individual
@@ -1599,6 +1632,8 @@
             //                 clickable for selection/drag.
             overlay.style.pointerEvents = activeTool ? 'auto' : 'none';
             plot.classList.toggle('is-drawing', !!activeTool);
+            // Close the flyout after a pick.
+            closeToolsMenu();
             renderAll();
         }
 
@@ -1616,6 +1651,18 @@
                 ev.stopPropagation();
                 setActiveTool(b.dataset.tool);
             });
+        });
+        if (toolsToggle) toolsToggle.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            toggleToolsMenu();
+        });
+        // Any click outside the sidebar closes the flyout — keeps
+        // toolbar visually compact when the user moves on.
+        document.addEventListener('click', function (ev) {
+            if (!toolsMenu || toolsMenu.classList.contains('hidden')) return;
+            var sidebar = document.getElementById('draw-sidebar');
+            if (sidebar && sidebar.contains(ev.target)) return;
+            closeToolsMenu();
         });
         if (clearBtn) clearBtn.addEventListener('click', function () {
             if (!drawings.length) return;
@@ -1647,6 +1694,9 @@
             var tag = (document.activeElement && document.activeElement.tagName) || '';
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
             if (ev.key === 'Escape') {
+                if (toolsMenu && !toolsMenu.classList.contains('hidden')) {
+                    closeToolsMenu(); ev.preventDefault(); return;
+                }
                 if (activeTool) { setActiveTool(null); ev.preventDefault(); return; }
                 if (selectedId) { selectedId = null; renderAll(); ev.preventDefault(); return; }
             }
