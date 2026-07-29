@@ -1392,15 +1392,29 @@
             ohlcChgEl.textContent = (delta >= 0 ? '+' : '') + fmtOHLC(delta)
                                   + ' (' + (delta >= 0 ? '+' : '') + pct.toFixed(2) + '%)';
         }
-        // Default the readout to the LAST bar so it's populated
-        // immediately after load, before the user hovers anything.
+        // Track which bar the crosshair is currently over so poll
+        // updates can refresh the readout in-place while the user is
+        // hovering the still-forming last bar (LWC's crosshair
+        // callback only fires on mouse-move, not on data update, so
+        // without this the C value would freeze at whatever price
+        // was live when the hover started).
+        var hoveredBarTime = null;
         function refreshOHLCFallback() {
             if (!allCandles || allCandles.length === 0) return;
-            var last = allCandles[allCandles.length - 1];
+            var bar = null;
+            // If hovering a specific bar, prefer that bar's LIVE data
+            // from allCandles (which the poll merges into on each
+            // tick). Otherwise show the last bar.
+            if (hoveredBarTime != null) {
+                for (var i = allCandles.length - 1; i >= 0; i--) {
+                    if (allCandles[i].time === hoveredBarTime) { bar = allCandles[i]; break; }
+                }
+            }
+            if (!bar) bar = allCandles[allCandles.length - 1];
             updateOHLCReadout({
-                time: last.time,
-                open: last.open, high: last.high,
-                low:  last.low,  close: last.close,
+                time: bar.time,
+                open: bar.open, high: bar.high,
+                low:  bar.low,  close: bar.close,
             });
         }
         // Prime the readout as soon as the first payload lands so
@@ -1414,9 +1428,14 @@
         // Also keep it fresh on every 5s poll — the forming bar's
         // close/high/low tick during a bar so the tile lags without
         // this. Piggyback on the poll by observing the header price
-        // element (updated by applyHeader on every poll).
+        // element (updated by applyHeader on every poll). Always
+        // refresh: if the user is hovering the forming last bar,
+        // refreshOHLCFallback re-reads allCandles for the SAME time
+        // so the C value matches the live mark, and if they're
+        // hovering an old (closed) bar, allCandles[thatTime] is
+        // unchanged so the readout stays put.
         var priceObserver = new MutationObserver(function () {
-            if (!mouseInsideWrap) refreshOHLCFallback();
+            refreshOHLCFallback();
         });
         var priceElForObs = document.getElementById('chart-header-price');
         if (priceElForObs) priceObserver.observe(priceElForObs, {characterData: true, childList: true, subtree: true});
@@ -1448,11 +1467,24 @@
             refreshOHLCFallback();
         });
         chart.subscribeCrosshairMove(function (param) {
-            // OHLC readout: whenever we have a bar under the crosshair,
-            // update the top-left tile with that bar's values.
+            // OHLC readout: whenever a bar is under the crosshair,
+            // update the tile AND remember which bar so the 5s poll
+            // can keep the C value fresh on the forming last bar.
             if (param && param.seriesData) {
                 var bar = param.seriesData.get(candleSeries);
-                if (bar) updateOHLCReadout(bar);
+                if (bar) {
+                    hoveredBarTime = bar.time;
+                    // Read the fresh values from allCandles rather
+                    // than the crosshair snapshot — for the forming
+                    // last bar those diverge as trades happen.
+                    var live = null;
+                    for (var i = allCandles.length - 1; i >= 0; i--) {
+                        if (allCandles[i].time === bar.time) { live = allCandles[i]; break; }
+                    }
+                    updateOHLCReadout(live || bar);
+                } else {
+                    hoveredBarTime = null;
+                }
             }
             if (!param || !param.point) return; // do NOT hide here
             var y = param.point.y;
