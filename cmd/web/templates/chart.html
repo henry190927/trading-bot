@@ -1447,8 +1447,12 @@
     //     drag one of its square handles → move that anchor
     //     Backspace / Delete key → remove selected drawing
     //     Esc → deselect / cancel in-progress drawing
-    // Persisted per (symbol, TF) in localStorage. Re-drawn on any
-    // visible-range change and on canvas resize.
+    // Persisted PER SYMBOL (not per TF) in localStorage — a level or
+    // rectangle you draw on 1h stays visible when you switch to 4h.
+    // Anchors are stored as (time, price); times beyond the last
+    // loaded bar (drawings extending into the right whitespace) are
+    // supported by extrapolating from the last bar's coord + the
+    // time-scale's bar spacing.
     (function initDrawTools() {
         var overlay = document.getElementById('chart-draw-overlay');
         var wrap    = document.querySelector('.chart-wrap');
@@ -1474,7 +1478,10 @@
             try { localStorage.setItem('chart-drawings-hidden', drawingsHidden ? '1' : '0'); } catch (e) {}
         }
 
-        function drawingsKey() { return 'chart-drawings-' + currentSym() + '-' + currentTF(); }
+        // Per-symbol only so drawings persist across TF switches. A
+        // horizontal level or rectangle is meaningful regardless of
+        // the timeframe the user is browsing.
+        function drawingsKey() { return 'chart-drawings-' + currentSym(); }
         function loadDrawings() {
             try {
                 var raw = localStorage.getItem(drawingsKey());
@@ -1486,17 +1493,55 @@
             try { localStorage.setItem(drawingsKey(), JSON.stringify(drawings)); } catch (e) {}
         }
 
-        // Convert chart-container coords → {time, price}. Returns
-        // nulls when outside the plot area.
+        // LWC's timeToCoordinate/coordinateToTime return null for
+        // clicks or times beyond the loaded bars — which meant tline
+        // and rect drawings couldn't extend into the empty
+        // right-side whitespace. We work around this by falling back
+        // to the logical-index API, which LWC extrapolates cleanly
+        // past the last bar. Storage stays (time, price) so drawings
+        // still translate across TFs and don't drift when new bars
+        // arrive; we only convert on the fly.
+        function tfSeconds() {
+            var tf = currentTF();
+            switch (tf) {
+                case '15m': return 15 * 60;
+                case '30m': return 30 * 60;
+                case '1h':  return 60 * 60;
+                case '2h':  return 2 * 60 * 60;
+                case '4h':  return 4 * 60 * 60;
+                case '1d':  return 24 * 60 * 60;
+                default:    return 60 * 60;
+            }
+        }
+        function xForTime(time) {
+            var x = chart.timeScale().timeToCoordinate(time);
+            if (x != null && !isNaN(x)) return x;
+            // Fall back: extrapolate from the last visible bar.
+            if (!allCandles || allCandles.length === 0) return null;
+            var last = allCandles[allCandles.length - 1];
+            var lastX = chart.timeScale().timeToCoordinate(last.time);
+            if (lastX == null) return null;
+            var barSpacing = chart.timeScale().options().barSpacing || 6;
+            var deltaBars = (time - last.time) / tfSeconds();
+            return lastX + deltaBars * barSpacing;
+        }
+        function timeForX(x) {
+            var t = chart.timeScale().coordinateToTime(x);
+            if (t != null) return t;
+            // Fall back: extrapolate from last bar via barSpacing.
+            if (!allCandles || allCandles.length === 0) return null;
+            var last = allCandles[allCandles.length - 1];
+            var lastX = chart.timeScale().timeToCoordinate(last.time);
+            if (lastX == null) return null;
+            var barSpacing = chart.timeScale().options().barSpacing || 6;
+            var deltaBars = (x - lastX) / barSpacing;
+            return last.time + Math.round(deltaBars) * tfSeconds();
+        }
         function coordToTP(x, y) {
-            var time  = chart.timeScale().coordinateToTime(x);
-            var price = candleSeries.coordinateToPrice(y);
-            return { time: time, price: price };
+            return { time: timeForX(x), price: candleSeries.coordinateToPrice(y) };
         }
         function tpToCoord(tp) {
-            var x = chart.timeScale().timeToCoordinate(tp.time);
-            var y = candleSeries.priceToCoordinate(tp.price);
-            return { x: x, y: y };
+            return { x: xForTime(tp.time), y: candleSeries.priceToCoordinate(tp.price) };
         }
 
         function sizeOverlay() {
@@ -1537,6 +1582,18 @@
                 if (d.type === 'hline') {
                     var y = candleSeries.priceToCoordinate(d.points[0].price);
                     if (y == null) return;
+                    // Invisible wide hit-line so the user doesn't need
+                    // pixel-perfect clicks on a 1.4px dashed stroke.
+                    var hit = document.createElementNS(SVG_NS, 'line');
+                    hit.setAttribute('x1', 0);
+                    hit.setAttribute('x2', w);
+                    hit.setAttribute('y1', y);
+                    hit.setAttribute('y2', y);
+                    hit.setAttribute('stroke', 'transparent');
+                    hit.setAttribute('stroke-width', '12');
+                    hit.setAttribute('data-drawing-id', d.id);
+                    hit.style.cursor = 'pointer';
+                    overlay.appendChild(hit);
                     var ln = document.createElementNS(SVG_NS, 'line');
                     ln.setAttribute('x1', 0);
                     ln.setAttribute('x2', w);
@@ -1546,7 +1603,7 @@
                     ln.setAttribute('stroke-width', isSel ? '2.2' : '1.4');
                     ln.setAttribute('stroke-dasharray', '4 3');
                     ln.setAttribute('data-drawing-id', d.id);
-                    ln.style.cursor = 'pointer';
+                    ln.setAttribute('pointer-events', 'none');
                     overlay.appendChild(ln);
                     var lbl = document.createElementNS(SVG_NS, 'text');
                     lbl.setAttribute('x', w - 4);
@@ -1555,6 +1612,7 @@
                     lbl.setAttribute('fill', d.color || '#4dabf7');
                     lbl.setAttribute('font-family', 'ui-monospace, monospace');
                     lbl.setAttribute('font-size', '11');
+                    lbl.setAttribute('pointer-events', 'none');
                     lbl.textContent = d.points[0].price.toFixed(2);
                     overlay.appendChild(lbl);
                     if (isSel) emitHandle(d, 0, w / 2, y);
@@ -1562,13 +1620,23 @@
                     var a = tpToCoord(d.points[0]);
                     var b = tpToCoord(d.points[1]);
                     if (a.x == null || b.x == null || a.y == null || b.y == null) return;
+                    // Wide invisible hit-line so click doesn't need
+                    // pixel-perfect targeting on the 1.6px stroke.
+                    var thit = document.createElementNS(SVG_NS, 'line');
+                    thit.setAttribute('x1', a.x); thit.setAttribute('y1', a.y);
+                    thit.setAttribute('x2', b.x); thit.setAttribute('y2', b.y);
+                    thit.setAttribute('stroke', 'transparent');
+                    thit.setAttribute('stroke-width', '12');
+                    thit.setAttribute('data-drawing-id', d.id);
+                    thit.style.cursor = 'pointer';
+                    overlay.appendChild(thit);
                     var ln2 = document.createElementNS(SVG_NS, 'line');
                     ln2.setAttribute('x1', a.x); ln2.setAttribute('y1', a.y);
                     ln2.setAttribute('x2', b.x); ln2.setAttribute('y2', b.y);
                     ln2.setAttribute('stroke', d.color || '#20c997');
                     ln2.setAttribute('stroke-width', isSel ? '2.4' : '1.6');
                     ln2.setAttribute('data-drawing-id', d.id);
-                    ln2.style.cursor = 'pointer';
+                    ln2.setAttribute('pointer-events', 'none');
                     overlay.appendChild(ln2);
                     if (isSel) { emitHandle(d, 0, a.x, a.y); emitHandle(d, 1, b.x, b.y); }
                 } else if (d.type === 'rect') {
@@ -1817,20 +1885,25 @@
         // applyHeader).
         var lastScope = null;
         function reloadForCurrentScope() {
-            var scope = currentSym() + '/' + currentTF();
-            if (scope === lastScope) return;
+            var scope = currentSym();
+            if (scope === lastScope) {
+                // Same symbol — just repaint (TF may have changed so
+                // coord conversion needs a redraw against the new
+                // time scale). Do NOT reload from storage.
+                renderAll();
+                return;
+            }
             lastScope = scope;
             loadDrawings();
             renderAll();
         }
         // Hook after each poll's applyHeader by observing changes to
-        // the header symbol/TF text.
+        // the header symbol span. TF changes trigger a repaint via
+        // the visible-range subscribers below; we don't need to
+        // observe the TF span for scope reload since drawings are
+        // per-symbol now.
         var headerSym = document.getElementById('chart-header-sym');
-        var headerTfEl = document.getElementById('chart-header-tf');
-        [headerSym, headerTfEl].forEach(function (el) {
-            if (!el) return;
-            new MutationObserver(reloadForCurrentScope).observe(el, {characterData: true, childList: true, subtree: true});
-        });
+        if (headerSym) new MutationObserver(reloadForCurrentScope).observe(headerSym, {characterData: true, childList: true, subtree: true});
 
         // Initial load once the chart has painted at least one bar.
         setTimeout(function () { reloadForCurrentScope(); renderAll(); }, 500);
