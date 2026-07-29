@@ -1225,25 +1225,44 @@
 
     // AI Analyze — reuses shared aiRender helper (bilingual output).
     aiBtn.addEventListener('click', function () {
+        console.log('[chart] AI analyze clicked', {sym: aiBtn.dataset.symbol, tf: aiBtn.dataset.tf});
         if (!aiPane.classList.contains('hidden')) { aiPane.classList.add('hidden'); return; }
         aiPane.classList.remove('hidden');
         if (aiPane.dataset.loaded === '1') return;
         aiPane.innerHTML = '<em class="ai-loading">Querying Quant advisor for ' + aiBtn.dataset.symbol + ' ' + aiBtn.dataset.tf + '…</em>';
         aiBtn.disabled = true;
+        // Guard: if aiRender didn't load (script blocked, cached-out,
+        // etc.) we'd silently fail. Fall back to inline HTML so the
+        // user at least sees the response.
+        function renderFallback(target, payload) {
+            if (window.aiRender && window.aiRender.renderInto) {
+                window.aiRender.renderInto(target, payload);
+                return;
+            }
+            if (payload.error) {
+                target.innerHTML = '<div class="ai-error">' + payload.error + '</div>';
+            } else if (payload.text) {
+                target.innerHTML = '<pre style="white-space:pre-wrap;color:var(--text);">' + payload.text.replace(/</g, '&lt;') + '</pre>';
+            } else {
+                target.innerHTML = '<div class="ai-error">no renderer + no text</div>';
+            }
+        }
         fetch('/ai/analyze/symbol/' + aiBtn.dataset.symbol + '/' + aiBtn.dataset.tf, { method: 'POST' })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
                 aiBtn.disabled = false;
+                console.log('[chart] AI analyze response', res);
                 if (!res.ok) {
-                    window.aiRender.renderInto(aiPane, { error: res.body.error || 'unknown error' });
+                    renderFallback(aiPane, { error: res.body.error || 'unknown error' });
                     return;
                 }
-                window.aiRender.renderInto(aiPane, res.body);
+                renderFallback(aiPane, res.body);
                 aiPane.dataset.loaded = '1';
             })
             .catch(function (err) {
                 aiBtn.disabled = false;
-                window.aiRender.renderInto(aiPane, { error: 'network error: ' + err.message });
+                console.error('[chart] AI analyze fetch failed', err);
+                renderFallback(aiPane, { error: 'network error: ' + (err && err.message ? err.message : String(err)) });
             });
     });
 

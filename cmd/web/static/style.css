@@ -1336,9 +1336,6 @@ footer {
    the chart. */
 .chart-price-marker {
     position: absolute;
-    /* Sit well inside the plot area — the LWC price scale + drag
-       handle live in the last ~60px on the right. Keeping the marker
-       further in avoids capturing scale-drag clicks. */
     right: 120px;
     top: 0;
     transform: translateY(-50%);
@@ -1352,10 +1349,17 @@ footer {
     font-family: ui-monospace, "SF Mono", monospace;
     font-size: 0.75rem;
     color: var(--text);
-    pointer-events: auto;
+    /* Container is see-through to mouse events. Otherwise hovering
+       the marker moves the cursor OUT of LWC's plot area from LWC's
+       perspective → crosshair-leave hides the marker → cursor
+       re-enters plot → marker reappears → infinite flicker.
+       Only the + button re-enables pointer-events so it stays
+       clickable. */
+    pointer-events: none;
     z-index: 5;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
+.chart-price-marker .chart-price-plus { pointer-events: auto; }
 .chart-price-marker[hidden] { display: none; }
 .chart-price-marker-label { min-width: 60px; text-align: right; }
 .chart-price-plus {
