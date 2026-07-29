@@ -98,12 +98,6 @@
       <button type="button" class="layer-chip" data-layer="macd">MACD × <span class="layer-count" data-layer-count="macd">0</span></button>
       <button type="button" class="layer-chip" data-layer="flags">⚑ flags <span class="layer-count" data-layer-count="flags">0</span></button>
     </span>
-    <span class="chart-layers-group chart-tools-group" aria-label="drawing tools">
-      <button type="button" class="tool-chip" data-tool="hline" title="Horizontal line — 1 click">─ hline</button>
-      <button type="button" class="tool-chip" data-tool="tline" title="Trend line — 2 clicks">╱ tline</button>
-      <button type="button" class="tool-chip" data-tool="rect"  title="Rectangle — 2 clicks">▭ rect</button>
-      <button type="button" class="tool-chip tool-clear"  id="draw-clear" title="Remove all drawings for this symbol/TF">🗑 clear</button>
-    </span>
     <span class="chart-layers-group chart-layers-actions">
       <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?">ⓘ</button>
       <button type="button" class="layer-chip layer-reset" id="layers-reset" title="Reset chart zoom to fit all data">⟲ fit</button>
@@ -119,18 +113,26 @@
   <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
 
   <div class="chart-wrap">
-    <div id="chart-container" class="chart-canvas"></div>
-    <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
-    <!-- User-drawings SVG overlay: horizontal lines, trend lines,
-         rectangles. Pointer-events off by default so chart pan/zoom
-         still works; toggled on only while a tool is active. -->
-    <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
-    <!-- Floating "+" marker that tracks the crosshair Y. Click opens
-         the quick-action modal with the price prefilled. Hidden until
-         the user hovers the chart. -->
-    <div class="chart-price-marker" id="chart-price-marker" hidden>
-      <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
-      <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
+    <!-- Left-side TradingView-style vertical drawing toolbar. Tool
+         buttons arm a drawing mode; the trash / hide toggles sit at
+         the bottom of the same group so all drawing actions stay
+         together. -->
+    <div class="chart-draw-sidebar" id="draw-sidebar" role="toolbar" aria-label="drawing tools">
+      <button type="button" class="draw-btn" data-tool="hline" title="Horizontal line (1 click)">─</button>
+      <button type="button" class="draw-btn" data-tool="tline" title="Trend line (2 clicks)">╱</button>
+      <button type="button" class="draw-btn" data-tool="rect"  title="Rectangle (2 clicks)">▭</button>
+      <div class="draw-sep"></div>
+      <button type="button" class="draw-btn draw-btn-hide"  id="draw-hide"  title="Hide / show drawings">👁</button>
+      <button type="button" class="draw-btn draw-btn-clear" id="draw-clear" title="Delete all drawings on this symbol/TF">🗑</button>
+    </div>
+    <div class="chart-plot-wrap">
+      <div id="chart-container" class="chart-canvas"></div>
+      <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
+      <div class="chart-price-marker" id="chart-price-marker" hidden>
+        <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
+        <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
+      </div>
     </div>
   </div>
 
@@ -1238,6 +1240,9 @@
         console.log('[chart] AI analyze clicked', {sym: aiBtn.dataset.symbol, tf: aiBtn.dataset.tf});
         if (!aiPane.classList.contains('hidden')) { aiPane.classList.add('hidden'); return; }
         aiPane.classList.remove('hidden');
+        // Bring the pane into view — otherwise it lives below the
+        // chart and looks like nothing happened.
+        aiPane.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (aiPane.dataset.loaded === '1') return;
         aiPane.innerHTML = '<em class="ai-loading">Querying Quant advisor for ' + aiBtn.dataset.symbol + ' ' + aiBtn.dataset.tf + '…</em>';
         aiBtn.disabled = true;
@@ -1306,18 +1311,31 @@
             return v.toFixed(6);
         }
 
-        // LWC's crosshair callback fires whenever the cursor moves
-        // inside the chart area. param.point is {x, y} relative to the
-        // chart container; when null, the cursor has left.
+        // Marker visibility is driven by mouseenter/mouseleave on the
+        // chart-wrap, NOT by LWC's crosshair-leave. That's because
+        // LWC's crosshair callback fires "left" as soon as the cursor
+        // is over the marker itself (which has pointer-events on the
+        // + button), so we'd end up in an infinite show/hide flicker.
+        // The crosshair callback below only updates the marker's Y
+        // position + label content while it's already visible.
+        var mouseInsideWrap = false;
+        wrap.addEventListener('mouseenter', function () {
+            mouseInsideWrap = true;
+            if (lastPrice != null) marker.hidden = false;
+        });
+        wrap.addEventListener('mouseleave', function () {
+            mouseInsideWrap = false;
+            marker.hidden = true;
+        });
         chart.subscribeCrosshairMove(function (param) {
-            if (!param || !param.point) { marker.hidden = true; return; }
+            if (!param || !param.point) return; // do NOT hide here
             var y = param.point.y;
             var price = candleSeries.coordinateToPrice(y);
-            if (price == null || isNaN(price)) { marker.hidden = true; return; }
+            if (price == null || isNaN(price)) return;
             lastPrice = price;
             marker.style.top = y + 'px';
             markerLabel.textContent = fmtPriceInput(price);
-            marker.hidden = false;
+            if (mouseInsideWrap) marker.hidden = false;
         });
 
         function selectedSide() {
@@ -1395,25 +1413,41 @@
     })();
 
     // ── Drawing tools ──────────────────────────────────────────────
-    // Custom SVG overlay on top of the chart. Three tools:
-    //   - horizontal line: 1 click captures {price}
-    //   - trend line:      2 clicks capture {t1,p1},{t2,p2}
-    //   - rectangle:       2 clicks capture two corners
-    // Drawings are persisted to localStorage per (symbol, TF) key so
-    // they follow the chart across reloads and are separated per
-    // scope. Re-drawn on any visible-range change and on resize.
+    // Custom SVG overlay above the chart. Three drawing tools plus
+    // select/drag/delete for existing drawings.
+    //   Draw tools:
+    //     hline: 1 click captures {price} → horizontal line
+    //     tline: 2 clicks capture two (time,price) anchors → line
+    //     rect:  2 clicks capture two corners → rectangle
+    //   Manipulation:
+    //     click a drawing (no tool armed) → select
+    //     drag one of its square handles → move that anchor
+    //     Backspace / Delete key → remove selected drawing
+    //     Esc → deselect / cancel in-progress drawing
+    // Persisted per (symbol, TF) in localStorage. Re-drawn on any
+    // visible-range change and on canvas resize.
     (function initDrawTools() {
         var overlay = document.getElementById('chart-draw-overlay');
         var wrap    = document.querySelector('.chart-wrap');
+        var plot    = document.querySelector('.chart-plot-wrap');
         var canvas  = document.getElementById('chart-container');
         var clearBtn = document.getElementById('draw-clear');
-        var toolBtns = document.querySelectorAll('.tool-chip[data-tool]');
+        var hideBtn  = document.getElementById('draw-hide');
+        var toolBtns = document.querySelectorAll('.draw-btn[data-tool]');
         if (!overlay || !wrap || !canvas) return;
 
         var activeTool = null;   // null | 'hline' | 'tline' | 'rect'
         var pending    = [];     // in-progress click points for multi-click tools
         var drawings   = [];     // {id, type, points: [{time, price}], color}
+        var selectedId = null;   // id of currently-selected drawing (for delete / drag)
+        var dragging   = null;   // {id, anchorIdx} while a handle is being dragged
+        var drawingsHidden = false; // 👁 button toggle
         var SVG_NS = 'http://www.w3.org/2000/svg';
+        var HANDLE_SIZE = 8;
+        try { drawingsHidden = localStorage.getItem('chart-drawings-hidden') === '1'; } catch (e) {}
+        function saveDrawingsHidden() {
+            try { localStorage.setItem('chart-drawings-hidden', drawingsHidden ? '1' : '0'); } catch (e) {}
+        }
 
         function drawingsKey() { return 'chart-drawings-' + currentSym() + '-' + currentTF(); }
         function loadDrawings() {
@@ -1448,14 +1482,33 @@
             overlay.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
         }
 
+        // Emit a square handle at (x,y) for anchor `idx` of drawing `d`.
+        // Handles carry data-* attrs so mousedown can identify what
+        // to drag without needing outside lookup.
+        function emitHandle(d, idx, x, y) {
+            var r = document.createElementNS(SVG_NS, 'rect');
+            r.setAttribute('x', x - HANDLE_SIZE / 2);
+            r.setAttribute('y', y - HANDLE_SIZE / 2);
+            r.setAttribute('width',  HANDLE_SIZE);
+            r.setAttribute('height', HANDLE_SIZE);
+            r.setAttribute('fill', '#fff');
+            r.setAttribute('stroke', '#4dabf7');
+            r.setAttribute('stroke-width', '1.5');
+            r.setAttribute('class', 'draw-handle');
+            r.setAttribute('data-drawing-id', d.id);
+            r.setAttribute('data-anchor-idx', idx);
+            r.style.cursor = 'move';
+            overlay.appendChild(r);
+        }
+
         function renderAll() {
             sizeOverlay();
-            // Wipe and re-emit every drawing. Cheap for <100 drawings;
-            // if we ever need more we can diff, but not yet.
             while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+            if (drawingsHidden) return; // fully suppressed by 👁
 
             var w = parseFloat(overlay.getAttribute('width'));
             drawings.forEach(function (d) {
+                var isSel = d.id === selectedId;
                 if (d.type === 'hline') {
                     var y = candleSeries.priceToCoordinate(d.points[0].price);
                     if (y == null) return;
@@ -1465,10 +1518,11 @@
                     ln.setAttribute('y1', y);
                     ln.setAttribute('y2', y);
                     ln.setAttribute('stroke', d.color || '#4dabf7');
-                    ln.setAttribute('stroke-width', '1.4');
+                    ln.setAttribute('stroke-width', isSel ? '2.2' : '1.4');
                     ln.setAttribute('stroke-dasharray', '4 3');
+                    ln.setAttribute('data-drawing-id', d.id);
+                    ln.style.cursor = 'pointer';
                     overlay.appendChild(ln);
-                    // Price label at right
                     var lbl = document.createElementNS(SVG_NS, 'text');
                     lbl.setAttribute('x', w - 4);
                     lbl.setAttribute('y', y - 4);
@@ -1478,6 +1532,7 @@
                     lbl.setAttribute('font-size', '11');
                     lbl.textContent = d.points[0].price.toFixed(2);
                     overlay.appendChild(lbl);
+                    if (isSel) emitHandle(d, 0, w / 2, y);
                 } else if (d.type === 'tline') {
                     var a = tpToCoord(d.points[0]);
                     var b = tpToCoord(d.points[1]);
@@ -1486,21 +1541,27 @@
                     ln2.setAttribute('x1', a.x); ln2.setAttribute('y1', a.y);
                     ln2.setAttribute('x2', b.x); ln2.setAttribute('y2', b.y);
                     ln2.setAttribute('stroke', d.color || '#20c997');
-                    ln2.setAttribute('stroke-width', '1.6');
+                    ln2.setAttribute('stroke-width', isSel ? '2.4' : '1.6');
+                    ln2.setAttribute('data-drawing-id', d.id);
+                    ln2.style.cursor = 'pointer';
                     overlay.appendChild(ln2);
+                    if (isSel) { emitHandle(d, 0, a.x, a.y); emitHandle(d, 1, b.x, b.y); }
                 } else if (d.type === 'rect') {
                     var a2 = tpToCoord(d.points[0]);
                     var b2 = tpToCoord(d.points[1]);
                     if (a2.x == null || b2.x == null || a2.y == null || b2.y == null) return;
                     var x1 = Math.min(a2.x, b2.x), y1 = Math.min(a2.y, b2.y);
                     var x2 = Math.max(a2.x, b2.x), y2 = Math.max(a2.y, b2.y);
-                    var r = document.createElementNS(SVG_NS, 'rect');
-                    r.setAttribute('x', x1); r.setAttribute('y', y1);
-                    r.setAttribute('width', x2 - x1); r.setAttribute('height', y2 - y1);
-                    r.setAttribute('fill', 'rgba(76,110,245,0.10)');
-                    r.setAttribute('stroke', d.color || '#4c6ef5');
-                    r.setAttribute('stroke-width', '1.2');
-                    overlay.appendChild(r);
+                    var rc = document.createElementNS(SVG_NS, 'rect');
+                    rc.setAttribute('x', x1); rc.setAttribute('y', y1);
+                    rc.setAttribute('width', x2 - x1); rc.setAttribute('height', y2 - y1);
+                    rc.setAttribute('fill', 'rgba(76,110,245,0.10)');
+                    rc.setAttribute('stroke', d.color || '#4c6ef5');
+                    rc.setAttribute('stroke-width', isSel ? '1.8' : '1.2');
+                    rc.setAttribute('data-drawing-id', d.id);
+                    rc.style.cursor = 'pointer';
+                    overlay.appendChild(rc);
+                    if (isSel) { emitHandle(d, 0, a2.x, a2.y); emitHandle(d, 1, b2.x, b2.y); }
                 }
             });
 
@@ -1521,15 +1582,28 @@
             if (activeTool === name) name = null; // toggle off
             activeTool = name;
             pending = [];
+            selectedId = null; // deselect when arming a new tool
             toolBtns.forEach(function (b) {
                 b.classList.toggle('is-active', b.dataset.tool === activeTool);
             });
-            // Only capture clicks when a tool is armed. Otherwise the
-            // overlay is fully transparent to mouse events so LWC gets
-            // pan/zoom back.
+            // Overlay pointer-events strategy:
+            //   Tool armed → auto (capture clicks anywhere on plot)
+            //   No tool     → none (LWC pan/zoom works). Individual
+            //                 drawing/handle elements re-enable
+            //                 pointer-events via CSS so they remain
+            //                 clickable for selection/drag.
             overlay.style.pointerEvents = activeTool ? 'auto' : 'none';
-            wrap.classList.toggle('is-drawing', !!activeTool);
+            plot.classList.toggle('is-drawing', !!activeTool);
             renderAll();
+        }
+
+        function findDrawing(id) {
+            for (var i = 0; i < drawings.length; i++) if (drawings[i].id === id) return drawings[i];
+            return null;
+        }
+        function findDrawingIdx(id) {
+            for (var i = 0; i < drawings.length; i++) if (drawings[i].id === id) return i;
+            return -1;
         }
 
         toolBtns.forEach(function (b) {
@@ -1540,43 +1614,122 @@
         });
         if (clearBtn) clearBtn.addEventListener('click', function () {
             if (!drawings.length) return;
-            if (!confirm('Remove all drawings on ' + currentSym() + ' ' + currentTF() + '?')) return;
             drawings = [];
+            selectedId = null;
             saveDrawings();
             renderAll();
         });
-        document.addEventListener('keydown', function (ev) {
-            if (ev.key === 'Escape' && activeTool) setActiveTool(null);
+        function syncHideBtn() {
+            if (!hideBtn) return;
+            hideBtn.classList.toggle('is-active', drawingsHidden);
+            hideBtn.textContent = drawingsHidden ? '🚫' : '👁';
+        }
+        syncHideBtn();
+        if (hideBtn) hideBtn.addEventListener('click', function () {
+            drawingsHidden = !drawingsHidden;
+            saveDrawingsHidden();
+            syncHideBtn();
+            renderAll();
         });
 
-        // Chart-space click handler: converts to (time, price) and
-        // either finishes a drawing or records the first anchor.
+        document.addEventListener('keydown', function (ev) {
+            // Only intercept if not typing in an input.
+            var tag = (document.activeElement && document.activeElement.tagName) || '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            if (ev.key === 'Escape') {
+                if (activeTool) { setActiveTool(null); ev.preventDefault(); return; }
+                if (selectedId) { selectedId = null; renderAll(); ev.preventDefault(); return; }
+            }
+            if ((ev.key === 'Backspace' || ev.key === 'Delete') && selectedId) {
+                var idx = findDrawingIdx(selectedId);
+                if (idx >= 0) {
+                    drawings.splice(idx, 1);
+                    selectedId = null;
+                    saveDrawings();
+                    renderAll();
+                    ev.preventDefault();
+                }
+            }
+        });
+
+        // Overlay click:
+        //   - Tool armed: place next drawing point.
+        //   - Otherwise: bubbled from a drawing/handle child selects
+        //     the drawing (via data-drawing-id).
         overlay.addEventListener('click', function (ev) {
-            if (!activeTool) return;
+            if (activeTool) {
+                var rect = canvas.getBoundingClientRect();
+                var x = ev.clientX - rect.left;
+                var y = ev.clientY - rect.top;
+                var tp = coordToTP(x, y);
+                if (tp.time == null || tp.price == null || isNaN(tp.price)) return;
+                if (activeTool === 'hline') {
+                    drawings.push({ id: 'd' + Date.now() + '_' + drawings.length,
+                                    type: 'hline', points: [tp], color: '#4dabf7' });
+                    saveDrawings();
+                    setActiveTool(null);
+                } else if (activeTool === 'tline' || activeTool === 'rect') {
+                    pending.push(tp);
+                    if (pending.length === 2) {
+                        drawings.push({ id: 'd' + Date.now() + '_' + drawings.length,
+                                        type: activeTool, points: pending.slice(),
+                                        color: activeTool === 'tline' ? '#20c997' : '#4c6ef5' });
+                        pending = [];
+                        saveDrawings();
+                        setActiveTool(null);
+                    } else {
+                        renderAll();
+                    }
+                }
+                return;
+            }
+            // No tool armed — treat as select-a-drawing or deselect.
+            var id = ev.target && ev.target.getAttribute
+                ? ev.target.getAttribute('data-drawing-id') : null;
+            if (id) {
+                selectedId = id;
+            } else {
+                selectedId = null;
+            }
+            renderAll();
+        });
+
+        // Handle-drag: mousedown on a handle starts a drag; mousemove
+        // updates the anchor's (time, price); mouseup commits + saves.
+        overlay.addEventListener('mousedown', function (ev) {
+            if (activeTool) return;
+            var t = ev.target;
+            if (!t || !t.classList || !t.classList.contains('draw-handle')) return;
+            var id  = t.getAttribute('data-drawing-id');
+            var idx = parseInt(t.getAttribute('data-anchor-idx'), 10);
+            if (!id || isNaN(idx)) return;
+            dragging = { id: id, anchorIdx: idx };
+            selectedId = id;
+            overlay.style.pointerEvents = 'auto'; // capture until mouseup
+            ev.preventDefault();
+        });
+        window.addEventListener('mousemove', function (ev) {
+            if (!dragging) return;
+            var d = findDrawing(dragging.id);
+            if (!d) { dragging = null; return; }
             var rect = canvas.getBoundingClientRect();
             var x = ev.clientX - rect.left;
             var y = ev.clientY - rect.top;
             var tp = coordToTP(x, y);
-            if (tp.time == null || tp.price == null || isNaN(tp.price)) return;
-
-            if (activeTool === 'hline') {
-                drawings.push({ id: 'd' + drawings.length + '_' + Math.floor(tp.price*100),
-                                type: 'hline', points: [tp], color: '#4dabf7' });
-                saveDrawings();
-                setActiveTool(null);
-            } else if (activeTool === 'tline' || activeTool === 'rect') {
-                pending.push(tp);
-                if (pending.length === 2) {
-                    drawings.push({ id: 'd' + drawings.length + '_' + Math.floor(tp.price*100),
-                                    type: activeTool, points: pending.slice(),
-                                    color: activeTool === 'tline' ? '#20c997' : '#4c6ef5' });
-                    pending = [];
-                    saveDrawings();
-                    setActiveTool(null);
-                } else {
-                    renderAll();
-                }
+            if (tp.price == null || isNaN(tp.price)) return;
+            if (d.type === 'hline') {
+                d.points[0].price = tp.price;
+            } else {
+                if (tp.time == null) return;
+                d.points[dragging.anchorIdx] = tp;
             }
+            renderAll();
+        });
+        window.addEventListener('mouseup', function () {
+            if (!dragging) return;
+            dragging = null;
+            saveDrawings();
+            overlay.style.pointerEvents = activeTool ? 'auto' : 'none';
         });
 
         // Redraw whenever the chart moves. subscribeVisibleTimeRangeChange

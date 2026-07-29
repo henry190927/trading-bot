@@ -1322,6 +1322,74 @@ footer {
 .chart-wrap {
     position: relative;
     width: 100%;
+    display: flex;
+    gap: 0;
+}
+.chart-plot-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0; /* let flex shrink; without this LWC overshoots */
+}
+/* Left-side vertical drawing toolbar. Buttons are compact icon-only
+   like TradingView. Sits INSIDE .chart-wrap flex so the plot area
+   auto-adjusts its width; LWC's ResizeObserver picks up the new
+   width immediately. */
+.chart-draw-sidebar {
+    flex: 0 0 42px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-right: 0;
+    border-radius: 6px 0 0 6px;
+    align-items: center;
+}
+.draw-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+.draw-btn:hover {
+    color: var(--text);
+    background: var(--surface);
+    border-color: var(--border);
+}
+.draw-btn.is-active {
+    background: var(--yellow);
+    color: #0d1117;
+    border-color: var(--yellow);
+}
+.draw-btn-hide.is-active {
+    background: rgba(251,191,36,0.15);
+    color: var(--yellow);
+    border-color: var(--yellow);
+}
+.draw-btn-clear {
+    color: var(--red);
+}
+.draw-btn-clear:hover {
+    background: rgba(224,49,49,0.10);
+    color: var(--red);
+    border-color: rgba(224,49,49,0.45);
+}
+.draw-sep {
+    width: 26px;
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
 }
 .chart-canvas {
     width: 100%;
@@ -1373,8 +1441,13 @@ footer {
     z-index: 4;
     overflow: hidden;
 }
-.chart-wrap.is-drawing .chart-canvas { cursor: crosshair; }
-.chart-wrap.is-drawing .chart-draw-overlay { cursor: crosshair; }
+/* Individual drawing elements re-enable pointer-events so they can
+   be clicked to select even when no tool is armed. Handles get a
+   generous hit area via CSS cursor + explicit pointer-events. */
+.chart-draw-overlay > * { pointer-events: auto; }
+.chart-draw-overlay .draw-handle { cursor: move; }
+.chart-plot-wrap.is-drawing .chart-canvas,
+.chart-plot-wrap.is-drawing .chart-draw-overlay { cursor: crosshair; }
 
 /* Drawing tool buttons — visually distinct from layer chips so users
    don't confuse toggle vs. one-shot action. */
