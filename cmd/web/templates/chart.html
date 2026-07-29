@@ -150,6 +150,20 @@
     </div>
     <div class="chart-plot-wrap">
       <div id="chart-container" class="chart-canvas"></div>
+      <!-- OHLC readout — top-left overlay showing the values of the
+           bar currently under the crosshair. Follows the bar as the
+           cursor moves; falls back to the last bar when the cursor
+           leaves the plot. -->
+      <div class="chart-ohlc" id="chart-ohlc">
+        <span class="ohlc-sym" id="ohlc-sym">—</span>
+        <span class="ohlc-tf" id="ohlc-tf">—</span>
+        <span class="ohlc-kv"><em>O</em> <span id="ohlc-o">—</span></span>
+        <span class="ohlc-kv"><em>H</em> <span id="ohlc-h">—</span></span>
+        <span class="ohlc-kv"><em>L</em> <span id="ohlc-l">—</span></span>
+        <span class="ohlc-kv"><em>C</em> <span id="ohlc-c">—</span></span>
+        <span class="ohlc-kv"><em>Vol</em> <span id="ohlc-v">—</span></span>
+        <span class="ohlc-chg" id="ohlc-chg">—</span>
+      </div>
       <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
       <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
       <div class="chart-price-marker" id="chart-price-marker" hidden>
@@ -1325,6 +1339,88 @@
         if (!wrap || !marker || !plusBtn || !backdrop) return;
 
         var lastPrice = null;
+
+        // ── OHLC readout ─────────────────────────────────────────
+        // TradingView-style top-left overlay: O H L C Vol Δ for the
+        // bar under the crosshair. Falls back to the LAST bar when
+        // the cursor isn't over one.
+        var ohlcSymEl = document.getElementById('ohlc-sym');
+        var ohlcTfEl  = document.getElementById('ohlc-tf');
+        var ohlcOEl   = document.getElementById('ohlc-o');
+        var ohlcHEl   = document.getElementById('ohlc-h');
+        var ohlcLEl   = document.getElementById('ohlc-l');
+        var ohlcCEl   = document.getElementById('ohlc-c');
+        var ohlcVEl   = document.getElementById('ohlc-v');
+        var ohlcChgEl = document.getElementById('ohlc-chg');
+        var ohlcRoot  = document.getElementById('chart-ohlc');
+        function fmtOHLC(v) {
+            if (v == null || isNaN(v)) return '—';
+            if (v >= 1000) return v.toFixed(2);
+            if (v >= 10)   return v.toFixed(3);
+            if (v >= 1)    return v.toFixed(4);
+            return v.toFixed(6);
+        }
+        function fmtOHLCVol(v) {
+            if (!v || isNaN(v)) return '—';
+            if (v >= 1e9) return (v/1e9).toFixed(2) + 'B';
+            if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
+            if (v >= 1e3) return (v/1e3).toFixed(1) + 'K';
+            return v.toFixed(0);
+        }
+        function updateOHLCReadout(bar) {
+            if (!ohlcRoot || !bar) return;
+            var isUp = bar.close >= bar.open;
+            ohlcRoot.className = 'chart-ohlc ' + (isUp ? 'is-up' : 'is-down');
+            ohlcSymEl.textContent = currentSym();
+            ohlcTfEl.textContent = currentTF();
+            ohlcOEl.textContent = fmtOHLC(bar.open);
+            ohlcHEl.textContent = fmtOHLC(bar.high);
+            ohlcLEl.textContent = fmtOHLC(bar.low);
+            ohlcCEl.textContent = fmtOHLC(bar.close);
+            // Volume isn't on the crosshair-provided candle bar (LWC
+            // candlestick series only carries OHLC), so look it up
+            // from allCandles by matching time.
+            var vol = null;
+            if (bar.time != null && allCandles && allCandles.length) {
+                for (var i = allCandles.length - 1; i >= 0; i--) {
+                    if (allCandles[i].time === bar.time) { vol = allCandles[i].volume; break; }
+                }
+            }
+            ohlcVEl.textContent = fmtOHLCVol(vol);
+            var delta = bar.close - bar.open;
+            var pct = bar.open > 0 ? (delta / bar.open) * 100 : 0;
+            ohlcChgEl.textContent = (delta >= 0 ? '+' : '') + fmtOHLC(delta)
+                                  + ' (' + (delta >= 0 ? '+' : '') + pct.toFixed(2) + '%)';
+        }
+        // Default the readout to the LAST bar so it's populated
+        // immediately after load, before the user hovers anything.
+        function refreshOHLCFallback() {
+            if (!allCandles || allCandles.length === 0) return;
+            var last = allCandles[allCandles.length - 1];
+            updateOHLCReadout({
+                time: last.time,
+                open: last.open, high: last.high,
+                low:  last.low,  close: last.close,
+            });
+        }
+        // Prime the readout as soon as the first payload lands so
+        // the tile isn't blank on initial page load.
+        var ohlcPrime = setInterval(function () {
+            if (allCandles && allCandles.length > 0) {
+                refreshOHLCFallback();
+                clearInterval(ohlcPrime);
+            }
+        }, 100);
+        // Also keep it fresh on every 5s poll — the forming bar's
+        // close/high/low tick during a bar so the tile lags without
+        // this. Piggyback on the poll by observing the header price
+        // element (updated by applyHeader on every poll).
+        var priceObserver = new MutationObserver(function () {
+            if (!mouseInsideWrap) refreshOHLCFallback();
+        });
+        var priceElForObs = document.getElementById('chart-header-price');
+        if (priceElForObs) priceObserver.observe(priceElForObs, {characterData: true, childList: true, subtree: true});
+
         function fmtPriceInput(v) {
             if (v == null || isNaN(v)) return '';
             // More precision than the header — user can trim manually.
@@ -1349,8 +1445,15 @@
         wrap.addEventListener('mouseleave', function () {
             mouseInsideWrap = false;
             marker.hidden = true;
+            refreshOHLCFallback();
         });
         chart.subscribeCrosshairMove(function (param) {
+            // OHLC readout: whenever we have a bar under the crosshair,
+            // update the top-left tile with that bar's values.
+            if (param && param.seriesData) {
+                var bar = param.seriesData.get(candleSeries);
+                if (bar) updateOHLCReadout(bar);
+            }
             if (!param || !param.point) return; // do NOT hide here
             var y = param.point.y;
             var price = candleSeries.coordinateToPrice(y);

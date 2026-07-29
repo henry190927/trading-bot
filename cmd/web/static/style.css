@@ -1330,6 +1330,51 @@ footer {
     flex: 1 1 auto;
     min-width: 0; /* let flex shrink; without this LWC overshoots */
 }
+/* TradingView-style OHLC readout overlay pinned to top-left of the
+   plot area. Updates on crosshair move; falls back to last bar
+   when the cursor isn't over one. */
+.chart-ohlc {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    padding: 4px 10px;
+    background: rgba(13,17,23,0.72);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+}
+.chart-ohlc .ohlc-sym {
+    color: var(--text);
+    font-weight: 700;
+}
+.chart-ohlc .ohlc-tf {
+    padding: 0 5px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-dim);
+    font-size: 0.68rem;
+}
+.chart-ohlc .ohlc-kv em {
+    font-style: normal;
+    color: var(--text-dim);
+    margin-right: 2px;
+    letter-spacing: 0.02em;
+}
+.chart-ohlc .ohlc-kv span { color: var(--text); }
+.chart-ohlc.is-up   .ohlc-kv span { color: var(--green); }
+.chart-ohlc.is-down .ohlc-kv span { color: var(--red); }
+.chart-ohlc .ohlc-chg { font-weight: 600; }
+.chart-ohlc.is-up   .ohlc-chg { color: var(--green); }
+.chart-ohlc.is-down .ohlc-chg { color: var(--red); }
 /* Left-side vertical drawing toolbar. Buttons are compact icon-only
    like TradingView. Sits INSIDE .chart-wrap flex so the plot area
    auto-adjusts its width; LWC's ResizeObserver picks up the new
