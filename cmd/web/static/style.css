@@ -1377,6 +1377,14 @@ footer {
     color: var(--yellow);
     border-color: var(--yellow);
 }
+/* Same eye / eye-off SVG swap pattern as the layer-eye button in
+   the horizontal action bar: show the open eye by default, swap to
+   the crossed-out eye once .is-hidden is set. */
+.draw-btn-hide svg { display: block; }
+.draw-btn-hide .icon-eye-off  { display: none; }
+.draw-btn-hide.is-hidden .icon-eye-open { display: none; }
+.draw-btn-hide.is-hidden .icon-eye-off  { display: block; }
+.draw-btn svg { stroke: currentColor; }
 .draw-btn-clear {
     color: var(--red);
 }
