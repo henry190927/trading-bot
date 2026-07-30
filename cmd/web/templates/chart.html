@@ -501,8 +501,14 @@
         priceLineVisible: false,
         lastValueVisible: true,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+        // Force the panel's y-axis to the 0-100 RSI range regardless
+        // of the data's min/max. Without this the auto-fit tries to
+        // hug the values (e.g. 40-70) and the 30/70 reference bands
+        // fall outside the visible area.
+        autoscaleInfoProvider: function () {
+            return { priceRange: { minValue: 0, maxValue: 100 } };
+        },
     });
-    rsiChart.priceScale('right').applyOptions({ autoScale: false });
     // Reference bands via createPriceLine so they render inside the
     // panel's price scale — 70 (overbought), 50 (midline), 30
     // (oversold).
