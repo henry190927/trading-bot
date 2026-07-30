@@ -509,20 +509,15 @@
     rsiSeries.createPriceLine({ price: 70, color: '#e03131', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '70' });
     rsiSeries.createPriceLine({ price: 50, color: '#adb5bd', lineWidth: 1, lineStyle: 3, axisLabelVisible: false });
     rsiSeries.createPriceLine({ price: 30, color: '#2f9e44', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '30' });
-    // Two-way time-axis sync. Guard against re-entrant calls with a
-    // token flag so the two subscribers don't loop-thrash.
-    var syncingRange = false;
+    // ONE-WAY time-axis sync: main → RSI only. RSI is non-interactive
+    // (handleScroll/Scale disabled), so it can only receive. Two-way
+    // sync caused a feedback loop because LWC fires
+    // subscribeVisibleLogicalRangeChange on setData too (not just user
+    // scrolls) — so the RSI's initial data load would push its
+    // auto-fitted range back to the main chart, jumping the view.
     chart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
-        if (syncingRange || !range) return;
-        syncingRange = true;
+        if (!range) return;
         try { rsiChart.timeScale().setVisibleLogicalRange(range); } catch (e) {}
-        syncingRange = false;
-    });
-    rsiChart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
-        if (syncingRange || !range) return;
-        syncingRange = true;
-        try { chart.timeScale().setVisibleLogicalRange(range); } catch (e) {}
-        syncingRange = false;
     });
 
     // ── Lazy history load ──────────────────────────────────────────
@@ -1209,6 +1204,14 @@
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
         rsiSeries.setData(data.rsi || []);
+        // Snap RSI's time scale to the main chart's current range so
+        // it doesn't auto-fit to its own bounds and momentarily
+        // misalign under the plot. Wrapped in requestAnimationFrame
+        // so LWC has finished the setData layout pass first.
+        requestAnimationFrame(function () {
+            var r = chart.timeScale().getVisibleLogicalRange();
+            if (r) { try { rsiChart.timeScale().setVisibleLogicalRange(r); } catch (e) {} }
+        });
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
         // toggled off, LWC would still draw them.
