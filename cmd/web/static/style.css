@@ -1488,6 +1488,36 @@ footer {
     border: 1px solid var(--border);
     border-radius: 6px;
 }
+/* RSI oscillator pane below the main chart. Height stays fixed so
+   the main chart above doesn't jump. Time-axis is hidden on the
+   RSI chart itself — the main chart's axis at the top of the pane
+   already labels the same times. */
+.chart-rsi-pane {
+    position: relative;
+    margin-top: 6px;
+    padding-left: 42px; /* align with plot area past the draw sidebar */
+}
+.chart-rsi-pane.hidden { display: none; }
+.chart-rsi-label {
+    position: absolute;
+    top: 4px;
+    left: 50px;
+    z-index: 2;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    background: rgba(13,17,23,0.72);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+.chart-rsi-canvas {
+    width: 100%;
+    height: 140px;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
 /* Floating price marker on the chart right edge — tracks the cursor
    crosshair. The + button opens the quick-action modal so the user
    can record a trade / validate at the hovered price without leaving

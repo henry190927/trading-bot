@@ -3594,6 +3594,17 @@ func (s *server) handleChartData(c *gin.Context) {
 		lower = append(lower, band{Time: t, Value: b.Lower})
 	}
 
+	// RSI(14) — line series feeding the /chart bottom oscillator
+	// panel. Skip warm-up rows (value 0 = not yet computable).
+	rsiArr := indicator.RSI(closes, 14)
+	rsiOut := make([]band, 0, len(rsiArr))
+	for i, v := range rsiArr {
+		if v == 0 {
+			continue
+		}
+		rsiOut = append(rsiOut, band{Time: candles[i].OpenTime.Unix(), Value: v})
+	}
+
 	// Historical-only paginated requests: skip signal/diagnose/plan
 	// derivation — the caller only wants OHLCV + Bollinger for the older
 	// window to render on the left side of the chart.
@@ -3671,12 +3682,30 @@ func (s *server) handleChartData(c *gin.Context) {
 	// requests cheap.
 	openPositions := collectOpenPositionsForChart(short, view.MarkPrice)
 
+	// Top volume-profile levels for the HVN layer. Signal.VP.HVN is
+	// already sorted by volume desc by the profile builder — take
+	// the first few + POC so the frontend can draw them as thin
+	// horizontal reference lines. Capped to keep the chart readable.
+	topHVN := make([]float64, 0, 6)
+	if view.Signal.VP.POC > 0 {
+		topHVN = append(topHVN, view.Signal.VP.POC)
+	}
+	for _, h := range view.Signal.VP.HVN {
+		if len(topHVN) >= 6 {
+			break
+		}
+		topHVN = append(topHVN, h)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"symbol":        short,
 		"tf":            tfStr,
 		"contract":      string(sym),
 		"candles":       ohlcArr,
 		"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
+		"rsi":           rsiOut,
+		"hvn":           topHVN,
+		"vpPOC":         view.Signal.VP.POC,
 		"volumeProfile": vpBuckets,
 		"markers":       chartMarkers,
 		"plan":          plan,

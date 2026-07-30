@@ -89,6 +89,8 @@
       <button type="button" class="layer-chip" data-layer="vp">VP</button>
       <button type="button" class="layer-chip" data-layer="plan">plan</button>
       <button type="button" class="layer-chip" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
+      <button type="button" class="layer-chip" data-layer="rsi">RSI pane</button>
+      <button type="button" class="layer-chip" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
     </span>
     <span class="chart-layers-group">
       <button type="button" class="layer-chip" data-layer="sweep">sweep <span class="layer-count" data-layer-count="sweep">0</span></button>
@@ -172,6 +174,14 @@
         <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
       </div>
     </div>
+  </div>
+
+  <!-- RSI oscillator panel — separate LWC chart instance stacked
+       under the main plot, time-scale synchronized. Toggled by the
+       RSI layer chip; hidden by default. -->
+  <div class="chart-rsi-pane hidden" id="chart-rsi-pane">
+    <div class="chart-rsi-label">RSI(14)</div>
+    <div id="chart-rsi-container" class="chart-rsi-canvas"></div>
   </div>
 
   <!-- Quick-action modal — Record Trade / Validate at a chosen price.
@@ -468,6 +478,53 @@
     // Volume sub-pane at bottom 25% of chart area.
     chart.priceScale('').applyOptions({ scaleMargins: { top: 0.80, bottom: 0 } });
 
+    // ── RSI sub-panel ────────────────────────────────────────────
+    // Separate LWC chart instance stacked under the main plot;
+    // shares the time-axis via bidirectional subscribeVisibleLogical
+    // RangeChange callbacks so the two charts pan / zoom together.
+    // Hidden by default (the RSI layer chip toggles the pane).
+    var rsiPane      = document.getElementById('chart-rsi-pane');
+    var rsiContainer = document.getElementById('chart-rsi-container');
+    var rsiChart = LightweightCharts.createChart(rsiContainer, {
+        layout:     { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
+        grid:       { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)' },
+        timeScale:  { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false, visible: false },
+        crosshair:  { mode: 1 },
+        autoSize: true,
+        handleScroll: false, // synced from the main chart's time-scale
+        handleScale:  false,
+    });
+    var rsiSeries = rsiChart.addLineSeries({
+        color: '#e599f7',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+    });
+    rsiChart.priceScale('right').applyOptions({ autoScale: false });
+    // Reference bands via createPriceLine so they render inside the
+    // panel's price scale — 70 (overbought), 50 (midline), 30
+    // (oversold).
+    rsiSeries.createPriceLine({ price: 70, color: '#e03131', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '70' });
+    rsiSeries.createPriceLine({ price: 50, color: '#adb5bd', lineWidth: 1, lineStyle: 3, axisLabelVisible: false });
+    rsiSeries.createPriceLine({ price: 30, color: '#2f9e44', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '30' });
+    // Two-way time-axis sync. Guard against re-entrant calls with a
+    // token flag so the two subscribers don't loop-thrash.
+    var syncingRange = false;
+    chart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
+        if (syncingRange || !range) return;
+        syncingRange = true;
+        try { rsiChart.timeScale().setVisibleLogicalRange(range); } catch (e) {}
+        syncingRange = false;
+    });
+    rsiChart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
+        if (syncingRange || !range) return;
+        syncingRange = true;
+        try { chart.timeScale().setVisibleLogicalRange(range); } catch (e) {}
+        syncingRange = false;
+    });
+
     // ── Lazy history load ──────────────────────────────────────────
     // Track the earliest loaded bar so we can fetch older data when
     // the user pans left. `earliestTime` is unix seconds of the leftmost
@@ -540,6 +597,7 @@
         boll: false, vol: false, vp: false, plan: false, positions: true,
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
+        rsi: false, hvn: false,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     // Master visibility override — when true, all layers render as
@@ -600,6 +658,7 @@
             if (k) counts[k] = (counts[k] || 0) + 1;
         });
         counts['positions'] = (lastPositions || []).length;
+        counts['hvn']       = (lastHVN || []).length;
         document.querySelectorAll('[data-layer-count]').forEach(function (span) {
             var k = span.dataset.layerCount;
             span.textContent = counts[k] || 0;
@@ -618,6 +677,8 @@
         // apply on toggle.
         applyPlanLinesVisibility();
         applyPositionLinesVisibility();
+        applyHVNLinesVisibility();
+        if (rsiPane) rsiPane.classList.toggle('hidden', !layerOn('rsi'));
     }
     // Track plan visibility separately since planLines are recreated
     // on each data load.
@@ -641,6 +702,27 @@
     // regardless of side).
     var positionLines = [];
     var lastPositions = [];
+    var hvnLines = [];
+    var lastHVN = [];
+    function clearHVNLines() {
+        hvnLines.forEach(function (l) { candleSeries.removePriceLine(l); });
+        hvnLines = [];
+    }
+    function applyHVNLinesVisibility() {
+        clearHVNLines();
+        if (!layerOn('hvn') || !lastHVN.length) return;
+        lastHVN.forEach(function (price, i) {
+            if (!price) return;
+            hvnLines.push(candleSeries.createPriceLine({
+                price: price,
+                color: i === 0 ? '#845ef7' : '#5c7cfa', // POC purple, HVN blue-purple
+                lineWidth: 1,
+                lineStyle: 3,      // sparsely dotted
+                axisLabelVisible: true,
+                title: i === 0 ? 'POC' : 'HVN',
+            }));
+        });
+    }
     function clearPositionLines() {
         positionLines.forEach(function (l) { candleSeries.removePriceLine(l); });
         positionLines = [];
@@ -1124,6 +1206,9 @@
         applyPlanLinesVisibility();
         lastPositions = data.openPositions || [];
         applyPositionLinesVisibility();
+        lastHVN = data.hvn || [];
+        applyHVNLinesVisibility();
+        rsiSeries.setData(data.rsi || []);
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
         // toggled off, LWC would still draw them.
@@ -1306,6 +1391,21 @@
                     lastPositions = data.openPositions;
                     applyPositionLinesVisibility();
                     updateLayerCounts();
+                }
+                if (Array.isArray(data.hvn)) {
+                    lastHVN = data.hvn;
+                    applyHVNLinesVisibility();
+                    updateLayerCounts();
+                }
+                if (Array.isArray(data.rsi) && data.rsi.length > 0) {
+                    // Update tail of RSI series — same time>=last
+                    // rule as the candle series.
+                    var rsiSeriesLastTime = rsiSeries.data && rsiSeries.data().length > 0
+                        ? rsiSeries.data()[rsiSeries.data().length - 1].time
+                        : 0;
+                    data.rsi.forEach(function (pt) {
+                        if (pt.time >= rsiSeriesLastTime) rsiSeries.update(pt);
+                    });
                 }
                 if (window.__chartDebug) {
                     var lc = candles[candles.length - 1];
