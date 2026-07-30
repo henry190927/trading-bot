@@ -2064,8 +2064,14 @@
         });
 
         // Redraw whenever the chart moves. subscribeVisibleTimeRangeChange
-        // fires on pan/zoom; also throttle via rAF so we're not
-        // recomputing during every mousemove-driven range tick.
+        // fires on time-scale pan/zoom, but NOT on price-scale drag
+        // (the right-axis stretch) — LWC has no direct price-scale
+        // subscription. Cover that gap with a native mousemove
+        // listener on the plot wrapper: any interaction that could
+        // change the coord mapping (drag the price axis, drag the
+        // time axis, pan the plot) involves mouse movement over the
+        // plot, and rAF-throttling keeps this to one redraw per
+        // frame regardless of mousemove firing rate.
         var pending_raf = 0;
         function scheduleRedraw() {
             if (pending_raf) return;
@@ -2077,6 +2083,12 @@
         chart.timeScale().subscribeVisibleTimeRangeChange(scheduleRedraw);
         chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleRedraw);
         new ResizeObserver(scheduleRedraw).observe(canvas);
+        plot.addEventListener('mousemove', scheduleRedraw);
+        // Also cover post-drag settle: LWC may finalize the scale a
+        // frame after mouseup, so schedule one more redraw on release.
+        plot.addEventListener('mouseup', function () {
+            requestAnimationFrame(scheduleRedraw);
+        });
 
         // Reload drawings whenever symbol/TF changes so we don't show
         // BTC 1h drawings while looking at ETH 4h. symSel change + tf
