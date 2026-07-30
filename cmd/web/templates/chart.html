@@ -516,14 +516,19 @@
     rsiSeries.createPriceLine({ price: 50, color: '#adb5bd', lineWidth: 1, lineStyle: 3, axisLabelVisible: false });
     rsiSeries.createPriceLine({ price: 30, color: '#2f9e44', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '30' });
     // ONE-WAY time-axis sync: main → RSI only. RSI is non-interactive
-    // (handleScroll/Scale disabled), so it can only receive. Two-way
-    // sync caused a feedback loop because LWC fires
-    // subscribeVisibleLogicalRangeChange on setData too (not just user
-    // scrolls) — so the RSI's initial data load would push its
-    // auto-fitted range back to the main chart, jumping the view.
-    chart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
+    // (handleScroll/Scale disabled), so it can only receive.
+    //
+    // Sync by TIME (not logical index) because the two series have
+    // different data lengths — RSI drops warm-up bars, so logical
+    // index 500 refers to a different actual bar on each chart, and
+    // logical-based sync makes the RSI drift out from under the main
+    // chart during scroll. Time is chart-agnostic and stays aligned.
+    // Zooming the main price scale (vertical) doesn't emit
+    // visibleTimeRangeChange, so the RSI panel correctly stays put
+    // during price-axis stretches — matching what the user wants.
+    chart.timeScale().subscribeVisibleTimeRangeChange(function (range) {
         if (!range) return;
-        try { rsiChart.timeScale().setVisibleLogicalRange(range); } catch (e) {}
+        try { rsiChart.timeScale().setVisibleRange(range); } catch (e) {}
     });
 
     // ── Lazy history load ──────────────────────────────────────────
@@ -1210,13 +1215,14 @@
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
         rsiSeries.setData(data.rsi || []);
-        // Snap RSI's time scale to the main chart's current range so
-        // it doesn't auto-fit to its own bounds and momentarily
-        // misalign under the plot. Wrapped in requestAnimationFrame
-        // so LWC has finished the setData layout pass first.
+        // Snap RSI's time axis to the main chart's current visible
+        // TIME window so it doesn't auto-fit to its own bounds and
+        // misalign under the plot. Time-based (not logical) for the
+        // same reason as the sync subscriber — logical indices
+        // differ across the two series.
         requestAnimationFrame(function () {
-            var r = chart.timeScale().getVisibleLogicalRange();
-            if (r) { try { rsiChart.timeScale().setVisibleLogicalRange(r); } catch (e) {} }
+            var r = chart.timeScale().getVisibleRange();
+            if (r) { try { rsiChart.timeScale().setVisibleRange(r); } catch (e) {} }
         });
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
