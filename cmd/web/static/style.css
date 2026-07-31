@@ -1327,8 +1327,16 @@ footer {
 }
 .chart-plot-wrap {
     position: relative;
+    width: 100%;
+}
+/* Shared column that stacks the main plot + sub-panes (RSI, etc.)
+   so they inherit the exact same width — critical for x-axis
+   alignment with the main chart. */
+.chart-column {
     flex: 1 1 auto;
-    min-width: 0; /* let flex shrink; without this LWC overshoots */
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 /* TradingView-style OHLC readout overlay pinned to top-left of the
    plot area. Updates on crosshair move; falls back to last bar
@@ -1495,13 +1503,15 @@ footer {
 .chart-rsi-pane {
     position: relative;
     margin-top: 6px;
-    padding-left: 42px; /* align with plot area past the draw sidebar */
+    /* No padding — the RSI pane is now nested inside .chart-column
+       alongside .chart-plot-wrap, so their widths already match
+       exactly, keeping the RSI curve aligned with the main bars. */
 }
 .chart-rsi-pane.hidden { display: none; }
 .chart-rsi-label {
     position: absolute;
     top: 4px;
-    left: 50px;
+    left: 8px;
     z-index: 2;
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", monospace;

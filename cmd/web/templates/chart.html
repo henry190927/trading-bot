@@ -151,37 +151,42 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
       </button>
     </div>
-    <div class="chart-plot-wrap">
-      <div id="chart-container" class="chart-canvas"></div>
-      <!-- OHLC readout — top-left overlay showing the values of the
-           bar currently under the crosshair. Follows the bar as the
-           cursor moves; falls back to the last bar when the cursor
-           leaves the plot. -->
-      <div class="chart-ohlc" id="chart-ohlc">
-        <span class="ohlc-sym" id="ohlc-sym">—</span>
-        <span class="ohlc-tf" id="ohlc-tf">—</span>
-        <span class="ohlc-kv"><em>O</em> <span id="ohlc-o">—</span></span>
-        <span class="ohlc-kv"><em>H</em> <span id="ohlc-h">—</span></span>
-        <span class="ohlc-kv"><em>L</em> <span id="ohlc-l">—</span></span>
-        <span class="ohlc-kv"><em>C</em> <span id="ohlc-c">—</span></span>
-        <span class="ohlc-kv"><em>Vol</em> <span id="ohlc-v">—</span></span>
-        <span class="ohlc-chg" id="ohlc-chg">—</span>
+    <!-- Column that stacks the main plot + any sub-panes (RSI etc.)
+         so they share the same width — anything using padding-left
+         to mimic the sidebar width was pixel-off and made the RSI
+         curve appear to extend past the main chart's last bar. -->
+    <div class="chart-column">
+      <div class="chart-plot-wrap">
+        <div id="chart-container" class="chart-canvas"></div>
+        <!-- OHLC readout — top-left overlay showing the values of the
+             bar currently under the crosshair. Follows the bar as the
+             cursor moves; falls back to the last bar when the cursor
+             leaves the plot. -->
+        <div class="chart-ohlc" id="chart-ohlc">
+          <span class="ohlc-sym" id="ohlc-sym">—</span>
+          <span class="ohlc-tf" id="ohlc-tf">—</span>
+          <span class="ohlc-kv"><em>O</em> <span id="ohlc-o">—</span></span>
+          <span class="ohlc-kv"><em>H</em> <span id="ohlc-h">—</span></span>
+          <span class="ohlc-kv"><em>L</em> <span id="ohlc-l">—</span></span>
+          <span class="ohlc-kv"><em>C</em> <span id="ohlc-c">—</span></span>
+          <span class="ohlc-kv"><em>Vol</em> <span id="ohlc-v">—</span></span>
+          <span class="ohlc-chg" id="ohlc-chg">—</span>
+        </div>
+        <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
+        <div class="chart-price-marker" id="chart-price-marker" hidden>
+          <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
+          <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
+        </div>
       </div>
-      <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
-      <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
-      <div class="chart-price-marker" id="chart-price-marker" hidden>
-        <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
-        <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
+      <!-- RSI oscillator panel — nested in the same flex column so
+           it inherits the plot's exact width for perfect x-axis
+           alignment. Time-scale synchronized; y-axis independent. -->
+      <div class="chart-rsi-pane hidden" id="chart-rsi-pane">
+        <div class="chart-rsi-label">RSI(14)</div>
+        <div id="chart-rsi-container" class="chart-rsi-canvas"></div>
       </div>
     </div>
-  </div>
-
-  <!-- RSI oscillator panel — separate LWC chart instance stacked
-       under the main plot, time-scale synchronized. Toggled by the
-       RSI layer chip; hidden by default. -->
-  <div class="chart-rsi-pane hidden" id="chart-rsi-pane">
-    <div class="chart-rsi-label">RSI(14)</div>
-    <div id="chart-rsi-container" class="chart-rsi-canvas"></div>
   </div>
 
   <!-- Quick-action modal — Record Trade / Validate at a chosen price.
@@ -492,8 +497,12 @@
         timeScale:  { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false, visible: false },
         crosshair:  { mode: 1 },
         autoSize: true,
-        handleScroll: false, // synced from the main chart's time-scale
-        handleScale:  false,
+        // Horizontal (time) stays sync-driven — RSI must follow the
+        // main chart when the user drags. Vertical (price) is
+        // interactive so the user can zoom into the 40-60 band
+        // independently without disturbing the main chart.
+        handleScroll: { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: true },
+        handleScale:  { axisPressedMouseMove: { time: false, price: true }, mouseWheel: true, pinch: true },
     });
     var rsiSeries = rsiChart.addLineSeries({
         color: '#e599f7',
@@ -501,13 +510,14 @@
         priceLineVisible: false,
         lastValueVisible: true,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
-        // Force the panel's y-axis to the 0-100 RSI range regardless
-        // of the data's min/max. Without this the auto-fit tries to
-        // hug the values (e.g. 40-70) and the 30/70 reference bands
-        // fall outside the visible area.
-        autoscaleInfoProvider: function () {
-            return { priceRange: { minValue: 0, maxValue: 100 } };
-        },
+    });
+    // Seed the initial y-axis view to 0-100 via scaleMargins on the
+    // price scale — LWC's auto-fit then reveals the reference bands
+    // (30/50/70) on load. Once the user drags the right axis, LWC
+    // switches to manual mode and respects their zoom.
+    rsiChart.priceScale('right').applyOptions({
+        autoScale: true,
+        scaleMargins: { top: 0.05, bottom: 0.05 },
     });
     // Reference bands via createPriceLine so they render inside the
     // panel's price scale — 70 (overbought), 50 (midline), 30
