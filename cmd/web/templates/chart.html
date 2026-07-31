@@ -962,11 +962,25 @@
     var allBtn   = document.getElementById('layers-all');
     var eyeBtn   = document.getElementById('layers-eye');
     var resetBtn = document.getElementById('layers-reset');
-    if (resetBtn) resetBtn.addEventListener('click', function () {
-        // fitContent auto-zooms the time scale to include every loaded
-        // bar; also reset the price scale to auto-fit vertically.
-        chart.timeScale().fitContent();
+    // Number of bars to show when the user hits "fit" or when the
+    // chart auto-fits on symbol/TF switch. Full-fit (all ~1000
+    // loaded bars) squishes candles too thin to read; ~150 is the
+    // sweet spot for confluence reading — enough context to see
+    // structure, wide enough per-bar to see wicks + bodies.
+    var FIT_TAIL_BARS = 150;
+    function fitRecent(n) {
+        var total = candleSeries.data().length;
+        if (total === 0) { chart.timeScale().fitContent(); return; }
+        var from = Math.max(0, total - n);
+        try {
+            chart.timeScale().setVisibleLogicalRange({ from: from, to: total + 4 });
+        } catch (e) {
+            chart.timeScale().fitContent();
+        }
         chart.priceScale('right').applyOptions({ autoScale: true });
+    }
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+        fitRecent(FIT_TAIL_BARS);
     });
     // Glossary modal (ⓘ button).
     var glossaryBackdrop = document.getElementById('glossary-backdrop');
@@ -1410,7 +1424,12 @@
         // toggles too (BOLL/vol/vp) — on initial load if user had
         // toggled off, LWC would still draw them.
         refreshLayerVisibility();
-        chart.timeScale().fitContent();
+        // Auto-fit to the recent tail on every load (initial visit +
+        // symbol / TF switch) so different price ranges don't leave
+        // the viewport parked at a weird zoom from the previous
+        // symbol. Deferred one tick so LWC has finished the setData
+        // layout pass first.
+        setTimeout(function () { fitRecent(FIT_TAIL_BARS); }, 0);
     }
 
     // Fetch and prepend an older batch. Called when user pans near the
