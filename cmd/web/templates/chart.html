@@ -451,6 +451,14 @@
     var refreshBtn = document.getElementById('chart-refresh');
 
     // ── Chart construction ──────────────────────────────────────────
+    // rightPriceScale.minimumWidth pins the price-axis column so
+    // the RSI pane (2-digit values like "70") lines up horizontally
+    // with the main chart (5-digit values like "63000"). Without
+    // this, the two charts' plot areas end at different x
+    // positions and the RSI line appears to extend past the main
+    // chart's last bar.
+    var PRICE_AXIS_WIDTH = 62;
+
     var chart = LightweightCharts.createChart(container, {
         layout: {
             background: { type: 'solid', color: '#0d1117' },
@@ -460,7 +468,7 @@
             vertLines: { color: 'rgba(255,255,255,0.04)' },
             horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)' },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)', minimumWidth: PRICE_AXIS_WIDTH },
         timeScale:       { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false },
         crosshair:       { mode: 1 /* magnet */ },
         autoSize: true,
@@ -493,16 +501,22 @@
     var rsiChart = LightweightCharts.createChart(rsiContainer, {
         layout:     { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
         grid:       { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)' },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)', minimumWidth: PRICE_AXIS_WIDTH },
         timeScale:  { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false, visible: false },
         crosshair:  { mode: 1 },
         autoSize: true,
-        // Horizontal (time) stays sync-driven — RSI must follow the
-        // main chart when the user drags. Vertical (price) is
-        // interactive so the user can zoom into the 40-60 band
-        // independently without disturbing the main chart.
+        // Vertical (price) is fully interactive — mouse wheel over
+        // the pane zooms, and dragging the right price axis shifts
+        // (LWC's axisPressedMouseMove: price). Horizontal (time)
+        // stays sync-driven from the main chart, so we disable all
+        // horizontal input on the RSI.
         handleScroll: { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: true },
-        handleScale:  { axisPressedMouseMove: { time: false, price: true }, mouseWheel: true, pinch: true },
+        handleScale: {
+            axisPressedMouseMove: { time: false, price: true },
+            axisDoubleClickReset: true,
+            mouseWheel: true,
+            pinch: true,
+        },
     });
     var rsiSeries = rsiChart.addLineSeries({
         color: '#e599f7',
