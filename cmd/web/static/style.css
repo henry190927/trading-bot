@@ -1106,6 +1106,79 @@ footer {
     color: white;
     border-color: var(--blue);
 }
+/* Category flyouts — Overlays / Oscillators / Events. Same
+   collapsed-palette pattern as the drawing sidebar's pencil menu.
+   Each toggle button opens a small floating panel with the actual
+   layer chips inside. Keeps the top bar compact. */
+.layer-menu-wrap {
+    position: relative;
+    display: inline-flex;
+}
+.layer-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.layer-menu-toggle.has-active {
+    border-color: var(--blue);
+    color: var(--text);
+}
+.layer-menu-hint {
+    display: inline-block;
+    min-width: 1.5em;
+    text-align: center;
+    padding: 0 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+}
+.layer-menu-toggle.has-active .layer-menu-hint {
+    background: var(--blue);
+    color: #fff;
+}
+.layer-menu-count {
+    display: inline-block;
+    min-width: 1.4em;
+    text-align: center;
+    padding: 0 4px;
+    margin-left: 2px;
+    background: rgba(255,255,255,0.10);
+    border-radius: 8px;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+.layer-menu-count.is-zero { opacity: 0.35; }
+.layer-menu-toggle.has-active .layer-menu-count {
+    background: var(--blue);
+    color: #fff;
+    opacity: 1;
+}
+.layer-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    z-index: 30;
+    min-width: 180px;
+}
+.layer-chip-menuitem {
+    justify-content: flex-start;
+    text-align: left;
+    padding: 4px 10px;
+    width: 100%;
+    font-size: 0.78rem;
+}
+
 .chart-layers-actions { margin-left: auto; }
 .layer-count {
     display: inline-block;

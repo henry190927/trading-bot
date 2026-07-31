@@ -82,26 +82,54 @@
   <span class="hidden" id="chart-banner-score-tf">—</span>
 
   <div class="chart-layers" role="group" aria-label="chart layers">
-    <span class="chart-layers-label">Layers:</span>
-    <span class="chart-layers-group">
-      <button type="button" class="layer-chip" data-layer="boll">BOLL</button>
-      <button type="button" class="layer-chip" data-layer="vol">VOL</button>
-      <button type="button" class="layer-chip" data-layer="vp">VP</button>
-      <button type="button" class="layer-chip" data-layer="plan">plan</button>
-      <button type="button" class="layer-chip" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
-      <button type="button" class="layer-chip" data-layer="rsi">RSI pane</button>
-      <button type="button" class="layer-chip" data-layer="macd-pane">MACD pane</button>
-      <button type="button" class="layer-chip" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
-    </span>
-    <span class="chart-layers-group">
-      <button type="button" class="layer-chip" data-layer="sweep">sweep <span class="layer-count" data-layer-count="sweep">0</span></button>
-      <button type="button" class="layer-chip" data-layer="double">2× top/bot <span class="layer-count" data-layer-count="double">0</span></button>
-      <button type="button" class="layer-chip" data-layer="div">RSI div <span class="layer-count" data-layer-count="div">0</span></button>
-      <button type="button" class="layer-chip" data-layer="volx">vol× <span class="layer-count" data-layer-count="volx">0</span></button>
-      <button type="button" class="layer-chip" data-layer="bb-events">BB touch/break <span class="layer-count" data-layer-count="bb-events">0</span></button>
-      <button type="button" class="layer-chip" data-layer="macd">MACD × <span class="layer-count" data-layer-count="macd">0</span></button>
-      <button type="button" class="layer-chip" data-layer="flags">⚑ flags <span class="layer-count" data-layer-count="flags">0</span></button>
-    </span>
+    <span class="chart-layers-label">Indicators:</span>
+
+    <!-- Three category buttons — each opens a flyout listing the
+         individual chips in that category. Mirrors the drawing
+         sidebar's collapsed-palette pattern so the bar stays quiet
+         until the user opens what they want.
+         Active-count badges tell you how many chips inside are on. -->
+    <div class="layer-menu-wrap">
+      <button type="button" class="layer-chip layer-menu-toggle" data-menu="overlays" aria-haspopup="menu" aria-expanded="false">
+        <span class="layer-menu-hint">OL</span> Overlays
+        <span class="layer-menu-count" data-menu-count="overlays">0</span>
+      </button>
+      <div class="layer-menu hidden" data-menu-panel="overlays" role="menu">
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="boll">BOLL</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="vol">VOL</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="vp">VP</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="plan">plan</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
+      </div>
+    </div>
+
+    <div class="layer-menu-wrap">
+      <button type="button" class="layer-chip layer-menu-toggle" data-menu="osc" aria-haspopup="menu" aria-expanded="false">
+        <span class="layer-menu-hint">∿</span> Oscillators
+        <span class="layer-menu-count" data-menu-count="osc">0</span>
+      </button>
+      <div class="layer-menu hidden" data-menu-panel="osc" role="menu">
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="rsi">RSI pane</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="macd-pane">MACD pane</button>
+      </div>
+    </div>
+
+    <div class="layer-menu-wrap">
+      <button type="button" class="layer-chip layer-menu-toggle" data-menu="events" aria-haspopup="menu" aria-expanded="false">
+        <span class="layer-menu-hint">✦</span> Events
+        <span class="layer-menu-count" data-menu-count="events">0</span>
+      </button>
+      <div class="layer-menu hidden" data-menu-panel="events" role="menu">
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="sweep">sweep <span class="layer-count" data-layer-count="sweep">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="double">2× top/bot <span class="layer-count" data-layer-count="double">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="div">RSI div <span class="layer-count" data-layer-count="div">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="volx">vol× <span class="layer-count" data-layer-count="volx">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="bb-events">BB touch/break <span class="layer-count" data-layer-count="bb-events">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="macd">MACD × <span class="layer-count" data-layer-count="macd">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="flags">⚑ flags <span class="layer-count" data-layer-count="flags">0</span></button>
+      </div>
+    </div>
     <span class="chart-layers-group chart-layers-actions">
       <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?">ⓘ</button>
       <button type="button" class="layer-chip layer-reset" id="layers-reset" title="Reset chart zoom to fit all data">⟲ fit</button>
@@ -706,6 +734,28 @@
             span.textContent = counts[k] || 0;
             span.classList.toggle('is-zero', !counts[k]);
         });
+        updateMenuActiveCounts();
+    }
+    // Each category toggle button shows "how many of my layers are
+    // currently ON". Recomputed on every layers-state change.
+    var MENU_MEMBERS = {
+        overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn'],
+        osc:      ['rsi', 'macd-pane'],
+        events:   ['sweep', 'double', 'div', 'volx', 'bb-events', 'macd', 'flags'],
+    };
+    function updateMenuActiveCounts() {
+        if (!layers) return;
+        Object.keys(MENU_MEMBERS).forEach(function (menu) {
+            var n = 0;
+            MENU_MEMBERS[menu].forEach(function (k) { if (layers[k]) n++; });
+            var badge = document.querySelector('[data-menu-count="' + menu + '"]');
+            if (badge) {
+                badge.textContent = n;
+                badge.classList.toggle('is-zero', n === 0);
+            }
+            var toggle = document.querySelector('.layer-menu-toggle[data-menu="' + menu + '"]');
+            if (toggle) toggle.classList.toggle('has-active', n > 0);
+        });
     }
     // Apply visibility to non-marker layers (series-level).
     function refreshLayerVisibility() {
@@ -721,6 +771,7 @@
         applyPositionLinesVisibility();
         applyHVNLinesVisibility();
         applyPaneLayout();
+        updateMenuActiveCounts();
     }
     // Track plan visibility separately since planLines are recreated
     // on each data load.
@@ -802,13 +853,47 @@
         var name = chip.dataset.layer;
         if (!layers[name]) chip.classList.remove('active');
         else chip.classList.add('active');
-        chip.addEventListener('click', function () {
+        chip.addEventListener('click', function (ev) {
+            ev.stopPropagation();
             layers[name] = !layers[name];
             chip.classList.toggle('active', layers[name]);
+            // If this chip lives inside a category flyout, keep the
+            // menu open so the user can toggle several without
+            // re-opening it each time.
             saveLayers();
             refreshMarkers();
             refreshLayerVisibility();
         });
+    });
+
+    // ── Category flyouts ────────────────────────────────────────
+    function closeAllLayerMenus(exceptMenu) {
+        document.querySelectorAll('[data-menu-panel]').forEach(function (panel) {
+            if (exceptMenu && panel.dataset.menuPanel === exceptMenu) return;
+            panel.classList.add('hidden');
+        });
+        document.querySelectorAll('.layer-menu-toggle').forEach(function (t) {
+            if (exceptMenu && t.dataset.menu === exceptMenu) return;
+            t.setAttribute('aria-expanded', 'false');
+        });
+    }
+    document.querySelectorAll('.layer-menu-toggle').forEach(function (toggle) {
+        toggle.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            var menu = toggle.dataset.menu;
+            var panel = document.querySelector('[data-menu-panel="' + menu + '"]');
+            if (!panel) return;
+            var willOpen = panel.classList.contains('hidden');
+            // Close every other category first so only one is open.
+            closeAllLayerMenus(menu);
+            panel.classList.toggle('hidden', !willOpen);
+            toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+    });
+    // Any click outside a menu closes them all.
+    document.addEventListener('click', function (ev) {
+        var inside = ev.target.closest && ev.target.closest('.layer-menu-wrap');
+        if (!inside) closeAllLayerMenus();
     });
     function syncChipsFromState() {
         document.querySelectorAll('.layer-chip[data-layer]').forEach(function (chip) {
