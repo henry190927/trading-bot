@@ -1761,7 +1761,8 @@ footer {
     letter-spacing: 0.06em;
     font-weight: 600;
 }
-.quick-row input {
+.quick-row input,
+.quick-row textarea {
     flex: 1;
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -1771,10 +1772,21 @@ footer {
     font-family: ui-monospace, "SF Mono", monospace;
     font-size: 0.95rem;
 }
-.quick-row input:focus {
+.quick-row input:focus,
+.quick-row textarea:focus {
     outline: none;
     border-color: var(--blue);
 }
+.quick-row textarea {
+    font-size: 0.85rem;
+    resize: vertical;
+    min-height: 3.6em;
+    line-height: 1.4;
+}
+/* Multi-line row: keep the label at the top rather than centered,
+   which reads better when the input is a tall textarea. */
+.quick-row-notes { align-items: flex-start; }
+.quick-row-notes label { padding-top: 0.4rem; }
 .quick-tf {
     color: var(--text-dim);
     font-family: ui-monospace, monospace;
