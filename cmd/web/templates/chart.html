@@ -973,7 +973,7 @@
     // loaded bars) squishes candles too thin to read; ~150 is the
     // sweet spot for confluence reading — enough context to see
     // structure, wide enough per-bar to see wicks + bodies.
-    var FIT_TAIL_BARS = 50;
+    var FIT_TAIL_BARS = 100;
     function fitRecent(n) {
         var total = candleSeries.data().length;
         if (total === 0) { chart.timeScale().fitContent(); return; }
