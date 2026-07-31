@@ -3605,6 +3605,24 @@ func (s *server) handleChartData(c *gin.Context) {
 		rsiOut = append(rsiOut, band{Time: candles[i].OpenTime.Unix(), Value: v})
 	}
 
+	// MACD 12/26/9 — three arrays feeding the /chart MACD pane:
+	// macdLine (fast-slow EMA diff), macdSignal (EMA of macdLine),
+	// macdHist (macdLine - signal, colored green/red client-side).
+	// Warm-up rows (both 0) skipped.
+	macdArr := indicator.MACD(closes, 12, 26, 9)
+	macdLine := make([]band, 0, len(macdArr))
+	macdSignal := make([]band, 0, len(macdArr))
+	macdHist := make([]band, 0, len(macdArr))
+	for i, m := range macdArr {
+		if m.MACD == 0 && m.Signal == 0 {
+			continue
+		}
+		t := candles[i].OpenTime.Unix()
+		macdLine = append(macdLine, band{Time: t, Value: m.MACD})
+		macdSignal = append(macdSignal, band{Time: t, Value: m.Signal})
+		macdHist = append(macdHist, band{Time: t, Value: m.Histogram})
+	}
+
 	// Historical-only paginated requests: skip signal/diagnose/plan
 	// derivation — the caller only wants OHLCV + Bollinger for the older
 	// window to render on the left side of the chart.
@@ -3704,6 +3722,9 @@ func (s *server) handleChartData(c *gin.Context) {
 		"candles":       ohlcArr,
 		"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
 		"rsi":           rsiOut,
+		"macdLine":      macdLine,
+		"macdSignal":    macdSignal,
+		"macdHist":      macdHist,
 		"hvn":           topHVN,
 		"vpPOC":         view.Signal.VP.POC,
 		"volumeProfile": vpBuckets,

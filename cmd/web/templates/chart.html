@@ -90,6 +90,7 @@
       <button type="button" class="layer-chip" data-layer="plan">plan</button>
       <button type="button" class="layer-chip" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
       <button type="button" class="layer-chip" data-layer="rsi">RSI pane</button>
+      <button type="button" class="layer-chip" data-layer="macd-pane">MACD pane</button>
       <button type="button" class="layer-chip" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
     </span>
     <span class="chart-layers-group">
@@ -357,6 +358,18 @@
             </div>
           </dd>
 
+          <dt><span class="glossary-tag">MACD pane</span></dt>
+          <dd>
+            <div class="lang-en">
+              <b>MACD (12/26/9) sub-pane</b> — histogram (green when momentum is positive, red when negative), MACD line (blue), signal line (orange). Reserved band at the bottom of the chart.
+              <p class="glossary-how"><b>Direction:</b> histogram above zero + expanding = strong bullish momentum → <span class="dir-long">LONG</span> bias. Below zero + expanding down = strong bearish → <span class="dir-short">SHORT</span>. Blue line crossing above orange = bullish cross, below = bearish. Contracting histogram = fading trend, watch for reversal.</p>
+            </div>
+            <div class="lang-zh">
+              <b>MACD (12/26/9) 子面板</b> — 柱狀圖（動能為正時綠色、負時紅色）、MACD 線（藍色）、訊號線（橘色），佔用圖表底部保留區。
+              <p class="glossary-how"><b>方向解讀：</b>柱狀在零軸上方且擴大 = 強勢多頭動能 → <span class="dir-long">做多</span>偏好；下方且擴大 = 強勢空頭 → <span class="dir-short">做空</span>。藍線上穿橘線 = 金叉，下穿 = 死叉。柱狀收窄 = 動能衰退，注意反轉。</p>
+            </div>
+          </dd>
+
           <dt><span class="glossary-tag">MACD ×</span></dt>
           <dd>
             <div class="lang-en">
@@ -473,30 +486,7 @@
         priceScaleId: '',
         color: 'rgba(180,180,180,0.4)',
     });
-    // Vertical layout of the main chart when RSI is HIDDEN:
-    //   candles (top 80%) + volume (bottom 20%)
-    // When RSI is SHOWN we squeeze both up and reserve the bottom
-    // ~18% for the RSI oscillator on its OWN overlay price scale.
-    // Everything lives inside the same LWC chart instance, so time
-    // and vertical alignment are perfect by construction — no
-    // separate chart to sync, no minimumWidth juggling.
-    var CANDLE_BOTTOM_NO_RSI = 0.20;
-    var VOL_TOP_NO_RSI       = 0.80;
-    var VOL_BOT_NO_RSI       = 0.00;
-
-    var CANDLE_BOTTOM_RSI = 0.35;
-    var VOL_TOP_RSI       = 0.65;
-    var VOL_BOT_RSI       = 0.20;
-    var RSI_TOP           = 0.82;
-    var RSI_BOT           = 0.00;
-
-    chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.02, bottom: CANDLE_BOTTOM_NO_RSI } });
-    chart.priceScale('').applyOptions({ scaleMargins: { top: VOL_TOP_NO_RSI, bottom: VOL_BOT_NO_RSI } });
-
     // ── RSI overlay series on the main chart ─────────────────────
-    // Same chart instance, own price scale ID 'rsi' positioned in
-    // the bottom band via scaleMargins. When toggled off we hide
-    // the series and rescale volume + candles to reclaim the space.
     var rsiSeries = chart.addLineSeries({
         color: '#e599f7',
         lineWidth: 1,
@@ -504,36 +494,78 @@
         priceLineVisible: false,
         lastValueVisible: false,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
-        // Force the RSI scale to always show 0-100 regardless of
-        // the data range so the 30/70 bands stay visible.
         autoscaleInfoProvider: function () {
             return { priceRange: { minValue: 0, maxValue: 100 } };
         },
         visible: false,
     });
-    chart.priceScale('rsi').applyOptions({
-        scaleMargins: { top: RSI_TOP, bottom: RSI_BOT },
-    });
-    // Reference bands (30 / 50 / 70) rendered inside the RSI scale
-    // so they only appear in the bottom band.
     rsiSeries.createPriceLine({ price: 70, color: '#e03131', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     rsiSeries.createPriceLine({ price: 50, color: '#adb5bd', lineWidth: 1, lineStyle: 3, axisLabelVisible: false });
     rsiSeries.createPriceLine({ price: 30, color: '#2f9e44', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
 
-    // Swap layout margins based on RSI on/off. Called by
-    // refreshLayerVisibility when the RSI chip toggles.
-    function applyRsiLayout(enabled) {
-        rsiSeries.applyOptions({ visible: enabled });
-        chart.priceScale('right').applyOptions({
-            scaleMargins: { top: 0.02, bottom: enabled ? CANDLE_BOTTOM_RSI : CANDLE_BOTTOM_NO_RSI },
-        });
-        chart.priceScale('').applyOptions({
-            scaleMargins: {
-                top:    enabled ? VOL_TOP_RSI : VOL_TOP_NO_RSI,
-                bottom: enabled ? VOL_BOT_RSI : VOL_BOT_NO_RSI,
-            },
-        });
+    // ── MACD overlay series ──────────────────────────────────────
+    // Three series sharing priceScaleId 'macd': histogram (bars),
+    // MACD line, signal line. Histogram is the visual anchor —
+    // colored green when positive, red when negative, at each bar.
+    var macdHistSeries = chart.addHistogramSeries({
+        priceScaleId: 'macd',
+        priceLineVisible: false,
+        lastValueVisible: false,
+        visible: false,
+    });
+    var macdLineSeries = chart.addLineSeries({
+        color: '#339af0',
+        lineWidth: 1,
+        priceScaleId: 'macd',
+        priceLineVisible: false,
+        lastValueVisible: false,
+        visible: false,
+    });
+    var macdSignalSeries = chart.addLineSeries({
+        color: '#f76707',
+        lineWidth: 1,
+        priceScaleId: 'macd',
+        priceLineVisible: false,
+        lastValueVisible: false,
+        visible: false,
+    });
+    // Zero-line reference on the MACD scale.
+    macdHistSeries.createPriceLine({ price: 0, color: '#adb5bd', lineWidth: 1, lineStyle: 3, axisLabelVisible: false });
+
+    // Dynamic vertical layout — allocates a fraction of the plot
+    // to each enabled sub-pane (volume is always on). Everything
+    // lives on the SAME chart, so alignment is perfect by
+    // construction.
+    var VOL_H = 0.15;
+    var OSC_H = 0.18;
+    function applyPaneLayout() {
+        var rsiOn  = layerOn('rsi');
+        var macdOn = layerOn('macd-pane');
+        // Bottom-up allocation. scaleMargins.bottom = distance from
+        // the BOTTOM of the chart; .top = distance from the TOP.
+        var macdBotEdge = 0;
+        var macdTopEdge = macdOn ? OSC_H : 0;
+        var rsiBotEdge  = macdTopEdge;
+        var rsiTopEdge  = rsiOn ? rsiBotEdge + OSC_H : rsiBotEdge;
+        var volBotEdge  = rsiTopEdge;
+        var volTopEdge  = volBotEdge + VOL_H;
+
+        chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.02, bottom: volTopEdge } });
+        chart.priceScale('').applyOptions({      scaleMargins: { top: 1 - volTopEdge, bottom: volBotEdge } });
+        if (rsiOn) {
+            chart.priceScale('rsi').applyOptions({ scaleMargins: { top: 1 - rsiTopEdge, bottom: rsiBotEdge } });
+        }
+        if (macdOn) {
+            chart.priceScale('macd').applyOptions({ scaleMargins: { top: 1 - macdTopEdge, bottom: macdBotEdge } });
+        }
+
+        rsiSeries.applyOptions({ visible: rsiOn });
+        macdHistSeries.applyOptions({ visible: macdOn });
+        macdLineSeries.applyOptions({ visible: macdOn });
+        macdSignalSeries.applyOptions({ visible: macdOn });
     }
+    // Prime the initial layout (no oscillators on by default).
+    applyPaneLayout();
 
     // ── Lazy history load ──────────────────────────────────────────
     // Track the earliest loaded bar so we can fetch older data when
@@ -607,7 +639,7 @@
         boll: false, vol: false, vp: false, plan: false, positions: true,
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
-        rsi: false, hvn: false,
+        rsi: false, 'macd-pane': false, hvn: false,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     // Master visibility override — when true, all layers render as
@@ -688,7 +720,7 @@
         applyPlanLinesVisibility();
         applyPositionLinesVisibility();
         applyHVNLinesVisibility();
-        applyRsiLayout(layerOn('rsi'));
+        applyPaneLayout();
     }
     // Track plan visibility separately since planLines are recreated
     // on each data load.
@@ -1219,7 +1251,18 @@
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
         rsiSeries.setData(data.rsi || []);
-        // RSI is now on the same chart — no sync step needed.
+        // MACD: histogram + line + signal. Color each histogram bar
+        // by its sign (green when momentum positive, red when negative).
+        var hist = (data.macdHist || []).map(function (h) {
+            return {
+                time: h.time, value: h.value,
+                color: h.value >= 0 ? 'rgba(38,166,154,0.8)' : 'rgba(239,83,80,0.8)',
+            };
+        });
+        macdHistSeries.setData(hist);
+        macdLineSeries.setData(data.macdLine || []);
+        macdSignalSeries.setData(data.macdSignal || []);
+        // Sub-panes are on the same chart — no sync step needed.
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
         // toggled off, LWC would still draw them.
@@ -1408,16 +1451,27 @@
                     applyHVNLinesVisibility();
                     updateLayerCounts();
                 }
-                if (Array.isArray(data.rsi) && data.rsi.length > 0) {
-                    // Update tail of RSI series — same time>=last
-                    // rule as the candle series.
-                    var rsiSeriesLastTime = rsiSeries.data && rsiSeries.data().length > 0
-                        ? rsiSeries.data()[rsiSeries.data().length - 1].time
-                        : 0;
-                    data.rsi.forEach(function (pt) {
-                        if (pt.time >= rsiSeriesLastTime) rsiSeries.update(pt);
+                // Helper: update the tail of any line/histogram
+                // series while respecting LWC's time>=last invariant.
+                function updateTail(series, arr, colorFn) {
+                    if (!Array.isArray(arr) || arr.length === 0) return;
+                    var d = series.data && series.data();
+                    var last = (d && d.length > 0) ? d[d.length - 1].time : 0;
+                    arr.forEach(function (pt) {
+                        if (pt.time < last) return;
+                        if (colorFn) {
+                            series.update({ time: pt.time, value: pt.value, color: colorFn(pt.value) });
+                        } else {
+                            series.update(pt);
+                        }
                     });
                 }
+                updateTail(rsiSeries, data.rsi);
+                updateTail(macdLineSeries,   data.macdLine);
+                updateTail(macdSignalSeries, data.macdSignal);
+                updateTail(macdHistSeries,   data.macdHist, function (v) {
+                    return v >= 0 ? 'rgba(38,166,154,0.8)' : 'rgba(239,83,80,0.8)';
+                });
                 if (window.__chartDebug) {
                     var lc = candles[candles.length - 1];
                     console.log('[chart poll] applied', {sym: currentSym(), close: lc.close, markPrice: data.markPrice, ts: lc.time});
