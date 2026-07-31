@@ -1720,8 +1720,7 @@ footer {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    min-width: 340px;
-    max-width: 92vw;
+    width: min(480px, 92vw);
     box-shadow: 0 12px 40px rgba(0,0,0,0.55);
 }
 .modal-head {
@@ -1762,7 +1761,7 @@ footer {
     letter-spacing: 0.06em;
     font-weight: 600;
 }
-.quick-row input[type="number"] {
+.quick-row input {
     flex: 1;
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -1772,7 +1771,7 @@ footer {
     font-family: ui-monospace, "SF Mono", monospace;
     font-size: 0.95rem;
 }
-.quick-row input[type="number"]:focus {
+.quick-row input:focus {
     outline: none;
     border-color: var(--blue);
 }
