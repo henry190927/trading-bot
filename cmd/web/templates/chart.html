@@ -451,13 +451,16 @@
     var refreshBtn = document.getElementById('chart-refresh');
 
     // ── Chart construction ──────────────────────────────────────────
-    // rightPriceScale.minimumWidth pins the price-axis column so
-    // the RSI pane (2-digit values like "70") lines up horizontally
-    // with the main chart (5-digit values like "63000"). Without
-    // this, the two charts' plot areas end at different x
-    // positions and the RSI line appears to extend past the main
-    // chart's last bar.
-    var PRICE_AXIS_WIDTH = 62;
+    // Price-axis column width, applied as minimumWidth on BOTH
+    // charts' rightPriceScale. Chosen big enough that every symbol
+    // we support (BTC ~5 digits + 2 decimals) fits inside the
+    // minimum, so LWC's max(labels, minimum) always evaluates to
+    // the minimum → both plot columns end at the same x, and
+    // alignment doesn't drift when zoom / poll re-renders the
+    // labels. Was dynamic measure-and-apply before, but the
+    // label-driven natural width fluctuates and produced
+    // intermittent misalignment.
+    var PRICE_AXIS_WIDTH = 90;
 
     var chart = LightweightCharts.createChart(container, {
         layout: {
@@ -558,23 +561,10 @@
         try { chart.timeScale().setVisibleRange(range); } catch (e) {}
     });
 
-    // Force both price-axis columns to the same actual width post-
-    // render. minimumWidth in the createChart config alone isn't
-    // enough because LWC picks max(labels, minimum) — main's 5-digit
-    // prices push its axis wider than RSI's 2-digit values, so
-    // their plot columns still end at different x positions and
-    // the RSI line appears offset from the main bars. Read the
-    // main's actual width after the first paint and pin both.
-    function alignPriceAxes() {
-        try {
-            var w = chart.priceScale('right').width();
-            if (!w || w <= 0) return;
-            chart.priceScale('right').applyOptions({ minimumWidth: w });
-            rsiChart.priceScale('right').applyOptions({ minimumWidth: w });
-        } catch (e) {}
-    }
-    // First alignment happens after the initial data load below via
-    // a rAF chain from applyChart → alignPriceAxes.
+    // No post-render axis width sync needed anymore — both charts
+    // are pinned to PRICE_AXIS_WIDTH at creation, and that value is
+    // wider than any label they'll actually render, so LWC's
+    // max(labels, minimumWidth) collapses to minimumWidth on both.
 
     // ── Lazy history load ──────────────────────────────────────────
     // Track the earliest loaded bar so we can fetch older data when
@@ -1260,14 +1250,13 @@
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
         rsiSeries.setData(data.rsi || []);
-        // After the initial paint: snap RSI's time window to match
-        // the main chart AND align both price-scale widths so their
-        // plot columns end at the same x. rAF chain ensures LWC has
-        // laid out and priceScale.width() returns a real value.
+        // After the initial paint: snap RSI's time window to the
+        // main chart's. Both charts already share a locked
+        // PRICE_AXIS_WIDTH from creation, so no separate alignment
+        // step is needed.
         requestAnimationFrame(function () {
             var r = chart.timeScale().getVisibleRange();
             if (r) { try { rsiChart.timeScale().setVisibleRange(r); } catch (e) {} }
-            alignPriceAxes();
         });
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
