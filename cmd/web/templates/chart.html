@@ -124,6 +124,7 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="sweep">sweep <span class="layer-count" data-layer-count="sweep">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="double">2× top/bot <span class="layer-count" data-layer-count="double">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="div">RSI div <span class="layer-count" data-layer-count="div">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="delta-div">Delta div <span class="layer-count" data-layer-count="delta-div">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="volx">vol× <span class="layer-count" data-layer-count="volx">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="bb-events">BB touch/break <span class="layer-count" data-layer-count="bb-events">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="macd">MACD × <span class="layer-count" data-layer-count="macd">0</span></button>
@@ -404,6 +405,18 @@
             </div>
           </dd>
 
+          <dt><span class="glossary-tag">Delta div</span></dt>
+          <dd>
+            <div class="lang-en">
+              <b>Estimated CVD (Cumulative Volume Delta) divergence</b> — price makes a new extreme but the cumulative buy-minus-sell delta doesn't. Approximated per bar as <code>(2·(close-low)/(high-low) - 1) · volume</code> since the free BingX endpoint doesn't expose per-trade buyer flags; on liquid perps this tracks real CVD closely enough for the divergence signal.
+              <p class="glossary-how"><b>Direction:</b> <b>bearish Δ-div</b> during a quick pump — price higher-high, CVD lower-high → aggressive buyers not stepping up, likely exhaustion → <span class="dir-short">SHORT</span> bias. <b>Bullish Δ-div</b> during a quick dump → sellers running out of ammo → <span class="dir-long">LONG</span> bias. Best used at the very end of an impulsive move as a fade signal. Currently <i>visual-only</i> — not fed into the engine score until backtested.</p>
+            </div>
+            <div class="lang-zh">
+              <b>估算 CVD（累計成交量差）背離</b> — 價創新高/低但買減賣的累計差沒跟上。每根 K 棒以 <code>(2·(close-low)/(high-low) - 1) · volume</code> 近似（BingX 免費端點不提供逐筆買賣方向），在主流合約上足以呈現真實 CVD 的背離。
+              <p class="glossary-how"><b>方向解讀：</b>急拉時<b>頂背離</b> — 價高但 CVD 未創新高 → 主動買單接不上，動能衰竭 →<span class="dir-short">做空</span>偏好；急殺時<b>底背離</b> → 賣單耗盡 →<span class="dir-long">做多</span>偏好。急促脈衝走勢末端最有效。目前<i>僅供視覺參考</i>，未納入引擎評分（需先回測驗證）。</p>
+            </div>
+          </dd>
+
           <dt><span class="glossary-tag">vol×</span></dt>
           <dd>
             <div class="lang-en">
@@ -489,6 +502,7 @@
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#2f9e44">▲</span>sweep-low</span>
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#ae3ec9">●</span>double top/bot</span>
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#adb5bd">■</span>RSI div</span>
+      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#fcc419">■</span>Δ div</span>
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#fab005">●</span>vol×</span>
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#20c997">▲</span>MACD bull ×</span>
       <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#f76707">▼</span>MACD bear ×</span>
@@ -710,6 +724,7 @@
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
         rsi: false, 'macd-pane': false, hvn: false,
+        'delta-div': false,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     // Master visibility override — when true, all layers render as
@@ -742,6 +757,7 @@
         if (k === 'sweep_high' || k === 'sweep_low') return 'sweep';
         if (k === 'double_top' || k === 'double_bottom') return 'double';
         if (k === 'rsi_bear_div' || k === 'rsi_bull_div') return 'div';
+        if (k === 'cvd_bear_div' || k === 'cvd_bull_div') return 'delta-div';
         if (k === 'vol_anomaly') return 'volx';
         if (k.indexOf('bb_') === 0) return 'bb-events';
         if (k === 'macd_bull_cross' || k === 'macd_bear_cross') return 'macd';
@@ -783,7 +799,7 @@
     var MENU_MEMBERS = {
         overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn'],
         osc:      ['rsi', 'macd-pane'],
-        events:   ['sweep', 'double', 'div', 'volx', 'bb-events', 'macd', 'flags'],
+        events:   ['sweep', 'double', 'div', 'delta-div', 'volx', 'bb-events', 'macd', 'flags'],
     };
     function updateMenuActiveCounts() {
         if (!layers) return;

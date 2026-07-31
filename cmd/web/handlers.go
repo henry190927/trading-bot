@@ -4055,6 +4055,52 @@ func computeChartMarkers(candles []market.Candle) []map[string]any {
 		}
 	}
 
+	// Candle-delta CVD divergence. Real CVD needs per-trade
+	// buyer/seller flags (not on the free BingX endpoint) — we
+	// approximate per-bar delta by assuming buy volume ≈
+	// (close - low)/(high - low) * volume, sell = remainder. On
+	// liquid perps this tracks real CVD closely enough for the
+	// divergence signal. Purely visual for now; NOT fed into
+	// the engine's scoring vote (that path exists in
+	// signal.Evaluate but wiring it requires a backtest A/B pass
+	// per the ship-gates rule).
+	cvdApprox := make([]float64, len(candles))
+	var cum float64
+	for i, b := range candles {
+		rng := b.High - b.Low
+		var delta float64
+		if rng > 0 {
+			buyFrac := (b.Close - b.Low) / rng
+			delta = (2*buyFrac - 1) * b.Volume // (buy - sell)
+		}
+		cum += delta
+		cvdApprox[i] = cum
+	}
+	cvdDiv := analyzer.Detect(closes, cvdApprox, 60, 2)
+	if cvdDiv.Kind != analyzer.NoDivergence && cvdDiv.PivotB >= 0 && cvdDiv.PivotB < len(candles) {
+		bar := candles[cvdDiv.PivotB]
+		bearish := cvdDiv.Kind == analyzer.BearishRegular || cvdDiv.Kind == analyzer.BearishHidden
+		if bearish {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "aboveBar",
+				"color":    "#fcc419",
+				"shape":    "square",
+				"text":     "Δ-",
+				"kind":     "cvd_bear_div",
+			})
+		} else {
+			markers = append(markers, map[string]any{
+				"time":     bar.OpenTime.Unix(),
+				"position": "belowBar",
+				"color":    "#fcc419",
+				"shape":    "square",
+				"text":     "Δ+",
+				"kind":     "cvd_bull_div",
+			})
+		}
+	}
+
 	// MACD 12/26/9 crossovers. Bullish cross = MACD line moves from
 	// below the signal line to at-or-above; bearish is the mirror.
 	// Zero-line crosses are omitted here — they're derivable and
