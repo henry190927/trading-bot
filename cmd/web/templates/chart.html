@@ -216,9 +216,13 @@
        pages in a new tab with the fields prefilled via query params so
        the flow is identical to entering them manually. -->
   <div class="modal-backdrop hidden" id="quick-modal-backdrop">
-    <div class="modal quick-modal" role="dialog" aria-labelledby="quick-modal-title">
+    <div class="modal quick-modal" role="dialog" aria-labelledby="quick-modal-title" data-tab="validate">
       <div class="modal-head">
         <h3 id="quick-modal-title">Quick action</h3>
+        <div class="quick-tabs" role="tablist">
+          <button type="button" class="quick-tab is-active" data-tab="validate" role="tab">Validate</button>
+          <button type="button" class="quick-tab" data-tab="record" role="tab">Record</button>
+        </div>
         <button type="button" class="modal-x" id="quick-modal-close" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
@@ -238,11 +242,49 @@
             <button type="button" class="quick-side-btn" data-side="short">SHORT</button>
           </div>
         </div>
-        <div class="quick-actions">
-          <button type="button" class="btn-primary quick-go" id="quick-go-record">Record Trade →</button>
-          <button type="button" class="btn-secondary quick-go" id="quick-go-validate">Validate →</button>
+
+        <!-- Record-only fields, shown when the Record tab is
+             active. Minimal set: stop / TP1 / TP2 / anchor /
+             notes. Advanced flags (leverage, margin, place_tp1
+             etc.) still live on /journal/new — the "Open full
+             form ↗" link at the bottom takes the user there
+             with everything prefilled. -->
+        <div class="quick-record-fields">
+          <div class="quick-row">
+            <label for="quick-stop">Stop</label>
+            <input type="number" step="any" id="quick-stop" placeholder="stop-loss price">
+          </div>
+          <div class="quick-row">
+            <label for="quick-tp1">TP1</label>
+            <input type="number" step="any" id="quick-tp1" placeholder="optional">
+          </div>
+          <div class="quick-row">
+            <label for="quick-tp2">TP2</label>
+            <input type="number" step="any" id="quick-tp2" placeholder="optional">
+          </div>
+          <div class="quick-row">
+            <label for="quick-anchor">Anchor</label>
+            <input type="text" id="quick-anchor" placeholder="e.g. sweep, HVN, BB">
+          </div>
+          <div class="quick-row">
+            <label for="quick-notes">Notes</label>
+            <input type="text" id="quick-notes" placeholder="short thesis">
+          </div>
         </div>
-        <p class="quick-hint">Opens the matching form in a new tab with fields prefilled.</p>
+
+        <div class="quick-actions">
+          <button type="button" class="btn-primary quick-go" id="quick-go-submit">Run</button>
+        </div>
+
+        <!-- Inline result panel — validate score/verdict or
+             record-success confirmation renders here without
+             navigating away from /chart. -->
+        <div class="quick-result hidden" id="quick-result"></div>
+
+        <p class="quick-hint">
+          <a href="#" class="quick-hint-link" id="quick-open-full">Open full form ↗</a>
+          — go to <code>/journal/new</code> or <code>/validate</code> with fields prefilled.
+        </p>
       </div>
     </div>
   </div>
@@ -1651,10 +1693,29 @@
         var symOut      = document.getElementById('quick-sym');
         var tfOut       = document.getElementById('quick-tf');
         var priceIn     = document.getElementById('quick-price');
+        var stopIn      = document.getElementById('quick-stop');
+        var tp1In       = document.getElementById('quick-tp1');
+        var tp2In       = document.getElementById('quick-tp2');
+        var anchorIn    = document.getElementById('quick-anchor');
+        var notesIn     = document.getElementById('quick-notes');
         var sideBtns    = document.querySelectorAll('.quick-side-btn');
-        var recordBtn   = document.getElementById('quick-go-record');
-        var validateBtn = document.getElementById('quick-go-validate');
+        var tabBtns     = document.querySelectorAll('.quick-tab');
+        var submitBtn   = document.getElementById('quick-go-submit');
+        var resultBox   = document.getElementById('quick-result');
+        var openFullBtn = document.getElementById('quick-open-full');
+        var modalRoot   = backdrop.querySelector('.quick-modal');
         if (!wrap || !marker || !plusBtn || !backdrop) return;
+        function currentTab() { return modalRoot.getAttribute('data-tab') || 'validate'; }
+        function setTab(name) {
+            modalRoot.setAttribute('data-tab', name);
+            tabBtns.forEach(function (b) { b.classList.toggle('is-active', b.dataset.tab === name); });
+            submitBtn.textContent = name === 'record' ? 'Record Trade' : 'Validate';
+            resultBox.classList.add('hidden');
+            resultBox.innerHTML = '';
+        }
+        tabBtns.forEach(function (b) {
+            b.addEventListener('click', function () { setTab(b.dataset.tab); });
+        });
 
         var lastPrice = null;
 
@@ -1819,9 +1880,7 @@
             return active ? active.dataset.side : '';
         }
         function updateGoState() {
-            var hasSide = !!selectedSide();
-            recordBtn.disabled   = !hasSide;
-            validateBtn.disabled = !hasSide;
+            submitBtn.disabled = !selectedSide();
         }
         sideBtns.forEach(function (b) {
             b.addEventListener('click', function () {
@@ -1836,6 +1895,15 @@
             tfOut.textContent  = currentTF();
             priceIn.value = fmtPriceInput(price);
             sideBtns.forEach(function (x) { x.classList.remove('active'); });
+            // Reset record-only fields on each open — user's stop /
+            // TP levels are typically per-trade.
+            stopIn.value = '';
+            tp1In.value  = '';
+            tp2In.value  = '';
+            anchorIn.value = '';
+            notesIn.value  = '';
+            resultBox.classList.add('hidden');
+            resultBox.innerHTML = '';
             updateGoState();
             backdrop.classList.remove('hidden');
             setTimeout(function () { priceIn.focus(); priceIn.select(); }, 30);
@@ -1855,37 +1923,105 @@
             if (ev.key === 'Escape' && !backdrop.classList.contains('hidden')) closeModal();
         });
 
-        // Build a same-page navigation (not a new tab) so the flow
-        // matches what the user gets from the sidebar links. The
-        // modal is now purely a "prefill helper" — submit navigates
-        // to the target page with the fields already filled in.
-        function buildQs(path) {
+        // ── Inline submit ────────────────────────────────────────
+        // Both tabs POST to their own JSON API — validate returns
+        // score/verdict, record writes the journal row — and the
+        // result renders in .quick-result without leaving /chart.
+        function serializeForm() {
             var side = selectedSide();
             var price = parseFloat(priceIn.value);
             if (!side || isNaN(price) || price <= 0) return null;
-            var q = 'symbol=' + encodeURIComponent(currentSym())
-                  + '&side='  + encodeURIComponent(side)
-                  + '&entry=' + encodeURIComponent(price)
-                  + '&tf='    + encodeURIComponent(currentTF());
-            return path + '?' + q;
+            return {
+                symbol: currentSym(), tf: currentTF(),
+                side:   side, entry:  price,
+                stop:   stopIn.value.trim(),
+                tp1:    tp1In.value.trim(),
+                tp2:    tp2In.value.trim(),
+                anchor: anchorIn.value.trim(),
+                notes:  notesIn.value.trim(),
+            };
         }
-        recordBtn.addEventListener('click', function () {
-            var url = buildQs('/journal/new');
-            if (!url) return;
-            window.location.href = url;
+        function encodeForm(obj) {
+            return Object.keys(obj).map(function (k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(obj[k]);
+            }).join('&');
+        }
+        function fmtR(v) { return (v == null || isNaN(v)) ? '—' : v.toFixed(2); }
+        function renderValidateResult(r) {
+            var band = r.total >= 7.5 ? 'strong' : r.total >= 5.5 ? 'take' : r.total >= 3.5 ? 'neutral' : 'avoid';
+            var lines = [
+                '<div class="qr-header band-' + band + '">',
+                '  <span class="qr-score">' + fmtR(r.total) + '/10</span>',
+                '  <span class="qr-verdict">' + (r.verdict || '—') + '</span>',
+                '  <span class="qr-side">' + r.side.toUpperCase() + ' @ ' + r.entry + '</span>',
+                '</div>',
+                '<div class="qr-sub">MR ' + fmtR(r.totalMR) + ' · MOM ' + fmtR(r.totalMOM) + ' · risk ' + fmtR(r.risk) + '% · fee ' + fmtR(r.feeR) + 'R</div>',
+            ];
+            if (r.suggStop || r.suggTP1 || r.suggTP2) {
+                lines.push('<div class="qr-sub">sugg stop ' + (r.suggStop || '—') + ' · TP1 ' + (r.suggTP1 || '—') + ' · TP2 ' + (r.suggTP2 || '—') + '</div>');
+            }
+            if (r.reasons && r.reasons.length) {
+                lines.push('<ul class="qr-reasons">' + r.reasons.slice(0, 6).map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>');
+            }
+            resultBox.innerHTML = lines.join('');
+            resultBox.className = 'quick-result';
+        }
+        function renderRecordResult(r) {
+            resultBox.innerHTML = '<div class="qr-ok">✓ Recorded trade #' + r.id + '. <a href="/journal/' + r.id + '/edit">Edit</a> · <a href="/journal">All trades</a></div>';
+            resultBox.className = 'quick-result';
+        }
+        function renderError(msg) {
+            resultBox.innerHTML = '<div class="qr-err">⚠ ' + msg + '</div>';
+            resultBox.className = 'quick-result';
+        }
+        submitBtn.addEventListener('click', function () {
+            var form = serializeForm();
+            if (!form) return;
+            var tab = currentTab();
+            var url = tab === 'record' ? '/api/chart/journal-open' : '/api/chart/validate';
+            submitBtn.disabled = true;
+            submitBtn.textContent = tab === 'record' ? 'Recording…' : 'Validating…';
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: encodeForm(form),
+            })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                .then(function (res) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = tab === 'record' ? 'Record Trade' : 'Validate';
+                    if (!res.ok) { renderError(res.body.error || 'request failed'); return; }
+                    if (tab === 'record') renderRecordResult(res.body);
+                    else                  renderValidateResult(res.body);
+                })
+                .catch(function (err) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = tab === 'record' ? 'Record Trade' : 'Validate';
+                    renderError('network: ' + (err && err.message ? err.message : 'unknown'));
+                });
         });
-        validateBtn.addEventListener('click', function () {
-            // /validate accepts a GET with the same query params (renders
-            // the form prefilled). Submit-on-load keeps this a one-click
-            // flow, which is what the user wants.
-            var url = buildQs('/validate');
-            if (!url) return;
-            // Append &auto=1 so /validate can auto-submit; if that param
-            // isn't recognized (yet) the user still lands on the prefilled
-            // form and clicks the existing submit button — one extra
-            // click but still same-page.
-            window.location.href = url + '&auto=1';
+
+        // "Open full form" — same-page navigation to /journal/new or
+        // /validate with fields prefilled, for when the user needs
+        // leverage / margin / auto-open / etc. beyond the modal.
+        function buildQs(path) {
+            var form = serializeForm();
+            if (!form) return null;
+            return path + '?' + encodeForm({
+                symbol: form.symbol, side: form.side,
+                entry:  form.entry,  tf:   form.tf,
+                stop:   form.stop,   tp1:  form.tp1, tp2: form.tp2,
+                anchor: form.anchor,
+            });
+        }
+        openFullBtn.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            var target = currentTab() === 'record' ? '/journal/new' : '/validate';
+            var url = buildQs(target);
+            if (!url) { renderError('Fill side and price first.'); return; }
+            window.location.href = url + (target === '/validate' ? '&auto=1' : '');
         });
+
     })();
 
     // ── Drawing tools ──────────────────────────────────────────────

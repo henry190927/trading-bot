@@ -1842,6 +1842,107 @@ footer {
     font-size: 0.75rem;
     text-align: center;
 }
+.quick-hint-link {
+    color: var(--blue);
+    text-decoration: none;
+}
+.quick-hint-link:hover { text-decoration: underline; }
+
+/* Modal tabs — Validate / Record split. Record-only fields hide
+   when the Validate tab is active. */
+.quick-tabs {
+    display: inline-flex;
+    gap: 2px;
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--surface-2);
+}
+.quick-tab {
+    background: transparent;
+    color: var(--text-dim);
+    border: 0;
+    padding: 4px 14px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.78rem;
+    cursor: pointer;
+    line-height: 1.4;
+}
+.quick-tab:hover { color: var(--text); }
+.quick-tab.is-active { background: var(--blue); color: #fff; }
+.quick-modal[data-tab="validate"] .quick-record-fields { display: none; }
+.quick-record-fields {
+    display: flex;
+    flex-direction: column;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border);
+    margin-top: 4px;
+}
+
+/* Inline result panel below the submit button. Bandcolor mirrors
+   the chart-banner verdict color so validate results feel familiar. */
+.quick-result {
+    margin-top: 0.8rem;
+    padding: 0.7rem 0.9rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--text);
+    line-height: 1.5;
+}
+.quick-result.hidden { display: none; }
+.qr-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px dashed var(--border);
+    margin-bottom: 0.4rem;
+}
+.qr-header.band-strong  { border-color: var(--green);  }
+.qr-header.band-take    { border-color: var(--blue);   }
+.qr-header.band-neutral { border-color: var(--yellow); }
+.qr-header.band-avoid   { border-color: var(--red);    }
+.qr-score {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.qr-header.band-strong  .qr-score { color: var(--green); }
+.qr-header.band-take    .qr-score { color: var(--blue); }
+.qr-header.band-neutral .qr-score { color: var(--yellow); }
+.qr-header.band-avoid   .qr-score { color: var(--red); }
+.qr-verdict {
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.04em;
+}
+.qr-side {
+    margin-left: auto;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.8rem;
+}
+.qr-sub {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    font-family: ui-monospace, "SF Mono", monospace;
+    margin-bottom: 0.2rem;
+}
+.qr-reasons {
+    margin: 0.4rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--text);
+    font-size: 0.8rem;
+}
+.qr-reasons li { margin: 0.15rem 0; }
+.qr-ok  { color: var(--green); font-weight: 600; }
+.qr-ok a { color: var(--blue); margin: 0 0.3rem; }
+.qr-err { color: var(--red); font-weight: 600; }
 /* Volume-by-price SVG overlay — anchored to the right edge of the
    chart just inside the price scale. Purely decorative; pointer
    events off so it doesn't intercept chart drag/zoom. */

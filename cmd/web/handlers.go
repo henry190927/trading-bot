@@ -2929,6 +2929,160 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 	})
 }
 
+// handleAPIChartValidate — POST /api/chart/validate.
+// JSON sibling of handleValidatePost, used by the /chart quick-action
+// modal so validation can render inline without navigating away.
+// Body params (form-encoded): symbol, side, entry, tf, fee_bps.
+func (s *server) handleAPIChartValidate(c *gin.Context) {
+	symStr := strings.ToUpper(strings.TrimSpace(c.PostForm("symbol")))
+	sideStr := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
+	tfStr := defaultStr(strings.TrimSpace(c.PostForm("tf")), "1h")
+
+	sym, err := resolveWebSymbol(symStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var side signal.Side
+	switch sideStr {
+	case "long":
+		side = signal.Long
+	case "short":
+		side = signal.Short
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "side must be long or short"})
+		return
+	}
+	entry, err := parseFloatPositive(c.PostForm("entry"), "entry")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	feeBps, err := parseFloatPositive(defaultStr(c.PostForm("fee_bps"), "6"), "fee_bps")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
+	defer cancel()
+	tf := market.Timeframe(tfStr)
+	candles, err := s.client.Klines(ctx, sym, tf, 300)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "fetch klines: " + err.Error()})
+		return
+	}
+	if len(candles) < 60 {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("only %d candles available, need 60+", len(candles))})
+		return
+	}
+	var markPrice float64
+	if fr, err := s.client.FundingRate(ctx, sym); err == nil {
+		markPrice = fr.MarkPrice
+	}
+	res := validator.Validate(sym, tf, side, entry, feeBps, candles, markPrice)
+
+	// Slim payload — only the fields the modal actually renders.
+	// Full result (reasons/notes/factor breakdown) can be surfaced
+	// via /validate?...&auto=1 for the deep-dive view.
+	c.JSON(http.StatusOK, gin.H{
+		"symbol":   shortSymbol(sym),
+		"side":     sideStr,
+		"entry":    res.Entry,
+		"price":    res.Price,
+		"total":    res.Total,
+		"totalMR":  res.TotalMR,
+		"totalMOM": res.TotalMOM,
+		"verdict":  res.Verdict,
+		"suggStop": res.SuggStop,
+		"suggTP1":  res.SuggTP1,
+		"suggTP2":  res.SuggTP2,
+		"risk":     res.Risk,
+		"feeR":     res.FeeR,
+		"reasons":  res.Reasons,
+		"notes":    res.Notes,
+	})
+}
+
+// handleAPIChartJournalOpen — POST /api/chart/journal-open.
+// Minimal JSON alternative to handleJournalOpen used by the /chart
+// modal for quick-record. Writes a basic trade to the journal (no
+// auto-open on BingX, no leverage math — user can edit later via
+// /journal/{id}/edit for advanced fields).
+// Body params: symbol, side, entry, stop, tp1, tp2, tf, anchor, notes.
+func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
+	symbol := strings.ToUpper(strings.TrimSpace(c.PostForm("symbol")))
+	side := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
+	if symbol == "" || (side != "long" && side != "short") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "symbol and side (long/short) are required"})
+		return
+	}
+	if _, err := resolveWebSymbol(symbol); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	entry, err := parseFloatPositive(c.PostForm("entry"), "entry")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var stop, tp1, tp2 float64
+	if v := strings.TrimSpace(c.PostForm("stop")); v != "" {
+		if f, err := parseFloatPositive(v, "stop"); err == nil {
+			stop = f
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if v := strings.TrimSpace(c.PostForm("tp1")); v != "" {
+		if f, err := parseFloatPositive(v, "tp1"); err == nil {
+			tp1 = f
+		}
+	}
+	if v := strings.TrimSpace(c.PostForm("tp2")); v != "" {
+		if f, err := parseFloatPositive(v, "tp2"); err == nil {
+			tp2 = f
+		}
+	}
+	tf := defaultStr(strings.TrimSpace(c.PostForm("tf")), "1h")
+	anchor := strings.TrimSpace(c.PostForm("anchor"))
+	notes := strings.TrimSpace(c.PostForm("notes"))
+
+	trades, err := journal.ReadAll("")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "read journal: " + err.Error()})
+		return
+	}
+	nextID := 1
+	for _, t := range trades {
+		if t.ID >= nextID {
+			nextID = t.ID + 1
+		}
+	}
+	now := time.Now()
+	t := journal.Trade{
+		ID:         nextID,
+		OpenedAt:   now,
+		AnalyzedAt: now,
+		Symbol:     symbol,
+		Side:       side,
+		TF:         tf,
+		Entry:      entry,
+		Stop:       stop,
+		TP1:        tp1,
+		TP2:        tp2,
+		Anchor:     anchor,
+		OpenNotes:  notes,
+	}
+	trades = append(trades, t)
+	if err := journal.WriteAll("", trades); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "write journal: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "id": t.ID})
+}
+
 // resolveWebSymbol maps the short symbol the form posts (BTC/ETH/XAU/XAG)
 // to the full BingX market symbol the engine needs.
 func resolveWebSymbol(s string) (market.Symbol, error) {

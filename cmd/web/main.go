@@ -115,6 +115,10 @@ func main() {
 	r.POST("/api/ai/model", srv.handleAIModelPost)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)
+	// JSON APIs used by the /chart quick-action modal so validate +
+	// record can happen inline without navigating away.
+	r.POST("/api/chart/validate", srv.handleAPIChartValidate)
+	r.POST("/api/chart/journal-open", srv.handleAPIChartJournalOpen)
 	r.GET("/onchain", srv.handleOnchainPage)
 	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
 	r.GET("/chart", srv.handleChartPage)
