@@ -654,7 +654,7 @@
     // layerOn(name) — the ONLY function refresh code should consult
     // when deciding whether to render a layer. Combines individual
     // chip state with the master hide toggle.
-    function layerOn(name) { return !layersHidden && !!layers[name]; }
+    function layerOn(name) { return !layersHidden && !!(layers && layers[name]); }
     function loadLayers() {
         try {
             var v = JSON.parse(localStorage.getItem(LAYERS_KEY) || '{}');
