@@ -505,18 +505,13 @@
         timeScale:  { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false, visible: false },
         crosshair:  { mode: 1 },
         autoSize: true,
-        // Vertical (price) is fully interactive — mouse wheel over
-        // the pane zooms, and dragging the right price axis shifts
-        // (LWC's axisPressedMouseMove: price). Horizontal (time)
-        // stays sync-driven from the main chart, so we disable all
-        // horizontal input on the RSI.
-        handleScroll: { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: true },
-        handleScale: {
-            axisPressedMouseMove: { time: false, price: true },
-            axisDoubleClickReset: true,
-            mouseWheel: true,
-            pinch: true,
-        },
+        // Both charts now stay in horizontal lockstep: whichever one
+        // the user drags / wheels, the other follows via the
+        // bidirectional time-range sync below. Only the price scale
+        // is independent, so the user can stretch the RSI's y-axis
+        // without touching the main chart's price zoom.
+        handleScroll: true,
+        handleScale: true,
     });
     var rsiSeries = rsiChart.addLineSeries({
         color: '#e599f7',
@@ -539,21 +534,47 @@
     rsiSeries.createPriceLine({ price: 70, color: '#e03131', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '70' });
     rsiSeries.createPriceLine({ price: 50, color: '#adb5bd', lineWidth: 1, lineStyle: 3, axisLabelVisible: false });
     rsiSeries.createPriceLine({ price: 30, color: '#2f9e44', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '30' });
-    // ONE-WAY time-axis sync: main → RSI only. RSI is non-interactive
-    // (handleScroll/Scale disabled), so it can only receive.
-    //
-    // Sync by TIME (not logical index) because the two series have
-    // different data lengths — RSI drops warm-up bars, so logical
-    // index 500 refers to a different actual bar on each chart, and
-    // logical-based sync makes the RSI drift out from under the main
-    // chart during scroll. Time is chart-agnostic and stays aligned.
-    // Zooming the main price scale (vertical) doesn't emit
-    // visibleTimeRangeChange, so the RSI panel correctly stays put
-    // during price-axis stretches — matching what the user wants.
+    // BIDIRECTIONAL time-axis sync. Either chart moves the other
+    // when panned or wheel-zoomed on the time axis. Loop prevention
+    // is done by value-based dedup rather than a synchronous flag
+    // (which LWC's async callback timing could slip past): each
+    // subscriber checks whether the incoming range matches the last
+    // one we PUSHED to that chart from the other side, and skips if
+    // so. Time comparison (not logical index) since the two series
+    // have different bar counts.
+    var lastPushToRsi  = null;
+    var lastPushToMain = null;
+    function rangeEq(a, b) {
+        return a && b && a.from === b.from && a.to === b.to;
+    }
     chart.timeScale().subscribeVisibleTimeRangeChange(function (range) {
-        if (!range) return;
+        if (!range || rangeEq(range, lastPushToMain)) return;
+        lastPushToRsi = range;
         try { rsiChart.timeScale().setVisibleRange(range); } catch (e) {}
     });
+    rsiChart.timeScale().subscribeVisibleTimeRangeChange(function (range) {
+        if (!range || rangeEq(range, lastPushToRsi)) return;
+        lastPushToMain = range;
+        try { chart.timeScale().setVisibleRange(range); } catch (e) {}
+    });
+
+    // Force both price-axis columns to the same actual width post-
+    // render. minimumWidth in the createChart config alone isn't
+    // enough because LWC picks max(labels, minimum) — main's 5-digit
+    // prices push its axis wider than RSI's 2-digit values, so
+    // their plot columns still end at different x positions and
+    // the RSI line appears offset from the main bars. Read the
+    // main's actual width after the first paint and pin both.
+    function alignPriceAxes() {
+        try {
+            var w = chart.priceScale('right').width();
+            if (!w || w <= 0) return;
+            chart.priceScale('right').applyOptions({ minimumWidth: w });
+            rsiChart.priceScale('right').applyOptions({ minimumWidth: w });
+        } catch (e) {}
+    }
+    // First alignment happens after the initial data load below via
+    // a rAF chain from applyChart → alignPriceAxes.
 
     // ── Lazy history load ──────────────────────────────────────────
     // Track the earliest loaded bar so we can fetch older data when
@@ -1239,14 +1260,14 @@
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
         rsiSeries.setData(data.rsi || []);
-        // Snap RSI's time axis to the main chart's current visible
-        // TIME window so it doesn't auto-fit to its own bounds and
-        // misalign under the plot. Time-based (not logical) for the
-        // same reason as the sync subscriber — logical indices
-        // differ across the two series.
+        // After the initial paint: snap RSI's time window to match
+        // the main chart AND align both price-scale widths so their
+        // plot columns end at the same x. rAF chain ensures LWC has
+        // laid out and priceScale.width() returns a real value.
         requestAnimationFrame(function () {
             var r = chart.timeScale().getVisibleRange();
             if (r) { try { rsiChart.timeScale().setVisibleRange(r); } catch (e) {} }
+            alignPriceAxes();
         });
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
