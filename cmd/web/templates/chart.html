@@ -179,13 +179,6 @@
           <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
         </div>
       </div>
-      <!-- RSI oscillator panel — nested in the same flex column so
-           it inherits the plot's exact width for perfect x-axis
-           alignment. Time-scale synchronized; y-axis independent. -->
-      <div class="chart-rsi-pane hidden" id="chart-rsi-pane">
-        <div class="chart-rsi-label">RSI(14)</div>
-        <div id="chart-rsi-container" class="chart-rsi-canvas"></div>
-      </div>
     </div>
   </div>
 
@@ -451,17 +444,6 @@
     var refreshBtn = document.getElementById('chart-refresh');
 
     // ── Chart construction ──────────────────────────────────────────
-    // Price-axis column width, applied as minimumWidth on BOTH
-    // charts' rightPriceScale. Chosen big enough that every symbol
-    // we support (BTC ~5 digits + 2 decimals) fits inside the
-    // minimum, so LWC's max(labels, minimum) always evaluates to
-    // the minimum → both plot columns end at the same x, and
-    // alignment doesn't drift when zoom / poll re-renders the
-    // labels. Was dynamic measure-and-apply before, but the
-    // label-driven natural width fluctuates and produced
-    // intermittent misalignment.
-    var PRICE_AXIS_WIDTH = 90;
-
     var chart = LightweightCharts.createChart(container, {
         layout: {
             background: { type: 'solid', color: '#0d1117' },
@@ -471,7 +453,7 @@
             vertLines: { color: 'rgba(255,255,255,0.04)' },
             horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)', minimumWidth: PRICE_AXIS_WIDTH },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)' },
         timeScale:       { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false },
         crosshair:       { mode: 1 /* magnet */ },
         autoSize: true,
@@ -491,80 +473,67 @@
         priceScaleId: '',
         color: 'rgba(180,180,180,0.4)',
     });
-    // Volume sub-pane at bottom 25% of chart area.
-    chart.priceScale('').applyOptions({ scaleMargins: { top: 0.80, bottom: 0 } });
+    // Vertical layout of the main chart when RSI is HIDDEN:
+    //   candles (top 80%) + volume (bottom 20%)
+    // When RSI is SHOWN we squeeze both up and reserve the bottom
+    // ~18% for the RSI oscillator on its OWN overlay price scale.
+    // Everything lives inside the same LWC chart instance, so time
+    // and vertical alignment are perfect by construction — no
+    // separate chart to sync, no minimumWidth juggling.
+    var CANDLE_BOTTOM_NO_RSI = 0.20;
+    var VOL_TOP_NO_RSI       = 0.80;
+    var VOL_BOT_NO_RSI       = 0.00;
 
-    // ── RSI sub-panel ────────────────────────────────────────────
-    // Separate LWC chart instance stacked under the main plot;
-    // shares the time-axis via bidirectional subscribeVisibleLogical
-    // RangeChange callbacks so the two charts pan / zoom together.
-    // Hidden by default (the RSI layer chip toggles the pane).
-    var rsiPane      = document.getElementById('chart-rsi-pane');
-    var rsiContainer = document.getElementById('chart-rsi-container');
-    var rsiChart = LightweightCharts.createChart(rsiContainer, {
-        layout:     { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
-        grid:       { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)', minimumWidth: PRICE_AXIS_WIDTH },
-        timeScale:  { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false, visible: false },
-        crosshair:  { mode: 1 },
-        autoSize: true,
-        // Both charts now stay in horizontal lockstep: whichever one
-        // the user drags / wheels, the other follows via the
-        // bidirectional time-range sync below. Only the price scale
-        // is independent, so the user can stretch the RSI's y-axis
-        // without touching the main chart's price zoom.
-        handleScroll: true,
-        handleScale: true,
-    });
-    var rsiSeries = rsiChart.addLineSeries({
+    var CANDLE_BOTTOM_RSI = 0.35;
+    var VOL_TOP_RSI       = 0.65;
+    var VOL_BOT_RSI       = 0.20;
+    var RSI_TOP           = 0.82;
+    var RSI_BOT           = 0.00;
+
+    chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.02, bottom: CANDLE_BOTTOM_NO_RSI } });
+    chart.priceScale('').applyOptions({ scaleMargins: { top: VOL_TOP_NO_RSI, bottom: VOL_BOT_NO_RSI } });
+
+    // ── RSI overlay series on the main chart ─────────────────────
+    // Same chart instance, own price scale ID 'rsi' positioned in
+    // the bottom band via scaleMargins. When toggled off we hide
+    // the series and rescale volume + candles to reclaim the space.
+    var rsiSeries = chart.addLineSeries({
         color: '#e599f7',
         lineWidth: 1,
+        priceScaleId: 'rsi',
         priceLineVisible: false,
-        lastValueVisible: true,
+        lastValueVisible: false,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+        // Force the RSI scale to always show 0-100 regardless of
+        // the data range so the 30/70 bands stay visible.
+        autoscaleInfoProvider: function () {
+            return { priceRange: { minValue: 0, maxValue: 100 } };
+        },
+        visible: false,
     });
-    // Seed the initial y-axis view to 0-100 via scaleMargins on the
-    // price scale — LWC's auto-fit then reveals the reference bands
-    // (30/50/70) on load. Once the user drags the right axis, LWC
-    // switches to manual mode and respects their zoom.
-    rsiChart.priceScale('right').applyOptions({
-        autoScale: true,
-        scaleMargins: { top: 0.05, bottom: 0.05 },
+    chart.priceScale('rsi').applyOptions({
+        scaleMargins: { top: RSI_TOP, bottom: RSI_BOT },
     });
-    // Reference bands via createPriceLine so they render inside the
-    // panel's price scale — 70 (overbought), 50 (midline), 30
-    // (oversold).
-    rsiSeries.createPriceLine({ price: 70, color: '#e03131', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '70' });
+    // Reference bands (30 / 50 / 70) rendered inside the RSI scale
+    // so they only appear in the bottom band.
+    rsiSeries.createPriceLine({ price: 70, color: '#e03131', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     rsiSeries.createPriceLine({ price: 50, color: '#adb5bd', lineWidth: 1, lineStyle: 3, axisLabelVisible: false });
-    rsiSeries.createPriceLine({ price: 30, color: '#2f9e44', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '30' });
-    // BIDIRECTIONAL time-axis sync. Either chart moves the other
-    // when panned or wheel-zoomed on the time axis. Loop prevention
-    // is done by value-based dedup rather than a synchronous flag
-    // (which LWC's async callback timing could slip past): each
-    // subscriber checks whether the incoming range matches the last
-    // one we PUSHED to that chart from the other side, and skips if
-    // so. Time comparison (not logical index) since the two series
-    // have different bar counts.
-    var lastPushToRsi  = null;
-    var lastPushToMain = null;
-    function rangeEq(a, b) {
-        return a && b && a.from === b.from && a.to === b.to;
-    }
-    chart.timeScale().subscribeVisibleTimeRangeChange(function (range) {
-        if (!range || rangeEq(range, lastPushToMain)) return;
-        lastPushToRsi = range;
-        try { rsiChart.timeScale().setVisibleRange(range); } catch (e) {}
-    });
-    rsiChart.timeScale().subscribeVisibleTimeRangeChange(function (range) {
-        if (!range || rangeEq(range, lastPushToRsi)) return;
-        lastPushToMain = range;
-        try { chart.timeScale().setVisibleRange(range); } catch (e) {}
-    });
+    rsiSeries.createPriceLine({ price: 30, color: '#2f9e44', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
 
-    // No post-render axis width sync needed anymore — both charts
-    // are pinned to PRICE_AXIS_WIDTH at creation, and that value is
-    // wider than any label they'll actually render, so LWC's
-    // max(labels, minimumWidth) collapses to minimumWidth on both.
+    // Swap layout margins based on RSI on/off. Called by
+    // refreshLayerVisibility when the RSI chip toggles.
+    function applyRsiLayout(enabled) {
+        rsiSeries.applyOptions({ visible: enabled });
+        chart.priceScale('right').applyOptions({
+            scaleMargins: { top: 0.02, bottom: enabled ? CANDLE_BOTTOM_RSI : CANDLE_BOTTOM_NO_RSI },
+        });
+        chart.priceScale('').applyOptions({
+            scaleMargins: {
+                top:    enabled ? VOL_TOP_RSI : VOL_TOP_NO_RSI,
+                bottom: enabled ? VOL_BOT_RSI : VOL_BOT_NO_RSI,
+            },
+        });
+    }
 
     // ── Lazy history load ──────────────────────────────────────────
     // Track the earliest loaded bar so we can fetch older data when
@@ -719,7 +688,7 @@
         applyPlanLinesVisibility();
         applyPositionLinesVisibility();
         applyHVNLinesVisibility();
-        if (rsiPane) rsiPane.classList.toggle('hidden', !layerOn('rsi'));
+        applyRsiLayout(layerOn('rsi'));
     }
     // Track plan visibility separately since planLines are recreated
     // on each data load.
@@ -1250,14 +1219,7 @@
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
         rsiSeries.setData(data.rsi || []);
-        // After the initial paint: snap RSI's time window to the
-        // main chart's. Both charts already share a locked
-        // PRICE_AXIS_WIDTH from creation, so no separate alignment
-        // step is needed.
-        requestAnimationFrame(function () {
-            var r = chart.timeScale().getVisibleRange();
-            if (r) { try { rsiChart.timeScale().setVisibleRange(r); } catch (e) {} }
-        });
+        // RSI is now on the same chart — no sync step needed.
         // Ensure current layer visibility is applied for series-level
         // toggles too (BOLL/vol/vp) — on initial load if user had
         // toggled off, LWC would still draw them.
