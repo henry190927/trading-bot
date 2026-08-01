@@ -1377,6 +1377,20 @@
     chart.timeScale().subscribeVisibleTimeRangeChange(scheduleVPUpdate);
     var resizeObs = new ResizeObserver(scheduleVPUpdate);
     resizeObs.observe(container);
+    // Price-axis drag doesn't fire subscribeVisibleTimeRangeChange
+    // (it's a price-scale event, not a time-scale one), so the VP
+    // bars stayed anchored to stale y coords when the user stretched
+    // the right axis — POC drifted off the actual highest-volume
+    // level. Same fix as the drawing overlay: cover the gap with a
+    // native mousemove listener on the plot wrap, rAF-throttled by
+    // scheduleVPUpdate so mousemove firing rate doesn't matter.
+    var plotWrapForVP = document.querySelector('.chart-plot-wrap');
+    if (plotWrapForVP) {
+        plotWrapForVP.addEventListener('mousemove', scheduleVPUpdate);
+        plotWrapForVP.addEventListener('mouseup',   function () {
+            requestAnimationFrame(scheduleVPUpdate);
+        });
+    }
 
     function applyChart(data) {
         allCandles = data.candles || [];
