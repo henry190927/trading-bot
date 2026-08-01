@@ -159,6 +159,18 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
       </button>
       <div class="draw-tools-menu hidden" id="draw-tools-menu" role="menu">
+        <!-- Color palette applied to any drawing created while this
+             color is selected. Persisted to localStorage. -->
+        <div class="draw-color-row" role="group" aria-label="drawing color">
+          <button type="button" class="draw-color-swatch" data-color="#4dabf7" style="background:#4dabf7" title="Blue"></button>
+          <button type="button" class="draw-color-swatch" data-color="#20c997" style="background:#20c997" title="Teal"></button>
+          <button type="button" class="draw-color-swatch" data-color="#f59f00" style="background:#f59f00" title="Orange"></button>
+          <button type="button" class="draw-color-swatch" data-color="#e03131" style="background:#e03131" title="Red"></button>
+          <button type="button" class="draw-color-swatch" data-color="#fcc419" style="background:#fcc419" title="Yellow"></button>
+          <button type="button" class="draw-color-swatch" data-color="#e599f7" style="background:#e599f7" title="Purple"></button>
+          <button type="button" class="draw-color-swatch" data-color="#c9d1d9" style="background:#c9d1d9" title="White"></button>
+        </div>
+        <div class="draw-menu-sep"></div>
         <button type="button" class="draw-btn draw-btn-menuitem" data-tool="hline" title="Horizontal line (1 click)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" x2="21" y1="12" y2="12"/></svg>
           <span class="draw-menuitem-label">Horizontal line</span>
@@ -2121,6 +2133,33 @@
         function saveDrawingsHidden() {
             try { localStorage.setItem('chart-drawings-hidden', drawingsHidden ? '1' : '0'); } catch (e) {}
         }
+        // Currently-selected color for NEW drawings. Persisted so
+        // the choice survives reloads. Existing drawings keep the
+        // color they were drawn with; this only affects what the
+        // next click creates.
+        var DEFAULT_DRAW_COLOR = '#4dabf7';
+        var drawColor = DEFAULT_DRAW_COLOR;
+        try {
+            var savedColor = localStorage.getItem('chart-draw-color');
+            if (savedColor) drawColor = savedColor;
+        } catch (e) {}
+        function saveDrawColor() {
+            try { localStorage.setItem('chart-draw-color', drawColor); } catch (e) {}
+        }
+        function syncColorSwatches() {
+            document.querySelectorAll('.draw-color-swatch').forEach(function (sw) {
+                sw.classList.toggle('is-active', sw.dataset.color === drawColor);
+            });
+        }
+        document.querySelectorAll('.draw-color-swatch').forEach(function (sw) {
+            sw.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                drawColor = sw.dataset.color;
+                saveDrawColor();
+                syncColorSwatches();
+            });
+        });
+        syncColorSwatches();
 
         // Per-symbol only so drawings persist across TF switches. A
         // horizontal level or rectangle is meaningful regardless of
@@ -2292,7 +2331,8 @@
                     var rc = document.createElementNS(SVG_NS, 'rect');
                     rc.setAttribute('x', x1); rc.setAttribute('y', y1);
                     rc.setAttribute('width', x2 - x1); rc.setAttribute('height', y2 - y1);
-                    rc.setAttribute('fill', 'rgba(76,110,245,0.10)');
+                    rc.setAttribute('fill', d.color || '#4c6ef5');
+                    rc.setAttribute('fill-opacity', '0.10');
                     rc.setAttribute('stroke', d.color || '#4c6ef5');
                     rc.setAttribute('stroke-width', isSel ? '1.8' : '1.2');
                     rc.setAttribute('data-drawing-id', d.id);
@@ -2437,7 +2477,7 @@
                 if (tp.time == null || tp.price == null || isNaN(tp.price)) return;
                 if (activeTool === 'hline') {
                     drawings.push({ id: 'd' + Date.now() + '_' + drawings.length,
-                                    type: 'hline', points: [tp], color: '#4dabf7' });
+                                    type: 'hline', points: [tp], color: drawColor });
                     saveDrawings();
                     setActiveTool(null);
                 } else if (activeTool === 'tline' || activeTool === 'rect') {
@@ -2445,7 +2485,7 @@
                     if (pending.length === 2) {
                         drawings.push({ id: 'd' + Date.now() + '_' + drawings.length,
                                         type: activeTool, points: pending.slice(),
-                                        color: activeTool === 'tline' ? '#20c997' : '#4c6ef5' });
+                                        color: drawColor });
                         pending = [];
                         saveDrawings();
                         setActiveTool(null);
