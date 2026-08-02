@@ -753,7 +753,10 @@
     var HIDE_KEY = 'chart-layers-hidden';
     var layersHidden = false;
     try { layersHidden = localStorage.getItem(HIDE_KEY) === '1'; } catch (e) {}
-    function saveHidden() { try { localStorage.setItem(HIDE_KEY, layersHidden ? '1' : '0'); } catch (e) {} }
+    function saveHidden() {
+        try { localStorage.setItem(HIDE_KEY, layersHidden ? '1' : '0'); } catch (e) {}
+        if (typeof pushStateToServer === 'function') pushStateToServer();
+    }
     // layerOn(name) — the ONLY function refresh code should consult
     // when deciding whether to render a layer. Combines individual
     // chip state with the master hide toggle.
@@ -764,8 +767,61 @@
             return Object.assign({}, DEFAULT_LAYERS, v);
         } catch (e) { return Object.assign({}, DEFAULT_LAYERS); }
     }
-    function saveLayers() { try { localStorage.setItem(LAYERS_KEY, JSON.stringify(layers)); } catch (e) {} }
+    // Debounced push of the current UI state to the server so a
+    // fresh browser (iPhone / incog / new device) inherits the most-
+    // used layer + color config without having to re-tick everything.
+    // localStorage remains the fast local cache; server is the
+    // cross-device source of truth.
+    var saveStateTimer = null;
+    function pushStateToServer() {
+        if (saveStateTimer) clearTimeout(saveStateTimer);
+        saveStateTimer = setTimeout(function () {
+            saveStateTimer = null;
+            var payload = { layers: layers, layersHidden: layersHidden };
+            // drawColor is set inside the drawings IIFE — read from
+            // localStorage instead of tightening scope, so a save
+            // still captures the latest color choice.
+            try { payload.drawColor = localStorage.getItem('chart-draw-color') || '#4dabf7'; } catch (e) {}
+            fetch('/api/chart/state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            }).catch(function () { /* silent — next save retries */ });
+        }, 400);
+    }
+    function saveLayers() {
+        try { localStorage.setItem(LAYERS_KEY, JSON.stringify(layers)); } catch (e) {}
+        pushStateToServer();
+    }
     var layers = loadLayers();
+    // On first load, ALSO pull the server state and apply it if the
+    // local one looks unpopulated (all defaults) — the case for a
+    // fresh device. If the local state has any layer flipped ON, we
+    // trust the local storage as the more recent user intent.
+    (function hydrateFromServer() {
+        var anyOn = false;
+        for (var k in layers) { if (layers[k]) { anyOn = true; break; } }
+        fetch('/api/chart/state', { headers: { 'Cache-Control': 'no-store' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (state) {
+                if (!state || !state.layers) return;
+                if (anyOn) return; // local wins when it has content
+                Object.keys(state.layers).forEach(function (k) { layers[k] = state.layers[k]; });
+                if (typeof state.layersHidden === 'boolean') layersHidden = state.layersHidden;
+                try { localStorage.setItem(LAYERS_KEY, JSON.stringify(layers)); } catch (e) {}
+                if (typeof state.drawColor === 'string') {
+                    try { localStorage.setItem('chart-draw-color', state.drawColor); } catch (e) {}
+                }
+                // Re-apply once the chart has finished initial paint.
+                setTimeout(function () {
+                    if (typeof syncChipsFromState === 'function') syncChipsFromState();
+                    if (typeof syncEyeButton === 'function') syncEyeButton();
+                    if (typeof refreshMarkers === 'function') refreshMarkers();
+                    if (typeof refreshLayerVisibility === 'function') refreshLayerVisibility();
+                }, 50);
+            })
+            .catch(function () { /* offline / first run — stay on local defaults */ });
+    })();
     // Cache the last-loaded markers so filter re-applies without refetch.
     var allMarkers = [];
 
@@ -2145,6 +2201,9 @@
         } catch (e) {}
         function saveDrawColor() {
             try { localStorage.setItem('chart-draw-color', drawColor); } catch (e) {}
+            // Also nudge the shared state pusher so a color change
+            // syncs across devices, not just the layer chips.
+            if (typeof pushStateToServer === 'function') pushStateToServer();
         }
         function syncColorSwatches() {
             document.querySelectorAll('.draw-color-swatch').forEach(function (sw) {

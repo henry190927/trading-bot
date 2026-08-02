@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -3081,6 +3082,57 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "id": t.ID})
+}
+
+// chartStatePath returns the on-disk location of the persisted
+// /chart preferences (layer selections, hide flag, draw color).
+// Single-user setup — no per-user segmentation.
+func chartStatePath() string {
+	if p := os.Getenv("CHART_STATE_PATH"); p != "" {
+		return p
+	}
+	return "/opt/trading/chart_state.json"
+}
+
+// handleAPIChartStateGet — GET /api/chart/state. Returns the
+// persisted layer/color state as raw JSON. Empty object if the
+// file doesn't exist yet.
+func (s *server) handleAPIChartStateGet(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	b, err := os.ReadFile(chartStatePath())
+	if err != nil || len(b) == 0 {
+		c.JSON(http.StatusOK, gin.H{})
+		return
+	}
+	var out map[string]any
+	if err := json.Unmarshal(b, &out); err != nil {
+		c.JSON(http.StatusOK, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+// handleAPIChartStatePost — POST /api/chart/state. Writes the
+// posted JSON body to disk verbatim so the client-side shape stays
+// authoritative. Rejects payloads > 8KB so a runaway client can't
+// blow up disk.
+func (s *server) handleAPIChartStatePost(c *gin.Context) {
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 8<<10))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "read: " + err.Error()})
+		return
+	}
+	// Sanity: must be valid JSON object.
+	var probe map[string]any
+	if err := json.Unmarshal(body, &probe); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "not a JSON object"})
+		return
+	}
+	if err := os.WriteFile(chartStatePath(), body, 0o644); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "write: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // resolveWebSymbol maps the short symbol the form posts (BTC/ETH/XAU/XAG)

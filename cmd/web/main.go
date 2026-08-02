@@ -119,6 +119,11 @@ func main() {
 	// record can happen inline without navigating away.
 	r.POST("/api/chart/validate", srv.handleAPIChartValidate)
 	r.POST("/api/chart/journal-open", srv.handleAPIChartJournalOpen)
+	// Per-user layer/color preferences persisted server-side so a
+	// fresh device (iPhone, incog window) inherits the same
+	// most-used config instead of the DEFAULT_LAYERS baseline.
+	r.GET("/api/chart/state", srv.handleAPIChartStateGet)
+	r.POST("/api/chart/state", srv.handleAPIChartStatePost)
 	r.GET("/onchain", srv.handleOnchainPage)
 	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
 	r.GET("/chart", srv.handleChartPage)
