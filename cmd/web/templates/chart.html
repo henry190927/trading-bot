@@ -794,18 +794,20 @@
         pushStateToServer();
     }
     var layers = loadLayers();
-    // On first load, ALSO pull the server state and apply it if the
-    // local one looks unpopulated (all defaults) — the case for a
-    // fresh device. If the local state has any layer flipped ON, we
-    // trust the local storage as the more recent user intent.
+    // On first load, ALSO pull the server state and apply it when
+    // localStorage is untouched (fresh device / cleared cache /
+    // iPhone incog). Detect "fresh" by whether the chart-layers key
+    // has ever been written — the previous "no layer is ON" check
+    // misfired because DEFAULT_LAYERS has `positions: true` baked
+    // in, so anyOn was always true even before the user did anything.
     (function hydrateFromServer() {
-        var anyOn = false;
-        for (var k in layers) { if (layers[k]) { anyOn = true; break; } }
+        var localFresh = false;
+        try { localFresh = localStorage.getItem(LAYERS_KEY) === null; } catch (e) { localFresh = true; }
         fetch('/api/chart/state', { headers: { 'Cache-Control': 'no-store' } })
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (state) {
                 if (!state || !state.layers) return;
-                if (anyOn) return; // local wins when it has content
+                if (!localFresh) return; // local wins when the user has already touched anything
                 Object.keys(state.layers).forEach(function (k) { layers[k] = state.layers[k]; });
                 if (typeof state.layersHidden === 'boolean') layersHidden = state.layersHidden;
                 try { localStorage.setItem(LAYERS_KEY, JSON.stringify(layers)); } catch (e) {}
