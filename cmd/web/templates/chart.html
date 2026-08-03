@@ -283,6 +283,33 @@
             <label for="quick-tp2">TP2</label>
             <input type="number" step="any" id="quick-tp2" placeholder="optional">
           </div>
+          <div class="quick-row quick-row-pair">
+            <label for="quick-margin">Margin</label>
+            <input type="number" step="any" min="0" id="quick-margin" placeholder="USDT">
+            <label for="quick-leverage" class="quick-inline-label">Lev</label>
+            <input type="number" step="1" min="0" max="500" id="quick-leverage" placeholder="×">
+          </div>
+          <!-- Estimated P&L block — populated live from entry / stop /
+               TP1 / TP2 / margin / leverage. Purely a preview; not
+               stored on the trade row. -->
+          <div class="quick-pnl hidden" id="quick-pnl">
+            <div class="quick-pnl-row">
+              <span class="quick-pnl-label">Notional</span>
+              <span class="quick-pnl-val" id="quick-pnl-notional">—</span>
+              <span class="quick-pnl-label">Risk</span>
+              <span class="quick-pnl-val quick-pnl-neg" id="quick-pnl-risk">—</span>
+            </div>
+            <div class="quick-pnl-row">
+              <span class="quick-pnl-label">TP1</span>
+              <span class="quick-pnl-val quick-pnl-pos" id="quick-pnl-tp1">—</span>
+              <span class="quick-pnl-label">TP2</span>
+              <span class="quick-pnl-val quick-pnl-pos" id="quick-pnl-tp2">—</span>
+            </div>
+            <div class="quick-pnl-row">
+              <span class="quick-pnl-label">R:R</span>
+              <span class="quick-pnl-val" id="quick-pnl-rr">—</span>
+            </div>
+          </div>
           <div class="quick-row">
             <label for="quick-anchor">Anchor</label>
             <input type="text" id="quick-anchor" placeholder="e.g. sweep, HVN, BB">
@@ -1897,6 +1924,72 @@
         var tp2In       = document.getElementById('quick-tp2');
         var anchorIn    = document.getElementById('quick-anchor');
         var notesIn     = document.getElementById('quick-notes');
+        var marginIn    = document.getElementById('quick-margin');
+        var leverageIn  = document.getElementById('quick-leverage');
+        var pnlBox      = document.getElementById('quick-pnl');
+        var pnlNotional = document.getElementById('quick-pnl-notional');
+        var pnlRisk     = document.getElementById('quick-pnl-risk');
+        var pnlTP1      = document.getElementById('quick-pnl-tp1');
+        var pnlTP2      = document.getElementById('quick-pnl-tp2');
+        var pnlRR       = document.getElementById('quick-pnl-rr');
+
+        // Live P&L preview: recomputes on any relevant field change.
+        // Formulas assume linear USDT-margined perp (long: gain when
+        // price rises above entry; short: mirror). Fees / funding are
+        // NOT included — this is the pre-fee gross so the user gets a
+        // clean upper bound.
+        function fmtUSD(v) {
+            if (v == null || isNaN(v)) return '—';
+            var s = (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2);
+            return v >= 0 ? s : '-$' + Math.abs(v).toFixed(2);
+        }
+        function recomputePnL() {
+            var side = selectedSide();
+            var entry = parseFloat(priceIn.value);
+            var stop  = parseFloat(stopIn.value);
+            var tp1   = parseFloat(tp1In.value);
+            var tp2   = parseFloat(tp2In.value);
+            var mgn   = parseFloat(marginIn.value);
+            var lev   = parseFloat(leverageIn.value);
+            if (!side || isNaN(entry) || entry <= 0 || isNaN(mgn) || mgn <= 0 || isNaN(lev) || lev <= 0) {
+                pnlBox.classList.add('hidden');
+                return;
+            }
+            pnlBox.classList.remove('hidden');
+            var notional = mgn * lev;               // USDT notional
+            var qty      = notional / entry;        // units of base asset
+            pnlNotional.textContent = '$' + notional.toFixed(2);
+            function legPnL(target) {
+                if (isNaN(target) || target <= 0) return null;
+                var move = side === 'long' ? (target - entry) : (entry - target);
+                return move * qty;
+            }
+            var riskPnL = null;
+            if (!isNaN(stop) && stop > 0) {
+                var stopMove = side === 'long' ? (stop - entry) : (entry - stop);
+                riskPnL = stopMove * qty; // negative on a stop hit
+                pnlRisk.textContent = fmtUSD(riskPnL);
+            } else {
+                pnlRisk.textContent = '—';
+            }
+            var tp1PnL = legPnL(tp1);
+            var tp2PnL = legPnL(tp2);
+            pnlTP1.textContent = tp1PnL == null ? '—' : fmtUSD(tp1PnL);
+            pnlTP2.textContent = tp2PnL == null ? '—' : fmtUSD(tp2PnL);
+            // R:R against TP1 (TP2 in parens if present).
+            var rrStr = '—';
+            if (riskPnL != null && riskPnL !== 0) {
+                var absRisk = Math.abs(riskPnL);
+                var parts = [];
+                if (tp1PnL != null) parts.push('TP1 ' + (tp1PnL / absRisk).toFixed(2) + 'R');
+                if (tp2PnL != null) parts.push('TP2 ' + (tp2PnL / absRisk).toFixed(2) + 'R');
+                if (parts.length) rrStr = parts.join(' · ');
+            }
+            pnlRR.textContent = rrStr;
+        }
+        [priceIn, stopIn, tp1In, tp2In, marginIn, leverageIn].forEach(function (el) {
+            if (el) el.addEventListener('input', recomputePnL);
+        });
         var sideBtns    = document.querySelectorAll('.quick-side-btn');
         var tabBtns     = document.querySelectorAll('.quick-tab');
         var submitBtn   = document.getElementById('quick-go-submit');
@@ -2086,6 +2179,27 @@
                 sideBtns.forEach(function (x) { x.classList.remove('active'); });
                 b.classList.add('active');
                 updateGoState();
+                recomputePnL();
+            });
+        });
+
+        // Sticky prefs: leverage + margin are habitual — remember the
+        // last used values so the user doesn't retype 100 / 100 on
+        // every trade.
+        var QUICK_LEV_KEY = 'chart-quick-lev';
+        var QUICK_MGN_KEY = 'chart-quick-mgn';
+        try {
+            var savedLev = localStorage.getItem(QUICK_LEV_KEY);
+            var savedMgn = localStorage.getItem(QUICK_MGN_KEY);
+            if (savedLev) leverageIn.value = savedLev;
+            if (savedMgn) marginIn.value   = savedMgn;
+        } catch (e) {}
+        [marginIn, leverageIn].forEach(function (el) {
+            el.addEventListener('change', function () {
+                try {
+                    localStorage.setItem(QUICK_LEV_KEY, leverageIn.value);
+                    localStorage.setItem(QUICK_MGN_KEY, marginIn.value);
+                } catch (e) {}
             });
         });
 
@@ -2095,7 +2209,8 @@
             priceIn.value = fmtPriceInput(price);
             sideBtns.forEach(function (x) { x.classList.remove('active'); });
             // Reset record-only fields on each open — user's stop /
-            // TP levels are typically per-trade.
+            // TP levels are typically per-trade. Leverage + margin
+            // stay populated from last-used (sticky prefs above).
             stopIn.value = '';
             tp1In.value  = '';
             tp2In.value  = '';
@@ -2104,6 +2219,7 @@
             resultBox.classList.add('hidden');
             resultBox.innerHTML = '';
             updateGoState();
+            recomputePnL();
             backdrop.classList.remove('hidden');
             setTimeout(function () { priceIn.focus(); priceIn.select(); }, 30);
         }
@@ -2131,13 +2247,15 @@
             var price = parseFloat(priceIn.value);
             if (!side || isNaN(price) || price <= 0) return null;
             return {
-                symbol: currentSym(), tf: currentTF(),
-                side:   side, entry:  price,
-                stop:   stopIn.value.trim(),
-                tp1:    tp1In.value.trim(),
-                tp2:    tp2In.value.trim(),
-                anchor: anchorIn.value.trim(),
-                notes:  notesIn.value.trim(),
+                symbol:      currentSym(), tf: currentTF(),
+                side:        side, entry:  price,
+                stop:        stopIn.value.trim(),
+                tp1:         tp1In.value.trim(),
+                tp2:         tp2In.value.trim(),
+                anchor:      anchorIn.value.trim(),
+                notes:       notesIn.value.trim(),
+                margin_usdt: marginIn.value.trim(),
+                leverage:    leverageIn.value.trim(),
             };
         }
         function encodeForm(obj) {

@@ -1605,6 +1605,16 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		}
 		leverage = n
 	}
+	// USDT margin (optional, 0 = "not recorded").
+	var marginUSDT float64
+	if mStr := strings.TrimSpace(c.PostForm("margin_usdt")); mStr != "" {
+		v, err := strconv.ParseFloat(mStr, 64)
+		if err != nil || v < 0 {
+			rerender("margin_usdt must be a non-negative number")
+			return
+		}
+		marginUSDT = v
+	}
 
 	// Apply mutations
 	trades[idx].Symbol = sym
@@ -1615,6 +1625,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	trades[idx].OpenNotes = strings.TrimSpace(c.PostForm("open_notes"))
 	trades[idx].CloseNotes = strings.TrimSpace(c.PostForm("close_notes"))
 	trades[idx].Leverage = leverage
+	trades[idx].MarginUSDT = marginUSDT
 	trades[idx].Entry = entry
 	trades[idx].Stop = stop
 	trades[idx].TP1 = tp1
@@ -3050,6 +3061,21 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 	anchor := strings.TrimSpace(c.PostForm("anchor"))
 	notes := strings.TrimSpace(c.PostForm("notes"))
 
+	// Optional collateral + leverage. Both silently ignored if
+	// blank; the user can fill them in later via /journal/:id/edit.
+	var margin float64
+	if v := strings.TrimSpace(c.PostForm("margin_usdt")); v != "" {
+		if f, err := parseFloatPositive(v, "margin_usdt"); err == nil {
+			margin = f
+		}
+	}
+	var leverage int
+	if v := strings.TrimSpace(c.PostForm("leverage")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			leverage = n
+		}
+	}
+
 	trades, err := journal.ReadAll("")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "read journal: " + err.Error()})
@@ -3075,6 +3101,8 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		TP2:        tp2,
 		Anchor:     anchor,
 		OpenNotes:  notes,
+		MarginUSDT: margin,
+		Leverage:   leverage,
 	}
 	trades = append(trades, t)
 	if err := journal.WriteAll("", trades); err != nil {
