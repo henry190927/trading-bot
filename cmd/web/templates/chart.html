@@ -1688,8 +1688,16 @@
                     linerEl.textContent = '⚠ ' + (res.body.error || 'load failed');
                     return;
                 }
-                applyHeader(res.body);
+                // applyChart FIRST — populates allCandles + all series
+                // data. applyHeader is downstream: its 24h-stats calc
+                // reads allCandles, and it also updates the symbol
+                // header text, which triggers the drawings' scope-
+                // reload MutationObserver — that also needs the fresh
+                // allCandles for correct tp→coord conversion. Swapping
+                // avoids a symbol-switch flash of stale-symbol content
+                // that only refreshing the page cleared.
                 applyChart(res.body);
+                applyHeader(res.body);
             })
             .catch(function (e) {
                 linerEl.textContent = '⚠ network: ' + e.message;
