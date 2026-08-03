@@ -224,6 +224,10 @@
           <span class="ohlc-chg" id="ohlc-chg">—</span>
         </div>
         <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <!-- POC migration labels — HTML text pinned to the LEFT
+             edge of the plot. Kept off the right axis so the VP
+             histogram there stays uncluttered. -->
+        <div id="chart-poc-labels" class="chart-poc-labels" aria-hidden="true"></div>
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
         <div class="chart-price-marker" id="chart-price-marker" hidden>
           <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
@@ -1119,24 +1123,53 @@
         clearPOCMigLines();
         if (!layerOn('poc-mig') || !lastPOCMig) return;
         var m = lastPOCMig;
-        function push(price, color, title) {
+        function push(price, color) {
             if (!price) return;
             pocMigLines.push(candleSeries.createPriceLine({
                 price: price, color: color,
                 lineWidth: 1, lineStyle: 2,
-                axisLabelVisible: true, title: title,
+                axisLabelVisible: false, // labels drawn as left-side HTML overlay
             }));
         }
-        // Trend arrow + drift % in the label so the direction is
-        // obvious even when the three lines are close together.
-        var arrow = '→';
-        if (m.trend === 'rising')  arrow = '↗';
-        if (m.trend === 'falling') arrow = '↘';
+        push(m.short, '#f76707');
+        push(m.med,   '#e599f7');
+        push(m.long,  '#7048e8');
+        drawPOCMigLabels();
+    }
+    // Left-side HTML label overlay for POC migration — keeps the
+    // right price axis + VP histogram uncluttered. Labels render at
+    // (left: 4px, top: priceToCoordinate(price)) and refresh
+    // whenever the chart repaints (piggybacked on scheduleVPUpdate).
+    function drawPOCMigLabels() {
+        var host = document.getElementById('chart-poc-labels');
+        if (!host) return;
+        while (host.firstChild) host.removeChild(host.firstChild);
+        if (!layerOn('poc-mig') || !lastPOCMig) return;
+        var m = lastPOCMig;
+        var arrow = m.trend === 'rising' ? '↗' : m.trend === 'falling' ? '↘' : '→';
         var driftStr = (m.driftPct * 100).toFixed(2) + '%';
         var stackTag = m.stacked ? ' [stacked]' : '';
-        push(m.short, '#f76707', 'POC50 ' + arrow + ' ' + driftStr + stackTag);
-        push(m.med,   '#e599f7', 'POC100');
-        push(m.long,  '#7048e8', 'POC200');
+        function fmt(v) {
+            if (!v || isNaN(v)) return '';
+            if (v >= 1000) return v.toFixed(2);
+            if (v >= 10)   return v.toFixed(3);
+            if (v >= 1)    return v.toFixed(4);
+            return v.toFixed(6);
+        }
+        function emit(price, color, name, extra) {
+            if (!price) return;
+            var y = candleSeries.priceToCoordinate(price);
+            if (y == null) return;
+            var el = document.createElement('div');
+            el.className = 'chart-poc-label';
+            el.style.top = y + 'px';
+            el.style.color = color;
+            el.textContent = name + ' ' + fmt(price) + (extra ? '  ' + extra : '');
+            host.appendChild(el);
+        }
+        emit(m.short, '#f76707', 'POC50',  arrow + ' ' + driftStr + stackTag);
+        emit(m.med,   '#e599f7', 'POC100', '');
+        emit(m.long,  '#7048e8', 'POC200', '');
     }
     function clearPositionLines() {
         positionLines.forEach(function (l) { candleSeries.removePriceLine(l); });
@@ -1629,6 +1662,9 @@
             vpFrame = null;
             recomputeVPForVisibleRange();
             drawVP();
+            // POC-mig labels ride the same rAF — they need to
+            // re-position on any price-scale change too.
+            if (typeof drawPOCMigLabels === 'function') drawPOCMigLabels();
         });
     }
 

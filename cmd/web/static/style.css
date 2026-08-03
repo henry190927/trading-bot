@@ -1672,6 +1672,32 @@ footer {
 }
 .chart-price-marker .chart-price-plus { pointer-events: auto; }
 
+/* POC migration labels — pinned to the LEFT edge so they don't
+   overlap the VP histogram + right price axis. Each label
+   translates -50% on Y so the text vertically centers on its
+   POC price line. */
+.chart-poc-labels {
+    position: absolute;
+    top: 0;
+    left: 4px;
+    right: 0;
+    height: 100%;
+    pointer-events: none;
+    z-index: 6;
+}
+.chart-poc-label {
+    position: absolute;
+    left: 0;
+    transform: translateY(-50%);
+    padding: 1px 6px;
+    background: rgba(13,17,23,0.85);
+    border-radius: 3px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
 /* Drawing tools overlay — SVG stacked above VP overlay & canvas.
    pointer-events toggled by JS based on active tool. */
 .chart-draw-overlay {
