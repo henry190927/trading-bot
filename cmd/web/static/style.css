@@ -1180,6 +1180,17 @@ footer {
 }
 
 .chart-layers-actions { margin-left: auto; }
+.chart-tz-select {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+.chart-tz-select:hover { border-color: var(--blue); }
 .layer-count {
     display: inline-block;
     min-width: 1.4em;

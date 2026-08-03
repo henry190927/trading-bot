@@ -133,6 +133,14 @@
     </div>
     <span class="chart-layers-group chart-layers-actions">
       <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?">ⓘ</button>
+      <select id="chart-tz-select" class="layer-chip chart-tz-select" title="Timezone for axis / tooltip times" aria-label="Timezone">
+        <option value="0">UTC</option>
+        <option value="8" selected>UTC+8 Taipei</option>
+        <option value="9">UTC+9 Tokyo</option>
+        <option value="-4">UTC-4 NY (EDT)</option>
+        <option value="-5">UTC-5 NY (EST)</option>
+        <option value="1">UTC+1 London</option>
+      </select>
       <button type="button" class="layer-chip layer-reset" id="layers-reset" title="Reset chart zoom to fit all data">⟲ fit</button>
       <button type="button" class="layer-chip layer-eye" id="layers-eye" title="toggle display without clearing selections" aria-label="Toggle indicator visibility">
         <svg class="icon-eye-open"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -559,6 +567,40 @@
     var refreshBtn = document.getElementById('chart-refresh');
 
     // ── Chart construction ──────────────────────────────────────────
+    // Timezone offset (hours from UTC) used for the time-axis labels
+    // and the crosshair tooltip. Default UTC+8 (Asia/Taipei) for the
+    // user; overridable via the select in the layer-actions row.
+    // Persisted in localStorage + server state so a fresh device
+    // inherits the same choice.
+    var TZ_KEY = 'chart-tz';
+    var tzOffsetHours = 8;
+    try {
+        var saved = localStorage.getItem(TZ_KEY);
+        if (saved != null && saved !== '') tzOffsetHours = parseFloat(saved);
+    } catch (e) {}
+    function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+    // Format `unixSec` as if the viewer were in a fixed UTC±N zone.
+    // We shift the timestamp by the offset then read UTC fields so
+    // the output text doesn't depend on the browser's local TZ.
+    function fmtTZTime(unixSec) {
+        var d = new Date((unixSec + tzOffsetHours * 3600) * 1000);
+        var y = d.getUTCFullYear(), mo = pad2(d.getUTCMonth() + 1), da = pad2(d.getUTCDate());
+        var hh = pad2(d.getUTCHours()), mm = pad2(d.getUTCMinutes());
+        return y + '-' + mo + '-' + da + ' ' + hh + ':' + mm;
+    }
+    // Compact axis label. tickMarkType: 0=Year 1=Month 2=DayOfMonth 3=Time 4=TimeWithSeconds
+    function fmtTZAxis(unixSec, tickMarkType) {
+        var d = new Date((unixSec + tzOffsetHours * 3600) * 1000);
+        switch (tickMarkType) {
+            case 0: return '' + d.getUTCFullYear();
+            case 1: return d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+            case 2: return d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }) + ' ' + d.getUTCDate();
+            case 3: return pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes());
+            case 4: return pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()) + ':' + pad2(d.getUTCSeconds());
+            default: return fmtTZTime(unixSec);
+        }
+    }
+
     var chart = LightweightCharts.createChart(container, {
         layout: {
             background: { type: 'solid', color: '#0d1117' },
@@ -569,10 +611,32 @@
             horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
         rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)' },
-        timeScale:       { borderColor: 'rgba(255,255,255,0.10)', timeVisible: true, secondsVisible: false },
-        crosshair:       { mode: 1 /* magnet */ },
+        timeScale: {
+            borderColor: 'rgba(255,255,255,0.10)',
+            timeVisible: true, secondsVisible: false,
+            tickMarkFormatter: fmtTZAxis,
+        },
+        localization: { timeFormatter: fmtTZTime },
+        crosshair: { mode: 1 /* magnet */ },
         autoSize: true,
     });
+
+    // Wire the timezone <select>. Rebinding via applyOptions makes
+    // LWC re-format the whole time axis immediately.
+    (function initTZ() {
+        var sel = document.getElementById('chart-tz-select');
+        if (!sel) return;
+        sel.value = String(tzOffsetHours);
+        sel.addEventListener('change', function () {
+            tzOffsetHours = parseFloat(sel.value);
+            try { localStorage.setItem(TZ_KEY, sel.value); } catch (e) {}
+            chart.applyOptions({
+                timeScale: { tickMarkFormatter: fmtTZAxis },
+                localization: { timeFormatter: fmtTZTime },
+            });
+            if (typeof pushStateToServer === 'function') pushStateToServer();
+        });
+    })();
 
     var candleSeries = chart.addCandlestickSeries({
         upColor: '#26a69a', downColor: '#ef5350',
@@ -777,7 +841,7 @@
         if (saveStateTimer) clearTimeout(saveStateTimer);
         saveStateTimer = setTimeout(function () {
             saveStateTimer = null;
-            var payload = { layers: layers, layersHidden: layersHidden };
+            var payload = { layers: layers, layersHidden: layersHidden, tzOffsetHours: tzOffsetHours };
             // drawColor is set inside the drawings IIFE — read from
             // localStorage instead of tightening scope, so a save
             // still captures the latest color choice.
@@ -813,6 +877,16 @@
                 try { localStorage.setItem(LAYERS_KEY, JSON.stringify(layers)); } catch (e) {}
                 if (typeof state.drawColor === 'string') {
                     try { localStorage.setItem('chart-draw-color', state.drawColor); } catch (e) {}
+                }
+                if (typeof state.tzOffsetHours === 'number') {
+                    tzOffsetHours = state.tzOffsetHours;
+                    try { localStorage.setItem(TZ_KEY, String(tzOffsetHours)); } catch (e) {}
+                    var tzSel = document.getElementById('chart-tz-select');
+                    if (tzSel) tzSel.value = String(tzOffsetHours);
+                    chart.applyOptions({
+                        timeScale: { tickMarkFormatter: fmtTZAxis },
+                        localization: { timeFormatter: fmtTZTime },
+                    });
                 }
                 // Re-apply once the chart has finished initial paint.
                 setTimeout(function () {
