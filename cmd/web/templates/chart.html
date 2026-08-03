@@ -1997,14 +1997,16 @@
     }
     function startPoll() {
         stopPoll();
-        // 5s interval — 3s overwhelmed the render pipeline (each tick
-        // rebuilds ctx-chip innerHTML, updates 3 Bollinger series, and
-        // forces LWC to re-lay-out). 5s stays snappy enough to feel
-        // live while letting one paint finish before the next fetch
-        // lands. Fire once immediately so the header doesn't feel
-        // stuck after a symbol/TF switch.
+        // 3s interval — the earlier render-pipeline stacking that
+        // forced us to 5s was rooted in the LWC series.update()
+        // stale-bar bug (fixed in 6fab2cd). Now that pollTick's
+        // .then chain reliably completes each cycle, 3s stays
+        // snappy for live-price feel while the in-flight guard
+        // still back-pressures on network hiccups. Fire once
+        // immediately so the header doesn't feel stuck after a
+        // symbol/TF switch.
         pollTick();
-        pollTimer = setInterval(pollTick, 5000);
+        pollTimer = setInterval(pollTick, 3000);
     }
     function stopPoll() {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
