@@ -1680,10 +1680,19 @@
     // scheduleVPUpdate so mousemove firing rate doesn't matter.
     var plotWrapForVP = document.querySelector('.chart-plot-wrap');
     if (plotWrapForVP) {
+        // Mouse (desktop) + touch (mobile) both trigger the same
+        // rAF-throttled redraw. LWC's touch pinch/pan doesn't emit
+        // mouse events, so without touchmove the VP + POC labels
+        // stay anchored to stale y coords when the user
+        // pinch-zooms or drags the price axis on iOS.
         plotWrapForVP.addEventListener('mousemove', scheduleVPUpdate);
         plotWrapForVP.addEventListener('mouseup',   function () {
             requestAnimationFrame(scheduleVPUpdate);
         });
+        plotWrapForVP.addEventListener('touchmove', scheduleVPUpdate, { passive: true });
+        plotWrapForVP.addEventListener('touchend',  function () {
+            requestAnimationFrame(scheduleVPUpdate);
+        }, { passive: true });
     }
 
     function applyChart(data) {
@@ -2960,6 +2969,13 @@
         plot.addEventListener('mouseup', function () {
             requestAnimationFrame(scheduleRedraw);
         });
+        // iOS / touch parity — pinch-zoom + pan emit touchmove, not
+        // mousemove, so drawings stayed anchored to stale coords on
+        // mobile.
+        plot.addEventListener('touchmove', scheduleRedraw, { passive: true });
+        plot.addEventListener('touchend',  function () {
+            requestAnimationFrame(scheduleRedraw);
+        }, { passive: true });
 
         // Reload drawings whenever symbol/TF changes so we don't show
         // BTC 1h drawings while looking at ETH 4h. symSel change + tf
