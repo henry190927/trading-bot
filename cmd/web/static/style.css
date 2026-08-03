@@ -1689,17 +1689,19 @@ footer {
     position: absolute;
     left: 0;
     transform: translateY(-50%);
-    padding: 1px 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
     font-family: ui-monospace, "SF Mono", monospace;
     font-size: 0.7rem;
     white-space: nowrap;
     line-height: 1.2;
-    /* No background — labels sit on top of the chart in their own
-       color (orange / pink / purple) matching each POC line. */
+    color: #fff;
+    /* Per-instance background comes from JS (matches the POC line
+       color); white text sits on top like LWC's own axis pills. */
 }
 .chart-poc-label-sub {
     font-size: 0.65rem;
-    opacity: 0.85;
+    opacity: 0.9;
 }
 
 /* Drawing tools overlay — SVG stacked above VP overlay & canvas.
