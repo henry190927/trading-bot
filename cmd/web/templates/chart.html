@@ -101,6 +101,7 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="plan">plan</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">POC migration</button>
       </div>
     </div>
 
@@ -383,12 +384,62 @@
           <dt><span class="glossary-tag">VP</span></dt>
           <dd>
             <div class="lang-en">
-              <b>Visible-Range Volume Profile (VRVP)</b> — buy/sell volume across price levels in the visible window; recomputes on pan/zoom.
-              <p class="glossary-how"><b>Direction:</b> <b>POC</b> (highest-vol row) acts as a magnet — price often reverts there. <b>HVN</b> = strong support (below current price) / resistance (above). <b>LVN</b> = air gap, price moves fast through. Blue &gt; orange on a level = absorption at that price → likely reversal from that side; reverse = distribution.</p>
+              <b>Visible-Range Volume Profile (VRVP)</b> — per-level buy/sell volume in the visible window; recomputes on pan/zoom.
+              <p class="glossary-how"><b>Colors are candle-direction approximations, NOT order-book flow:</b>
+                <br>• <span style="color:#4c6ef5">■ Blue</span> = green-candle (close ≥ open) volume — buyer-led bars at that price
+                <br>• <span style="color:#f59f00">■ Orange</span> = red-candle volume — seller-led bars
+              </p>
+              <p class="glossary-how"><b>Levels:</b>
+                <br>• <b>POC</b> (highest-volume row) — magnet; price tends to revert
+                <br>• <b>HVN</b> — support below current price / resistance above
+                <br>• <b>LVN</b> — air gap; price moves fast through
+              </p>
+              <p class="glossary-how"><b>Reading combinations:</b>
+                <br>• Blue-heavy at HIGH prices + orange-heavy at LOW prices → <b>trend-up structure</b>: buyers stepping up on rallies, sellers exhausted on dips. Blue HVN below current price often becomes <span class="dir-long">support</span>.
+                <br>• Orange-heavy at HIGH + blue-heavy at LOW → mirror bearish structure. Orange HVN above becomes <span class="dir-short">resistance</span>.
+                <br>• Blue &gt; orange <b>at a specific level</b> = absorption there → likely reversal from that side.
+                <br><b>Caveat:</b> if the window covers a long one-directional move, colors just mirror the trajectory itself — not "active pressure". Cross-check with recent price action.
+              </p>
             </div>
             <div class="lang-zh">
               <b>可視範圍成交量分佈 (VRVP)</b> — 視窗內各價位的買賣量，隨移動/縮放重新計算。
-              <p class="glossary-how"><b>方向解讀：</b><b>POC</b>（最大量價位）為磁吸點，價格常回歸此處。<b>HVN</b>（高量區） = 現價下方為支撐、上方為壓力。<b>LVN</b>（低量區） = 真空帶，快速穿越。藍色 &gt; 橘色 = 該價位有吸籌，可能自此反轉<span class="dir-long">做多</span>；反之則有派發風險。</p>
+              <p class="glossary-how"><b>顏色是 K 棒方向的近似，不是訂單簿真正買賣流向：</b>
+                <br>• <span style="color:#4c6ef5">■ 藍色</span> = 綠 K（收 ≥ 開）的成交量 — 該價位是買方主導成交
+                <br>• <span style="color:#f59f00">■ 橘色</span> = 紅 K 的成交量 — 該價位是賣方主導成交
+              </p>
+              <p class="glossary-how"><b>三個關鍵位置：</b>
+                <br>• <b>POC</b>（最大量價位）— 磁吸點，價格常回歸
+                <br>• <b>HVN</b>（高量區）— 現價下方為支撐、上方為壓力
+                <br>• <b>LVN</b>（低量區）— 真空帶，價格快速穿越
+              </p>
+              <p class="glossary-how"><b>顏色分佈組合解讀：</b>
+                <br>• 高價區藍多、低價區橘多 → <b>多頭結構</b>：買方在高位承接、賣方在低位力竭。下方藍色 HVN 常成為<span class="dir-long">支撐</span>。
+                <br>• 高價區橘多、低價區藍多 → 空頭結構，上方橘色 HVN 成為<span class="dir-short">壓力</span>。
+                <br>• 某個價位藍色 &gt; 橘色 = 該價位有吸籌 → 可能自此反轉。
+                <br><b>陷阱：</b>若視窗涵蓋長段單向走勢，顏色只是反映走勢軌跡本身，不代表「主動壓力」。要結合近期價格行為交叉驗證。
+              </p>
+            </div>
+          </dd>
+
+          <dt><span class="glossary-tag">POC migration</span></dt>
+          <dd>
+            <div class="lang-en">
+              <b>Three POC price lines across nested windows</b> — POC50 (last 50 bars, brightest), POC100 (medium), POC200 (long, faded purple). The label on POC50 shows an arrow + drift % vs POC200 and a `[stacked]` tag when the three are strictly monotonic.
+              <p class="glossary-how"><b>Reading:</b>
+                <br>• <b>Rising + stacked (↗ POC50 &gt; POC100 &gt; POC200)</b> — volume-weighted uptrend regime → <span class="dir-long">trade-with-trend LONG</span>, favor pullback longs to the ladder.
+                <br>• <b>Falling + stacked (↘)</b> → mirror → <span class="dir-short">SHORT</span> bias, fade rallies into the ladder.
+                <br>• <b>Flat / non-stacked</b> — range regime; VP-driven mean-reversion trades score better than trend-continuation.
+                <br>Drift &lt; 0.5% collapses to "flat". Stacked = high-conviction regime; non-stacked drift = weaker signal.
+              </p>
+            </div>
+            <div class="lang-zh">
+              <b>三條 POC 水平線（不同視窗）</b> — POC50（最近 50 根、最亮）、POC100（中）、POC200（長、褪色紫）。POC50 標籤帶方向箭頭 + 相對 POC200 的漂移 %，三線嚴格單調時加 <code>[stacked]</code>。
+              <p class="glossary-how"><b>方向解讀：</b>
+                <br>• <b>上行且 stacked (↗ POC50 &gt; POC100 &gt; POC200)</b> — 量能加權多頭趨勢 → <span class="dir-long">順勢做多</span>，優先回踩到梯線做多。
+                <br>• <b>下行且 stacked (↘)</b> → 反之 → <span class="dir-short">做空</span>偏好，反彈到梯線做空。
+                <br>• <b>Flat 或非 stacked</b> — 盤整期，做均值回歸型別（VP 反轉）比做趨勢延續好。
+                <br>漂移 &lt; 0.5% 判為 flat。Stacked = 高信心的趨勢期；非 stacked 的漂移 = 弱訊號。
+              </p>
             </div>
           </dd>
 
@@ -832,7 +883,7 @@
         boll: false, vol: false, vp: false, plan: false, positions: true,
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
-        rsi: false, 'macd-pane': false, hvn: false,
+        rsi: false, 'macd-pane': false, hvn: false, 'poc-mig': false,
         'delta-div': false,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
@@ -1005,6 +1056,7 @@
         applyPlanLinesVisibility();
         applyPositionLinesVisibility();
         applyHVNLinesVisibility();
+        applyPOCMigLinesVisibility();
         applyPaneLayout();
         updateMenuActiveCounts();
     }
@@ -1050,6 +1102,41 @@
                 title: i === 0 ? 'POC' : 'HVN',
             }));
         });
+    }
+
+    // ── POC migration ladder ─────────────────────────────────────
+    // Three horizontal lines at POC50 (recent 50 bars) / POC100 /
+    // POC200. Colored to hint the temporal recency — brightest for
+    // the newest window, faded for the longest — so the visual
+    // ladder makes it easy to see the direction and speed of drift.
+    var pocMigLines = [];
+    var lastPOCMig = null;
+    function clearPOCMigLines() {
+        pocMigLines.forEach(function (l) { candleSeries.removePriceLine(l); });
+        pocMigLines = [];
+    }
+    function applyPOCMigLinesVisibility() {
+        clearPOCMigLines();
+        if (!layerOn('poc-mig') || !lastPOCMig) return;
+        var m = lastPOCMig;
+        function push(price, color, title) {
+            if (!price) return;
+            pocMigLines.push(candleSeries.createPriceLine({
+                price: price, color: color,
+                lineWidth: 1, lineStyle: 2,
+                axisLabelVisible: true, title: title,
+            }));
+        }
+        // Trend arrow + drift % in the label so the direction is
+        // obvious even when the three lines are close together.
+        var arrow = '→';
+        if (m.trend === 'rising')  arrow = '↗';
+        if (m.trend === 'falling') arrow = '↘';
+        var driftStr = (m.driftPct * 100).toFixed(2) + '%';
+        var stackTag = m.stacked ? ' [stacked]' : '';
+        push(m.short, '#f76707', 'POC50 ' + arrow + ' ' + driftStr + stackTag);
+        push(m.med,   '#e599f7', 'POC100');
+        push(m.long,  '#7048e8', 'POC200');
     }
     function clearPositionLines() {
         positionLines.forEach(function (l) { candleSeries.removePriceLine(l); });
@@ -1598,6 +1685,8 @@
         applyPositionLinesVisibility();
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
+        lastPOCMig = data.pocMigration || null;
+        applyPOCMigLinesVisibility();
         rsiSeries.setData(data.rsi || []);
         // MACD: histogram + line + signal. Color each histogram bar
         // by its sign (green when momentum positive, red when negative).
@@ -1811,6 +1900,10 @@
                     lastHVN = data.hvn;
                     applyHVNLinesVisibility();
                     updateLayerCounts();
+                }
+                if (data.pocMigration) {
+                    lastPOCMig = data.pocMigration;
+                    applyPOCMigLinesVisibility();
                 }
                 // Helper: update the tail of any line/histogram
                 // series while respecting LWC's time>=last invariant.
