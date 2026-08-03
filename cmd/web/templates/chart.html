@@ -1164,7 +1164,18 @@
             el.className = 'chart-poc-label';
             el.style.top = y + 'px';
             el.style.color = color;
-            el.textContent = name + ' ' + fmt(price) + (extra ? '  ' + extra : '');
+            // Main line: name + price. Extra info (arrow + drift +
+            // stacked tag) goes on a second line so labels stay
+            // narrow and don't overrun the plot.
+            var head = document.createElement('div');
+            head.textContent = name + ' ' + fmt(price);
+            el.appendChild(head);
+            if (extra) {
+                var sub = document.createElement('div');
+                sub.className = 'chart-poc-label-sub';
+                sub.textContent = extra;
+                el.appendChild(sub);
+            }
             host.appendChild(el);
         }
         emit(m.short, '#f76707', 'POC50',  arrow + ' ' + driftStr + stackTag);

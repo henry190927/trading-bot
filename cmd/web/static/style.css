@@ -1697,6 +1697,10 @@ footer {
     /* No background — labels sit on top of the chart in their own
        color (orange / pink / purple) matching each POC line. */
 }
+.chart-poc-label-sub {
+    font-size: 0.65rem;
+    opacity: 0.85;
+}
 
 /* Drawing tools overlay — SVG stacked above VP overlay & canvas.
    pointer-events toggled by JS based on active tool. */
