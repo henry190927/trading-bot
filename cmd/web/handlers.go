@@ -3682,7 +3682,7 @@ func (s *server) handleChartPage(c *gin.Context) {
 		"Symbol":  strings.ToUpper(defaultStr(c.Query("symbol"), "BTC")),
 		"TF":      defaultStr(c.Query("tf"), "1h"),
 		"Symbols": []string{"BTC", "ETH", "XAU", "XAG"},
-		"TFs":     []string{"15m", "30m", "1h", "2h", "4h", "1d"},
+		"TFs":     []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 	})
 }
 
@@ -3978,6 +3978,7 @@ func (s *server) handleChartData(c *gin.Context) {
 		"markPrice":     view.MarkPrice,
 		"marketCtx":     ctxSnap,
 		"openPositions": openPositions,
+		"structure":     computeChartStructure(candles),
 	})
 }
 
@@ -4048,6 +4049,56 @@ func collectOpenPositionsForChart(short string, markPrice float64) []map[string]
 // All input candles must be in ascending time order (as returned by
 // bingx.Klines / KlinesWithForming). Marker times MUST also be sorted
 // ascending for LWC — we sort at the end.
+// computeChartStructure projects the N 字 structural snapshot for the
+// /chart "struct" layer: recent swing points (the zigzag), the active
+// 樞紐區 pivot zone with its invalidation + measured-move target, the
+// key BOS/protected levels, and the latest BOS/CHoCH event. Returns nil
+// on short input. Pure/read-only — same closed-bar detector the engine
+// veto uses (signal.AnalyzeStructure), so the chart shows exactly what
+// the engine sees.
+func computeChartStructure(candles []market.Candle) map[string]any {
+	if len(candles) < 10 {
+		return nil
+	}
+	st := signal.AnalyzeStructure(candles, 2)
+
+	pts := signal.FindSwingPoints(candles, 2, 8) // last 8 tops + 8 bots, index-ordered
+	swings := make([]map[string]any, 0, len(pts))
+	for _, p := range pts {
+		if p.Index < 0 || p.Index >= len(candles) {
+			continue
+		}
+		swings = append(swings, map[string]any{
+			"time":  candles[p.Index].OpenTime.Unix(),
+			"price": p.Price,
+			"isTop": p.IsTop,
+		})
+	}
+
+	out := map[string]any{
+		"trend":     st.Trend.String(),
+		"event":     st.Event.String(),
+		"bosLevel":  st.BOSLevel,
+		"protected": st.Protected,
+		"inZone":    st.InZone,
+		"swings":    swings,
+	}
+	if st.Zone != nil {
+		dir := "up"
+		if st.Zone.Dir == signal.StructDowntrend {
+			dir = "down"
+		}
+		out["zone"] = map[string]any{
+			"dir":        dir,
+			"hi":         st.Zone.Hi,
+			"lo":         st.Zone.Lo,
+			"invalidate": st.Zone.Invalidate,
+			"target":     st.Zone.Target,
+		}
+	}
+	return out
+}
+
 func computeChartMarkers(candles []market.Candle) []map[string]any {
 	if len(candles) < 20 {
 		return nil

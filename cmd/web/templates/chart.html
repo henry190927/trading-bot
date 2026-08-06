@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
 <title>chart · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
 </head>
 <body>
 
@@ -102,6 +104,7 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">POC migration</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="struct">N字 struct <span class="layer-count" data-layer-count="struct">0</span></button>
       </div>
     </div>
 
@@ -153,6 +156,27 @@
   </div>
 
   <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
+
+  <!-- N 字 structure read-out. Shows only when the `struct` layer is on.
+       Turns the bare zigzag into an actual long/short read: lean badge +
+       trend / event / in-zone state + 樞紐區 numbers, with an ⓘ that
+       explains how to read it. Populated by applyStructureVisibility(). -->
+  <div class="chart-struct-panel hidden" id="chart-struct-panel">
+    <span class="cs-lean" id="cs-lean">—</span>
+    <span class="cs-kv"><em>trend</em><span id="cs-trend">—</span></span>
+    <span class="cs-kv"><em>event</em><span id="cs-event">—</span></span>
+    <span class="cs-kv" id="cs-zone-wrap"><em>樞紐區</em><span id="cs-zone">—</span></span>
+    <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
+    <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
+    <button type="button" class="cs-info-btn" id="cs-info-btn" aria-expanded="false" title="怎麼判讀 N 字結構">ⓘ</button>
+    <div class="cs-info hidden" id="cs-info">
+      <b>N 字判讀:</b> 推動 → 回檔 → 再推動。
+      <b>BOS</b> = 收盤突破 leg 終端 swing(續勢);
+      <b>CHoCH</b> = 收盤跌破 leg 起點(反轉警訊,樞紐區作廢)。
+      <b>樞紐區</b>(0.5–0.705 回檔帶)= 順勢進場區,<b>invalid</b> = 結構停損,<b>target</b> = 1:1 量測。
+      實戰:價格回落進<em>同向</em>樞紐區且未 CHoCH → 找續勢;收破 invalid → 這個 N 作廢。
+    </div>
+  </div>
 
   <div class="chart-wrap">
     <!-- Left-side TradingView-style vertical drawing toolbar. Tool
@@ -685,8 +709,8 @@
 
     var chart = LightweightCharts.createChart(container, {
         layout: {
-            background: { type: 'solid', color: '#0d1117' },
-            textColor:  '#c9d1d9',
+            background: { type: 'solid', color: '#0f0b07' },
+            textColor:  '#f3ebdf',
         },
         grid: {
             vertLines: { color: 'rgba(255,255,255,0.04)' },
@@ -728,6 +752,9 @@
     var upperSeries = chart.addLineSeries({ color: '#4c6ef5', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
     var midSeries   = chart.addLineSeries({ color: '#adb5bd', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
     var lowerSeries = chart.addLineSeries({ color: '#4c6ef5', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    // N 字 structure zigzag — connects the recent swing highs/lows in
+    // amber (brand accent) to make the impulse/pullback legs legible.
+    var structSeries = chart.addLineSeries({ color: '#f6a623', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
 
     var volSeries = chart.addHistogramSeries({
         priceFormat: { type: 'volume' },
@@ -888,7 +915,7 @@
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
         rsi: false, 'macd-pane': false, hvn: false, 'poc-mig': false,
-        'delta-div': false,
+        'delta-div': false, struct: false,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     // Master visibility override — when true, all layers render as
@@ -1019,6 +1046,7 @@
         });
         counts['positions'] = (lastPositions || []).length;
         counts['hvn']       = (lastHVN || []).length;
+        counts['struct']    = (lastStructure && lastStructure.swings) ? lastStructure.swings.length : 0;
         document.querySelectorAll('[data-layer-count]').forEach(function (span) {
             var k = span.dataset.layerCount;
             span.textContent = counts[k] || 0;
@@ -1029,7 +1057,7 @@
     // Each category toggle button shows "how many of my layers are
     // currently ON". Recomputed on every layers-state change.
     var MENU_MEMBERS = {
-        overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn'],
+        overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn', 'struct'],
         osc:      ['rsi', 'macd-pane'],
         events:   ['sweep', 'double', 'div', 'delta-div', 'volx', 'bb-events', 'macd', 'flags'],
     };
@@ -1061,9 +1089,95 @@
         applyPositionLinesVisibility();
         applyHVNLinesVisibility();
         applyPOCMigLinesVisibility();
+        applyStructureVisibility();
         applyPaneLayout();
         updateMenuActiveCounts();
     }
+
+    // ── N 字 structure overlay (swings zigzag + BOS/CHoCH + 樞紐區) ───
+    // Draws exactly what signal.AnalyzeStructure sees: the swing zigzag,
+    // the pivot zone (0.5 / .705 band), its invalidation + measured-move
+    // target, and the BOS/protected level labelled with the latest event.
+    var structLines = [];
+    var lastStructure = null;
+    function clearStructLines() {
+        structLines.forEach(function (l) { candleSeries.removePriceLine(l); });
+        structLines = [];
+        if (structSeries) structSeries.setData([]);
+    }
+    // Translate the structural snapshot into a plain long/short lean so
+    // the panel reads as a bias, not raw fields.
+    function structLean(s) {
+        if (!s) return { txt: '—', cls: '' };
+        switch (s.event) {
+            case 'BOS-up':     return { txt: '偏多 · BOS 續勢', cls: 'bull' };
+            case 'BOS-down':   return { txt: '偏空 · BOS 續勢', cls: 'bear' };
+            case 'CHoCH-up':   return { txt: '轉多警訊 · CHoCH', cls: 'bull' };
+            case 'CHoCH-down': return { txt: '轉空警訊 · CHoCH', cls: 'bear' };
+        }
+        if (s.zone && s.inZone) {
+            return s.zone.dir === 'up'
+                ? { txt: '偏多 · 樞紐區回檔', cls: 'bull' }
+                : { txt: '偏空 · 樞紐區反彈', cls: 'bear' };
+        }
+        if (s.trend === 'HH-HL uptrend')   return { txt: '結構偏多 (HH-HL)', cls: 'bull' };
+        if (s.trend === 'LH-LL downtrend') return { txt: '結構偏空 (LH-LL)', cls: 'bear' };
+        return { txt: '中性 · 無明確結構', cls: '' };
+    }
+    function csFmt(v) {
+        if (v === undefined || v === null) return '—';
+        return Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(3);
+    }
+    function csSet(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
+    function csShow(id, on) { var el = document.getElementById(id); if (el) el.classList.toggle('hidden', !on); }
+    function updateStructPanel() {
+        var panel = document.getElementById('chart-struct-panel');
+        if (!panel) return;
+        var s = lastStructure;
+        if (!layerOn('struct') || !s) { panel.classList.add('hidden'); return; }
+        panel.classList.remove('hidden');
+        var lean = structLean(s);
+        var leanEl = document.getElementById('cs-lean');
+        if (leanEl) { leanEl.textContent = lean.txt; leanEl.className = 'cs-lean ' + lean.cls; }
+        csSet('cs-trend', s.trend || '—');
+        csSet('cs-event', (s.event && s.event !== 'none') ? s.event : '—');
+        if (s.zone) {
+            csSet('cs-zone', csFmt(s.zone.lo) + '–' + csFmt(s.zone.hi));
+            csSet('cs-inzone', s.inZone ? '✓ 區內' : '✗ 區外');
+            csSet('cs-target', csFmt(s.zone.target) + ' / inv ' + csFmt(s.zone.invalidate));
+            csShow('cs-zone-wrap', true); csShow('cs-inzone-wrap', true); csShow('cs-tgt-wrap', true);
+        } else {
+            csShow('cs-zone-wrap', false); csShow('cs-inzone-wrap', false); csShow('cs-tgt-wrap', false);
+        }
+    }
+    (function wireStructInfo() {
+        var btn = document.getElementById('cs-info-btn');
+        var box = document.getElementById('cs-info');
+        if (!btn || !box) return;
+        btn.addEventListener('click', function () {
+            var open = box.classList.toggle('hidden') === false;
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    })();
+    function applyStructureVisibility() {
+        clearStructLines();
+        updateStructPanel();
+        if (!layerOn('struct') || !lastStructure) return;
+        var s = lastStructure;
+        var zz = (s.swings || []).map(function (p) { return { time: p.time, value: p.price }; });
+        if (structSeries) structSeries.setData(zz);
+        if (s.zone) {
+            structLines.push(candleSeries.createPriceLine({ price: s.zone.hi, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '樞紐 .5' }));
+            structLines.push(candleSeries.createPriceLine({ price: s.zone.lo, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '樞紐 .705' }));
+            structLines.push(candleSeries.createPriceLine({ price: s.zone.invalidate, color: '#e03131', lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: 'invalid' }));
+            structLines.push(candleSeries.createPriceLine({ price: s.zone.target, color: '#2f9e44', lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: 'target' }));
+        }
+        if (s.bosLevel) {
+            var lbl = (s.event && s.event !== 'none') ? s.event : 'BOS';
+            structLines.push(candleSeries.createPriceLine({ price: s.bosLevel, color: '#adb5bd', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: lbl }));
+        }
+    }
+
     // Track plan visibility separately since planLines are recreated
     // on each data load.
     var lastPlan = null;
@@ -1743,6 +1857,8 @@
         applyHVNLinesVisibility();
         lastPOCMig = data.pocMigration || null;
         applyPOCMigLinesVisibility();
+        lastStructure = data.structure || null;
+        applyStructureVisibility();
         rsiSeries.setData(data.rsi || []);
         // MACD: histogram + line + signal. Color each histogram bar
         // by its sign (green when momentum positive, red when negative).
