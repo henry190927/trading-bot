@@ -12,22 +12,30 @@
     var STORE_KEY = 'mini-chart-mode';
     var DEFAULT_MODE = 'candle';
 
+    // Pull colors from the active theme's CSS variables so the sparkline
+    // matches whichever theme is live (industrial / slate). Read once at
+    // load; the dashboard's auto-refresh re-runs this after a theme toggle.
+    // Value-area purples stay literal — they're a data-viz encoding, not chrome.
+    var _css = getComputedStyle(document.documentElement);
+    function _v(name, fb)  { return (_css.getPropertyValue(name).trim() || fb); }
+    function _rgba(name, a, fb) { return 'rgba(' + (_css.getPropertyValue(name).trim() || fb) + ', ' + a + ')'; }
     var COLORS = {
-        line:   '#56d4dd',
-        fill:   'rgba(86, 212, 221, 0.10)',
-        up:     '#4ade80',
-        down:   '#f87171',
-        entry:  '#58a6ff',
-        stop:   '#f87171',
-        tp:     '#4ade80',
-        mark:   '#fbbf24',
+        line:   _v('--blue', '#f6a623'),
+        fill:   _rgba('--blue-rgb', 0.10, '246, 166, 35'),
+        up:     _v('--green', '#6bbf7b'),
+        down:   _v('--red', '#e0602b'),
+        entry:  _v('--blue', '#f6a623'),
+        stop:   _v('--red', '#e0602b'),
+        tp:     _v('--green', '#6bbf7b'),
+        mark:   _v('--yellow', '#d1741f'),
+        halo:   _rgba('--bg-rgb', 0.95, '15, 11, 7'),
         poc:    'rgba(192, 132, 252, 0.85)',  // strong purple — POC200 (primary)
         poc100: 'rgba(192, 132, 252, 0.55)',  // medium purple — POC100
         poc50:  'rgba(192, 132, 252, 0.35)',  // light purple — POC50 (most recent)
         va:     'rgba(192, 132, 252, 0.35)',  // faint purple — VAH/VAL edges
         vaFill: 'rgba(192, 132, 252, 0.06)',  // very faint purple band fill
-        grid:   'rgba(139, 148, 158, 0.10)',
-        axis:   '#8b949e',
+        grid:   _rgba('--text-dim-rgb', 0.10, '176, 154, 127'),
+        axis:   _v('--text-dim', '#b09a7f'),
     };
 
     function getMode() {
@@ -63,7 +71,7 @@
             var x = u.bbox.left + u.bbox.width - tw - 10;
             ctx.lineJoin = 'round';
             ctx.lineWidth = 4;
-            ctx.strokeStyle = 'rgba(13, 17, 23, 0.95)';
+            ctx.strokeStyle = COLORS.halo;
             ctx.strokeText(label, x, yPx);
             ctx.fillStyle = color;
             ctx.fillText(label, x, yPx);
