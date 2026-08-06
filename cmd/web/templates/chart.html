@@ -915,7 +915,7 @@
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
         rsi: false, 'macd-pane': false, hvn: false, 'poc-mig': false,
-        'delta-div': false, struct: false,
+        'delta-div': false, struct: true,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     // Master visibility override — when true, all layers render as
@@ -1103,7 +1103,7 @@
     function clearStructLines() {
         structLines.forEach(function (l) { candleSeries.removePriceLine(l); });
         structLines = [];
-        if (structSeries) structSeries.setData([]);
+        if (structSeries) { structSeries.setData([]); structSeries.setMarkers([]); }
     }
     // Translate the structural snapshot into a plain long/short lean so
     // the panel reads as a bias, not raw fields.
@@ -1165,7 +1165,20 @@
         if (!layerOn('struct') || !lastStructure) return;
         var s = lastStructure;
         var zz = (s.swings || []).map(function (p) { return { time: p.time, value: p.price }; });
-        if (structSeries) structSeries.setData(zz);
+        if (structSeries) {
+            structSeries.setData(zz);
+            // Mark each N-leg turning point: H on swing highs, L on swing
+            // lows, so the zigzag reads as labelled structure, not a bare line.
+            structSeries.setMarkers((s.swings || []).map(function (p) {
+                return {
+                    time: p.time,
+                    position: p.isTop ? 'aboveBar' : 'belowBar',
+                    color: '#f6a623',
+                    shape: p.isTop ? 'arrowDown' : 'arrowUp',
+                    text: p.isTop ? 'H' : 'L',
+                };
+            }));
+        }
         if (s.zone) {
             structLines.push(candleSeries.createPriceLine({ price: s.zone.hi, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '樞紐 .5' }));
             structLines.push(candleSeries.createPriceLine({ price: s.zone.lo, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '樞紐 .705' }));
