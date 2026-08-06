@@ -28,6 +28,10 @@ func main() {
 	feeBps := flag.Float64("fee-bps", 6, "round-trip fee in basis points (BingX maker 4, mixed 6, taker 10)")
 	sweepOnly := flag.Bool("sweep-only", false, "skip trades whose entry isn't anchored to a liquidity sweep")
 	stopRefine := flag.Bool("stop-refine", false, "enable widening stops past obstacles (HVN/equal levels). default off — backtest shows it hurts net R within 24-bar hold")
+	structVeto := flag.Bool("struct-veto", false, "STRATEGY VARIANT: enable the N 字 counter-trend structure veto (逆勢否決) for ALL symbols. Removes signals taken against a confirmed opposing BOS/CHoCH or HH-HL/LH-LL trend. Default OFF. A/B this vs baseline to measure per-symbol Δ before baking an allowlist.")
+	structZone := flag.Bool("struct-zone", false, "STRATEGY VARIANT: enable the N 字 zone-confluence vote (樞紐區 順向回檔) for ALL symbols. Adds a MOM vote when the close has pulled back into the current leg's pivot zone in the leg direction (structure intact). Additive, never vetoes. Default OFF. A/B vs baseline per symbol.")
+	htfStruct := flag.Bool("htf-struct", false, "STRATEGY VARIANT (Phase 2 降維入局): fetch 4h HTF candles and require each base-TF entry to sit inside an aligned 4h 樞紐區 (same direction). Take/skip gate for ALL symbols. Default OFF. Run at -tf=1h for the 4h→1h design; A/B vs baseline per symbol.")
+	structOff := flag.Bool("struct-off", false, "Short-circuit ALL live structure allowlists (metals veto + BTC/ETH zone) to establish a clean no-structure baseline. Combine with a single --struct-* flag to A/B that feature in isolation on any TF.")
 	useDXY := flag.Bool("dxy", false, "enable DXY macro veto on XAU/XAG signals. Default OFF — 2026-05-27 backtest showed it hurt by ~46R (vetoed trades were the best ones; mean-reversion thrives on macro-divergent dips)")
 	bodyWeight := flag.Float64("body-weight", 0, "POC/HVN body-weighted distribution: fraction (0,1) of each candle's volume routed to its body range. Default 0 = legacy uniform-over-HL. Try 0.7 to damp wick-hunt distortion during whipsaw.")
 	verbose := flag.Bool("v", false, "print every trade")
@@ -50,6 +54,18 @@ func main() {
 
 	if *stopRefine {
 		signal.StopRefineEnabled = true
+	}
+	if *structVeto {
+		signal.StructureVetoEnabled = true
+	}
+	if *structZone {
+		signal.StructureZoneVoteEnabled = true
+	}
+	if *htfStruct {
+		signal.MTFStructEnabled = true
+	}
+	if *structOff {
+		signal.StructureLiveOff = true
 	}
 	indicator.BodyWeight = *bodyWeight
 
@@ -111,6 +127,20 @@ func main() {
 				log.Printf("%s: bias history fetch failed: %v", sym, err)
 				biasCandles = nil
 			}
+		}
+		if *htfStruct {
+			// Phase 2 降維入局: fetch the 4h HTF series for the structure
+			// gate (fixed 4h regardless of base TF, per the 4h→1h design).
+			if htf, herr := client.KlinesRange(ctx, sym, market.Timeframe("4h"), start, end); herr == nil && len(htf) > 0 {
+				opts.HTFCandles = htf
+			} else {
+				if herr != nil {
+					log.Printf("%s: HTF(4h) fetch failed (降維 gate inert this symbol): %v", sym, herr)
+				}
+				opts.HTFCandles = nil
+			}
+		} else {
+			opts.HTFCandles = nil
 		}
 		if *useFunding {
 			// 1000 points × 8h ≈ 333 days, covers any window we'd backtest.

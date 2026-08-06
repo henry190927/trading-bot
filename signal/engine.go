@@ -89,6 +89,16 @@ type Inputs struct {
 	// Compute with signal.Bias(higherTfCandles).
 	Bias Side
 
+	// Phase 2 降維入局 (dimension-reduction entry): higher-TF structure
+	// context, precomputed by the caller with no look-ahead (see
+	// backtest.precomputeHTFStruct). HTFZoneDir is the direction of the
+	// active HTF 樞紐區 (Flat = none); HTFInZone is whether the current
+	// price sits inside that HTF zone. Only consulted when
+	// MTFStructEnabled / isMTFStructSymbol; both zero-value by default so
+	// callers that don't populate these are unaffected.
+	HTFZoneDir Side
+	HTFInZone  bool
+
 	// DXYTrend is the current U.S. Dollar Index direction. Used as a macro
 	// veto on XAU/XAG only: long XAU into a strengthening DXY is fighting
 	// macro flow. Compute with dxy.Classify(dxyCandles). Empty/Flat = no
@@ -434,6 +444,30 @@ func Evaluate(in Inputs) Signal {
 		}
 	}
 
+	// N 字 zone-confluence vote (樞紐區 順向回檔). Additive — never vetoes.
+	// When the latest close has pulled back INTO the current impulse
+	// leg's pivot zone in the leg direction (InZone) and structure hasn't
+	// flipped (Zone is nil'd on an opposing CHoCH), vote in the leg
+	// direction: the buy-the-pullback / sell-the-rally continuation entry.
+	// Complements the HH-HL / LH-LL trend vote by firing at the entry
+	// LOCATION rather than on the trend label. Gated per-symbol via
+	// isStructureZoneVoteSymbol, or forced across the whole universe by
+	// StructureZoneVoteEnabled (--struct-zone) for the A/B.
+	if StructureZoneVoteEnabled || (isStructureZoneVoteSymbol(in.Symbol) && isStructureTF(in.Timeframe)) {
+		if zst := AnalyzeStructure(in.Candles, 2); zst.Zone != nil && zst.InZone {
+			switch zst.Zone.Dir {
+			case StructUptrend:
+				bullMOM++
+				sig.Reasons = append(sig.Reasons,
+					fmt.Sprintf("[MOM] 樞紐區 pullback %.4f–%.4f (up-leg intact)", zst.Zone.Lo, zst.Zone.Hi))
+			case StructDowntrend:
+				bearMOM++
+				sig.Reasons = append(sig.Reasons,
+					fmt.Sprintf("[MOM] 樞紐區 rally %.4f–%.4f (down-leg intact)", zst.Zone.Lo, zst.Zone.Hi))
+			}
+		}
+	}
+
 	// Time-of-day momentum vote — when the signal bar opens during the
 	// NY pre-market / active session (12:00-21:00 UTC, roughly 20:00 TPE
 	// to 05:00 TPE next day) AND the bar has clear directional body,
@@ -587,6 +621,20 @@ func Evaluate(in Inputs) Signal {
 		sig.Score = 0
 	}
 
+	// Phase 2 降維入局 (dimension-reduction entry) gate. Require the
+	// base-TF entry to sit inside an aligned higher-TF 樞紐區 (same
+	// direction): HTF structure blesses the pullback zone, the base TF
+	// provides the trigger. Filter (take/skip) using the precomputed,
+	// no-look-ahead HTF context. A/B behind MTFStructEnabled before any
+	// per-symbol allowlist is baked in.
+	if (MTFStructEnabled || isMTFStructSymbol(in.Symbol)) && sig.Side != Flat {
+		if in.HTFZoneDir != sig.Side || !in.HTFInZone {
+			sig.Warnings = append(sig.Warnings, "降維入局: no aligned HTF 樞紐區 — suppressed")
+			sig.Side = Flat
+			sig.Score = 0
+		}
+	}
+
 	// DXY macro veto — applies only to precious metals (XAU/XAG).
 	//
 	// 2026-05-27 backtest finding: enabling this veto HURT XAU/XAG by ~46R
@@ -609,6 +657,34 @@ func Evaluate(in Inputs) Signal {
 		case sig.Side == Short && in.DXYTrend == dxy.Down:
 			sig.Warnings = append(sig.Warnings,
 				fmt.Sprintf("DXY downtrend — short %s fights USD weakness", shortName(in.Symbol)))
+			sig.Side = Flat
+			sig.Score = 0
+		}
+	}
+
+	// N 字 counter-trend structure veto (逆勢否決) — A/B only, default OFF.
+	// Removes signals taken against a confirmed opposing structure: a
+	// BOS/CHoCH against the side on the latest closed bar, or an
+	// established HH-HL / LH-LL trend against the side. Closed-bar (uses
+	// AnalyzeStructure on in.Candles). Applies to all symbols while
+	// enabled so the backtest can measure per-symbol Δ before any
+	// allowlist is baked in.
+	if (StructureVetoEnabled || (isStructureVetoSymbol(in.Symbol) && isStructureTF(in.Timeframe))) && sig.Side != Flat {
+		st := AnalyzeStructure(in.Candles, 2)
+		var veto bool
+		switch sig.Side {
+		case Long:
+			veto = st.Trend == StructDowntrend || st.Event == EvCHoCHDown || st.Event == EvBOSDown
+		case Short:
+			veto = st.Trend == StructUptrend || st.Event == EvCHoCHUp || st.Event == EvBOSUp
+		}
+		if veto {
+			label := st.Trend.String()
+			if st.Event != EvNone {
+				label = st.Event.String()
+			}
+			sig.Warnings = append(sig.Warnings,
+				fmt.Sprintf("Structure veto — %s entry against %s", sig.Side, label))
 			sig.Side = Flat
 			sig.Score = 0
 		}
@@ -661,6 +737,37 @@ func Evaluate(in Inputs) Signal {
 // shipped on. Set to false from cmd/backtest via --no-funding-vote
 // to compare to the pre-2026-06-08 baseline.
 var FundingContrarianVoteEnabled = true
+
+// StructureLiveOff, when true, short-circuits ALL live per-symbol
+// structure allowlists (veto / zone / mtf) back to off. Used by
+// cmd/backtest --struct-off to establish a clean no-structure baseline
+// so a single structure feature can be A/B'd in isolation via its own
+// --struct-* flag (otherwise the already-shipped BTC/ETH zone + metals
+// veto contaminate the baseline). Never set in live daemon/web.
+var StructureLiveOff = false
+
+// MTFStructEnabled forces the Phase 2 降維入局 HTF-structure gate ON for
+// ALL symbols. Default false. Set true from cmd/backtest via
+// --htf-struct to A/B it. Live enablement is per-symbol via
+// isMTFStructSymbol. Requires the caller to populate Inputs.HTFZoneDir /
+// HTFInZone (no-look-ahead HTF 樞紐區 context).
+var MTFStructEnabled = false
+
+// StructureZoneVoteEnabled forces the N 字 zone-confluence vote (樞紐區
+// 順向回檔) ON for ALL symbols. Default false. Set true from
+// cmd/backtest via --struct-zone to A/B the vote across the universe.
+// Live enablement is per-symbol via isStructureZoneVoteSymbol.
+var StructureZoneVoteEnabled = false
+
+// StructureVetoEnabled forces the N 字 counter-trend structure veto
+// (逆勢否決) ON for ALL symbols. Default false. Set true from
+// cmd/backtest via --struct-veto to A/B the veto across the whole
+// universe. Live enablement is per-symbol via isStructureVetoSymbol
+// (currently the precious metals) — this global flag is purely the
+// backtest override that ignores the allowlist. The veto only ever
+// REMOVES trades taken against a confirmed opposing structure — never
+// adds — so worst case is lost edge, not new bad entries.
+var StructureVetoEnabled = false
 
 // applyFundingContrarianVote adds confluence votes when the trade side
 // is OPPOSITE the crowded side — the side getting paid to hold a
@@ -788,6 +895,78 @@ func isVolumeAnomalySymbol(s market.Symbol) bool {
 // the cascade direction even when oscillator votes were silent.
 func isStructureVoteSymbol(s market.Symbol) bool {
 	return s == market.ETHUSDT
+}
+
+// isStructureVetoSymbol returns true for symbols where the N 字
+// counter-trend structure veto (逆勢否決) is enabled live. Per the
+// 2026-08-06 backtest A/B (60/90/120d × 4 symbols at 1h, sweep-only,
+// fee=6bp) of the BOS/CHoCH + trend veto (Δ = veto − baseline netR):
+//
+//	Symbol  60d Δ    90d Δ    120d Δ   3-window total
+//	BTC     +1.95    +4.71    -3.07     +3.59R   ~ mixed sign
+//	ETH     +3.68    -9.29    -9.11    -14.72R   ❌ kills the MR edge
+//	XAU     +0.79    +3.07    +3.57     +7.43R   ✓ all-positive harm-reduction
+//	XAG    +11.63   +13.02    +5.47    +30.12R   ✓✓ all-positive, flips 1h to green
+//
+// Mechanistic split: the veto strips counter-structure entries. ETH's
+// edge IS mean-reversion (dip-buying into trend) so it hurts — same
+// failure mode as the DXY veto (−46R); ETH also already runs the
+// structure *vote*, so a veto double-suppresses. The metals had no MR
+// edge to protect there — the vetoed trades were pure bleed, so XAG
+// flips positive (3/3 windows) and XAU consistently bleeds less.
+//
+// Enable the precious metals only (= isPreciousMetal). BTC mixed / ETH
+// hard-fail stay off. Validated at 1h; re-test before relying on it at
+// the daemon's native TF.
+// isStructureTF gates the LIVE structure features (veto + zone vote) to
+// the timeframe they were validated on. The 2026-08-06 A/Bs show the
+// edge is a 1h phenomenon: at 15m the zone vote turns net-negative
+// (adds trades in a poison regime) and at 5m everything is catastrophic
+// (−76~−151R/60d). Only 1h ships live; lower TFs fall back to the plain
+// engine so /chart scores aren't inflated by a known-negative vote. The
+// backtest flags (StructureVetoEnabled / StructureZoneVoteEnabled) skip
+// this gate so any TF can still be A/B'd.
+func isStructureTF(tf market.Timeframe) bool {
+	return tf == "1h"
+}
+
+func isStructureVetoSymbol(s market.Symbol) bool {
+	if StructureLiveOff {
+		return false
+	}
+	return isPreciousMetal(s)
+}
+
+// isStructureZoneVoteSymbol returns true for symbols where the N 字
+// zone-confluence vote (樞紐區 順向回檔) is enabled live. Per the
+// 2026-08-06 A/B (--struct-zone, 60/90/120d × 4 symbols at 1h,
+// sweep-only, fee=6bp; Δ = vote − baseline netR, baseline already
+// includes the live metals veto):
+//
+//	Symbol  60d Δ    90d Δ    120d Δ   3-window total
+//	BTC     +5.58    +8.65    +2.83    +17.06R   ✓✓ all-positive, flips BTC green
+//	ETH     -6.53    +4.51    +4.92     +2.90R   ~ 2/3 positive (60d dips)
+//	XAU     +0.24    -0.18    +2.95     +3.01R   ~ marginal (already has veto)
+//	XAG     -1.77    +0.20    +3.00     +1.43R   ~ mixed (already has veto)
+//
+// Complements the veto perfectly: the veto helps the metals and hurts
+// BTC/ETH; this additive with-structure vote helps BTC (the veto's
+// weak spot) and ETH. Enable BTC + ETH (user call 2026-08-06: BTC is a
+// clean gate pass; ETH taken for its +4.5/+4.9 on the two longer windows
+// despite the 60d dip). Metals stay veto-only — don't stack.
+func isStructureZoneVoteSymbol(s market.Symbol) bool {
+	if StructureLiveOff {
+		return false
+	}
+	return s == market.BTCUSDT || s == market.ETHUSDT
+}
+
+// isMTFStructSymbol returns true for symbols where the Phase 2 降維入局
+// HTF-structure gate is enabled live. Default: none — pending the
+// 2026-08-06 A/B (--htf-struct, 4h→1h). Being a take/skip filter it may
+// fight the MR edge (cf. the veto), so results decide the allowlist.
+func isMTFStructSymbol(s market.Symbol) bool {
+	return false
 }
 
 // isTimeOfDaySymbol returns true for symbols where the NY-session

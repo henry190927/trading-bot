@@ -102,6 +102,159 @@ func FindSwingPoints(candles []market.Candle, strength int, cap int) []SwingPoin
 	return pts
 }
 
+// ---------------------------------------------------------------------
+// N 字分形結構 — BOS / CHoCH + 樞紐區 (pivot zone)
+//
+// Models NFE's N-shaped fractal structure: price advances in impulse →
+// pullback → impulse legs. The most recent confirmed swing high (mrH)
+// and swing low (mrL) define the current leg; a CLOSED-bar close beyond
+// one of them is a structural event:
+//
+//   - Close beyond the leg's terminal pivot in the leg direction = BOS
+//     (Break Of Structure — continuation).
+//   - Close beyond the leg's origin pivot (against the leg) = CHoCH
+//     (Change of Character — the leg failed; reversal warning).
+//
+// The 樞紐區 (PivotZone) is the 0.5–0.705 retracement band of the leg —
+// where a continuation entry is sought — with the leg origin as the
+// structural invalidation and a 1:1 measured move as the first target.
+//
+// Closed-bar only: uses candles[len-1].Close and swings confirmed
+// `strength` bars back, so it never peeks at an unclosed bar.
+// ---------------------------------------------------------------------
+
+type StructEventKind int
+
+const (
+	EvNone StructEventKind = iota
+	EvBOSUp        // close broke above the last swing high (up-leg continuation)
+	EvBOSDown      // close broke below the last swing low (down-leg continuation)
+	EvCHoCHUp      // in a down-leg, close broke above the last swing high (bullish shift)
+	EvCHoCHDown    // in an up-leg, close broke below the last swing low (bearish shift)
+)
+
+func (k StructEventKind) String() string {
+	switch k {
+	case EvBOSUp:
+		return "BOS-up"
+	case EvBOSDown:
+		return "BOS-down"
+	case EvCHoCHUp:
+		return "CHoCH-up"
+	case EvCHoCHDown:
+		return "CHoCH-down"
+	}
+	return "none"
+}
+
+// PivotZone (樞紐區) is the continuation-entry band of an impulse leg.
+type PivotZone struct {
+	Dir        TrendStructure // Uptrend = bullish pullback (buy), Downtrend = bearish (sell)
+	Hi, Lo     float64        // 0.5 (Hi) .. 0.705 (Lo) retrace band for an up-leg; mirrored for down
+	Invalidate float64        // structural stop: the leg origin pivot
+	Target     float64        // 1:1 measured-move projection from the leg
+	LegHigh    float64
+	LegLow     float64
+}
+
+// StructureState is the closed-bar structural snapshot.
+type StructureState struct {
+	Trend      TrendStructure  // HH-HL / LH-LL classification (context)
+	Event      StructEventKind // structural event on the latest closed bar
+	EventPrice float64
+	BOSLevel   float64    // swing whose break = continuation
+	Protected  float64    // swing whose break = CHoCH (reversal)
+	Zone       *PivotZone // active 樞紐區 for the current leg; nil if leg invalidated (CHoCH)
+	InZone     bool       // latest close sits inside Zone
+}
+
+// AnalyzeStructure returns the N 字 structural snapshot for the series.
+// strength < 1 defaults to 2 (matches FindSwingPoints / the double-pattern
+// detector). Safe on short/empty input (returns a zero StructureState).
+func AnalyzeStructure(candles []market.Candle, strength int) StructureState {
+	if strength < 1 {
+		strength = 2
+	}
+	var st StructureState
+	if len(candles) == 0 {
+		return st
+	}
+	st.Trend, _, _ = ClassifyTrendStructure(candles)
+
+	pts := FindSwingPoints(candles, strength, 0)
+	var mrH, mrL *SwingPoint
+	for i := range pts {
+		p := pts[i]
+		if p.IsTop {
+			mrH = &pts[i]
+		} else {
+			mrL = &pts[i]
+		}
+	}
+	if mrH == nil || mrL == nil {
+		return st
+	}
+
+	lastClose := candles[len(candles)-1].Close
+	lastPivotIsHigh := mrH.Index > mrL.Index
+
+	if lastPivotIsHigh {
+		// Current leg is an up-leg (low → high). Break above the high =
+		// BOS-up; break below the origin low = CHoCH-down.
+		st.BOSLevel, st.Protected = mrH.Price, mrL.Price
+		switch {
+		case lastClose > mrH.Price:
+			st.Event, st.EventPrice = EvBOSUp, lastClose
+		case lastClose < mrL.Price:
+			st.Event, st.EventPrice = EvCHoCHDown, lastClose
+		}
+		if st.Event != EvCHoCHDown {
+			st.Zone = buildPivotZone(StructUptrend, mrH.Price, mrL.Price)
+		}
+	} else {
+		// Current leg is a down-leg (high → low). Break below the low =
+		// BOS-down; break above the origin high = CHoCH-up.
+		st.BOSLevel, st.Protected = mrL.Price, mrH.Price
+		switch {
+		case lastClose < mrL.Price:
+			st.Event, st.EventPrice = EvBOSDown, lastClose
+		case lastClose > mrH.Price:
+			st.Event, st.EventPrice = EvCHoCHUp, lastClose
+		}
+		if st.Event != EvCHoCHUp {
+			st.Zone = buildPivotZone(StructDowntrend, mrH.Price, mrL.Price)
+		}
+	}
+
+	if st.Zone != nil {
+		st.InZone = lastClose >= st.Zone.Lo && lastClose <= st.Zone.Hi
+	}
+	return st
+}
+
+// buildPivotZone computes the 0.5–0.705 retracement band (樞紐區) of a
+// leg spanning [legLow, legHigh], oriented by direction. Returns nil for
+// a degenerate leg.
+func buildPivotZone(dir TrendStructure, legHigh, legLow float64) *PivotZone {
+	if legHigh <= legLow {
+		return nil
+	}
+	span := legHigh - legLow
+	z := &PivotZone{Dir: dir, LegHigh: legHigh, LegLow: legLow}
+	if dir == StructUptrend {
+		z.Hi = legHigh - 0.5*span
+		z.Lo = legHigh - 0.705*span
+		z.Invalidate = legLow
+		z.Target = legHigh + span
+	} else {
+		z.Lo = legLow + 0.5*span
+		z.Hi = legLow + 0.705*span
+		z.Invalidate = legHigh
+		z.Target = legLow - span
+	}
+	return z
+}
+
 // ClassifyTrendStructure inspects the most recent swing series and
 // returns Uptrend / Downtrend / Neutral.
 //

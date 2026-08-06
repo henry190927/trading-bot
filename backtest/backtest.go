@@ -41,6 +41,13 @@ type Options struct {
 	// behavior where Ctx was empty in backtest.
 	FundingHistory []bingx.FundingPoint
 
+	// HTFCandles is optional higher-timeframe (e.g. 4h) data for the
+	// Phase 2 降維入局 gate. When provided, precomputeHTFStruct derives a
+	// per-base-bar HTF 樞紐區 direction + in-zone flag (no look-ahead)
+	// and feeds Inputs.HTFZoneDir / HTFInZone. Only consulted by the
+	// engine when signal.MTFStructEnabled / isMTFStructSymbol.
+	HTFCandles []market.Candle
+
 	// StopBufferR widens the stop by this fraction of the original
 	// risk distance. E.g. 0.3 = stop moves 0.3R further from entry.
 	// Entry unchanged → R risk per trade grows; TPs at 1R/2R from
@@ -152,6 +159,7 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 	}
 	biases := precomputeBiases(candles, biasCandles)
 	dxyTrends := precomputeDXYTrends(candles, opts.DXYCandles)
+	htfDirs, htfInZone := precomputeHTFStruct(candles, opts.HTFCandles)
 	const warmup = 100
 	openTradeUntil := -1
 
@@ -173,10 +181,12 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 		sig := signal.Evaluate(signal.Inputs{
 			Symbol:    sym,
 			Timeframe: tf,
-			Candles:   slice,
-			Bias:      biases[i],
-			DXYTrend:  dxyTrends[i],
-			Ctx:       sigCtx,
+			Candles:    slice,
+			Bias:       biases[i],
+			DXYTrend:   dxyTrends[i],
+			HTFZoneDir: htfDirs[i],
+			HTFInZone:  htfInZone[i],
+			Ctx:        sigCtx,
 		})
 		if sig.Side == signal.Flat || sig.Score < threshold || sig.Plan.Entry == 0 {
 			continue
@@ -267,6 +277,45 @@ func precomputeDXYTrends(base, dxyCandles []market.Candle) []dxy.Trend {
 		out[ci] = dxy.Classify(dxyCandles[:di+1])
 	}
 	return out
+}
+
+// precomputeHTFStruct returns, per base candle, the active higher-TF
+// 樞紐區 direction and whether the base bar's close sits inside that
+// zone — the Phase 2 降維入局 context. Aligned with no look-ahead: the
+// HTF structure at base[i] is computed only from HTF bars CLOSED at or
+// before base[i].OpenTime. AnalyzeStructure is recomputed only when the
+// aligned HTF bar advances (every few base bars), so this stays cheap.
+func precomputeHTFStruct(base, htf []market.Candle) ([]signal.Side, []bool) {
+	dirs := make([]signal.Side, len(base))
+	inZone := make([]bool, len(base))
+	if len(htf) < 12 {
+		return dirs, inZone
+	}
+	hi, lastHi := 0, -1
+	var st signal.StructureState
+	for ci, c := range base {
+		for hi+1 < len(htf) && !htf[hi+1].CloseTime.After(c.OpenTime) {
+			hi++
+		}
+		if htf[hi].CloseTime.After(c.OpenTime) {
+			continue // no closed HTF bar yet
+		}
+		if hi != lastHi {
+			st = signal.AnalyzeStructure(htf[:hi+1], 2)
+			lastHi = hi
+		}
+		if st.Zone == nil {
+			continue
+		}
+		switch st.Zone.Dir {
+		case signal.StructUptrend:
+			dirs[ci] = signal.Long
+		case signal.StructDowntrend:
+			dirs[ci] = signal.Short
+		}
+		inZone[ci] = c.Close >= st.Zone.Lo && c.Close <= st.Zone.Hi
+	}
+	return dirs, inZone
 }
 
 // applyStopVariants mutates sig.Plan in place to implement the buffered-
