@@ -1167,15 +1167,30 @@
         var zz = (s.swings || []).map(function (p) { return { time: p.time, value: p.price }; });
         if (structSeries) {
             structSeries.setData(zz);
-            // Mark each N-leg turning point: H on swing highs, L on swing
-            // lows, so the zigzag reads as labelled structure, not a bare line.
+            // Label each N-leg turning point with its relative-sequence read:
+            // a swing high is HH (> prior high) or LH (< prior high); a swing
+            // low is HL (> prior low) or LL (< prior low). Colour by bias —
+            // HH/HL (bullish structure) green, LH/LL (bearish) red, the first
+            // of each kind amber (no prior to compare). Lets HH-HL vs LH-LL
+            // trend strength read at a glance along the zigzag.
+            var prevTop = null, prevBot = null;
             structSeries.setMarkers((s.swings || []).map(function (p) {
+                var text, color;
+                if (p.isTop) {
+                    text  = prevTop === null ? 'H' : (p.price > prevTop ? 'HH' : 'LH');
+                    color = prevTop === null ? '#f6a623' : (p.price > prevTop ? '#2f9e44' : '#e03131');
+                    prevTop = p.price;
+                } else {
+                    text  = prevBot === null ? 'L' : (p.price > prevBot ? 'HL' : 'LL');
+                    color = prevBot === null ? '#f6a623' : (p.price > prevBot ? '#2f9e44' : '#e03131');
+                    prevBot = p.price;
+                }
                 return {
                     time: p.time,
                     position: p.isTop ? 'aboveBar' : 'belowBar',
-                    color: '#f6a623',
+                    color: color,
                     shape: p.isTop ? 'arrowDown' : 'arrowUp',
-                    text: p.isTop ? 'H' : 'L',
+                    text: text,
                 };
             }));
         }
