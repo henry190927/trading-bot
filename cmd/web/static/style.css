@@ -1716,6 +1716,7 @@ footer {
     height: 100%;
     pointer-events: none;
     z-index: 6;
+    overflow: hidden; /* safety net: never let a label overrun the plot */
 }
 .chart-poc-label {
     position: absolute;

@@ -1318,6 +1318,16 @@
             if (!price) return;
             var y = candleSeries.priceToCoordinate(price);
             if (y == null) return;
+            // Keep the label inside the plot when the price zooms out of
+            // view. Fully off-screen → hide; near an edge → clamp so it
+            // never overruns the chart. Upper clamp sits just below the
+            // top-left OHLC (H/L/price) readout so they don't collide.
+            var plotH = host.clientHeight || 600;
+            if (y < -40 || y > plotH + 40) return;
+            var ohlc = document.getElementById('chart-ohlc');
+            var upper = (ohlc ? ohlc.offsetTop + ohlc.offsetHeight : 8) + 18;
+            var lower = plotH - 30;
+            y = Math.max(upper, Math.min(y, lower));
             var el = document.createElement('div');
             el.className = 'chart-poc-label';
             el.style.top = y + 'px';
