@@ -5128,3 +5128,12 @@ main { overflow-x: hidden; }
 .chart-struct-panel .cs-info.hidden { display: none; }
 .chart-struct-panel .cs-info b  { color: var(--text); }
 .chart-struct-panel .cs-info em { color: var(--blue); font-style: normal; }
+
+/* unconfirmed (forming-bar) structure readouts — event / in-zone / lean
+   derived from the unclosed bar; may repaint before close. */
+.chart-struct-panel .cs-kv span.unconfirmed { opacity: 0.55; font-style: italic; }
+.chart-struct-panel .cs-lean.unconfirmed {
+    opacity: 0.7;
+    font-style: italic;
+    border: 1px dashed currentColor;
+}

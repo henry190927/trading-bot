@@ -4075,12 +4075,20 @@ func computeChartStructure(candles []market.Candle) map[string]any {
 		})
 	}
 
+	// The chart uses KlinesWithForming, so the last bar may be the current
+	// UNCLOSED bar. event / inZone are derived from that bar's live close
+	// (see AnalyzeStructure), so they can repaint before the bar closes —
+	// flag it so the panel can mark them "unconfirmed". swings / trend /
+	// the zone price levels are closed-bar and unaffected.
+	forming := candles[len(candles)-1].CloseTime.After(time.Now())
+
 	out := map[string]any{
 		"trend":     st.Trend.String(),
 		"event":     st.Event.String(),
 		"bosLevel":  st.BOSLevel,
 		"protected": st.Protected,
 		"inZone":    st.InZone,
+		"forming":   forming,
 		"swings":    swings,
 	}
 	if st.Zone != nil {

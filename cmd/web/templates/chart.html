@@ -175,6 +175,7 @@
       <b>CHoCH</b> = 收盤跌破 leg 起點(反轉警訊,樞紐區作廢)。
       <b>樞紐區</b>(0.5–0.705 回檔帶)= 順勢進場區,<b>invalid</b> = 結構停損,<b>target</b> = 1:1 量測。
       實戰:價格回落進<em>同向</em>樞紐區且未 CHoCH → 找續勢;收破 invalid → 這個 N 作廢。
+      <br><b>⏳</b> = event / in-zone 是拿<em>未收盤</em> bar 的即時價算的,收盤前可能變動;swing 折點與樞紐區位階是收盤確認、不變。
     </div>
   </div>
 
@@ -1130,20 +1131,35 @@
     }
     function csSet(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
     function csShow(id, on) { var el = document.getElementById(id); if (el) el.classList.toggle('hidden', !on); }
+    function csMark(id, on) { var el = document.getElementById(id); if (el) el.classList.toggle('unconfirmed', on); }
     function updateStructPanel() {
         var panel = document.getElementById('chart-struct-panel');
         if (!panel) return;
         var s = lastStructure;
         if (!layerOn('struct') || !s) { panel.classList.add('hidden'); return; }
         panel.classList.remove('hidden');
+        // event / inZone come from the (possibly) unclosed last bar, so
+        // they can repaint until it closes. Mark those — and any lean they
+        // drive — as unconfirmed (⏳ + dimmed). trend / swings / zone levels
+        // are closed-bar and stay solid.
+        var hasEvent = s.event && s.event !== 'none';
+        var eventLive = !!(s.forming && hasEvent);
+        var zoneLive  = !!(s.forming && s.zone && s.inZone);
+        var leanLive  = !!(s.forming && (hasEvent || (s.zone && s.inZone)));
+
         var lean = structLean(s);
         var leanEl = document.getElementById('cs-lean');
-        if (leanEl) { leanEl.textContent = lean.txt; leanEl.className = 'cs-lean ' + lean.cls; }
+        if (leanEl) {
+            leanEl.textContent = lean.txt + (leanLive ? ' ⏳' : '');
+            leanEl.className = 'cs-lean ' + lean.cls + (leanLive ? ' unconfirmed' : '');
+        }
         csSet('cs-trend', s.trend || '—');
-        csSet('cs-event', (s.event && s.event !== 'none') ? s.event : '—');
+        csSet('cs-event', hasEvent ? (s.event + (eventLive ? ' ⏳' : '')) : '—');
+        csMark('cs-event', eventLive);
         if (s.zone) {
             csSet('cs-zone', csFmt(s.zone.lo) + '–' + csFmt(s.zone.hi));
-            csSet('cs-inzone', s.inZone ? '✓ 區內' : '✗ 區外');
+            csSet('cs-inzone', (s.inZone ? '✓ 區內' : '✗ 區外') + (zoneLive ? ' ⏳' : ''));
+            csMark('cs-inzone', zoneLive);
             csSet('cs-target', csFmt(s.zone.target) + ' / inv ' + csFmt(s.zone.invalidate));
             csShow('cs-zone-wrap', true); csShow('cs-inzone-wrap', true); csShow('cs-tgt-wrap', true);
         } else {
