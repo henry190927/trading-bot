@@ -124,6 +124,10 @@ func main() {
 	// most-used config instead of the DEFAULT_LAYERS baseline.
 	r.GET("/api/chart/state", srv.handleAPIChartStateGet)
 	r.POST("/api/chart/state", srv.handleAPIChartStatePost)
+	r.POST("/api/chart/setup", srv.handleAPIChartSetupRecord)
+	r.GET("/setups", srv.handleSetupsList)
+	r.POST("/api/setups/refresh", srv.handleAPISetupsRefresh)
+	r.POST("/setups/:id/delete", srv.handleSetupDelete)
 	r.GET("/onchain", srv.handleOnchainPage)
 	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
 	r.GET("/chart", srv.handleChartPage)

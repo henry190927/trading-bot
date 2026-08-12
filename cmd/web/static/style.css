@@ -5138,3 +5138,33 @@ main { overflow-x: hidden; }
     font-style: italic;
     border: 1px dashed currentColor;
 }
+
+/* -------- /setups forward-log table -------- */
+.setups-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.setups-table th, .setups-table td { padding: 5px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.setups-table th { color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.setups-table td.cs-dim { color: var(--text-dim); }
+.setups-table .dir-neutral { color: var(--text-dim); }
+.outcome-badge { padding: 1px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+.oc-open    { color: var(--yellow); background: var(--yellow-bg); }
+.oc-bos     { color: var(--green);  background: var(--green-bg); }
+.oc-choch   { color: var(--red);    background: var(--red-bg); }
+.oc-expired { color: var(--text-dim); background: var(--surface-2); }
+.setup-del { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; }
+.setup-del:hover { color: var(--red); }
+
+/* /chart struct-panel "記 setup" button */
+.chart-struct-panel .cs-record-btn {
+    background: transparent;
+    border: 1px solid var(--blue);
+    color: var(--blue);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+.chart-struct-panel .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
+.chart-struct-panel .cs-record-btn:disabled { opacity: 0.6; cursor: wait; }

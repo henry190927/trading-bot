@@ -18,6 +18,7 @@
     <a href="/journal">Portfolio</a>
     <a href="/validate">Validate</a>
     <a href="/chart" class="active">Chart</a>
+    <a href="/setups">Setups</a>
     <a href="/onchain">On-chain</a>
     <a href="/ops">Ops</a>
   </nav>
@@ -168,6 +169,7 @@
     <span class="cs-kv" id="cs-zone-wrap"><em>樞紐區</em><span id="cs-zone">—</span></span>
     <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
     <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
+    <button type="button" class="cs-record-btn" id="cs-record-btn" title="記錄這個 setup 到 forward-log(/setups),不管有沒有開單">⚑ 記</button>
     <button type="button" class="cs-info-btn" id="cs-info-btn" aria-expanded="false" title="怎麼判讀 N 字結構">ⓘ</button>
     <div class="cs-info hidden" id="cs-info">
       <b>N 字判讀:</b> 推動 → 回檔 → 再推動。
@@ -1175,6 +1177,51 @@
             btn.setAttribute('aria-expanded', open ? 'true' : 'false');
         });
     })();
+    // Live price + engine snapshot for setup recording (set in applyChart).
+    var lastRecordCtx = { price: 0, side: '', score: 0, verdict: '' };
+    function structDir(s) {
+        if (s.zone) return s.zone.dir === 'up' ? 'long' : 'short';
+        if (s.trend === 'HH-HL uptrend') return 'long';
+        if (s.trend === 'LH-LL downtrend') return 'short';
+        if (s.event && s.event.indexOf('up') >= 0) return 'long';
+        if (s.event && s.event.indexOf('down') >= 0) return 'short';
+        return 'neutral';
+    }
+    (function wireStructRecord() {
+        var btn = document.getElementById('cs-record-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var s = lastStructure;
+            if (!s) { alert('目前沒有結構資料可記'); return; }
+            var z = s.zone;
+            var body = {
+                symbol: currentSym(), tf: currentTF(),
+                price: lastRecordCtx.price || 0,
+                dir: structDir(s),
+                lean: structLean(s).txt,
+                trend: s.trend || '', event: s.event || '',
+                in_zone: !!s.inZone, forming: !!s.forming,
+                entry: z ? (z.lo + z.hi) / 2 : (lastRecordCtx.price || 0),
+                stop: z ? z.invalidate : (s.protected || 0),
+                target: z ? z.target : 0,
+                bos_level: s.bosLevel || 0, protected: s.protected || 0,
+                engine_side: lastRecordCtx.side || '', engine_score: lastRecordCtx.score || 0,
+                engine_verdict: lastRecordCtx.verdict || '',
+                opened: false, note: ''
+            };
+            var orig = btn.textContent;
+            btn.disabled = true; btn.textContent = '記錄中…';
+            fetch('/api/chart/setup', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).then(function (r) { return r.json(); })
+              .then(function (d) {
+                  btn.disabled = false;
+                  btn.textContent = d && d.id ? ('✓ #' + d.id + ' → /setups') : orig;
+                  setTimeout(function () { btn.textContent = orig; }, 2600);
+              }).catch(function () { btn.disabled = false; btn.textContent = orig; });
+        });
+    })();
     function applyStructureVisibility() {
         clearStructLines();
         updateStructPanel();
@@ -1911,6 +1958,12 @@
         applyHVNLinesVisibility();
         lastPOCMig = data.pocMigration || null;
         applyPOCMigLinesVisibility();
+        lastRecordCtx = {
+            price: data.markPrice || 0,
+            side: (data.signal || {}).side || '',
+            score: (data.signal || {}).score || 0,
+            verdict: (data.diagnose || {}).verdict || ''
+        };
         lastStructure = data.structure || null;
         applyStructureVisibility();
         rsiSeries.setData(data.rsi || []);

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>setups · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/journal">Portfolio</a>
+    <a href="/validate">Validate</a>
+    <a href="/chart">Chart</a>
+    <a href="/setups" class="active">Setups</a>
+    <a href="/onchain">On-chain</a>
+    <a href="/ops">Ops</a>
+  </nav>
+</header>
+
+<main>
+  <div class="stats-card">
+    <h2>N字 setup forward-log
+      <button type="button" id="setups-refresh" class="ai-analyze-btn" style="margin-left:.6rem">↻ 回填 outcome</button>
+    </h2>
+    <div class="stats-grid">
+      <div><span class="lbl">Total</span><span class="val">{{.Stats.Total}}</span></div>
+      <div><span class="lbl">Open</span><span class="val">{{.Stats.Open}}</span></div>
+      <div><span class="lbl">BOS ✓</span><span class="val r-pos">{{.Stats.BOS}}</span></div>
+      <div><span class="lbl">CHoCH ✗</span><span class="val r-neg">{{.Stats.CHoCH}}</span></div>
+      <div><span class="lbl">Expired</span><span class="val r-zero">{{.Stats.Expired}}</span></div>
+      <div><span class="lbl">Hit-rate</span><span class="val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
+    </div>
+    <p class="glossary-hint" style="margin-top:.6rem">
+      Hit-rate = BOS ÷ (BOS + CHoCH)。BOS = 收破續勢確認;CHoCH = 收破反向、setup 作廢;Expired = 20 根內未定。
+      不管有沒有真開單都記,避免倖存者偏差。
+    </p>
+  </div>
+
+  {{if .Setups}}
+  <div style="overflow-x:auto">
+    <table class="setups-table">
+      <thead>
+        <tr>
+          <th>#</th><th>time</th><th>sym/tf</th><th>dir</th><th>lean</th><th>trend</th>
+          <th>event</th><th>entry</th><th>stop</th><th>target</th><th>BOS</th><th>prot</th>
+          <th>engine</th><th>開單</th><th>outcome</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Setups}}
+        <tr>
+          <td>{{.ID}}</td>
+          <td class="cs-dim">{{.RecordedAt.Format "01-02 15:04"}}</td>
+          <td><b>{{.Symbol}}</b> {{.TF}}</td>
+          <td class="dir-{{.Dir}}">{{.Dir}}</td>
+          <td>{{.Lean}}{{if .Forming}} ⏳{{end}}</td>
+          <td class="cs-dim">{{.Trend}}</td>
+          <td>{{if .Event}}{{.Event}}{{else}}—{{end}}</td>
+          <td>{{if .Entry}}{{printf "%.3f" .Entry}}{{else}}—{{end}}</td>
+          <td>{{if .Stop}}{{printf "%.3f" .Stop}}{{else}}—{{end}}</td>
+          <td>{{if .Target}}{{printf "%.3f" .Target}}{{else}}—{{end}}</td>
+          <td>{{if .BOSLevel}}{{printf "%.3f" .BOSLevel}}{{else}}—{{end}}</td>
+          <td>{{if .Protected}}{{printf "%.3f" .Protected}}{{else}}—{{end}}</td>
+          <td class="cs-dim">{{.EngineSide}} {{.EngineScore}}</td>
+          <td>{{if .Opened}}✓{{else}}—{{end}}</td>
+          <td><span class="outcome-badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
+          <td><form method="post" action="/setups/{{.ID}}/delete" onsubmit="return confirm('刪除 setup #{{.ID}}?')"><button class="setup-del" title="delete">✕</button></form></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="empty">還沒有記錄的 setup。到 <a href="/chart">/chart</a> 開 <b>N字 struct</b> 層,用面板的「⚑ 記 setup」記一筆。</div>
+  {{end}}
+</main>
+
+<footer>N字 structure setup forward-log · single-user</footer>
+
+<script>
+  document.getElementById('setups-refresh').addEventListener('click', function () {
+    var b = this; b.disabled = true; b.textContent = '回填中…';
+    fetch('/api/setups/refresh', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { location.reload(); })
+      .catch(function () { b.disabled = false; b.textContent = '↻ 回填 outcome'; });
+  });
+</script>
+</body>
+</html>
