@@ -5147,8 +5147,8 @@ main { overflow-x: hidden; }
 .setups-table .dir-neutral { color: var(--text-dim); }
 .outcome-badge { padding: 1px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
 .oc-open    { color: var(--yellow); background: var(--yellow-bg); }
-.oc-bos     { color: var(--green);  background: var(--green-bg); }
-.oc-choch   { color: var(--red);    background: var(--red-bg); }
+.oc-win     { color: var(--green);  background: var(--green-bg); }
+.oc-loss   { color: var(--red);    background: var(--red-bg); }
 .oc-expired { color: var(--text-dim); background: var(--surface-2); }
 .setup-del { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; }
 .setup-del:hover { color: var(--red); }

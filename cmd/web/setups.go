@@ -132,10 +132,12 @@ func appendSetup(s Setup) (int, error) {
 }
 
 // classifyOutcome scans closed bars recorded AFTER the setup and returns
-// the first structural resolution: a close through BOSLevel in the
-// setup direction = "bos" (continuation confirmed); a close through
-// Protected against it = "choch" (voided). >= expireBars with neither =
-// "expired". Empty = still open.
+// the first resolution IN THE SETUP'S DIRECTION using its own stop /
+// target (which the recorder assembled dir-correctly) — not the raw
+// structure leg levels, which can point the wrong way for a CHoCH
+// reversal setup. A close through the target = "win"; a close through
+// the stop = "loss"; >= expireBars with neither = "expired"; empty =
+// still open (or no target/stop and never stopped).
 func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float64, int) {
 	const expireBars = 20
 	n := 0
@@ -145,18 +147,18 @@ func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float
 		}
 		n++
 		if su.Dir == "short" {
-			if su.BOSLevel > 0 && c.Close < su.BOSLevel {
-				return "bos", c.CloseTime, c.Close, n
+			if su.Stop > 0 && c.Close >= su.Stop {
+				return "loss", c.CloseTime, c.Close, n
 			}
-			if su.Protected > 0 && c.Close > su.Protected {
-				return "choch", c.CloseTime, c.Close, n
+			if su.Target > 0 && c.Close <= su.Target {
+				return "win", c.CloseTime, c.Close, n
 			}
-		} else { // long / neutral default
-			if su.BOSLevel > 0 && c.Close > su.BOSLevel {
-				return "bos", c.CloseTime, c.Close, n
+		} else { // long / neutral
+			if su.Stop > 0 && c.Close <= su.Stop {
+				return "loss", c.CloseTime, c.Close, n
 			}
-			if su.Protected > 0 && c.Close < su.Protected {
-				return "choch", c.CloseTime, c.Close, n
+			if su.Target > 0 && c.Close >= su.Target {
+				return "win", c.CloseTime, c.Close, n
 			}
 		}
 	}
@@ -198,8 +200,8 @@ func (s *server) handleAPISetupsRefresh(c *gin.Context) {
 	now := time.Now()
 	resolved := 0
 	for i := range all {
-		if all[i].Outcome != "" {
-			continue
+		if all[i].Outcome == "skip" {
+			continue // skip is a terminal user decision — never auto-judge it
 		}
 		sym, err := resolveWebSymbol(all[i].Symbol)
 		if err != nil {
@@ -272,8 +274,8 @@ func (s *server) handleSetupDelete(c *gin.Context) {
 
 // setupStats is the hit-rate rollup shown atop /setups.
 type setupStats struct {
-	Total, Open, BOS, CHoCH, Expired, Skip int
-	HitRate                                float64 // bos / (bos+choch)
+	Total, Open, Win, Loss, Expired, Skip int
+	HitRate                               float64 // win / (win+loss)
 }
 
 func rollupSetups(all []Setup) setupStats {
@@ -283,18 +285,18 @@ func rollupSetups(all []Setup) setupStats {
 		switch s.Outcome {
 		case "":
 			st.Open++
-		case "bos":
-			st.BOS++
-		case "choch":
-			st.CHoCH++
+		case "win":
+			st.Win++
+		case "loss":
+			st.Loss++
 		case "expired":
 			st.Expired++
 		case "skip":
 			st.Skip++
 		}
 	}
-	if d := st.BOS + st.CHoCH; d > 0 {
-		st.HitRate = float64(st.BOS) / float64(d) * 100
+	if d := st.Win + st.Loss; d > 0 {
+		st.HitRate = float64(st.Win) / float64(d) * 100
 	}
 	return st
 }

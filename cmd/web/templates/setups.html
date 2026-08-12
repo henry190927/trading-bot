@@ -32,14 +32,14 @@
     <div class="stats-grid">
       <div><span class="lbl">Total</span><span class="val">{{.Stats.Total}}</span></div>
       <div><span class="lbl">Open</span><span class="val">{{.Stats.Open}}</span></div>
-      <div><span class="lbl">BOS ✓</span><span class="val r-pos">{{.Stats.BOS}}</span></div>
-      <div><span class="lbl">CHoCH ✗</span><span class="val r-neg">{{.Stats.CHoCH}}</span></div>
+      <div><span class="lbl">Win ✓</span><span class="val r-pos">{{.Stats.Win}}</span></div>
+      <div><span class="lbl">Loss ✗</span><span class="val r-neg">{{.Stats.Loss}}</span></div>
       <div><span class="lbl">Expired</span><span class="val r-zero">{{.Stats.Expired}}</span></div>
       <div><span class="lbl">Skip</span><span class="val r-zero">{{.Stats.Skip}}</span></div>
       <div><span class="lbl">Hit-rate</span><span class="val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
     </div>
     <p class="glossary-hint" style="margin-top:.6rem">
-      Hit-rate = BOS ÷ (BOS + CHoCH)。BOS = 收破續勢確認;CHoCH = 收破反向、setup 作廢;Expired = 20 根內未定。
+      Hit-rate = Win ÷ (Win + Loss)。依 setup 自己的方向 + stop/target 判定:Win = 收破 target(達標);Loss = 收破 stop(觸停損);Expired = 20 根內未觸;Skip = 你決定不進。
       不管有沒有真開單都記,避免倖存者偏差。
     </p>
   </div>
