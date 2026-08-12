@@ -5168,3 +5168,10 @@ main { overflow-x: hidden; }
 }
 .chart-struct-panel .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
 .chart-struct-panel .cs-record-btn:disabled { opacity: 0.6; cursor: wait; }
+
+/* setups skip state + action buttons */
+.oc-skip { color: var(--text-dim); background: var(--surface-2); border: 1px dashed var(--border); }
+.setup-actions { display: flex; gap: 0.4rem; align-items: center; }
+.setup-actions form { display: inline; }
+.setup-skip { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 4px; padding: 1px 7px; font-size: 0.72rem; cursor: pointer; }
+.setup-skip:hover { color: var(--yellow); border-color: var(--yellow); }

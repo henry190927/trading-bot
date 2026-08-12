@@ -35,6 +35,7 @@
       <div><span class="lbl">BOS ✓</span><span class="val r-pos">{{.Stats.BOS}}</span></div>
       <div><span class="lbl">CHoCH ✗</span><span class="val r-neg">{{.Stats.CHoCH}}</span></div>
       <div><span class="lbl">Expired</span><span class="val r-zero">{{.Stats.Expired}}</span></div>
+      <div><span class="lbl">Skip</span><span class="val r-zero">{{.Stats.Skip}}</span></div>
       <div><span class="lbl">Hit-rate</span><span class="val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
     </div>
     <p class="glossary-hint" style="margin-top:.6rem">
@@ -71,7 +72,10 @@
           <td class="cs-dim">{{.EngineSide}} {{.EngineScore}}</td>
           <td>{{if .Opened}}✓{{else}}—{{end}}</td>
           <td><span class="outcome-badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
-          <td><form method="post" action="/setups/{{.ID}}/delete" onsubmit="return confirm('刪除 setup #{{.ID}}?')"><button class="setup-del" title="delete">✕</button></form></td>
+          <td class="setup-actions">
+            {{if not .Outcome}}<form method="post" action="/setups/{{.ID}}/skip"><button class="setup-skip" title="標記不進 skip">skip</button></form>{{end}}
+            <form method="post" action="/setups/{{.ID}}/delete" onsubmit="return confirm('刪除 setup #{{.ID}}?')"><button class="setup-del" title="delete">✕</button></form>
+          </td>
         </tr>
         {{end}}
       </tbody>

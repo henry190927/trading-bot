@@ -232,6 +232,26 @@ func (s *server) handleAPISetupsRefresh(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "resolved": resolved})
 }
 
+// handleSetupSkip — POST /setups/:id/skip. Marks a setup as "skip"
+// (you decided NOT to take it). It's a terminal state: drops out of the
+// BOS/CHoCH hit-rate and won't be touched by refresh, but stays logged
+// as an observed-but-passed sample.
+func (s *server) handleSetupSkip(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	all, err := readSetups()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "%s", err.Error())
+		return
+	}
+	for i := range all {
+		if all[i].ID == id {
+			all[i].Outcome = "skip"
+		}
+	}
+	_ = writeSetups(all)
+	c.Redirect(http.StatusSeeOther, "/setups")
+}
+
 // handleSetupDelete — POST /setups/:id/delete.
 func (s *server) handleSetupDelete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
@@ -252,8 +272,8 @@ func (s *server) handleSetupDelete(c *gin.Context) {
 
 // setupStats is the hit-rate rollup shown atop /setups.
 type setupStats struct {
-	Total, Open, BOS, CHoCH, Expired int
-	HitRate                          float64 // bos / (bos+choch)
+	Total, Open, BOS, CHoCH, Expired, Skip int
+	HitRate                                float64 // bos / (bos+choch)
 }
 
 func rollupSetups(all []Setup) setupStats {
@@ -269,6 +289,8 @@ func rollupSetups(all []Setup) setupStats {
 			st.CHoCH++
 		case "expired":
 			st.Expired++
+		case "skip":
+			st.Skip++
 		}
 	}
 	if d := st.BOS + st.CHoCH; d > 0 {

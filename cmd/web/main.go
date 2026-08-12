@@ -127,6 +127,7 @@ func main() {
 	r.POST("/api/chart/setup", srv.handleAPIChartSetupRecord)
 	r.GET("/setups", srv.handleSetupsList)
 	r.POST("/api/setups/refresh", srv.handleAPISetupsRefresh)
+	r.POST("/setups/:id/skip", srv.handleSetupSkip)
 	r.POST("/setups/:id/delete", srv.handleSetupDelete)
 	r.GET("/onchain", srv.handleOnchainPage)
 	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
