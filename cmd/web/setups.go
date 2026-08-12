@@ -11,6 +11,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -140,6 +141,11 @@ func appendSetup(s Setup) (int, error) {
 // still open (or no target/stop and never stopped).
 func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float64, int) {
 	const expireBars = 20
+	const winR = 2.0 // R-based win when no explicit target: closed through +2R
+	var risk float64
+	if su.Entry > 0 && su.Stop > 0 {
+		risk = math.Abs(su.Entry - su.Stop)
+	}
 	n := 0
 	for _, c := range closed {
 		if !c.CloseTime.After(su.RecordedAt) {
@@ -153,11 +159,17 @@ func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float
 			if su.Target > 0 && c.Close <= su.Target {
 				return "win", c.CloseTime, c.Close, n
 			}
+			if su.Target == 0 && risk > 0 && c.Close <= su.Entry-winR*risk {
+				return "win", c.CloseTime, c.Close, n
+			}
 		} else { // long / neutral
 			if su.Stop > 0 && c.Close <= su.Stop {
 				return "loss", c.CloseTime, c.Close, n
 			}
 			if su.Target > 0 && c.Close >= su.Target {
+				return "win", c.CloseTime, c.Close, n
+			}
+			if su.Target == 0 && risk > 0 && c.Close >= su.Entry+winR*risk {
 				return "win", c.CloseTime, c.Close, n
 			}
 		}
