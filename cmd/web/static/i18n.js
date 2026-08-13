@@ -13,12 +13,12 @@
   var DICT = {
     en: {
       'nav.dashboard': 'Dashboard', 'nav.portfolio': 'Portfolio', 'nav.validate': 'Validate',
-      'nav.chart': 'Chart', 'nav.setups': 'Setups', 'nav.onchain': 'On-chain', 'nav.ops': 'Ops',
+      'nav.chart': 'Chart', 'nav.setups': 'Setups', 'nav.tips': 'Tips', 'nav.onchain': 'On-chain', 'nav.ops': 'Ops',
       'lang.toggle': '繁', 'lang.title': 'Switch language / 切換語言'
     },
     zh: {
       'nav.dashboard': '儀表板', 'nav.portfolio': '投資組合', 'nav.validate': '驗證',
-      'nav.chart': '圖表', 'nav.setups': 'Setups', 'nav.onchain': '鏈上', 'nav.ops': '維運',
+      'nav.chart': '圖表', 'nav.setups': 'Setups', 'nav.tips': '小卡', 'nav.onchain': '鏈上', 'nav.ops': '維運',
       'lang.toggle': 'EN', 'lang.title': '切換語言 / Switch language'
     }
   };

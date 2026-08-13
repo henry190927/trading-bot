@@ -5205,3 +5205,48 @@ main { overflow-x: hidden; }
 .slice-table td { text-align: center; }
 .slice-table th:first-child, .slice-table .slice-rowhead { text-align: left; }
 .slice-table .slice-rowhead { font-weight: 600; white-space: nowrap; }
+
+/* -------- i18n CSS-based language toggle (long/formatted content) -------- */
+:root:not([data-lang="zh"]) .i18n-zh { display: none; }
+[data-lang="zh"] .i18n-en { display: none; }
+
+/* -------- /tips — expandable trading-tip cards -------- */
+.tips-main { max-width: 720px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
+.tips-h1 { font-size: 1.5rem; font-weight: 700; color: var(--text); display: flex; flex-direction: column; }
+.tips-h1 .tips-sub { font-size: 0.85rem; font-weight: 400; color: var(--text-dim); margin-top: 0.25rem; }
+.tip-card {
+    margin-top: 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(var(--blue-rgb),0.06), transparent 42%), var(--surface);
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    transition: box-shadow 150ms ease, border-color 150ms ease;
+}
+.tip-card[open]  { border-color: var(--blue); box-shadow: 0 4px 18px rgba(0,0,0,0.35); }
+.tip-card:hover  { border-color: var(--blue); }
+.tip-summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.9rem 1rem; font-size: 1.05rem; font-weight: 600; color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+}
+.tip-summary::-webkit-details-marker { display: none; }
+.tip-icon { font-size: 1.5rem; line-height: 1; flex: 0 0 auto; }
+.tip-title { flex: 1; }
+.tip-title em { color: var(--blue); font-style: normal; }
+.tip-chevron { color: var(--text-dim); transition: transform 200ms ease; flex: 0 0 auto; }
+.tip-card[open] .tip-chevron { transform: rotate(180deg); }
+.tip-body { padding: 0.2rem 1rem 1rem; }
+.tip-steps { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin: 0; padding: 0; counter-reset: tip; }
+.tip-step {
+    padding: 0.6rem 0.8rem; border-radius: 8px; border-left: 4px solid var(--border);
+    background: rgba(var(--text-dim-rgb), 0.06); font-size: 0.9rem; line-height: 1.55; color: var(--text);
+}
+.tip-step b { color: var(--text); }
+.step-trend   { border-left-color: var(--green);  background: linear-gradient(90deg, var(--green-bg), transparent 72%); }
+.step-neutral { border-left-color: var(--yellow); background: linear-gradient(90deg, var(--yellow-bg), transparent 72%); }
+.step-agree   { border-left-color: var(--blue);   background: linear-gradient(90deg, rgba(var(--blue-rgb),0.12), transparent 72%); }
+.step-clash   { border-left-color: var(--red);    background: linear-gradient(90deg, var(--red-bg), transparent 72%); }
+.tip-foot { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px dashed var(--border); font-size: 0.82rem; color: var(--text-dim); }
+.tip-foot b { color: var(--text); }
+.tips-more { margin-top: 1.2rem; color: var(--text-dim); font-size: 0.85rem; text-align: center; font-style: italic; }

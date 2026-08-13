@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>tips · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Trading</div>
+  <nav class="topnav">
+    <a href="/" data-i18n="nav.dashboard">Dashboard</a>
+    <a href="/journal" data-i18n="nav.portfolio">Portfolio</a>
+    <a href="/validate" data-i18n="nav.validate">Validate</a>
+    <a href="/chart" data-i18n="nav.chart">Chart</a>
+    <a href="/setups" data-i18n="nav.setups">Setups</a>
+    <a href="/tips" class="active" data-i18n="nav.tips">Tips</a>
+    <a href="/onchain" data-i18n="nav.onchain">On-chain</a>
+    <a href="/ops" data-i18n="nav.ops">Ops</a>
+  </nav>
+</header>
+
+<main class="tips-main">
+  <h1 class="tips-h1">
+    <span class="i18n-en">Trading Tips</span><span class="i18n-zh">交易小卡</span>
+    <span class="tips-sub"><span class="i18n-en">principles distilled from your own trades</span><span class="i18n-zh">從你自己的交易萃取的原則</span></span>
+  </h1>
+
+  <!-- Card 1: Engine vs N-struct regime decision -->
+  <details class="tip-card" open>
+    <summary class="tip-summary">
+      <span class="tip-icon">🧭</span>
+      <span class="tip-title">
+        <span class="i18n-en">Engine vs N-struct? Ask <em>regime</em> first</span>
+        <span class="i18n-zh">Engine vs N-struct?先問 <em>regime</em></span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-trend">
+          <span class="i18n-en"><b>Clear trend</b> (HH-HL / LH-LL) or breakout → lean <b>N-struct</b>. The engine (mean-reversion) lags here.</span>
+          <span class="i18n-zh"><b>趨勢明確</b>(HH-HL / LH-LL)或突破 → 偏向 <b>N struct</b>。engine(均值回歸)在這裡會慢半拍。</span>
+        </li>
+        <li class="tip-step step-neutral">
+          <span class="i18n-en"><b>Neutral chop</b> → lean <b>engine</b>. N-struct's pivot/CHoCH throws a lot of fakes.</span>
+          <span class="i18n-zh"><b>neutral 拉鋸</b> → 偏向 <b>engine</b>。N struct 的樞紐/CHoCH 假訊號多。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>Both agree</b> → highest confidence (e.g. #11 engine TAKE + N-struct → +2.76R).</span>
+          <span class="i18n-zh"><b>兩者同意</b> → 最高信心(例:#11 engine TAKE + N struct → +2.76R)。</span>
+        </li>
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>They clash</b> → decide by <b>regime</b> + your own read. Don't let one indicator veto the other.</span>
+          <span class="i18n-zh"><b>兩者衝突</b> → 用 <b>regime</b> + 你的讀盤裁決。別讓單一指標否決另一個。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 From your forward-log: neutral chop went <b>0/7</b>. Real filter = regime, not engine-vs-struct.</span>
+        <span class="i18n-zh">📊 出自你的 forward-log:neutral 拉鋸 <b>0/7</b>。真正的 filter 是 regime,不是 engine vs struct。</span>
+      </p>
+    </div>
+  </details>
+
+  <p class="tips-more"><span class="i18n-en">More cards land here as we distill them.</span><span class="i18n-zh">之後萃取出的原則會陸續加成小卡。</span></p>
+</main>
+
+</body>
+</html>

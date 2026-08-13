@@ -377,6 +377,13 @@ func regimeRollup(all []Setup) map[string]map[string]SliceCell {
 	return out
 }
 
+// handleTipsPage — GET /tips. Static reference: expandable trading-tip
+// cards (bilingual via the i18n .i18n-en/.i18n-zh CSS toggle).
+func (s *server) handleTipsPage(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.HTML(http.StatusOK, "tips.html", gin.H{})
+}
+
 // handleSetupsList — GET /setups. Newest first + hit-rate rollup.
 func (s *server) handleSetupsList(c *gin.Context) {
 	all, err := readSetups()
