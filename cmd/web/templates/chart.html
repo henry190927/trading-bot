@@ -1482,6 +1482,11 @@
     // sweet spot for confluence reading — enough context to see
     // structure, wide enough per-bar to see wicks + bodies.
     var FIT_TAIL_BARS = 100;
+    // Bars fetched on initial load / symbol-TF switch. Fit shows only the
+    // last FIT_TAIL_BARS; this is the scroll-back headroom before a pan
+    // triggers loadMoreHistory(). 400 keeps payload + client render light
+    // (~200KB vs ~480KB at 1000) while leaving 300 bars of pan room.
+    var INIT_BARS = 400;
     function fitRecent(n) {
         var total = candleSeries.data().length;
         if (total === 0) { chart.timeScale().fitContent(); return; }
@@ -1978,8 +1983,10 @@
         // symbol / TF switch) so different price ranges don't leave
         // the viewport parked at a weird zoom from the previous
         // symbol. Deferred one tick so LWC has finished the setData
-        // layout pass first.
-        setTimeout(function () { fitRecent(FIT_TAIL_BARS); }, 0);
+        // layout pass first. rAF (not setTimeout) so the fitted range is
+        // applied in the same frame as the first paint — no flash of the
+        // default full-width scroll before the fit kicks in.
+        requestAnimationFrame(function () { fitRecent(FIT_TAIL_BARS); });
     }
 
     // Fetch and prepend an older batch. Called when user pans near the
@@ -2040,7 +2047,7 @@
 
     function load() {
         linerEl.textContent = 'Loading ' + currentSym() + ' ' + currentTF() + '…';
-        fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym()) + '&tf=' + encodeURIComponent(currentTF()))
+        fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym()) + '&tf=' + encodeURIComponent(currentTF()) + '&limit=' + INIT_BARS)
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
                 if (!res.ok) {

@@ -3700,7 +3700,7 @@ func (s *server) handleChartData(c *gin.Context) {
 	}
 	tf := market.Timeframe(tfStr)
 
-	limit := 1000
+	limit := 400
 	if v := c.Query("limit"); v != "" {
 		fmt.Sscanf(v, "%d", &limit)
 		if limit < 60 {
@@ -3798,14 +3798,10 @@ func (s *server) handleChartData(c *gin.Context) {
 		closes = append(closes, k.Close)
 	}
 
-	// Volume-by-price profile for the right-side vertical histogram
-	// (matches BingX-style "chip distribution" overlay). Splits each
-	// candle's volume into buy (green candles: close >= open) vs sell
-	// (red candles: close < open) at every price level the candle
-	// touched. Backend gives raw buckets; frontend positions bars via
-	// LWC priceScale.priceToCoordinate.
-	const vpBins = 60
-	vpBuckets := volumeByPrice(candles, vpBins)
+	// Volume-by-price profile is computed CLIENT-SIDE from the visible
+	// range (recomputeVPForVisibleRange in chart.html), so the backend no
+	// longer ships a vpBuckets array — it was ~8KB of payload the frontend
+	// threw away on every load.
 
 	// Chart markers: sweep events + double-top/bottom + divergences +
 	// range-expansion flash bars. Each entry maps to an LWC
@@ -3867,7 +3863,6 @@ func (s *server) handleChartData(c *gin.Context) {
 			"tf":            tfStr,
 			"candles":       ohlcArr,
 			"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
-			"volumeProfile": vpBuckets,
 			"markers":       chartMarkers,
 			"paginated":     true,
 		})
@@ -3969,7 +3964,6 @@ func (s *server) handleChartData(c *gin.Context) {
 			"stacked":  view.Signal.POCMig.Stacked,
 		},
 		"vpPOC":         view.Signal.VP.POC,
-		"volumeProfile": vpBuckets,
 		"markers":       chartMarkers,
 		"plan":          plan,
 		"signal":        sig,
