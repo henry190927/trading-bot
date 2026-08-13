@@ -5256,10 +5256,11 @@ main { overflow-x: hidden; }
    stacked vertically. Colours match the candle up/down palette;
    strong = deeper tint, lean = faint. rgba solids (no color-mix). */
 .tf-bias-panel {
-  display: inline-flex; flex-direction: column; gap: 2px;
-  margin-top: .4rem; padding: .28rem .35rem;
-  border-radius: 8px; font-size: .7rem; width: max-content;
-  background: rgba(255,255,255,0.03);
+  position: absolute; top: 36px; left: 10px; z-index: 6;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: .28rem .35rem; border-radius: 8px; font-size: .7rem;
+  width: max-content;
+  background: rgba(13,17,23,0.72); backdrop-filter: blur(3px);
   border: 1px solid rgba(255,255,255,0.09);
   user-select: none;
 }
