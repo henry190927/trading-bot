@@ -16,6 +16,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"myFirstGo/trading-bot/market"
@@ -313,6 +314,69 @@ func rollupSetups(all []Setup) setupStats {
 	return st
 }
 
+// engineStance classifies whether the engine agreed with the setup's
+// direction at record time: agree (same side), against (opposite), or
+// flat (engine had no directional read).
+func engineStance(s Setup) string {
+	es := strings.ToUpper(strings.TrimSpace(s.EngineSide))
+	if es == "" || es == "FLAT" {
+		return "flat"
+	}
+	if es == strings.ToUpper(s.Dir) {
+		return "agree"
+	}
+	return "against"
+}
+
+// regimeOf buckets a setup by market regime from its recorded trend:
+// a confirmed HH-HL / LH-LL sequence = "trend", anything else = "neutral".
+func regimeOf(s Setup) string {
+	if strings.Contains(s.Trend, "uptrend") || strings.Contains(s.Trend, "downtrend") {
+		return "trend"
+	}
+	return "neutral"
+}
+
+// SliceCell is one engine-stance × regime bucket's win/loss tally.
+type SliceCell struct {
+	Win, Loss, N int
+	HitRate      float64 // win / (win+loss)
+}
+
+// regimeRollup answers "when the engine disagrees with N-struct, does
+// following N-struct pay off — and does it depend on regime?" It tallies
+// resolved (win/loss) setups into a 3×2 grid: stance {agree,against,flat}
+// × regime {neutral,trend}.
+func regimeRollup(all []Setup) map[string]map[string]SliceCell {
+	out := map[string]map[string]SliceCell{
+		"agree":   {"neutral": {}, "trend": {}},
+		"against": {"neutral": {}, "trend": {}},
+		"flat":    {"neutral": {}, "trend": {}},
+	}
+	for _, s := range all {
+		st, rg := engineStance(s), regimeOf(s)
+		c := out[st][rg]
+		switch s.Outcome {
+		case "win":
+			c.Win++
+			c.N++
+		case "loss":
+			c.Loss++
+			c.N++
+		}
+		out[st][rg] = c
+	}
+	for st := range out {
+		for rg, c := range out[st] {
+			if d := c.Win + c.Loss; d > 0 {
+				c.HitRate = float64(c.Win) / float64(d) * 100
+			}
+			out[st][rg] = c
+		}
+	}
+	return out
+}
+
 // handleSetupsList — GET /setups. Newest first + hit-rate rollup.
 func (s *server) handleSetupsList(c *gin.Context) {
 	all, err := readSetups()
@@ -325,5 +389,6 @@ func (s *server) handleSetupsList(c *gin.Context) {
 	c.HTML(http.StatusOK, "setups.html", gin.H{
 		"Setups": all,
 		"Stats":  rollupSetups(all),
+		"Regime": regimeRollup(all),
 	})
 }

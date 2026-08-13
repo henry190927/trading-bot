@@ -46,6 +46,34 @@
     </p>
   </div>
 
+  <div class="stats-card">
+    <h2>Engine × Regime 命中率切片</h2>
+    <div style="overflow-x:auto">
+    <table class="setups-table slice-table">
+      <thead>
+        <tr><th>engine 立場 ＼ regime</th><th>neutral 拉鋸</th><th>趨勢 (HH-HL / LH-LL)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="slice-rowhead">✅ 同意<span class="cs-dim"> (engine=方向)</span></td>
+          <td>{{with index $.Regime "agree" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
+          <td>{{with index $.Regime "agree" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
+        </tr>
+        <tr><td class="slice-rowhead">⚔️ 衝突<span class="cs-dim"> (engine 相反)</span></td>
+          <td>{{with index $.Regime "against" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
+          <td>{{with index $.Regime "against" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
+        </tr>
+        <tr><td class="slice-rowhead">➖ 中性<span class="cs-dim"> (engine FLAT)</span></td>
+          <td>{{with index $.Regime "flat" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
+          <td>{{with index $.Regime "flat" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="glossary-hint" style="margin-top:.5rem">
+      命中率 = Win ÷ (Win+Loss),只計已定案。<b>用法</b>:<b>衝突 + neutral</b> 命中低 → 聽 engine、別追 N struct;<b>衝突 + 趨勢</b> → N struct 可能對(engine 滯後);<b>同意</b> → 最高信心。樣本要夠才可信。
+    </p>
+  </div>
+
   {{if .Setups}}
   <div style="overflow-x:auto">
     <table class="setups-table">

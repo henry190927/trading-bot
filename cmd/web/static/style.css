@@ -5200,3 +5200,8 @@ main { overflow-x: hidden; }
     z-index: 50;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
+
+/* setups regime slice table */
+.slice-table td { text-align: center; }
+.slice-table th:first-child, .slice-table .slice-rowhead { text-align: left; }
+.slice-table .slice-rowhead { font-weight: 600; white-space: nowrap; }
