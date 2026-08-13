@@ -48,6 +48,14 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     apply();
+    // Mark the active nav link by current path (topnav is now a shared
+    // partial with no per-page active class).
+    var path = location.pathname;
+    document.querySelectorAll('.topnav a').forEach(function (a) {
+      var h = a.getAttribute('href');
+      var on = h === '/' ? (path === '/') : (path === h || path.indexOf(h + '/') === 0);
+      if (on) a.classList.add('active');
+    });
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'lang-toggle';
