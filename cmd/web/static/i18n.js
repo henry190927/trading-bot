@@ -14,11 +14,19 @@
     en: {
       'nav.dashboard': 'Dashboard', 'nav.portfolio': 'Portfolio', 'nav.validate': 'Validate',
       'nav.chart': 'Chart', 'nav.setups': 'Setups', 'nav.tips': 'Tips', 'nav.onchain': 'On-chain', 'nav.ops': 'Ops',
+      'setups.total': 'Total', 'setups.open': 'Open', 'setups.win': 'Win ✓', 'setups.loss': 'Loss ✗',
+      'setups.expired': 'Expired', 'setups.skip': 'Skip', 'setups.hitrate': 'Hit-rate',
+      'setups.refill': '↻ Backfill', 'setups.slice': 'Engine × Regime hit-rate',
+      'setups.r_neutral': 'neutral chop', 'setups.r_trend': 'trend (HH-HL / LH-LL)',
       'lang.toggle': '繁', 'lang.title': 'Switch language / 切換語言'
     },
     zh: {
       'nav.dashboard': '儀表板', 'nav.portfolio': '投資組合', 'nav.validate': '驗證',
       'nav.chart': '圖表', 'nav.setups': 'Setups', 'nav.tips': '小卡', 'nav.onchain': '鏈上', 'nav.ops': '維運',
+      'setups.total': 'Total', 'setups.open': 'Open', 'setups.win': '勝 ✓', 'setups.loss': '負 ✗',
+      'setups.expired': 'Expired', 'setups.skip': 'Skip', 'setups.hitrate': '命中率',
+      'setups.refill': '↻ 回填 outcome', 'setups.slice': 'Engine × Regime 命中率切片',
+      'setups.r_neutral': 'neutral 拉鋸', 'setups.r_trend': '趨勢 (HH-HL / LH-LL)',
       'lang.toggle': 'EN', 'lang.title': '切換語言 / Switch language'
     }
   };

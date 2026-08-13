@@ -18,16 +18,16 @@
 <main>
   <div class="stats-card">
     <h2>N字 setup forward-log
-      <button type="button" id="setups-refresh" class="ai-analyze-btn" style="margin-left:.6rem">↻ 回填 outcome</button>
+      <button type="button" id="setups-refresh" class="ai-analyze-btn" style="margin-left:.6rem" data-i18n="setups.refill">↻ 回填 outcome</button>
     </h2>
     <div class="stats-grid">
-      <div><span class="lbl">Total</span><span class="val">{{.Stats.Total}}</span></div>
-      <div><span class="lbl">Open</span><span class="val">{{.Stats.Open}}</span></div>
-      <div><span class="lbl">Win ✓</span><span class="val r-pos">{{.Stats.Win}}</span></div>
-      <div><span class="lbl">Loss ✗</span><span class="val r-neg">{{.Stats.Loss}}</span></div>
-      <div><span class="lbl">Expired</span><span class="val r-zero">{{.Stats.Expired}}</span></div>
-      <div><span class="lbl">Skip</span><span class="val r-zero">{{.Stats.Skip}}</span></div>
-      <div><span class="lbl">Hit-rate</span><span class="val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
+      <div><span class="lbl" data-i18n="setups.total">Total</span><span class="val">{{.Stats.Total}}</span></div>
+      <div><span class="lbl" data-i18n="setups.open">Open</span><span class="val">{{.Stats.Open}}</span></div>
+      <div><span class="lbl" data-i18n="setups.win">Win ✓</span><span class="val r-pos">{{.Stats.Win}}</span></div>
+      <div><span class="lbl" data-i18n="setups.loss">Loss ✗</span><span class="val r-neg">{{.Stats.Loss}}</span></div>
+      <div><span class="lbl" data-i18n="setups.expired">Expired</span><span class="val r-zero">{{.Stats.Expired}}</span></div>
+      <div><span class="lbl" data-i18n="setups.skip">Skip</span><span class="val r-zero">{{.Stats.Skip}}</span></div>
+      <div><span class="lbl" data-i18n="setups.hitrate">Hit-rate</span><span class="val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
     </div>
     <p class="glossary-hint" style="margin-top:.6rem">
       Hit-rate = Win ÷ (Win + Loss)。依 setup 自己的方向 + stop/target 判定:Win = 收破 target(達標);Loss = 收破 stop(觸停損);Expired = 20 根內未觸;Skip = 你決定不進。
@@ -36,11 +36,11 @@
   </div>
 
   <div class="stats-card">
-    <h2>Engine × Regime 命中率切片</h2>
+    <h2 data-i18n="setups.slice">Engine × Regime 命中率切片</h2>
     <div style="overflow-x:auto">
     <table class="setups-table slice-table">
       <thead>
-        <tr><th>engine 立場 ＼ regime</th><th>neutral 拉鋸</th><th>趨勢 (HH-HL / LH-LL)</th></tr>
+        <tr><th>engine ＼ regime</th><th data-i18n="setups.r_neutral">neutral 拉鋸</th><th data-i18n="setups.r_trend">趨勢 (HH-HL / LH-LL)</th></tr>
       </thead>
       <tbody>
         <tr><td class="slice-rowhead">✅ 同意<span class="cs-dim"> (engine=方向)</span></td>
