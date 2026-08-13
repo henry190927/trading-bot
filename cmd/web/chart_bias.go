@@ -169,3 +169,66 @@ func (s *server) handleChartBias(c *gin.Context) {
 	biasCacheMu.Unlock()
 	c.JSON(http.StatusOK, resp)
 }
+
+// ── Top ticker bar ──────────────────────────────────────────────────
+// Live price + 24h change % for every tradeable symbol, so the trader
+// can watch all four without switching the <select>. 24h change = last
+// close vs the close ~24h ago on the 1h series, matching the daily % the
+// chart header shows next to the price.
+
+var tickerSymbols = []string{"BTC", "ETH", "XAU", "XAG"}
+
+type tickerCacheT struct {
+	at   time.Time
+	resp gin.H
+}
+
+var (
+	tickerCacheMu sync.Mutex
+	tickerCache   tickerCacheT
+)
+
+const tickerCacheTTL = 12 * time.Second
+
+// handleTickers — GET /api/tickers
+func (s *server) handleTickers(c *gin.Context) {
+	tickerCacheMu.Lock()
+	if tickerCache.resp != nil && time.Since(tickerCache.at) < tickerCacheTTL {
+		resp := tickerCache.resp
+		tickerCacheMu.Unlock()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	tickerCacheMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+
+	out := make([]gin.H, 0, len(tickerSymbols))
+	for _, short := range tickerSymbols {
+		row := gin.H{"symbol": short}
+		sym, err := resolveWebSymbol(short)
+		if err == nil && s.client != nil {
+			// 26 hourly bars ≈ 25h: enough to look back a full 24h and
+			// still keep the current forming bar as the live price.
+			if ks, err := s.client.KlinesWithForming(ctx, sym, market.Timeframe("1h"), 26); err == nil && len(ks) > 0 {
+				last := ks[len(ks)-1].Close
+				row["price"] = last
+				ref := ks[0].Close
+				if idx := len(ks) - 1 - 24; idx >= 0 {
+					ref = ks[idx].Close
+				}
+				if ref > 0 {
+					row["changePct"] = (last - ref) / ref * 100
+				}
+			}
+		}
+		out = append(out, row)
+	}
+
+	resp := gin.H{"tickers": out}
+	tickerCacheMu.Lock()
+	tickerCache = tickerCacheT{at: time.Now(), resp: resp}
+	tickerCacheMu.Unlock()
+	c.JSON(http.StatusOK, resp)
+}

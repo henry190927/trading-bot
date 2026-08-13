@@ -17,6 +17,8 @@
 
 <main class="chart-main">
 
+  <div class="chart-ticker" id="chart-ticker" aria-label="all symbols ticker"></div>
+
   <div class="chart-toolbar">
     <div class="chart-sym-group">
       <select id="chart-symbol" class="chart-select">
@@ -33,8 +35,6 @@
     <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
             data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
   </div>
-
-  <div class="tf-bias" id="tf-bias" aria-label="multi-timeframe bias"></div>
 
   <div class="chart-header" id="chart-header">
     <div class="chart-header-left">
@@ -99,6 +99,7 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">POC migration</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="struct">N字 struct <span class="layer-count" data-layer-count="struct">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="tf-bias">TF bias 表</button>
       </div>
     </div>
 
@@ -229,6 +230,7 @@
     <div class="chart-column">
       <div class="chart-plot-wrap">
         <div id="chart-container" class="chart-canvas"></div>
+        <div class="tf-bias-panel" id="tf-bias" aria-label="multi-timeframe bias"></div>
         <!-- OHLC readout — top-left overlay showing the values of the
              bar currently under the crosshair. Follows the bar as the
              cursor moves; falls back to the last bar when the cursor
@@ -911,7 +913,7 @@
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
         rsi: false, 'macd-pane': false, hvn: false, 'poc-mig': false,
-        'delta-div': false, struct: true,
+        'delta-div': false, struct: true, 'tf-bias': true,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
     // Master visibility override — when true, all layers render as
@@ -1086,6 +1088,8 @@
         applyHVNLinesVisibility();
         applyPOCMigLinesVisibility();
         applyStructureVisibility();
+        var tbEl = document.getElementById('tf-bias');
+        if (tbEl) tbEl.style.display = layerOn('tf-bias') ? '' : 'none';
         applyPaneLayout();
         updateMenuActiveCounts();
     }
@@ -2068,7 +2072,7 @@
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d || !d.tfs) return;
-                var html = '<span class="tf-bias-label">TF bias</span>';
+                var html = '<div class="tf-bias-title">TF bias</div>';
                 d.tfs.forEach(function (t) {
                     var m = biasMeta(t.dir);
                     var sc = (t.score >= 0 ? '+' : '') + t.score;
@@ -2076,19 +2080,62 @@
                             + '結構 ' + (t.struct || '-') + '\n'
                             + (t.poc || '-') + '\n'
                             + 'engine ' + (t.engine || '-');
-                    html += '<span class="tf-bias-chip ' + m.cls + '" title="'
+                    html += '<div class="tf-bias-row ' + m.cls + '" title="'
                           + tip.replace(/"/g, '&quot;') + '">'
                           + '<span class="tf-bias-tf">' + t.tf + '</span>'
-                          + '<span class="tf-bias-dot">' + m.dot + '</span></span>';
+                          + '<span class="tf-bias-dot">' + m.dot + '</span>'
+                          + '<span class="tf-bias-sc">' + sc + '</span></div>';
                 });
                 el.innerHTML = html;
             })
             .catch(function () { /* strip is best-effort; ignore failures */ });
     }
 
+    // Top ticker bar — all symbols' live price + 24h %, click to switch.
+    function loadTickers() {
+        var el = document.getElementById('chart-ticker');
+        if (!el) return;
+        fetch('/api/tickers?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.tickers) return;
+                var cur = currentSym();
+                var html = '';
+                d.tickers.forEach(function (t) {
+                    var chg = (typeof t.changePct === 'number') ? t.changePct : null;
+                    var cls = chg == null ? '' : (chg >= 0 ? 'tk-up' : 'tk-down');
+                    var chgTxt = chg == null ? '·' : (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+                    var px = (typeof t.price === 'number')
+                        ? (t.price >= 1000 ? t.price.toLocaleString('en-US', { maximumFractionDigits: 1 })
+                                           : t.price.toLocaleString('en-US', { maximumFractionDigits: 3 }))
+                        : '—';
+                    var act = (t.symbol === cur) ? ' is-active' : '';
+                    html += '<button type="button" class="chart-ticker-item' + act + '" data-sym="' + t.symbol + '">'
+                          + '<span class="tk-sym">' + t.symbol + '</span>'
+                          + '<span class="tk-px">' + px + '</span>'
+                          + '<span class="tk-chg ' + cls + '">' + chgTxt + '</span></button>';
+                });
+                el.innerHTML = html;
+            })
+            .catch(function () { /* best-effort */ });
+    }
+    (function () {
+        var tk = document.getElementById('chart-ticker');
+        if (!tk) return;
+        tk.addEventListener('click', function (e) {
+            var btn = e.target.closest('.chart-ticker-item');
+            if (!btn) return;
+            var sym = btn.getAttribute('data-sym');
+            if (!sym || sym === currentSym()) return;
+            symSel.value = sym;
+            symSel.dispatchEvent(new Event('change'));
+        });
+    })();
+
     function load() {
         linerEl.textContent = 'Loading ' + currentSym() + ' ' + currentTF() + '…';
         loadBias();
+        loadTickers();
         fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym()) + '&tf=' + encodeURIComponent(currentTF()) + '&limit=' + INIT_BARS)
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
@@ -2138,6 +2185,9 @@
     var pollTimer = null;
     var pollInFlight = false;
     function pollTick() {
+        // Ticker + bias refresh every tick (both cheap: server-cached).
+        loadTickers();
+        loadBias();
         // If a previous poll is still resolving, skip this tick so we
         // don't stack requests during transient network slowness.
         if (pollInFlight) return;

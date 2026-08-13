@@ -135,6 +135,7 @@ func main() {
 	r.GET("/chart", srv.handleChartPage)
 	r.GET("/api/chart/data", srv.handleChartData)
 	r.GET("/api/chart/bias", srv.handleChartBias)
+	r.GET("/api/tickers", srv.handleTickers)
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/logs", srv.handleOpsLogs)

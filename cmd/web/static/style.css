@@ -5251,30 +5251,58 @@ main { overflow-x: hidden; }
 .tip-foot b { color: var(--text); }
 .tips-more { margin-top: 1.2rem; color: var(--text-dim); font-size: 0.85rem; text-align: center; font-style: italic; }
 
-/* ── Multi-TF bias strip (/chart) ───────────────────────────────────
-   Per-symbol composite vote {N-struct, POC regime, engine} per TF.
-   Colours match the candle up/down palette; strong = deeper tint,
-   lean = faint tint. rgba solids so no color-mix fallback needed. */
-.tf-bias {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: .4rem; padding: .35rem .1rem .1rem; font-size: .8rem;
+/* ── Multi-TF bias table (/chart, top-right overlay) ────────────────
+   Per-symbol composite vote {N-struct, POC regime, engine} per TF,
+   stacked vertically. Colours match the candle up/down palette;
+   strong = deeper tint, lean = faint. rgba solids (no color-mix). */
+.tf-bias-panel {
+  position: absolute; top: 8px; right: 10px; z-index: 6;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: .3rem .35rem; border-radius: 8px; font-size: .72rem;
+  background: rgba(13,17,23,0.72); backdrop-filter: blur(3px);
+  border: 1px solid rgba(255,255,255,0.09);
+  pointer-events: auto; user-select: none;
 }
-.tf-bias:empty { display: none; }
-.tf-bias-label {
-  color: #8b949e; font-weight: 600; font-size: .68rem;
-  text-transform: uppercase; letter-spacing: .05em; margin-right: .15rem;
+.tf-bias-panel:empty { display: none; }
+.tf-bias-title {
+  color: #8b949e; font-weight: 700; font-size: .6rem;
+  text-transform: uppercase; letter-spacing: .06em;
+  text-align: center; margin-bottom: 2px;
 }
-.tf-bias-chip {
-  display: inline-flex; align-items: center; gap: .28rem;
-  padding: .14rem .48rem; border-radius: 6px; cursor: default;
+.tf-bias-row {
+  display: grid; grid-template-columns: 2.2em 1.1em 1.6em; align-items: center;
+  gap: .3rem; padding: .12rem .32rem; border-radius: 5px; cursor: default;
+  border: 1px solid transparent;
+}
+.tf-bias-row .tf-bias-tf { font-weight: 600; opacity: .92; }
+.tf-bias-row .tf-bias-dot { font-size: .66rem; line-height: 1; text-align: center; }
+.tf-bias-row .tf-bias-sc { text-align: right; opacity: .7; font-variant-numeric: tabular-nums; }
+.tf-bias-row.bias-long       { background: rgba(38,166,154,0.24); border-color: rgba(38,166,154,0.55); }
+.tf-bias-row.bias-long-lean  { background: rgba(38,166,154,0.11); }
+.tf-bias-row.bias-short      { background: rgba(239,83,80,0.24);  border-color: rgba(239,83,80,0.55); }
+.tf-bias-row.bias-short-lean { background: rgba(239,83,80,0.11); }
+.tf-bias-row.bias-neutral    { opacity: .8; }
+.tf-bias-row.bias-na         { opacity: .4; }
+
+/* ── Top ticker bar (/chart) ────────────────────────────────────────
+   All symbols' live price + 24h %, click to switch symbol. */
+.chart-ticker {
+  display: flex; flex-wrap: wrap; gap: .4rem; padding: .1rem 0 .5rem;
+}
+.chart-ticker:empty { display: none; }
+.chart-ticker-item {
+  display: inline-flex; align-items: baseline; gap: .4rem;
+  padding: .28rem .6rem; border-radius: 7px; cursor: pointer;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
+  font: inherit; color: inherit; line-height: 1.1;
 }
-.tf-bias-tf { font-weight: 600; opacity: .9; }
-.tf-bias-dot { font-size: .68rem; line-height: 1; }
-.tf-bias-chip.bias-long       { background: rgba(38,166,154,0.22); border-color: rgba(38,166,154,0.55); }
-.tf-bias-chip.bias-long-lean  { background: rgba(38,166,154,0.10); border-color: rgba(38,166,154,0.30); }
-.tf-bias-chip.bias-short      { background: rgba(239,83,80,0.22);  border-color: rgba(239,83,80,0.55); }
-.tf-bias-chip.bias-short-lean { background: rgba(239,83,80,0.10);  border-color: rgba(239,83,80,0.30); }
-.tf-bias-chip.bias-neutral    { opacity: .75; }
-.tf-bias-chip.bias-na         { opacity: .4; }
+.chart-ticker-item:hover { background: rgba(255,255,255,0.07); }
+.chart-ticker-item.is-active {
+  border-color: rgba(88,166,255,0.6); background: rgba(88,166,255,0.12);
+}
+.chart-ticker-item .tk-sym { font-weight: 700; font-size: .82rem; }
+.chart-ticker-item .tk-px { font-size: .82rem; font-variant-numeric: tabular-nums; }
+.chart-ticker-item .tk-chg { font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart-ticker-item .tk-chg.tk-up   { color: #26a69a; }
+.chart-ticker-item .tk-chg.tk-down { color: #ef5350; }
