@@ -146,11 +146,25 @@ func Evaluate(in Inputs) Signal {
 	// Flat signal and the Reason carries the event name so the user knows
 	// why nothing is being suggested.
 	if evt := macro.ActiveAt(time.Now().UTC()); evt != nil {
-		return Signal{
+		sig := Signal{
 			Symbol:    in.Symbol,
 			Timeframe: in.Timeframe,
 			Reasons:   []string{fmt.Sprintf("macro blackout: %s (window %dmin before / %dmin after)", evt.Name, evt.BeforeMinutes, evt.AfterMinutes)},
 		}
+		// The TRADE signal is suppressed (side stays Flat) — but POC
+		// migration + volume profile are market-structure VISUALISATION,
+		// not trade signals. Populate them so the chart's POC/VP overlays
+		// don't vanish during every CPI/FOMC/NFP/PPI window. This changes
+		// no trade decision: side is Flat, so nothing acts on these.
+		if len(in.Candles) >= 60 {
+			vpStart := len(in.Candles) - 200
+			if vpStart < 0 {
+				vpStart = 0
+			}
+			sig.VP = indicator.BuildVolumeProfile(in.Candles[vpStart:], 80, 5)
+			sig.POCMig = indicator.ComputePOCMigration(in.Candles, 50, 100, 200)
+		}
+		return sig
 	}
 
 	closes := market.Closes(in.Candles)
