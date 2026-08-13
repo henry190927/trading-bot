@@ -5250,3 +5250,31 @@ main { overflow-x: hidden; }
 .tip-foot { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px dashed var(--border); font-size: 0.82rem; color: var(--text-dim); }
 .tip-foot b { color: var(--text); }
 .tips-more { margin-top: 1.2rem; color: var(--text-dim); font-size: 0.85rem; text-align: center; font-style: italic; }
+
+/* ── Multi-TF bias strip (/chart) ───────────────────────────────────
+   Per-symbol composite vote {N-struct, POC regime, engine} per TF.
+   Colours match the candle up/down palette; strong = deeper tint,
+   lean = faint tint. rgba solids so no color-mix fallback needed. */
+.tf-bias {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: .4rem; padding: .35rem .1rem .1rem; font-size: .8rem;
+}
+.tf-bias:empty { display: none; }
+.tf-bias-label {
+  color: #8b949e; font-weight: 600; font-size: .68rem;
+  text-transform: uppercase; letter-spacing: .05em; margin-right: .15rem;
+}
+.tf-bias-chip {
+  display: inline-flex; align-items: center; gap: .28rem;
+  padding: .14rem .48rem; border-radius: 6px; cursor: default;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.tf-bias-tf { font-weight: 600; opacity: .9; }
+.tf-bias-dot { font-size: .68rem; line-height: 1; }
+.tf-bias-chip.bias-long       { background: rgba(38,166,154,0.22); border-color: rgba(38,166,154,0.55); }
+.tf-bias-chip.bias-long-lean  { background: rgba(38,166,154,0.10); border-color: rgba(38,166,154,0.30); }
+.tf-bias-chip.bias-short      { background: rgba(239,83,80,0.22);  border-color: rgba(239,83,80,0.55); }
+.tf-bias-chip.bias-short-lean { background: rgba(239,83,80,0.10);  border-color: rgba(239,83,80,0.30); }
+.tf-bias-chip.bias-neutral    { opacity: .75; }
+.tf-bias-chip.bias-na         { opacity: .4; }

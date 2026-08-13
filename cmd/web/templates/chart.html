@@ -34,6 +34,8 @@
             data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
   </div>
 
+  <div class="tf-bias" id="tf-bias" aria-label="multi-timeframe bias"></div>
+
   <div class="chart-header" id="chart-header">
     <div class="chart-header-left">
       <div class="chart-header-symrow">
@@ -2045,8 +2047,48 @@
         }
     });
 
+    // Multi-TF bias strip — per-symbol, closed-bar (canonical engine view,
+    // so it never repaints but lags the forming bar by design). Composite
+    // vote of {N-struct, POC regime, engine} from /api/chart/bias.
+    function biasMeta(dir) {
+        switch (dir) {
+            case 'long':       return { dot: '🟢', cls: 'bias-long' };
+            case 'long-lean':  return { dot: '🟢', cls: 'bias-long-lean' };
+            case 'short':      return { dot: '🔴', cls: 'bias-short' };
+            case 'short-lean': return { dot: '🔴', cls: 'bias-short-lean' };
+            case 'neutral':    return { dot: '⚪', cls: 'bias-neutral' };
+            default:           return { dot: '·',  cls: 'bias-na' };
+        }
+    }
+    function loadBias() {
+        var el = document.getElementById('tf-bias');
+        if (!el) return;
+        fetch('/api/chart/bias?symbol=' + encodeURIComponent(currentSym()) + '&_=' + Date.now(),
+              { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.tfs) return;
+                var html = '<span class="tf-bias-label">TF bias</span>';
+                d.tfs.forEach(function (t) {
+                    var m = biasMeta(t.dir);
+                    var sc = (t.score >= 0 ? '+' : '') + t.score;
+                    var tip = t.tf + '  ' + (t.dir || '') + ' (score ' + sc + ')\n'
+                            + '結構 ' + (t.struct || '-') + '\n'
+                            + (t.poc || '-') + '\n'
+                            + 'engine ' + (t.engine || '-');
+                    html += '<span class="tf-bias-chip ' + m.cls + '" title="'
+                          + tip.replace(/"/g, '&quot;') + '">'
+                          + '<span class="tf-bias-tf">' + t.tf + '</span>'
+                          + '<span class="tf-bias-dot">' + m.dot + '</span></span>';
+                });
+                el.innerHTML = html;
+            })
+            .catch(function () { /* strip is best-effort; ignore failures */ });
+    }
+
     function load() {
         linerEl.textContent = 'Loading ' + currentSym() + ' ' + currentTF() + '…';
+        loadBias();
         fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym()) + '&tf=' + encodeURIComponent(currentTF()) + '&limit=' + INIT_BARS)
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {

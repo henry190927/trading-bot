@@ -134,6 +134,7 @@ func main() {
 	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
 	r.GET("/chart", srv.handleChartPage)
 	r.GET("/api/chart/data", srv.handleChartData)
+	r.GET("/api/chart/bias", srv.handleChartBias)
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/logs", srv.handleOpsLogs)
