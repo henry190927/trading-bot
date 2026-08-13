@@ -5175,3 +5175,28 @@ main { overflow-x: hidden; }
 .setup-actions form { display: inline; }
 .setup-skip { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 4px; padding: 1px 7px; font-size: 0.72rem; cursor: pointer; }
 .setup-skip:hover { color: var(--yellow); border-color: var(--yellow); }
+
+/* -------- language toggle (injected by /static/i18n.js) -------- */
+.lang-toggle {
+    align-self: center;
+    background: var(--surface-2);
+    color: var(--blue);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-family: var(--cjk);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 100ms ease, color 100ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.lang-toggle:hover { border-color: var(--blue); color: var(--blue); }
+.lang-toggle.floating {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 8px);
+    right: 76px;
+    z-index: 50;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}

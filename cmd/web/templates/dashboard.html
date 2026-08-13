@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
 <!-- Auto-refresh moved to JS (see refresh-mgr below) so modals can pause it. -->
@@ -11,6 +12,7 @@
 <title>trading-web · {{.TF}}</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
 <link rel="stylesheet" href="/static/uplot/uPlot.min.css">
 </head>
 <body>
@@ -18,13 +20,13 @@
 <header class="topbar">
   <div class="brand">Trading</div>
   <nav class="topnav">
-    <a href="/" class="active">Dashboard</a>
-    <a href="/journal">Portfolio</a>
-    <a href="/validate">Validate</a>
-    <a href="/chart">Chart</a>
-    <a href="/setups">Setups</a>
-    <a href="/onchain">On-chain</a>
-    <a href="/ops">Ops</a>
+    <a href="/" class="active" data-i18n="nav.dashboard">Dashboard</a>
+    <a href="/journal" data-i18n="nav.portfolio">Portfolio</a>
+    <a href="/validate" data-i18n="nav.validate">Validate</a>
+    <a href="/chart" data-i18n="nav.chart">Chart</a>
+    <a href="/setups" data-i18n="nav.setups">Setups</a>
+    <a href="/onchain" data-i18n="nav.onchain">On-chain</a>
+    <a href="/ops" data-i18n="nav.ops">Ops</a>
   </nav>
 </header>
 
