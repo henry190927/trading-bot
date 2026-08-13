@@ -57,6 +57,166 @@
     </div>
   </details>
 
+  <!-- Card 2: No-fill discipline — biggest leak (31% no-fill) -->
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🎣</span>
+      <span class="tip-title">
+        <span class="i18n-en">Pullback limits won't fill in a trend — stop parking them</span>
+        <span class="i18n-zh">趨勢盤掛回撤限價會落空 — 別空等</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-trend">
+          <span class="i18n-en">When drift is <b>stacked</b> (POC50&gt;100&gt;200) or price is trending, a pullback-limit entry often <b>never fills</b> — price runs without the retrace you waited for.</span>
+          <span class="i18n-zh">當 drift <b>stacked</b>(POC50&gt;100&gt;200)或價格在趨勢中,回撤限價常常<b>填不到</b> — 價格沒回撤就直接噴走。</span>
+        </li>
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>Low-conviction plans (total 3, MOM 0)</b> are the worst offenders — the engine's mean-reversion pullback rarely materializes in a drifting tape.</span>
+          <span class="i18n-zh"><b>低信心 plan(total 3、MOM 0)</b>最容易落空 — 均值回歸的回撤在 drift 盤很少真的發生。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>Fix:</b> in a stacked / trending regime, take a <b>market entry</b> (accept a slightly worse price) or <b>skip</b>. Reserve pullback-limits for neutral / range regimes.</span>
+          <span class="i18n-zh"><b>修法:</b>stacked / 趨勢 regime 就 <b>market 進</b>(接受稍差價位)或<b>跳過</b>。回撤限價留給 neutral / range。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 From your journal: <b>16 of 51 trades (31%) were no-fills</b> — 10 explicitly "price never pulled back", 7 were total-3/MOM-0 limits.</span>
+        <span class="i18n-zh">📊 出自你的 journal:<b>51 筆有 16 筆(31%)no-fill</b> — 10 筆明講「沒回撤到 entry」,7 筆是 total-3/MOM-0 限價。</span>
+      </p>
+    </div>
+  </details>
+
+  <!-- Card 3: Don't fade a stacked regime -->
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🛑</span>
+      <span class="tip-title">
+        <span class="i18n-en">Don't fade a stacked regime — MR longs need range</span>
+        <span class="i18n-zh">別逆勢 fade stacked 盤 — MR 做多要 range</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en">A mean-reversion <b>long into a stacked-down regime gets run over</b> — "price broke down, downtrend continued". The engine's MR edge assumes a range, not a trend.</span>
+          <span class="i18n-zh">MR <b>做多逆一個 stacked-down regime 會被輾</b> —「broke down、downtrend continued」。MR 的邊際假設是 range,不是趨勢。</span>
+        </li>
+        <li class="tip-step step-neutral">
+          <span class="i18n-en"><b>Check regime first:</b> stacked drift (POC ladder aligned) = trade <b>with</b> it; flat / non-stacked = mean-reversion is safe.</span>
+          <span class="i18n-zh"><b>先看 regime:</b>stacked drift(POC 梯對齊)= <b>順勢</b>做;flat / non-stacked = 才適合回歸。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en">If you must counter-trend, <b>wait for a structural signal</b> (BOS / CHoCH / sweep) confirming the turn — don't fade on RSI alone.</span>
+          <span class="i18n-zh">真要逆勢,<b>等結構訊號</b>(BOS / CHoCH / 掃單)確認轉折 — 別只靠 RSI 就 fade。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 From your journal: <b>4 of 10 stops</b> were counter-trend positions run over by continuation (#10 / 26 / 27 / 47).</span>
+        <span class="i18n-zh">📊 出自你的 journal:<b>10 筆停損有 4 筆</b>是逆勢單被延續打掉(#10 / 26 / 27 / 47)。</span>
+      </p>
+    </div>
+  </details>
+
+  <!-- Card 4: Defensive close on counter-signal -->
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🛡️</span>
+      <span class="tip-title">
+        <span class="i18n-en">Counter-signal against you? Close — don't wait for the stop</span>
+        <span class="i18n-zh">對手訊號出現?防禦性平倉 — 別等停損</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en">Holding a short while a <b>double-bottom + RSI bull-div forms against you</b> = ignoring the tape. That's a full −1R you could have cut.</span>
+          <span class="i18n-zh">抱空單卻讓 <b>double bottom + RSI bull div 在對面成形</b> = 無視盤面。那是本可砍掉的 −1R。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en">When structure <b>flips against your position</b> (opposite BOS/CHoCH, divergence, pivot reclaim), take the defensive exit — a give-back beats a full stop.</span>
+          <span class="i18n-zh">當結構<b>對你的部位反轉</b>(反向 BOS/CHoCH、背離、樞紐收復),防禦性出場 — 讓一點利也比吃滿停損好。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en">This is <b>+EV even when price later returns to target</b> — you're paying for tail-risk insurance, not chasing perfection.</span>
+          <span class="i18n-zh">就算之後價格又回到 target,這仍是 <b>+EV</b> — 你買的是尾部風險保險,不是追求完美。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 #23 held too long into a bull-div → full −1R. #51 closed defensively pre-CPI → +2.76R.</span>
+        <span class="i18n-zh">📊 #23 抱太久遇 bull div → 吃滿 −1R;#51 CPI 前防禦平倉 → +2.76R。</span>
+      </p>
+    </div>
+  </details>
+
+  <!-- Card 5: Flatten/size-down into scheduled macro -->
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">📅</span>
+      <span class="tip-title">
+        <span class="i18n-en">Flatten or size down into scheduled macro</span>
+        <span class="i18n-zh">排程 macro 事件前:減碼或清倉</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en">A short into a <b>geopolitical headline reversed straight into the stop</b> (#17). Scheduled catalysts (CPI / FOMC / geopolitics) can gap through any technical level.</span>
+          <span class="i18n-zh">空單遇<b>地緣新聞直接反轉打停損</b>(#17)。排程催化(CPI / FOMC / 地緣)能跳過任何技術位。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en">Before a known event: <b>cut size, tighten, or flatten</b>. The +2.76R defensive close pre-CPI (#51) is the mirror image done right.</span>
+          <span class="i18n-zh">已知事件前:<b>減碼、收緊、或清倉</b>。#51 CPI 前 +2.76R 防禦平倉就是做對的鏡像。</span>
+        </li>
+        <li class="tip-step step-neutral">
+          <span class="i18n-en"><b>Don't widen stops</b> to "survive" the event — that just enlarges the loss. Reduce exposure instead.</span>
+          <span class="i18n-zh"><b>別靠加寬停損</b>「撐過」事件 — 那只是放大虧損。該做的是降曝險。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 #17 (geopolitical reversal) = −1R; #51 (pre-CPI defensive close) = +2.76R.</span>
+        <span class="i18n-zh">📊 #17(地緣反轉)= −1R;#51(CPI 前防禦平倉)= +2.76R。</span>
+      </p>
+    </div>
+  </details>
+
+  <!-- Card 6: Stop-then-reverse — fix execution, not stop width -->
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🔧</span>
+      <span class="tip-title">
+        <span class="i18n-en">Stopped then reversed? Fix execution, not stop width</span>
+        <span class="i18n-zh">被掃後反轉?修執行,別加寬停損</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en">Half your stops were "hit stop, <b>then</b> price pulled back / reversed". The instinct is to <b>widen the stop — wrong</b>. A wider stop just loses more on the trades that keep going.</span>
+          <span class="i18n-zh">一半的停損是「打停損<b>後</b>價格又回來 / 反轉」。直覺是<b>加寬停損 — 錯</b>。加寬只會在真的續跌的單上賠更多。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>The real fix:</b> check TP-limit fill mechanics (did your entry / TP actually rest correctly?) and whether a macro event caused the sweep.</span>
+          <span class="i18n-zh"><b>真正的修法:</b>查 TP-limit 成交機制(你的 entry / TP 真的正確掛著嗎?)+ 是否 macro 事件造成那次掃單。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en">Closed-bar evaluation stays canonical — the leak is at the <b>execution layer</b> (market entry, timeout fallback), not the stop distance.</span>
+          <span class="i18n-zh">closed-bar 判定維持不變 — 漏在<b>執行層</b>(market 進、timeout fallback),不在停損距離。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 From your journal: <b>5 of 10 stops</b> were stop-then-reverse (#5 / 8 / 10 / 17 / 19).</span>
+        <span class="i18n-zh">📊 出自你的 journal:<b>10 筆停損有 5 筆</b> stop-then-reverse(#5 / 8 / 10 / 17 / 19)。</span>
+      </p>
+    </div>
+  </details>
+
   <p class="tips-more"><span class="i18n-en">More cards land here as we distill them.</span><span class="i18n-zh">之後萃取出的原則會陸續加成小卡。</span></p>
 </main>
 
