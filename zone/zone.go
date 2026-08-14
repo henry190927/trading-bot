@@ -48,6 +48,69 @@ func Path() string {
 	return DefaultPath
 }
 
+// Config is the live-editable zone-alert config, stored as JSON and re-read
+// each cycle by the monitor goroutine — so /ops edits apply within one poll
+// (no restart). Separate from the secrets .env.
+type Config struct {
+	Enabled bool   `json:"enabled"` // master on/off for the whole channel
+	Auto    bool   `json:"auto"`    // auto-derive zones from structure
+	TFs     string `json:"tfs"`     // comma-separated, e.g. "1h,2h"
+}
+
+// ConfigPath — zone-config.json location (ZONE_CONFIG_PATH override).
+func ConfigPath() string {
+	if p := os.Getenv("ZONE_CONFIG_PATH"); strings.TrimSpace(p) != "" {
+		return p
+	}
+	return "/opt/trading/zone-config.json"
+}
+
+// DefaultConfig falls back to env/defaults when no config file exists yet.
+func DefaultConfig() Config {
+	tfs := strings.TrimSpace(os.Getenv("ZONE_TFS"))
+	if tfs == "" {
+		tfs = "1h,2h"
+	}
+	return Config{Enabled: true, Auto: AutoEnabled(), TFs: tfs}
+}
+
+// ReadConfig reads the live config (call each cycle). Missing/bad file →
+// defaults.
+func ReadConfig() Config {
+	b, err := os.ReadFile(ConfigPath())
+	if err != nil {
+		return DefaultConfig()
+	}
+	var c Config
+	if err := json.Unmarshal(b, &c); err != nil {
+		return DefaultConfig()
+	}
+	if strings.TrimSpace(c.TFs) == "" {
+		c.TFs = "1h,2h"
+	}
+	return c
+}
+
+// WriteConfig persists the config (used by /ops).
+func WriteConfig(c Config) error {
+	b, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(ConfigPath(), b, 0644)
+}
+
+// TFList parses the comma-separated TFs into timeframes.
+func (c Config) TFList() []market.Timeframe {
+	var out []market.Timeframe
+	for _, p := range strings.Split(c.TFs, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, market.Timeframe(p))
+		}
+	}
+	return out
+}
+
 // AutoEnabled — auto structure zones on unless ZONE_AUTO=off.
 func AutoEnabled() bool {
 	return strings.ToLower(strings.TrimSpace(os.Getenv("ZONE_AUTO"))) != "off"

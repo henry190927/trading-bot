@@ -49,11 +49,10 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 	}
 	n := notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
 	inside := map[string]bool{}
-	autoOn := zone.AutoEnabled()
-	tfs := zone.AutoTFs()
 	var autoZones []zone.Zone
 	var lastStruct time.Time
-	log.Printf("zonealert: up — poll %s, auto=%v tfs=%v, manual=%s", zonePollEvery, autoOn, tfs, zone.Path())
+	var lastTFs string
+	log.Printf("zonealert: up — poll %s, config=%s, manual=%s", zonePollEvery, zone.ConfigPath(), zone.Path())
 
 	tick := time.NewTicker(zonePollEvery)
 	defer tick.Stop()
@@ -61,11 +60,25 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 		select {
 		case <-ctx.Done():
 			return
-		case t := <-tick.C:
-			if autoOn && t.Sub(lastStruct) >= zoneStructEvery {
-				autoZones = zone.ComputeAuto(ctx, client, tfs)
-				lastStruct = t
+		case <-tick.C:
+		}
+
+		// Live config — re-read each cycle so /ops toggles apply without
+		// a restart. Disabled → no fetches, no alerts (loop keeps running
+		// so re-enabling is live too).
+		cfg := zone.ReadConfig()
+		if !cfg.Enabled {
+			continue
+		}
+		if cfg.Auto {
+			tfKey := cfg.TFs
+			if time.Since(lastStruct) >= zoneStructEvery || tfKey != lastTFs {
+				autoZones = zone.ComputeAuto(ctx, client, cfg.TFList())
+				lastStruct = time.Now()
+				lastTFs = tfKey
 			}
+		} else {
+			autoZones = nil
 		}
 
 		zones := append(zone.LoadManual(), autoZones...)

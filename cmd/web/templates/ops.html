@@ -86,6 +86,26 @@
     </div>
     <div class="ops-zone-armed" data-role="zone-armed"><span class="ops-zone-hint">loading…</span></div>
   </div>
+
+  <!-- config: applies live (monitor re-reads each cycle, no restart) -->
+  <form id="ops-zone-config" class="trade-form ops-zone-form" onsubmit="return false;">
+    <label class="ops-zone-toggle"><input type="checkbox" id="zone-enabled"> <span>啟用 enabled</span></label>
+    <label class="ops-zone-toggle"><input type="checkbox" id="zone-auto-in"> <span>auto（結構自動導出）</span></label>
+    <div class="field field-inline">
+      <label for="zone-tfs-in">TFs</label>
+      <input type="text" id="zone-tfs-in" placeholder="1h,2h" autocomplete="off">
+    </div>
+    <button type="button" class="btn-primary" id="ops-zone-apply">Apply（即時生效）</button>
+  </form>
+
+  <!-- log tail (zone-alert lines only) -->
+  <div class="ops-zone-logwrap">
+    <div class="ops-zone-logbar">
+      <span>log</span>
+      <button type="button" class="btn-ops" id="ops-zone-logtoggle">show</button>
+    </div>
+    <pre class="ops-zone-log hidden" id="ops-zone-log">—</pre>
+  </div>
 </section>
 
 <!-- Mutex banner — shown when the OTHER service is active -->
@@ -309,12 +329,19 @@
         fetch('/ops/zones')
             .then(function (r) { return r.json(); })
             .then(function (z) {
-                var on = z.auto && z.ntfy;
+                var on = z.enabled && z.ntfy;
                 var dot = document.querySelector('[data-role="zone-dot"]');
                 if (dot) dot.className = 'ops-state-dot ' + (on ? 'on' : 'off');
-                zSet('zone-label', on ? 'ARMED' : (z.ntfy ? 'auto off' : 'ntfy unset'));
+                zSet('zone-label', !z.enabled ? 'DISABLED' : (z.ntfy ? 'ARMED' : 'ntfy unset'));
                 zSet('zone-auto', z.auto ? 'on' : 'off');
                 zSet('zone-tfs', z.tfs || '—');
+                // Seed the config form once so refreshes don't clobber edits.
+                if (!window.__zoneSeeded) {
+                    window.__zoneSeeded = true;
+                    var en = document.getElementById('zone-enabled'); if (en) en.checked = !!z.enabled;
+                    var au = document.getElementById('zone-auto-in'); if (au) au.checked = !!z.auto;
+                    var tfi = document.getElementById('zone-tfs-in'); if (tfi) tfi.value = z.tfs || '1h,2h';
+                }
                 var wrap = document.querySelector('[data-role="zone-armed"]');
                 if (!wrap) return;
                 var arr = z.armed || [];
@@ -344,6 +371,50 @@
         fetch('/ops/zones').then(function (r) { return r.json(); }).then(function (z) {
             zoneRefreshBtn.disabled = false; fetchZones();
         }).catch(function () { zoneRefreshBtn.disabled = false; });
+    });
+
+    // Apply config — writes zone-config.json; monitor picks it up within 25s.
+    var zoneApplyBtn = document.getElementById('ops-zone-apply');
+    if (zoneApplyBtn) zoneApplyBtn.addEventListener('click', function () {
+        var body = new URLSearchParams();
+        body.set('enabled', document.getElementById('zone-enabled').checked ? '1' : '0');
+        body.set('auto', document.getElementById('zone-auto-in').checked ? '1' : '0');
+        body.set('tfs', (document.getElementById('zone-tfs-in').value || '1h,2h').trim());
+        zoneApplyBtn.disabled = true;
+        fetch('/ops/zone-config', { method: 'POST', body: body })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                zoneApplyBtn.disabled = false;
+                if (res.ok) { showToast('zone config saved (即時生效)', 'ok'); fetchZones(); }
+                else { showToast('zone config: ' + (res.body.error || 'failed'), 'err'); }
+            })
+            .catch(function () { zoneApplyBtn.disabled = false; showToast('zone config failed', 'err'); });
+    });
+
+    // Zone log tail — show/hide + poll while shown.
+    var zoneLogTimer = null;
+    function fetchZoneLogs() {
+        fetch('/ops/zone-logs')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var el = document.getElementById('ops-zone-log');
+                if (el) el.textContent = (d.lines && d.lines.length) ? d.lines.join('\n') : '(no zone-alert lines yet)';
+            })
+            .catch(function () {});
+    }
+    var zoneLogToggle = document.getElementById('ops-zone-logtoggle');
+    if (zoneLogToggle) zoneLogToggle.addEventListener('click', function () {
+        var log = document.getElementById('ops-zone-log');
+        if (!log) return;
+        var showing = log.classList.toggle('hidden');
+        if (!showing) { // now visible
+            zoneLogToggle.textContent = 'hide';
+            fetchZoneLogs();
+            zoneLogTimer = setInterval(fetchZoneLogs, 10000);
+        } else {
+            zoneLogToggle.textContent = 'show';
+            if (zoneLogTimer) { clearInterval(zoneLogTimer); zoneLogTimer = null; }
+        }
     });
 
     // ─── Lifecycle buttons (per service) ───────────────────────────────

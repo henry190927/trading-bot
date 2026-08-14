@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/zone"
 
 	"github.com/gin-gonic/gin"
@@ -219,43 +218,74 @@ func (s *server) handleOpsStatus(c *gin.Context) {
 // package the monitor fires from) plus any manual pins. Lets /ops show what
 // the zone-alert channel is watching right now.
 func (s *server) handleOpsZones(c *gin.Context) {
-	auto := true
-	tfsRaw := "1h,2h"
+	cfg := zone.ReadConfig()
 	ntfyOn := false
 	if data, err := os.ReadFile(envPath()); err == nil {
 		for _, line := range strings.Split(string(data), "\n") {
-			switch {
-			case strings.HasPrefix(line, "ZONE_AUTO="):
-				auto = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, "ZONE_AUTO="))) != "off"
-			case strings.HasPrefix(line, "ZONE_TFS="):
-				if v := strings.TrimSpace(strings.TrimPrefix(line, "ZONE_TFS=")); v != "" {
-					tfsRaw = v
-				}
-			case strings.HasPrefix(line, "NTFY_TOPIC="):
+			if strings.HasPrefix(line, "NTFY_TOPIC=") {
 				// presence only — never expose the topic value
 				ntfyOn = strings.TrimSpace(strings.TrimPrefix(line, "NTFY_TOPIC=")) != ""
 			}
 		}
 	}
-	var tfs []market.Timeframe
-	for _, p := range strings.Split(tfsRaw, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			tfs = append(tfs, market.Timeframe(p))
-		}
-	}
 	armed := zone.LoadManual()
-	if auto && s.client != nil {
+	if cfg.Enabled && cfg.Auto && s.client != nil {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
 		defer cancel()
-		armed = append(armed, zone.ComputeAuto(ctx, s.client, tfs)...)
+		armed = append(armed, zone.ComputeAuto(ctx, s.client, cfg.TFList())...)
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"auto":  auto,
-		"tfs":   tfsRaw,
-		"ntfy":  ntfyOn,
-		"poll":  "25s",
-		"armed": armed,
+		"enabled": cfg.Enabled,
+		"auto":    cfg.Auto,
+		"tfs":     cfg.TFs,
+		"ntfy":    ntfyOn,
+		"poll":    "25s",
+		"armed":   armed,
 	})
+}
+
+// handleOpsZoneConfig persists the zone-alert config. The monitor re-reads
+// it each cycle, so changes apply live (no restart). Form sends enabled/auto
+// as explicit "1"/"0" plus a tfs csv.
+func (s *server) handleOpsZoneConfig(c *gin.Context) {
+	tfs := strings.TrimSpace(c.PostForm("tfs"))
+	if tfs == "" {
+		tfs = "1h,2h"
+	}
+	for _, p := range strings.Split(tfs, ",") {
+		if p = strings.TrimSpace(p); p != "" && !contains(validTFs, p) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tf: " + p})
+			return
+		}
+	}
+	cfg := zone.Config{
+		Enabled: c.PostForm("enabled") == "1",
+		Auto:    c.PostForm("auto") == "1",
+		TFs:     tfs,
+	}
+	if err := zone.WriteConfig(cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "enabled": cfg.Enabled, "auto": cfg.Auto, "tfs": cfg.TFs})
+}
+
+// handleOpsZoneLogs returns the recent zone-alert log lines (filtered from
+// the trading-monitor journal).
+func (s *server) handleOpsZoneLogs(c *gin.Context) {
+	out, _ := exec.Command("sudo", "journalctl", "-u", "trading-monitor",
+		"-n", "300", "--no-pager", "--output=short-iso").CombinedOutput()
+	var lines []string
+	for _, l := range strings.Split(string(out), "\n") {
+		if strings.Contains(l, "zonealert") {
+			// trim the journald prefix noise, keep timestamp + message
+			lines = append(lines, l)
+		}
+	}
+	if len(lines) > 40 {
+		lines = lines[len(lines)-40:]
+	}
+	c.JSON(http.StatusOK, gin.H{"lines": lines})
 }
 
 // siblingOf returns the OTHER service in the trading-bot ↔ trading-monitor pair.
