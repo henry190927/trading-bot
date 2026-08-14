@@ -39,6 +39,36 @@ func NewNtfy(server, topic string) *Ntfy {
 	}
 }
 
+// Push sends a plain alert with a custom title/body/tags — for alerts that
+// don't map to a signal.Signal (e.g. price-zone touches). Same topic/server
+// and high priority as Notify.
+func (n *Ntfy) Push(ctx context.Context, title, body, tags string) error {
+	if n.Topic == "" {
+		return nil
+	}
+	url := n.Server + "/" + n.Topic
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("ntfy push: build req: %w", err)
+	}
+	req.Header.Set("Title", title)
+	req.Header.Set("Priority", "4")
+	if tags != "" {
+		req.Header.Set("Tags", tags)
+	}
+	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+	resp, err := n.HTTP.Do(req)
+	if err != nil {
+		return fmt.Errorf("ntfy push: do: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ntfy push: http %d: %s", resp.StatusCode, raw)
+	}
+	return nil
+}
+
 func (n *Ntfy) Notify(ctx context.Context, sig signal.Signal, ctxInfo signal.Context) error {
 	if n.Topic == "" {
 		return nil

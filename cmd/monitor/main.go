@@ -117,6 +117,11 @@ func main() {
 	defer cancel()
 	go waitForShutdown(cancel)
 
+	// Zone-alert channel: fast live-price watcher for pivot-zone-fade
+	// entries (separate cadence from the confluence scan). No-op if
+	// NTFY_TOPIC is unset. Zones live in /opt/trading/zones.json.
+	go runZoneAlerts(ctx, client)
+
 	dedup := newDedupSet()
 	ratioMsg := "off"
 	if *minRatio > 0 {

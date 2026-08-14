@@ -1,0 +1,10 @@
+[
+  {
+    "symbol": "XAG",
+    "lo": 64.82,
+    "hi": 65.16,
+    "dir": "short",
+    "note": "pivot-zone-fade: 反彈進樞紐區 fade 空",
+    "enabled": true
+  }
+]
