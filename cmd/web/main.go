@@ -138,6 +138,7 @@ func main() {
 	r.GET("/api/tickers", srv.handleTickers)
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/status", srv.handleOpsStatus)
+	r.GET("/ops/zones", srv.handleOpsZones)
 	r.GET("/ops/logs", srv.handleOpsLogs)
 	r.POST("/ops/start", srv.handleOpsStart)
 	r.POST("/ops/stop", srv.handleOpsStop)

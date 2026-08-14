@@ -11,6 +11,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -18,6 +19,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/zone"
 
 	"github.com/gin-gonic/gin"
 )
@@ -207,6 +211,51 @@ func (s *server) handleOpsStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, readDaemonStatus(svc))
+}
+
+// handleOpsZones reports the zone-fade alert config (read from .env, so it
+// matches what the monitor daemon actually uses) plus the currently-armed
+// zones — auto ones derived live from AnalyzeStructure (same shared `zone`
+// package the monitor fires from) plus any manual pins. Lets /ops show what
+// the zone-alert channel is watching right now.
+func (s *server) handleOpsZones(c *gin.Context) {
+	auto := true
+	tfsRaw := "1h,2h"
+	ntfyOn := false
+	if data, err := os.ReadFile(envPath()); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			switch {
+			case strings.HasPrefix(line, "ZONE_AUTO="):
+				auto = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, "ZONE_AUTO="))) != "off"
+			case strings.HasPrefix(line, "ZONE_TFS="):
+				if v := strings.TrimSpace(strings.TrimPrefix(line, "ZONE_TFS=")); v != "" {
+					tfsRaw = v
+				}
+			case strings.HasPrefix(line, "NTFY_TOPIC="):
+				// presence only — never expose the topic value
+				ntfyOn = strings.TrimSpace(strings.TrimPrefix(line, "NTFY_TOPIC=")) != ""
+			}
+		}
+	}
+	var tfs []market.Timeframe
+	for _, p := range strings.Split(tfsRaw, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			tfs = append(tfs, market.Timeframe(p))
+		}
+	}
+	armed := zone.LoadManual()
+	if auto && s.client != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
+		defer cancel()
+		armed = append(armed, zone.ComputeAuto(ctx, s.client, tfs)...)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"auto":  auto,
+		"tfs":   tfsRaw,
+		"ntfy":  ntfyOn,
+		"poll":  "25s",
+		"armed": armed,
+	})
 }
 
 // siblingOf returns the OTHER service in the trading-bot ↔ trading-monitor pair.

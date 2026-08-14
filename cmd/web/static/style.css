@@ -5307,3 +5307,22 @@ main { overflow-x: hidden; }
 .chart-ticker-item .tk-chg { font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .chart-ticker-item .tk-chg.tk-up   { color: #26a69a; }
 .chart-ticker-item .tk-chg.tk-down { color: #ef5350; }
+
+/* ── Zone-fade alert card (/ops) ────────────────────────────────────── */
+#ops-zone-refresh { padding: .2rem .55rem; margin-left: .4rem; }
+.ops-zone-armed { margin-top: .5rem; display: flex; flex-direction: column; gap: 4px; }
+.ops-zone-hint { color: #8b949e; font-size: .82rem; font-style: italic; }
+.ops-zone-row {
+  display: grid; grid-template-columns: 6.5em 3.5em 9em 1fr; align-items: baseline;
+  gap: .5rem; padding: .3rem .5rem; border-radius: 6px; font-size: .82rem;
+  background: rgba(255,255,255,0.03); border-left: 3px solid rgba(255,255,255,0.15);
+}
+.ops-zone-row .z-sym { font-weight: 700; }
+.ops-zone-row .z-dir { text-transform: uppercase; font-weight: 600; font-size: .72rem; }
+.ops-zone-row .z-band { font-variant-numeric: tabular-nums; }
+.ops-zone-row .z-note { color: #8b949e; font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops-zone-row.z-short { border-left-color: #ef5350; }
+.ops-zone-row.z-short .z-dir { color: #ef5350; }
+.ops-zone-row.z-long  { border-left-color: #26a69a; }
+.ops-zone-row.z-long  .z-dir { color: #26a69a; }
+.ops-zone-row.z-watch { border-left-color: #d8a657; }

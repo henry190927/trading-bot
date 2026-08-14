@@ -68,6 +68,26 @@
   </div>
 </section>
 
+<!-- ── Zone-fade alerts (runs inside trading-monitor) ── -->
+<section class="ops-svc-block" id="ops-zone-block">
+  <h2 class="ops-svc-title">
+    <span class="ops-svc-name">zone-fade alerts</span>
+    <span class="ops-svc-tag">runs in trading-monitor · ntfy</span>
+  </h2>
+  <div class="ops-status-card">
+    <div class="ops-status-row">
+      <span class="ops-state-dot" data-role="zone-dot"></span>
+      <span class="ops-state-label" data-role="zone-label">—</span>
+      <span class="ops-state-flex"></span>
+      <span class="ops-config-pill">auto <strong data-role="zone-auto">—</strong></span>
+      <span class="ops-config-pill">TFs <strong data-role="zone-tfs">—</strong></span>
+      <span class="ops-config-pill">poll <strong data-role="zone-poll">25s</strong></span>
+      <button type="button" class="btn-ops btn-restart" id="ops-zone-refresh" title="recompute armed zones">↻</button>
+    </div>
+    <div class="ops-zone-armed" data-role="zone-armed"><span class="ops-zone-hint">loading…</span></div>
+  </div>
+</section>
+
 <!-- Mutex banner — shown when the OTHER service is active -->
 <div id="ops-mutex-warn" class="ops-mutex-warn hidden" role="status">
   ⚠ <span id="ops-mutex-msg">—</span> Only one of <code>trading-bot</code> / <code>trading-monitor</code> can run at a time. Stop the active one first.
@@ -275,6 +295,56 @@
         applyMutexUI();
     })();
     setInterval(fetchAll, 5000);
+
+    // ─── Zone-fade alert status (recomputes structure, so slower cadence) ──
+    function zFmt(v) {
+        if (typeof v !== 'number') return v;
+        return v >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(3);
+    }
+    function zSet(role, v) {
+        var el = document.querySelector('[data-role="' + role + '"]');
+        if (el) el.textContent = v;
+    }
+    function fetchZones() {
+        fetch('/ops/zones')
+            .then(function (r) { return r.json(); })
+            .then(function (z) {
+                var on = z.auto && z.ntfy;
+                var dot = document.querySelector('[data-role="zone-dot"]');
+                if (dot) dot.className = 'ops-state-dot ' + (on ? 'on' : 'off');
+                zSet('zone-label', on ? 'ARMED' : (z.ntfy ? 'auto off' : 'ntfy unset'));
+                zSet('zone-auto', z.auto ? 'on' : 'off');
+                zSet('zone-tfs', z.tfs || '—');
+                var wrap = document.querySelector('[data-role="zone-armed"]');
+                if (!wrap) return;
+                var arr = z.armed || [];
+                if (!arr.length) {
+                    wrap.innerHTML = '<span class="ops-zone-hint">目前無上膛區間（沒有 symbol 在乾淨趨勢）</span>';
+                    return;
+                }
+                wrap.innerHTML = arr.map(function (a) {
+                    var cls = a.dir === 'short' ? 'z-short' : (a.dir === 'long' ? 'z-long' : 'z-watch');
+                    var tf = a.tf ? ' ' + a.tf : '';
+                    return '<div class="ops-zone-row ' + cls + '">'
+                        + '<span class="z-sym">' + a.symbol + tf + '</span>'
+                        + '<span class="z-dir">' + a.dir + '</span>'
+                        + '<span class="z-band">' + zFmt(a.lo) + '–' + zFmt(a.hi) + '</span>'
+                        + '<span class="z-note">' + (a.note || '') + '</span></div>';
+                }).join('');
+            })
+            .catch(function () {});
+    }
+    fetchZones();
+    setInterval(fetchZones, 60000);
+    var zoneRefreshBtn = document.getElementById('ops-zone-refresh');
+    if (zoneRefreshBtn) zoneRefreshBtn.addEventListener('click', function () {
+        zoneRefreshBtn.disabled = true;
+        var w = document.querySelector('[data-role="zone-armed"]');
+        if (w) w.innerHTML = '<span class="ops-zone-hint">recomputing…</span>';
+        fetch('/ops/zones').then(function (r) { return r.json(); }).then(function (z) {
+            zoneRefreshBtn.disabled = false; fetchZones();
+        }).catch(function () { zoneRefreshBtn.disabled = false; });
+    });
 
     // ─── Lifecycle buttons (per service) ───────────────────────────────
     document.querySelectorAll('.btn-ops').forEach(function (btn) {
