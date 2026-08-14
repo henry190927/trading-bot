@@ -100,17 +100,20 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 				if z.TF != "" {
 					tfTag = " " + z.TF
 				}
-				title := fmt.Sprintf("%s%s 進%s區 %.4g–%.4g", short, tfTag, dirWord(dir), z.Lo, z.Hi)
-				body := fmt.Sprintf("%s%s 現價 %.4g 進入 %.4g–%.4g（%s）\n%s\n→ 來判斷 reject / 進場",
-					short, tfTag, px, z.Lo, z.Hi, dir, z.Note)
-				tag := "eyes"
+				// ntfy can't colour arbitrary text — encode direction/zone as
+				// coloured emoji: 🔴 short, 🟢 long, 🟡 the 樞紐區 band. The
+				// coloured-circle tag also renders before the notification title.
+				dirEmoji, tags := "🟡", "eyes"
 				switch dir {
 				case "SHORT":
-					tag = "chart_with_downwards_trend"
+					dirEmoji, tags = "🔴", "red_circle,chart_with_downwards_trend"
 				case "LONG":
-					tag = "chart_with_upwards_trend"
+					dirEmoji, tags = "🟢", "green_circle,chart_with_upwards_trend"
 				}
-				if err := n.Push(ctx, title, body, tag); err != nil {
+				title := fmt.Sprintf("%s%s 進%s區 %.4g–%.4g", short, tfTag, dirWord(dir), z.Lo, z.Hi)
+				body := fmt.Sprintf("%s %s%s ｜ 現價 %.4g\n🟡 樞紐區 %.4g–%.4g（%s %s）\n%s\n→ 判斷 reject / 進場",
+					dirEmoji, short, tfTag, px, z.Lo, z.Hi, dirEmoji, dir, z.Note)
+				if err := n.Push(ctx, title, body, tags); err != nil {
 					log.Printf("zonealert: push failed: %v", err)
 				} else {
 					log.Printf("zonealert: fired %s%s px=%.4g zone=%.4g-%.4g dir=%s", short, tfTag, px, z.Lo, z.Hi, dir)
