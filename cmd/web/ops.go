@@ -200,6 +200,9 @@ func (s *server) handleOpsPage(c *gin.Context) {
 		"Monitor":          readDaemonStatus("trading-monitor"),
 		"ValidTFs":         validTFs,
 		"MonitorTFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h"},
+		"Zone":             zone.ReadConfig(),
+		"ZoneTFList":       zone.ReadConfig().TFList(),
+		"ZoneTFOptions":    []string{"15m", "30m", "1h", "2h", "4h"},
 	})
 }
 
@@ -248,20 +251,26 @@ func (s *server) handleOpsZones(c *gin.Context) {
 // it each cycle, so changes apply live (no restart). Form sends enabled/auto
 // as explicit "1"/"0" plus a tfs csv.
 func (s *server) handleOpsZoneConfig(c *gin.Context) {
-	tfs := strings.TrimSpace(c.PostForm("tfs"))
-	if tfs == "" {
-		tfs = "1h,2h"
+	// Merge with the current config — Start/Stop send only `enabled`, the
+	// config form sends `auto` + `tfs[]`, so absent fields stay untouched.
+	cfg := zone.ReadConfig()
+	if v := c.PostForm("enabled"); v != "" {
+		cfg.Enabled = v == "1"
 	}
-	for _, p := range strings.Split(tfs, ",") {
-		if p = strings.TrimSpace(p); p != "" && !contains(validTFs, p) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tf: " + p})
-			return
+	if v := c.PostForm("auto"); v != "" {
+		cfg.Auto = v == "1"
+	}
+	if tfArr := c.PostFormArray("tfs"); len(tfArr) > 0 {
+		for _, p := range tfArr {
+			if !contains(validTFs, strings.TrimSpace(p)) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tf: " + p})
+				return
+			}
 		}
+		cfg.TFs = strings.Join(tfArr, ",")
 	}
-	cfg := zone.Config{
-		Enabled: c.PostForm("enabled") == "1",
-		Auto:    c.PostForm("auto") == "1",
-		TFs:     tfs,
+	if strings.TrimSpace(cfg.TFs) == "" {
+		cfg.TFs = "1h,2h"
 	}
 	if err := zone.WriteConfig(cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

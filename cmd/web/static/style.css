@@ -5327,17 +5327,10 @@ main { overflow-x: hidden; }
 .ops-zone-row.z-long  .z-dir { color: #26a69a; }
 .ops-zone-row.z-watch { border-left-color: #d8a657; }
 
-/* ── Zone-fade alert: config form + log (/ops) ──────────────────────── */
-.ops-zone-form {
-  display: flex; flex-wrap: wrap; align-items: center; gap: .7rem;
-  margin-top: .6rem; padding: .5rem .1rem 0;
-}
-.ops-zone-toggle { display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; cursor: pointer; }
-.ops-zone-toggle input { width: auto; }
-.ops-zone-form .field-inline { display: flex; align-items: center; gap: .4rem; margin: 0; }
-.ops-zone-form .field-inline label { margin: 0; font-size: .85rem; }
-.ops-zone-form .field-inline input { width: 8rem; }
-.ops-zone-logwrap { margin-top: .6rem; }
+/* ── Zone-fade alert: config + log (/ops) ───────────────────────────── */
+.ops-zone-autorow { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
+.ops-zone-autorow input { width: auto; }
+.ops-zone-logwrap { margin-top: .8rem; }
 .ops-zone-logbar { display: flex; align-items: center; justify-content: space-between; font-size: .8rem; color: #8b949e; }
 .ops-zone-log {
   margin-top: .35rem; max-height: 200px; overflow: auto;

@@ -76,32 +76,52 @@
   </h2>
   <div class="ops-status-card">
     <div class="ops-status-row">
-      <span class="ops-state-dot" data-role="zone-dot"></span>
-      <span class="ops-state-label" data-role="zone-label">—</span>
+      <span class="ops-state-dot {{if .Zone.Enabled}}on{{else}}off{{end}}" data-role="zone-dot"></span>
+      <span class="ops-state-label" data-role="zone-label">{{if .Zone.Enabled}}ARMED{{else}}DISABLED{{end}}</span>
       <span class="ops-state-flex"></span>
-      <span class="ops-config-pill">auto <strong data-role="zone-auto">—</strong></span>
-      <span class="ops-config-pill">TFs <strong data-role="zone-tfs">—</strong></span>
+      <span class="ops-config-pill">auto <strong data-role="zone-auto">{{if .Zone.Auto}}on{{else}}off{{end}}</strong></span>
+      <span class="ops-config-pill">TFs <strong data-role="zone-tfs">{{.Zone.TFs}}</strong></span>
       <span class="ops-config-pill">poll <strong data-role="zone-poll">25s</strong></span>
-      <button type="button" class="btn-ops btn-restart" id="ops-zone-refresh" title="recompute armed zones">↻</button>
     </div>
     <div class="ops-zone-armed" data-role="zone-armed"><span class="ops-zone-hint">loading…</span></div>
   </div>
+  <div class="ops-actions">
+    <button type="button" class="btn-ops btn-start" data-zone-action="start">▶ Start</button>
+    <button type="button" class="btn-ops btn-stop" data-zone-action="stop">■ Stop</button>
+    <button type="button" class="btn-ops btn-restart" data-zone-action="restart" title="restart trading-monitor">↻ Restart</button>
+  </div>
+</section>
 
-  <!-- config: applies live (monitor re-reads each cycle, no restart) -->
-  <form id="ops-zone-config" class="trade-form ops-zone-form" onsubmit="return false;">
-    <label class="ops-zone-toggle"><input type="checkbox" id="zone-enabled"> <span>啟用 enabled</span></label>
-    <label class="ops-zone-toggle"><input type="checkbox" id="zone-auto-in"> <span>auto（結構自動導出）</span></label>
-    <div class="field field-inline">
-      <label for="zone-tfs-in">TFs</label>
-      <input type="text" id="zone-tfs-in" placeholder="1h,2h" autocomplete="off">
+<section class="ops-block">
+  <h2>zone-fade config <span class="hint">(applies live — monitor re-reads every 25s, no restart)</span></h2>
+  <form id="ops-zone-config-form" class="trade-form" onsubmit="return false;">
+    <div class="field">
+      <label>Auto fade-zone TFs <span class="hint">(structure-derived; 1h,2h recommended)</span></label>
+      {{$zoneTFs := .ZoneTFList}}
+      <div class="ops-tf-checkboxes">
+        {{range $opt := .ZoneTFOptions}}
+          <label class="ops-tf-check">
+            <input type="checkbox" name="tfs" value="{{$opt}}"
+              {{range $sel := $zoneTFs}}{{if eq (printf "%s" $sel) $opt}}checked{{end}}{{end}}>
+            <span>{{$opt}}</span>
+          </label>
+        {{end}}
+      </div>
     </div>
-    <button type="button" class="btn-primary" id="ops-zone-apply">Apply（即時生效）</button>
+    <div class="field">
+      <label class="ops-tf-check ops-zone-autorow">
+        <input type="checkbox" id="zone-auto-in" {{if .Zone.Auto}}checked{{end}}>
+        <span>auto — 從結構自動導出 fade 區（關掉則只用手動 zones.json）</span>
+      </label>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-primary" id="ops-zone-apply">Apply config</button>
+    </div>
   </form>
 
-  <!-- log tail (zone-alert lines only) -->
   <div class="ops-zone-logwrap">
     <div class="ops-zone-logbar">
-      <span>log</span>
+      <span>zone log</span>
       <button type="button" class="btn-ops" id="ops-zone-logtoggle">show</button>
     </div>
     <pre class="ops-zone-log hidden" id="ops-zone-log">—</pre>
@@ -335,13 +355,6 @@
                 zSet('zone-label', !z.enabled ? 'DISABLED' : (z.ntfy ? 'ARMED' : 'ntfy unset'));
                 zSet('zone-auto', z.auto ? 'on' : 'off');
                 zSet('zone-tfs', z.tfs || '—');
-                // Seed the config form once so refreshes don't clobber edits.
-                if (!window.__zoneSeeded) {
-                    window.__zoneSeeded = true;
-                    var en = document.getElementById('zone-enabled'); if (en) en.checked = !!z.enabled;
-                    var au = document.getElementById('zone-auto-in'); if (au) au.checked = !!z.auto;
-                    var tfi = document.getElementById('zone-tfs-in'); if (tfi) tfi.value = z.tfs || '1h,2h';
-                }
                 var wrap = document.querySelector('[data-role="zone-armed"]');
                 if (!wrap) return;
                 var arr = z.armed || [];
@@ -363,23 +376,37 @@
     }
     fetchZones();
     setInterval(fetchZones, 60000);
-    var zoneRefreshBtn = document.getElementById('ops-zone-refresh');
-    if (zoneRefreshBtn) zoneRefreshBtn.addEventListener('click', function () {
-        zoneRefreshBtn.disabled = true;
-        var w = document.querySelector('[data-role="zone-armed"]');
-        if (w) w.innerHTML = '<span class="ops-zone-hint">recomputing…</span>';
-        fetch('/ops/zones').then(function (r) { return r.json(); }).then(function (z) {
-            zoneRefreshBtn.disabled = false; fetchZones();
-        }).catch(function () { zoneRefreshBtn.disabled = false; });
+
+    // Start / Stop (enabled on/off, live) · Restart (restart trading-monitor).
+    document.querySelectorAll('[data-zone-action]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var act = btn.getAttribute('data-zone-action');
+            btn.disabled = true;
+            var done = function (ok, msg) { btn.disabled = false; showToast(msg, ok ? 'ok' : 'err'); fetchZones(); };
+            if (act === 'restart') {
+                fetch('/ops/restart?service=trading-monitor', { method: 'POST' })
+                    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                    .then(function (res) { done(res.ok, 'zone restart (trading-monitor) ' + (res.ok ? 'ok' : (res.body.error || 'failed'))); })
+                    .catch(function () { done(false, 'restart failed'); });
+                return;
+            }
+            var body = new URLSearchParams();
+            body.set('enabled', act === 'start' ? '1' : '0');
+            fetch('/ops/zone-config', { method: 'POST', body: body })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                .then(function (res) { done(res.ok, 'zone ' + act + (res.ok ? ' ok' : ': ' + (res.body.error || 'failed'))); })
+                .catch(function () { done(false, 'zone ' + act + ' failed'); });
+        });
     });
 
-    // Apply config — writes zone-config.json; monitor picks it up within 25s.
+    // Apply config (auto + TF checkboxes) — writes zone-config.json live.
     var zoneApplyBtn = document.getElementById('ops-zone-apply');
     if (zoneApplyBtn) zoneApplyBtn.addEventListener('click', function () {
         var body = new URLSearchParams();
-        body.set('enabled', document.getElementById('zone-enabled').checked ? '1' : '0');
         body.set('auto', document.getElementById('zone-auto-in').checked ? '1' : '0');
-        body.set('tfs', (document.getElementById('zone-tfs-in').value || '1h,2h').trim());
+        document.querySelectorAll('#ops-zone-config-form input[name="tfs"]:checked').forEach(function (cb) {
+            body.append('tfs', cb.value);
+        });
         zoneApplyBtn.disabled = true;
         fetch('/ops/zone-config', { method: 'POST', body: body })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
@@ -422,6 +449,7 @@
         btn.addEventListener('click', function () {
             var action = btn.getAttribute('data-action');
             var service = btn.getAttribute('data-service');
+            if (!action || !service) return; // zone buttons / log toggle handled elsewhere
             btn.disabled = true;
             var origText = btn.textContent;
             btn.textContent = '…';
