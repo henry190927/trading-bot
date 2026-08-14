@@ -123,13 +123,13 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 				case "LONG":
 					dirEmoji, tags = "🟢", "green_circle,chart_with_upwards_trend"
 				}
-				title := fmt.Sprintf("%s%s 進%s區 %.4g–%.4g", short, tfTag, dirWord(dir), z.Lo, z.Hi)
-				body := fmt.Sprintf("%s %s%s ｜ 現價 %.4g\n🟡 樞紐區 %.4g–%.4g（%s %s）\n%s\n→ 判斷 reject / 進場",
-					dirEmoji, short, tfTag, px, z.Lo, z.Hi, dirEmoji, dir, z.Note)
+				title := fmt.Sprintf("%s%s 進%s區 %s–%s", short, tfTag, dirWord(dir), zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi))
+				body := fmt.Sprintf("%s %s%s ｜ 現價 %s\n🟡 樞紐區 %s–%s（%s %s）\n%s\n→ 判斷 reject / 進場",
+					dirEmoji, short, tfTag, zone.FmtPrice(px), zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), dirEmoji, dir, z.Note)
 				if err := n.Push(ctx, title, body, tags); err != nil {
 					log.Printf("zonealert: push failed: %v", err)
 				} else {
-					log.Printf("zonealert: fired %s%s px=%.4g zone=%.4g-%.4g dir=%s", short, tfTag, px, z.Lo, z.Hi, dir)
+					log.Printf("zonealert: fired %s%s px=%s zone=%s-%s dir=%s", short, tfTag, zone.FmtPrice(px), zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), dir)
 				}
 			}
 			inside[key] = in

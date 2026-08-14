@@ -9,12 +9,45 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/signal"
 )
+
+// FmtPrice renders a price for humans — thousands-separated for BTC/ETH/XAU
+// scale (avoids %g scientific notation like "6.282e+04"), decimals kept for
+// sub-1000 (XAG). e.g. 62820 → "62,820", 4343.9 → "4,343.9", 64.91 → "64.91".
+func FmtPrice(v float64) string {
+	if v < 1000 && v > -1000 {
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	}
+	s := strconv.FormatFloat(v, 'f', 1, 64)
+	s = strings.TrimSuffix(s, ".0")
+	neg := strings.HasPrefix(s, "-")
+	if neg {
+		s = s[1:]
+	}
+	intPart, frac := s, ""
+	if i := strings.IndexByte(s, '.'); i >= 0 {
+		intPart, frac = s[:i], s[i:]
+	}
+	n := len(intPart)
+	var b strings.Builder
+	for i, c := range intPart {
+		if i > 0 && (n-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(c)
+	}
+	out := b.String() + frac
+	if neg {
+		out = "-" + out
+	}
+	return out
+}
 
 const DefaultPath = "/opt/trading/zones.json"
 
@@ -189,8 +222,8 @@ func ComputeAuto(ctx context.Context, client *bingx.Client, tfs []market.Timefra
 			if hi < lo {
 				lo, hi = hi, lo
 			}
-			note := fmt.Sprintf("auto %s %s 樞紐區 fade｜stop %.4g target %.4g",
-				string(tf), TrendWord(st.Trend), st.Zone.Invalidate, st.Zone.Target)
+			note := fmt.Sprintf("auto %s %s 樞紐區 fade｜stop %s target %s",
+				string(tf), TrendWord(st.Trend), FmtPrice(st.Zone.Invalidate), FmtPrice(st.Zone.Target))
 			zs = append(zs, Zone{Symbol: short, Lo: lo, Hi: hi, Dir: dir, Note: note, TF: string(tf)})
 		}
 	}
