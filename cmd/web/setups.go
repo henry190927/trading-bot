@@ -52,11 +52,26 @@ type Setup struct {
 	Opened bool   `json:"opened"` // did you actually open a trade on it?
 	Note   string `json:"note"`
 
-	// Outcome — backfilled by /api/setups/refresh.
-	Outcome      string    `json:"outcome"` // "" open | bos | choch | expired
+	// Outcome — backfilled by /api/setups/refresh. CLOSE-based: did the
+	// setup's read resolve to the win direction (a close through target)
+	// before a close through stop. Measures "was the direction right".
+	Outcome      string    `json:"outcome"` // "" open | win | loss | expired | skip
 	OutcomeAt    time.Time `json:"outcome_at,omitempty"`
 	OutcomePrice float64   `json:"outcome_price,omitempty"`
 	Bars         int       `json:"bars,omitempty"`
+
+	// RealOutcome — PATH-DEPENDENT: walks intrabar high/low and reports
+	// which of stop/target was touched FIRST after the entry filled (same
+	// bar → stop first, the conservative backtest convention). Answers "if
+	// actually traded this entry/stop, would it have hit TP or SL first" —
+	// which Outcome misses when a wick sweeps the stop before price later
+	// reaches target. The gap between Outcome and RealOutcome = the
+	// execution / stop-placement quality signal (e.g. read right, stop too
+	// tight). "no-fill" = entry never reached within the window.
+	RealOutcome      string    `json:"real_outcome,omitempty"` // "" | win | loss | no-fill | expired
+	RealOutcomeAt    time.Time `json:"real_outcome_at,omitempty"`
+	RealOutcomePrice float64   `json:"real_outcome_price,omitempty"`
+	RealBars         int       `json:"real_bars,omitempty"`
 }
 
 // setupsPath is the on-disk JSONL store (one Setup per line).
@@ -181,6 +196,58 @@ func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float
 	return "", time.Time{}, 0, n
 }
 
+// classifyRealOutcome is the PATH-DEPENDENT twin of classifyOutcome: it
+// walks intrabar high/low and reports which of stop/target was touched
+// FIRST after the entry filled — the outcome an actual resting order would
+// have seen. Needs entry + stop. Fill = a bar whose range spans the entry.
+// Same-bar stop AND target → stop first (conservative). Never fills within
+// the window → "no-fill".
+func classifyRealOutcome(su Setup, closed []market.Candle) (string, time.Time, float64, int) {
+	const expireBars = 20
+	if su.Entry <= 0 || su.Stop <= 0 {
+		return "", time.Time{}, 0, 0
+	}
+	filled := false
+	n := 0
+	for _, c := range closed {
+		if !c.CloseTime.After(su.RecordedAt) {
+			continue
+		}
+		n++
+		if !filled {
+			if c.Low <= su.Entry && su.Entry <= c.High {
+				filled = true // price traded through the entry this bar
+			} else {
+				continue
+			}
+		}
+		// First-touch after fill (incl. the fill bar). Check stop before
+		// target so a bar that spans both resolves to the stop.
+		if su.Dir == "short" {
+			if c.High >= su.Stop {
+				return "loss", c.CloseTime, su.Stop, n
+			}
+			if su.Target > 0 && c.Low <= su.Target {
+				return "win", c.CloseTime, su.Target, n
+			}
+		} else { // long / neutral
+			if c.Low <= su.Stop {
+				return "loss", c.CloseTime, su.Stop, n
+			}
+			if su.Target > 0 && c.High >= su.Target {
+				return "win", c.CloseTime, su.Target, n
+			}
+		}
+	}
+	if !filled && n >= expireBars {
+		return "no-fill", time.Time{}, 0, n
+	}
+	if filled && n >= expireBars {
+		return "expired", time.Time{}, 0, n
+	}
+	return "", time.Time{}, 0, n
+}
+
 // handleAPIChartSetupRecord — POST /api/chart/setup. Body is the
 // snapshot the /chart client assembled from the live structure. Assigns
 // an ID and appends. Outcome stays empty until a refresh resolves it.
@@ -221,11 +288,21 @@ func (s *server) handleAPISetupsRefresh(c *gin.Context) {
 			continue
 		}
 		tf := market.Timeframe(all[i].TF)
-		cs, err := s.client.KlinesWithForming(ctx, sym, tf, 200)
+		// Fetch the setup's OWN forward window (recorded → +~25 bars) rather
+		// than the recent 200, so an OLD setup resolves on the bars that
+		// actually followed it — required for the path-dependent RealOutcome
+		// (which of stop/target got wicked first) and also fixes stale
+		// re-judging of old Outcomes on unrelated recent price.
+		start := all[i].RecordedAt
+		end := start.Add(25 * tfDurationSeconds(tf))
+		if end.After(now) {
+			end = now
+		}
+		cs, err := s.client.KlinesRange(ctx, sym, tf, start, end)
 		if err != nil || len(cs) == 0 {
 			continue
 		}
-		// Keep only closed bars (drop the still-forming last bar).
+		// Keep only closed bars.
 		closed := cs[:0:0]
 		for _, k := range cs {
 			if k.CloseTime.Before(now) {
@@ -235,6 +312,12 @@ func (s *server) handleAPISetupsRefresh(c *gin.Context) {
 		oc, at, px, bars := classifyOutcome(all[i], closed)
 		if oc != "" {
 			all[i].Outcome, all[i].OutcomeAt, all[i].OutcomePrice, all[i].Bars = oc, at, px, bars
+			resolved++
+		}
+		// Path-dependent twin — resolves independently of Outcome.
+		roc, rat, rpx, rbars := classifyRealOutcome(all[i], closed)
+		if roc != "" {
+			all[i].RealOutcome, all[i].RealOutcomeAt, all[i].RealOutcomePrice, all[i].RealBars = roc, rat, rpx, rbars
 			resolved++
 		}
 	}
@@ -288,7 +371,12 @@ func (s *server) handleSetupDelete(c *gin.Context) {
 // setupStats is the hit-rate rollup shown atop /setups.
 type setupStats struct {
 	Total, Open, Win, Loss, Expired, Skip int
-	HitRate                               float64 // win / (win+loss)
+	HitRate                               float64 // win / (win+loss), close-based
+	// Path-dependent (real) tallies — what an actual entry/stop would have
+	// seen. RealNoFill = entry never reached. The gap RealHitRate vs
+	// HitRate = the execution / stop-quality signal.
+	RealWin, RealLoss, RealNoFill int
+	RealHitRate                   float64 // realWin / (realWin+realLoss)
 }
 
 func rollupSetups(all []Setup) setupStats {
@@ -307,9 +395,20 @@ func rollupSetups(all []Setup) setupStats {
 		case "skip":
 			st.Skip++
 		}
+		switch s.RealOutcome {
+		case "win":
+			st.RealWin++
+		case "loss":
+			st.RealLoss++
+		case "no-fill":
+			st.RealNoFill++
+		}
 	}
 	if d := st.Win + st.Loss; d > 0 {
 		st.HitRate = float64(st.Win) / float64(d) * 100
+	}
+	if d := st.RealWin + st.RealLoss; d > 0 {
+		st.RealHitRate = float64(st.RealWin) / float64(d) * 100
 	}
 	return st
 }

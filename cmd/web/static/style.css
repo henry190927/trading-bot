@@ -5338,3 +5338,7 @@ main { overflow-x: hidden; }
   border-radius: 6px; padding: .5rem .6rem; font-size: .72rem; line-height: 1.5;
   white-space: pre-wrap; word-break: break-word;
 }
+
+/* setups: real-outcome badge (path-dependent) additions */
+.outcome-badge.oc-no-fill { background: rgba(139,148,158,0.18); color: #8b949e; }
+.oc-gap { color: #d8a657; font-weight: 700; cursor: help; margin-left: .1rem; }
