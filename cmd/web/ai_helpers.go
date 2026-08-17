@@ -122,3 +122,14 @@ func structureNoteFor(candles []market.Candle) string {
 	trend, _, _ := signal.ClassifyTrendStructure(candles)
 	return trend.String()
 }
+
+// analyzeStructForAI returns the full N-字 snapshot (pivot zone, trend,
+// BOS/CHoCH, invalidation, target) for the AI symbol-analysis ground-truth
+// section. nil when too few bars.
+func analyzeStructForAI(candles []market.Candle) *signal.StructureState {
+	if len(candles) < 60 {
+		return nil
+	}
+	st := signal.AnalyzeStructure(candles, 2)
+	return &st
+}

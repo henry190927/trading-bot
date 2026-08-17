@@ -36,6 +36,11 @@ type SymbolAnalysisInputs struct {
 	// Empty when not computable.
 	StructureNote string
 
+	// Structure is the full N-字 snapshot (pivot 樞紐區, trend, BOS/CHoCH,
+	// invalidation, measured target) — the GROUND TRUTH the pivot-zone-fade
+	// analysis reasons over. nil when not computable.
+	Structure *signal.StructureState
+
 	// HigherTFs carries digested Signal + POC read from each parent TF
 	// the handler decided to fetch (typically 30m→[1h,4h] or 1h→[4h]).
 	// Empty when the handler skipped higher-TF fetch (e.g. failed API).
@@ -156,6 +161,34 @@ func BuildSymbolAnalysisMessage(in SymbolAnalysisInputs) string {
 		sb.WriteString(fmt.Sprintf("structure  : %s (this TF)\n", in.StructureNote))
 	}
 	sb.WriteString("```\n\n")
+
+	// --- Section: N-字 structure + pivot zone (GROUND TRUTH) ---
+	if st := in.Structure; st != nil {
+		sb.WriteString("## Structure — GROUND TRUTH (reason over these; do NOT recompute or invent numbers)\n\n")
+		sb.WriteString("```\n")
+		sb.WriteString(fmt.Sprintf("trend      : %s (read the swing sequence, not just this label — the label lags)\n", st.Trend.String()))
+		if st.Event != signal.EvNone {
+			sb.WriteString(fmt.Sprintf("event      : %s @ %.4f\n", st.Event.String(), st.EventPrice))
+		}
+		if st.BOSLevel > 0 {
+			sb.WriteString(fmt.Sprintf("BOS level  : %.4f (close beyond = trend continuation)\n", st.BOSLevel))
+		}
+		if st.Protected > 0 {
+			sb.WriteString(fmt.Sprintf("protected  : %.4f (close beyond = CHoCH / reversal)\n", st.Protected))
+		}
+		if z := st.Zone; z != nil {
+			dir := "up — buy-the-dip"
+			if z.Dir == signal.StructDowntrend {
+				dir = "down — sell-the-bounce"
+			}
+			sb.WriteString(fmt.Sprintf("樞紐區 zone : %s | band 0.5=%.4f .. 0.705=%.4f | invalidate %.4f | target %.4f\n",
+				dir, z.Hi, z.Lo, z.Invalidate, z.Target))
+			sb.WriteString("  → pivot-zone-fade entry: LIMIT inside the band (upper-middle ~0.6 default), stop past invalidate, never market-chase outside it.\n")
+		} else {
+			sb.WriteString("樞紐區 zone : none (leg invalidated by CHoCH / no active zone) — no fade entry here\n")
+		}
+		sb.WriteString("```\n\n")
+	}
 
 	// --- Section: top HVNs (chip zones) ---
 	if len(sig.VP.HVN) > 0 {

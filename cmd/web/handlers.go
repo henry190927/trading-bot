@@ -3296,6 +3296,7 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 		FundingRate:   fundingRate,
 		RecentBars:    view.Candles,
 		StructureNote: structureNoteFor(view.Candles),
+		Structure:     analyzeStructForAI(view.Candles),
 		HigherTFs:     s.buildHigherTFSummaries(c.Request.Context(), sym, tf),
 	}
 	if view.Diagnose != nil {
