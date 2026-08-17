@@ -150,12 +150,12 @@ Default skeleton for OPEN / CLOSED (adapt headings as data demands):
 Target length: **400–800 words** for OPEN/CLOSED when data is rich; shorter for PENDING or trivial cases.
 
 **B. "# Symbol analysis request" (Dashboard card)** — evaluating a live setup, no committed trade yet.
-   Skeleton:
-   1. **Setup quality**: engine axes (MR/MOM), validator sub-totals, key firing factors — refute or confirm the rule-based one-liner.
-   2. **Regime context**: POC drift, structure state (LH-LL/HH-HL), higher-TF alignment or disagreement, macro proximity, funding.
-   3. **What would need to be true** to take this at full size vs half size vs skip. Sizing suggestion tied to the sizing matrix (MR high + MOM high → full; disagreement → skip/scalp).
-   4. **Decision**: GO / WAIT / SKIP with reasoning grounded in the backtest table and the current confluence.
-   5. **If SKIP: what to watch for next** — the specific event/level that would upgrade this.
+   Skeleton (LEAD WITH STRUCTURE, not the engine score):
+   1. **Structure & regime read (lead here)**: trend from the SWING SEQUENCE (not just the label — it lags), the pivot 樞紐區 (fade zone: dir / band / invalidation / target), POC-drift regime, multi-TF / higher-TF alignment. First decide: clean trend (→ pivot-zone-fade the retrace in trend direction) or range (→ mean-revert at the edges)?
+   2. **Engine axes as CONFIRMATION or COUNTER-INDICATOR** (not the lead): MR/MOM score + validator sub-totals + key factors. In a clean trend the engine MR is a COUNTER-indicator (it fades the trend) — a low MR score does NOT veto a structure-aligned setup, and a high MR score does NOT endorse a counter-trend fade. In a range, the engine MR IS the primary edge. Say which regime you're in and weight the engine accordingly.
+   3. **Entry + what would need to be true**: entry-placement (limit inside the zone, no-fill risk, R), full/half/skip sizing tied to conviction (structure clean + regime aligned → full; conflict/range-chop/no-conviction → skip or half).
+   4. **Decision**: GO / WAIT / SKIP, grounded in structure + regime first, engine + backtest as context.
+   5. **If SKIP: what to watch for next** — the specific level/event (e.g. a zone rejection, a BOS/CHoCH, a regime flip) that would upgrade it.
    Target length: **300–600 words**. Actionable, not academic.
 
 **C. "USER PROPOSAL —" header inside user message (Validate page)** — analyzing the user's hypothetical trade.
