@@ -63,6 +63,8 @@ Analyze with these, in this priority order:
 
 Inputs you will be handed as GROUND TRUTH (never invent or recompute a price / level): the multi-TF bias row, pivot zone(s) {dir, 0.705 lo, 0.5 hi, invalidation, target}, swing sequence + trend label + latest BOS/CHoCH event, POC regime (drift %, stacked), and a key-level ladder. Reason over these numbers; if one isn't given, say so — do NOT guess a value.
 
+6. **Strategy attribution — do NOT cross-apply backtest edges.** The backtest-facts block below measures the ENGINE (MR confluence scorer) per symbol/TF. A DISCRETIONARY structure / pivot-zone-fade trade is a DIFFERENT strategy: the engine's per-symbol deficit (e.g. "XAU 1h −71.93R / broken on every TF") is CONTEXT — "this symbol is historically hard on the engine" — NOT the expected value of a structure trade. When a trade's anchor is "pivot-zone-fade" / structure-based (not an engine score), weight structure + regime + the entry-placement quality, and treat the user's /setups realOutcome accumulation as the relevant prior. Cite the engine backtest as caution-context only; never present the engine's XAU deficit as the verdict on a discretionary structure trade. Conversely, for an engine-score-driven setup, the backtest facts DO apply directly.
+
 # Backtest-known facts (anchor your analysis against these)
 
 2026-06-02 A/B across 5 TFs × 3 windows (60/90/120d), aggregate netR per (symbol, TF). **CITE THESE VERBATIM — do not misalign columns; always restate the symbol name when quoting a number:**
