@@ -98,20 +98,40 @@ func BuildSymbolAnalysisMessage(in SymbolAnalysisInputs) string {
 	sb.WriteString("# Symbol analysis request\n\n")
 	sb.WriteString(fmt.Sprintf("Quick analysis of %s on %s — what's the current setup look like, should I take it?\n\n",
 		in.Short, in.Timeframe))
-	sb.WriteString("Follow your system prompt's output structure but adapt: there's no committed Trade yet — instead give (1) current setup quality, (2) regime context, (3) decision: GO / WAIT / SKIP with sizing suggestion.\n\n")
+	sb.WriteString("Follow your system prompt's output structure but adapt: there's no committed Trade yet. LEAD WITH STRUCTURE, not the engine score. Give (1) structure & regime read — trend from the SWING SEQUENCE (the label lags), the 樞紐區 fade zone, POC-drift regime, higher-TF alignment; decide trend-vs-range FIRST; (2) engine axes as CONFIRMATION or COUNTER-INDICATOR — in a clean trend the engine MR is a counter-indicator (it fades the trend), so a low MR score does NOT veto a structure-aligned setup and a high MR score does NOT endorse a counter-trend fade; in a range, MR is the primary edge; (3) decision: GO / WAIT / SKIP with sizing. Do NOT open with the MR score or the rule-based one-liner — those are engine inputs, not the anchor.\n\n")
 
-	// --- Section: rule-based one-liner as the anchor ---
-	if in.Summary != "" {
-		sb.WriteString("## Rule-based one-line read\n\n")
-		sb.WriteString("> ")
-		sb.WriteString(in.Summary)
-		sb.WriteString("\n\n")
-		sb.WriteString("(This is what the deterministic Go summary emitted — confirm, refine, or contradict it with deeper context.)\n\n")
+	sig := in.Signal
+
+	// --- Section: N-字 structure + pivot zone (GROUND TRUTH) — LEAD WITH THIS ---
+	if st := in.Structure; st != nil {
+		sb.WriteString("## Structure — GROUND TRUTH (reason over these FIRST; do NOT recompute or invent numbers)\n\n")
+		sb.WriteString("```\n")
+		sb.WriteString(fmt.Sprintf("trend      : %s (read the swing sequence, not just this label — the label lags)\n", st.Trend.String()))
+		if st.Event != signal.EvNone {
+			sb.WriteString(fmt.Sprintf("event      : %s @ %.4f\n", st.Event.String(), st.EventPrice))
+		}
+		if st.BOSLevel > 0 {
+			sb.WriteString(fmt.Sprintf("BOS level  : %.4f (close beyond = trend continuation)\n", st.BOSLevel))
+		}
+		if st.Protected > 0 {
+			sb.WriteString(fmt.Sprintf("protected  : %.4f (close beyond = CHoCH / reversal)\n", st.Protected))
+		}
+		if z := st.Zone; z != nil {
+			dir := "up — buy-the-dip"
+			if z.Dir == signal.StructDowntrend {
+				dir = "down — sell-the-bounce"
+			}
+			sb.WriteString(fmt.Sprintf("樞紐區 zone : %s | band 0.5=%.4f .. 0.705=%.4f | invalidate %.4f | target %.4f\n",
+				dir, z.Hi, z.Lo, z.Invalidate, z.Target))
+			sb.WriteString("  → pivot-zone-fade entry: LIMIT inside the band (upper-middle ~0.6 default), stop past invalidate, never market-chase outside it.\n")
+		} else {
+			sb.WriteString("樞紐區 zone : none (leg invalidated by CHoCH / no active zone) — no fade entry here\n")
+		}
+		sb.WriteString("```\n\n")
 	}
 
-	// --- Section: engine signal state ---
-	sig := in.Signal
-	sb.WriteString("## Engine signal\n\n")
+	// --- Section: engine signal state (confirmation / counter-indicator input) ---
+	sb.WriteString("## Engine signal (confirmation / counter-indicator — NOT the lead)\n\n")
 	sb.WriteString("```\n")
 	sb.WriteString(fmt.Sprintf("symbol/tf  : %s / %s\n", in.Short, in.Timeframe))
 	sb.WriteString(fmt.Sprintf("side       : %s\n", sig.Side))
@@ -162,32 +182,13 @@ func BuildSymbolAnalysisMessage(in SymbolAnalysisInputs) string {
 	}
 	sb.WriteString("```\n\n")
 
-	// --- Section: N-字 structure + pivot zone (GROUND TRUTH) ---
-	if st := in.Structure; st != nil {
-		sb.WriteString("## Structure — GROUND TRUTH (reason over these; do NOT recompute or invent numbers)\n\n")
-		sb.WriteString("```\n")
-		sb.WriteString(fmt.Sprintf("trend      : %s (read the swing sequence, not just this label — the label lags)\n", st.Trend.String()))
-		if st.Event != signal.EvNone {
-			sb.WriteString(fmt.Sprintf("event      : %s @ %.4f\n", st.Event.String(), st.EventPrice))
-		}
-		if st.BOSLevel > 0 {
-			sb.WriteString(fmt.Sprintf("BOS level  : %.4f (close beyond = trend continuation)\n", st.BOSLevel))
-		}
-		if st.Protected > 0 {
-			sb.WriteString(fmt.Sprintf("protected  : %.4f (close beyond = CHoCH / reversal)\n", st.Protected))
-		}
-		if z := st.Zone; z != nil {
-			dir := "up — buy-the-dip"
-			if z.Dir == signal.StructDowntrend {
-				dir = "down — sell-the-bounce"
-			}
-			sb.WriteString(fmt.Sprintf("樞紐區 zone : %s | band 0.5=%.4f .. 0.705=%.4f | invalidate %.4f | target %.4f\n",
-				dir, z.Hi, z.Lo, z.Invalidate, z.Target))
-			sb.WriteString("  → pivot-zone-fade entry: LIMIT inside the band (upper-middle ~0.6 default), stop past invalidate, never market-chase outside it.\n")
-		} else {
-			sb.WriteString("樞紐區 zone : none (leg invalidated by CHoCH / no active zone) — no fade entry here\n")
-		}
-		sb.WriteString("```\n\n")
+	// --- Section: rule-based one-liner (engine's deterministic take — one input, not the anchor) ---
+	if in.Summary != "" {
+		sb.WriteString("## Rule-based one-line read (engine's deterministic take — one input, NOT the anchor)\n\n")
+		sb.WriteString("> ")
+		sb.WriteString(in.Summary)
+		sb.WriteString("\n\n")
+		sb.WriteString("(This is what the deterministic Go summary emitted — confirm, refine, or contradict it with the structure read above.)\n\n")
 	}
 
 	// --- Section: top HVNs (chip zones) ---
