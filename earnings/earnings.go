@@ -14,6 +14,7 @@
 package earnings
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -325,3 +326,49 @@ var defaultCal = NewCalendar()
 // Default returns the process-wide Calendar the app loads at startup and the
 // refresher updates. Tests should construct their own via NewCalendar.
 func Default() *Calendar { return defaultCal }
+
+// --- app wiring: load Default + hot-reload watcher ------------------------
+
+// Path returns the earnings.json location: EARNINGS_FILE if set, else the
+// VPS default. Non-secret; safe to read from env.
+func Path() string {
+	if p := strings.TrimSpace(os.Getenv("EARNINGS_FILE")); p != "" {
+		return p
+	}
+	return "/opt/trading/earnings.json"
+}
+
+// LoadDefaultAndWatch loads the package Default calendar from path once
+// (best-effort: a missing/unreadable file leaves Default empty = the gate is a
+// no-op, never fatal), then — if interval > 0 — spawns a goroutine that
+// MaybeReloads on each tick until ctx is done, so a cron-rewritten file is
+// picked up without a restart. logf may be nil.
+func LoadDefaultAndWatch(ctx context.Context, path string, interval time.Duration, logf func(string, ...any)) {
+	if logf == nil {
+		logf = func(string, ...any) {}
+	}
+	if err := defaultCal.LoadFile(path); err != nil {
+		logf("earnings: initial load %s: %v (gate inactive until file present)", path, err)
+	} else {
+		logf("earnings: loaded %d events from %s", defaultCal.Len(), path)
+	}
+	if interval <= 0 {
+		return
+	}
+	go func() {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if reloaded, err := defaultCal.MaybeReload(path); err != nil {
+					logf("earnings: reload %s: %v", path, err)
+				} else if reloaded {
+					logf("earnings: reloaded %d events from %s", defaultCal.Len(), path)
+				}
+			}
+		}
+	}()
+}

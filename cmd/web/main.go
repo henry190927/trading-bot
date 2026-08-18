@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -21,6 +22,7 @@ import (
 	"myFirstGo/trading-bot/ai"
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/onchain"
 )
@@ -149,6 +151,11 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok %s\n", time.Now().Format(time.RFC3339))
 	})
+
+	// Load the earnings-blackout calendar (F3) and hot-reload it every 10min so
+	// the daily cron-written earnings.json is picked up without a restart. A
+	// missing file just leaves the gate a no-op — never fatal.
+	earnings.LoadDefaultAndWatch(context.Background(), earnings.Path(), 10*time.Minute, log.Printf)
 
 	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
 	if err := r.Run(bind); err != nil {
