@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>stocks · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+<style>
+  .fund-badge{display:inline-block;padding:.12rem .5rem;border-radius:.4rem;font-weight:700;font-size:.82rem;letter-spacing:.02em}
+  .fund-buy{background:rgba(46,160,67,.18);color:#3fb950}
+  .fund-hold{background:rgba(210,153,34,.18);color:#d29922}
+  .fund-avoid{background:rgba(248,81,73,.18);color:#f85149}
+  .fund-unknown{background:rgba(139,148,158,.18);color:#8b949e}
+  .fund-table td,.fund-table th{white-space:nowrap;text-align:right}
+  .fund-table td:first-child,.fund-table th:first-child{text-align:left}
+  .fund-er{font-variant-numeric:tabular-nums}
+  .fund-note{color:#8b949e;font-size:.8rem;text-align:left;white-space:normal;max-width:22rem}
+</style>
+</head>
+<body>
+
+{{template "topnav" .}}
+
+<main class="tips-main">
+  <h1 class="tips-h1">
+    <span class="i18n-en">Stock Fundamentals</span><span class="i18n-zh">個股基本面</span>
+    <span class="tips-sub">
+      <span class="i18n-en">standalone spot buy/hold/avoid — quality × valuation, not a trade signal</span>
+      <span class="i18n-zh">獨立現貨 buy/hold/avoid —— 品質 × 估值,非交易訊號</span>
+    </span>
+  </h1>
+
+  {{if .NoKey}}
+  <div class="stats-card"><p class="glossary-hint">FINNHUB_KEY 未設定 — 無法抓基本面。</p></div>
+  {{else}}
+  <div class="stats-card">
+    <table class="setups-table slice-table fund-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th><span class="i18n-en">Rating</span><span class="i18n-zh">評級</span></th>
+          <th>Quality</th><th>Valuation</th>
+          <th class="cs-dim">g/p/b</th>
+          <th>P/E</th><th>P/S</th>
+          <th><span class="i18n-en">Rev YoY</span><span class="i18n-zh">營收</span></th>
+          <th><span class="i18n-en">Net M</span><span class="i18n-zh">淨利率</span></th>
+          <th>D/E</th>
+          <th><span class="i18n-en">Next ER</span><span class="i18n-zh">下次財報</span></th>
+          <th class="fund-note"><span class="i18n-en">Note</span><span class="i18n-zh">說明</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><strong>{{.Symbol}}</strong></td>
+          {{if .Err}}
+            <td colspan="10" class="cs-dim">{{.Err}}</td>
+          {{else}}
+            <td><span class="fund-badge fund-{{.Rating.Label}}">{{.Rating.Label}}</span>
+                {{if eq .Rating.Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
+            <td class="{{if ge .Rating.Quality 60.0}}r-pos{{else if lt .Rating.Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Rating.Quality}}</td>
+            <td class="{{if ge .Rating.Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Rating.Valuation}}</td>
+            <td class="cs-dim">{{printf "%.0f" .Rating.Growth}}/{{printf "%.0f" .Rating.Profitability}}/{{printf "%.0f" .Rating.BalanceSheet}}</td>
+            <td>{{if .Metrics.PE}}{{printf "%.1f" .Metrics.PE}}{{else}}—{{end}}</td>
+            <td>{{if .Metrics.PS}}{{printf "%.1f" .Metrics.PS}}{{else}}—{{end}}</td>
+            <td class="{{if ge .Metrics.RevGrowthYoY 10.0}}r-pos{{else if lt .Metrics.RevGrowthYoY 0.0}}r-neg{{end}}">{{printf "%.0f" .Metrics.RevGrowthYoY}}%</td>
+            <td class="{{if ge .Metrics.NetMargin 10.0}}r-pos{{else if lt .Metrics.NetMargin 0.0}}r-neg{{end}}">{{printf "%.0f" .Metrics.NetMargin}}%</td>
+            <td class="{{if le .Metrics.DebtToEquity 1.0}}r-pos{{else if gt .Metrics.DebtToEquity 2.0}}r-neg{{end}}">{{printf "%.2f" .Metrics.DebtToEquity}}</td>
+            <td class="fund-er">{{if .NextEarnings}}{{.NextEarnings.DatetimeUTC.Format "01-02"}} <span class="cs-dim">({{.DaysToER}}d {{.NextEarnings.When}})</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+            <td class="fund-note">{{range .Rating.Notes}}{{.}}{{end}}</td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    <p class="glossary-hint" style="margin-top:.6rem">
+      <span class="i18n-en">Quality = growth·profitability·balance-sheet (0-100). Valuation = higher is cheaper. Ratings cached 6h. Not a trade signal — spot / buy-hold only.</span>
+      <span class="i18n-zh">Quality = 成長·獲利·資產負債(0-100)。Valuation 越高越便宜。評級快取 6h。非交易訊號 —— 純現貨 / buy-hold。</span>
+      <br>Updated: {{.Updated}}
+    </p>
+  </div>
+  {{end}}
+</main>
+</body>
+</html>
