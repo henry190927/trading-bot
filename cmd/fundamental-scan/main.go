@@ -28,6 +28,7 @@ func main() {
 		symsCSV  = flag.String("symbols", "", "comma-separated tickers (overrides the NCSK universe scan)")
 		limit    = flag.Int("limit", 0, "cap number of symbols (0 = all; for testing)")
 		sleepMS  = flag.Int("sleep-ms", 1100, "delay between Finnhub calls (~54/min at 1100)")
+		minCap   = flag.Float64("min-market-cap", 1000, "skip symbols below this market cap (Finnhub units = USD millions; 1000 = $1B); 0 disables")
 	)
 	flag.Parse()
 
@@ -53,7 +54,7 @@ func main() {
 
 	c := finnhub.NewClient(token)
 	var entries []fundamental.BoardEntry
-	var scored, skipped int
+	var scored, skipped, tooSmall int
 	for i, tk := range tickers {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		m, err := c.FetchMetrics(ctx, tk)
@@ -64,6 +65,10 @@ func main() {
 			// No fundamentals (private co like ANTHROPIC/OPENAI, delisted, or an
 			// ETF Finnhub doesn't cover) — drop rather than list as "unknown".
 			skipped++
+		} else if *minCap > 0 && m.MarketCap > 0 && m.MarketCap < *minCap {
+			// Micro-cap: pure-metric scoring is noise here (distorted P/E,
+			// triple-digit growth off a tiny base). Drop below the floor.
+			tooSmall++
 		} else {
 			r := fundamental.Score(*m)
 			entries = append(entries, fundamental.BoardEntry{
@@ -104,8 +109,8 @@ func main() {
 		log.Fatalf("write: %v", err)
 	}
 	cnt := board.Counts()
-	log.Printf("wrote %s: %d scored, %d skipped | buy=%d hold=%d avoid=%d unknown=%d",
-		*out, scored, skipped, cnt["buy"], cnt["hold"], cnt["avoid"], cnt["unknown"])
+	log.Printf("wrote %s: %d scored, %d skipped, %d below $%.0fM cap | buy=%d hold=%d avoid=%d unknown=%d",
+		*out, scored, skipped, tooSmall, *minCap, cnt["buy"], cnt["hold"], cnt["avoid"], cnt["unknown"])
 }
 
 // ncskUniverse fetches BingX contracts and returns the bare tickers of the
