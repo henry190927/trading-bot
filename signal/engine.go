@@ -6,6 +6,7 @@ import (
 
 	"myFirstGo/trading-bot/analyzer"
 	"myFirstGo/trading-bot/dxy"
+	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/market"
@@ -165,6 +166,37 @@ func Evaluate(in Inputs) Signal {
 			sig.POCMig = indicator.ComputePOCMigration(in.Candles, 50, 100, 200)
 		}
 		return sig
+	}
+
+	// Earnings blackout gate (US-stock synthetics only). Mirrors the macro
+	// gate above but is (a) scoped to the symbol — SNDK earnings blacks out
+	// only SNDK — and (b) keyed on the last CLOSED bar's time, not wall-clock,
+	// so it is deterministic in BOTH backtest and live (the macro gate's
+	// time.Now() is a live-only no-op in backtest; the earnings A/B needs the
+	// gate to fire on historical bars). Non-stock symbols (BTC/ETH/XAU/XAG)
+	// and an empty/unloaded calendar always return nil, so running this
+	// unconditionally is a no-op for everything except loaded stock symbols.
+	if len(in.Candles) > 0 {
+		barTime := in.Candles[len(in.Candles)-1].CloseTime.UTC()
+		if evt := earnings.Default().ActiveAt(string(in.Symbol), barTime); evt != nil {
+			sig := Signal{
+				Symbol:    in.Symbol,
+				Timeframe: in.Timeframe,
+				Reasons:   []string{fmt.Sprintf("earnings blackout: %s %s (window %dmin before / %dmin after)", evt.Symbol, evt.When, evt.BeforeMinutes, evt.AfterMinutes)},
+			}
+			// Same as the macro gate: keep POC/VP visualisation populated so
+			// the chart overlays don't vanish during the window. Side stays
+			// Flat, so no trade decision consumes these.
+			if len(in.Candles) >= 60 {
+				vpStart := len(in.Candles) - 200
+				if vpStart < 0 {
+					vpStart = 0
+				}
+				sig.VP = indicator.BuildVolumeProfile(in.Candles[vpStart:], 80, 5)
+				sig.POCMig = indicator.ComputePOCMigration(in.Candles, 50, 100, 200)
+			}
+			return sig
+		}
 	}
 
 	closes := market.Closes(in.Candles)
