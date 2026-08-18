@@ -779,7 +779,7 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		"Notes":         "",
 		"AnalyzedAt":    analyzedAt,
 		"SignalCtx":     c.Query("ctx"), // verbatim from recordHref / validateRecordHref
-		"Symbols":       []string{"BTC", "ETH", "XAU", "XAG"},
+		"Symbols":       uiSymbols,
 		"Anchors":       recommendedAnchors,
 		"Error":         "",
 		"MarginUSDT":     "",
@@ -817,7 +817,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 			"TP1PartialPct":  strings.TrimSpace(c.PostForm("tp1_partial_pct")),
 			"PlaceTP1":       c.PostForm("place_tp1") == "on",
 			"MarginOverride": c.PostForm("margin_override") == "on",
-			"Symbols":        []string{"BTC", "ETH", "XAU", "XAG"},
+			"Symbols":        uiSymbols,
 			"Anchors":        recommendedAnchors,
 			"Error":          errMsg,
 		})
@@ -1050,7 +1050,7 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 //
 // The JS PnL preview mirrors this map; keep them in sync if BingX changes.
 var qtyPrecision = map[string]int{
-	"BTC": 4, "ETH": 2, "XAU": 4, "XAG": 4,
+	"BTC": 4, "ETH": 2, "XAU": 4, "XAG": 4, "SNDK": 5, "NVDA": 3,
 }
 
 func floorTo(v float64, decimals int) float64 {
@@ -1876,7 +1876,7 @@ func editFormData(t journal.Trade, errMsg string) gin.H {
 		"TP1":           fmt.Sprintf("%.4f", t.TP1),
 		"TP2":           fmt.Sprintf("%.4f", t.TP2),
 		"ExitPrice":     exitStr,
-		"Symbols":       []string{"BTC", "ETH", "XAU", "XAG"},
+		"Symbols":       uiSymbols,
 		"Anchors":       recommendedAnchors,
 		"Error":         errMsg,
 		"TP1PartialPct": "50",
@@ -2846,7 +2846,7 @@ func (s *server) handleValidateForm(c *gin.Context) {
 		"Entry":     c.Query("entry"),
 		"TF":        defaultStr(c.Query("tf"), "1h"),
 		"FeeBps":    defaultStr(c.Query("fee_bps"), "6"),
-		"Symbols":   []string{"BTC", "ETH", "XAU", "XAG"},
+		"Symbols":   uiSymbols,
 		"TFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 	})
 }
@@ -2883,7 +2883,7 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 			"Entry":     entryIn,
 			"TF":        tfStr,
 			"FeeBps":    defaultStr(feeIn, "6"),
-			"Symbols":   []string{"BTC", "ETH", "XAU", "XAG"},
+			"Symbols":   uiSymbols,
 			"TFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 			"Error":     errMsg,
 		})
@@ -3175,9 +3175,18 @@ func resolveWebSymbol(s string) (market.Symbol, error) {
 		return market.XAUUSDT, nil
 	case "XAG":
 		return market.XAGUSDT, nil
+	case "SNDK":
+		return market.SNDKUSDT, nil
+	case "NVDA":
+		return market.NVDAUSDT, nil
 	}
-	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG)", s)
+	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG / SNDK / NVDA)", s)
 }
+
+// uiSymbols is the symbol dropdown for chart + journal forms. Core 4 first,
+// then the forward-log stock synthetics (SNDK+veto / NVDA+zone). NOT the same
+// as market.All() — these stay out of the daemon scan and dashboard cards.
+var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA"}
 
 func defaultStr(v, fallback string) string {
 	if v == "" {
@@ -3682,7 +3691,7 @@ func (s *server) handleChartPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "chart.html", gin.H{
 		"Symbol":  strings.ToUpper(defaultStr(c.Query("symbol"), "BTC")),
 		"TF":      defaultStr(c.Query("tf"), "1h"),
-		"Symbols": []string{"BTC", "ETH", "XAU", "XAG"},
+		"Symbols": uiSymbols,
 		"TFs":     []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 	})
 }

@@ -980,7 +980,9 @@ func isStructureVetoSymbol(s market.Symbol) bool {
 	if StructureLiveOff {
 		return false
 	}
-	return isPreciousMetal(s)
+	// SNDK: counter-trend structure veto was the robust 2026-08-15 A/B
+	// survivor (+7.4/+5.8/+4.9R across 60/90/120d). Forward-log only.
+	return isPreciousMetal(s) || s == market.SNDKUSDT
 }
 
 // isStructureZoneVoteSymbol returns true for symbols where the N 字
@@ -1004,7 +1006,9 @@ func isStructureZoneVoteSymbol(s market.Symbol) bool {
 	if StructureLiveOff {
 		return false
 	}
-	return s == market.BTCUSDT || s == market.ETHUSDT
+	// NVDA: 樞紐區 zone vote was the robust 2026-08-15 A/B survivor
+	// (+8.7/+2.2/+5.7R across 60/90/120d). Forward-log only.
+	return s == market.BTCUSDT || s == market.ETHUSDT || s == market.NVDAUSDT
 }
 
 // isMTFStructSymbol returns true for symbols where the Phase 2 降維入局
@@ -1052,6 +1056,10 @@ func shortName(s market.Symbol) string {
 		return "XAU"
 	case market.XAGUSDT:
 		return "XAG"
+	case market.SNDKUSDT:
+		return "SNDK"
+	case market.NVDAUSDT:
+		return "NVDA"
 	}
 	return string(s)
 }

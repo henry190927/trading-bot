@@ -15,6 +15,14 @@ const (
 	// 2026-06-03. Activate by adding to All() once the 60/90/120d A/B
 	// clears the user's strategy-change gate.
 	BRENTUSDT Symbol = "NCCO1OILBRENT2USD-USDT"
+	// US-stock synthetics (NCSK* family). DELIBERATELY NOT in All(): they
+	// are forward-log only (web analyze / chart / setups / journal), kept
+	// out of the daemon scan + ntfy until the backtest survivors clear the
+	// ship-gate on live data. SNDK gets the counter-trend structure veto,
+	// NVDA gets the 樞紐區 zone vote (their respective 2026-08-15 A/B
+	// survivors). See isStructureVetoSymbol / isStructureZoneVoteSymbol.
+	SNDKUSDT Symbol = "NCSKSNDK2USD-USDT"
+	NVDAUSDT Symbol = "NCSKNVDA2USD-USDT"
 )
 
 func (s Symbol) IsMetal() bool {
