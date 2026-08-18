@@ -15,7 +15,10 @@
 package fundamental
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"myFirstGo/trading-bot/earnings/finnhub"
 )
@@ -250,4 +253,92 @@ func (b Board) Counts() map[string]int {
 		m[e.Label]++
 	}
 	return m
+}
+
+// --- F1/F2 → technical sizing overlay (consumer A cooperation) -------------
+
+// SizingHint is how the SLOW fundamental layer modulates a FAST technical
+// setup on a stock. It never generates a trade and never enters the engine
+// (which stays closed-bar / backtest-pure) — it's a discretionary sizing +
+// direction-permission overlay applied at the decision surface:
+//   F1 quality  = direction permission (don't full-size a long into a
+//                 deteriorating company; green-light a short on one)
+//   F2 valuation = conviction/size (expensive fades a long, tailwinds a short)
+type SizingHint struct {
+	Factor    float64 `json:"factor"`    // 1.0 full · 0.5 half · 0.25 small · 0 skip · <0 = n/a
+	Label     string  `json:"label"`     // "full" | "half" | "small" | "skip" | "neutral"
+	Aligned   string  `json:"aligned"`   // "aligned" | "conflict" | "neutral"
+	Rationale string  `json:"rationale"`
+}
+
+// effectiveLabel folds the Rich flag into a 5-way label.
+func (r Rating) effectiveLabel() string {
+	if r.Label == "hold" && r.Rich {
+		return "rich"
+	}
+	return r.Label
+}
+
+// SuggestSizing combines a technical side ("long"/"short"/"flat"/"") with the
+// fundamental rating. Unknown fundamentals or a flat technical read → neutral
+// (size on the technical alone; the overlay abstains).
+func SuggestSizing(techSide string, r Rating) SizingHint {
+	side := strings.ToLower(strings.TrimSpace(techSide))
+	if side != "long" && side != "short" {
+		return SizingHint{Factor: -1, Label: "neutral", Aligned: "neutral", Rationale: "no directional technical setup"}
+	}
+	eff := r.effectiveLabel()
+	if eff == "unknown" || eff == "" {
+		return SizingHint{Factor: -1, Label: "neutral", Aligned: "neutral", Rationale: "no fundamentals — size on the technical read alone"}
+	}
+	switch side {
+	case "long":
+		switch eff {
+		case "buy":
+			return SizingHint{1.0, "full", "aligned", "fundamentals (buy) support the long — full size ok"}
+		case "hold":
+			return SizingHint{0.5, "half", "neutral", "solid but priced in (hold) — don't full-size a long"}
+		case "rich":
+			return SizingHint{0.25, "small", "conflict", "very expensive (rich) — a long is chasing; small size or wait for a pullback"}
+		case "avoid":
+			return SizingHint{0.0, "skip", "conflict", "weak fundamentals (avoid) — a long fights the slow layer; skip or scalp only"}
+		}
+	case "short":
+		switch eff {
+		case "avoid":
+			return SizingHint{1.0, "full", "aligned", "weak fundamentals (avoid) support the short — full size ok"}
+		case "rich":
+			return SizingHint{1.0, "full", "aligned", "expensive (rich) — shorting into strength has a fundamental tailwind"}
+		case "hold":
+			return SizingHint{0.5, "half", "neutral", "fairly-valued quality (hold) — half size on the short"}
+		case "buy":
+			return SizingHint{0.25, "small", "conflict", "strong, cheap company (buy) — a short fights fundamentals; small size or skip"}
+		}
+	}
+	return SizingHint{Factor: -1, Label: "neutral", Aligned: "neutral", Rationale: ""}
+}
+
+// LoadBoard reads a fundamentals.json board from disk (written by
+// cmd/fundamental-scan). Returns an error if missing/unparseable.
+func LoadBoard(path string) (*Board, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var b Board
+	if err := json.Unmarshal(data, &b); err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+// Find returns the board entry for a bare ticker (case-insensitive), if present.
+func (b *Board) Find(ticker string) (*BoardEntry, bool) {
+	tk := strings.ToUpper(strings.TrimSpace(ticker))
+	for i := range b.Entries {
+		if b.Entries[i].Symbol == tk {
+			return &b.Entries[i], true
+		}
+	}
+	return nil, false
 }

@@ -45,6 +45,18 @@ type SymbolAnalysisInputs struct {
 	// the handler decided to fetch (typically 30m→[1h,4h] or 1h→[4h]).
 	// Empty when the handler skipped higher-TF fetch (e.g. failed API).
 	HigherTFs []HigherTFSummary
+
+	// Fundamental layer (STOCKS ONLY) — the slow spot quality/valuation
+	// context from the fundamental board + the F1/F2 × technical sizing
+	// overlay. Flat fields (not the fundamental types) to keep ai decoupled.
+	// FundLabel empty = not a stock / no rating available.
+	FundLabel       string  // buy / hold / rich / avoid / unknown
+	FundQuality     float64 // 0-100
+	FundValuation   float64 // 0-100 (higher = cheaper)
+	FundNote        string
+	FundSizeLabel   string // full / half / small / skip / neutral
+	FundSizeAligned string // aligned / conflict / neutral
+	FundSizeWhy     string
 }
 
 // HigherTFSummary is one parent-TF snapshot for multi-TF context.
@@ -128,6 +140,21 @@ func BuildSymbolAnalysisMessage(in SymbolAnalysisInputs) string {
 			sb.WriteString("樞紐區 zone : none (leg invalidated by CHoCH / no active zone) — no fade entry here\n")
 		}
 		sb.WriteString("```\n\n")
+	}
+
+	// --- Section: fundamental layer (STOCKS ONLY) — slow spot context + sizing overlay ---
+	if in.FundLabel != "" {
+		sb.WriteString("## Fundamental layer (STOCK — slow spot quality/valuation, NOT a trade trigger)\n\n")
+		sb.WriteString("```\n")
+		sb.WriteString(fmt.Sprintf("spot rating : %s (quality %.0f/100, valuation %.0f/100 — higher=cheaper)\n", in.FundLabel, in.FundQuality, in.FundValuation))
+		if in.FundNote != "" {
+			sb.WriteString(fmt.Sprintf("read        : %s\n", in.FundNote))
+		}
+		if in.FundSizeLabel != "" && in.FundSizeLabel != "neutral" {
+			sb.WriteString(fmt.Sprintf("sizing over.: %s (%s) — %s\n", in.FundSizeLabel, in.FundSizeAligned, in.FundSizeWhy))
+		}
+		sb.WriteString("```\n")
+		sb.WriteString("  → Use this as PERMISSION + SIZE, not timing: F1 quality gates direction (don't full-size a LONG into a deteriorating company; green-light a SHORT on one), F2 valuation scales conviction (expensive fades a long / tailwinds a short). The technical structure above still owns the ENTRY. Fundamentals move on a quarterly clock — never let them override the structural read on timing.\n\n")
 	}
 
 	// --- Section: engine signal state (confirmation / counter-indicator input) ---

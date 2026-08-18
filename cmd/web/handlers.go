@@ -24,6 +24,7 @@ import (
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/journal"
 	"myFirstGo/trading-bot/macro"
+	"myFirstGo/trading-bot/fundamental"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/signal"
 	"myFirstGo/trading-bot/ai"
@@ -3183,6 +3184,19 @@ func resolveWebSymbol(s string) (market.Symbol, error) {
 	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG / SNDK / NVDA)", s)
 }
 
+// techSideStr renders an engine Side as the "long"/"short"/"flat" string the
+// fundamental sizing overlay expects.
+func techSideStr(s signal.Side) string {
+	switch s {
+	case signal.Long:
+		return "long"
+	case signal.Short:
+		return "short"
+	default:
+		return "flat"
+	}
+}
+
 // uiSymbols is the symbol dropdown for chart + journal forms. Core 4 first,
 // then the forward-log stock synthetics (SNDK+veto / NVDA+zone). NOT the same
 // as market.All() — these stay out of the daemon scan and dashboard cards.
@@ -3307,6 +3321,24 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 		StructureNote: structureNoteFor(view.Candles),
 		Structure:     analyzeStructForAI(view.Candles),
 		HigherTFs:     s.buildHigherTFSummaries(c.Request.Context(), sym, tf),
+	}
+	// Fundamental overlay (STOCKS ONLY): pull the spot rating from the daily
+	// board + derive the F1/F2 × technical sizing hint. Non-stock symbols
+	// aren't in the board → this is a no-op for BTC/ETH/XAU/XAG.
+	if board, errB := fundamental.LoadBoard(fundamentalsPath()); errB == nil {
+		if e, ok := board.Find(short); ok {
+			in.FundLabel = e.Label
+			if e.Rich {
+				in.FundLabel = "rich"
+			}
+			in.FundQuality = e.Quality
+			in.FundValuation = e.Valuation
+			in.FundNote = firstNote(e.Notes)
+			hint := fundamental.SuggestSizing(techSideStr(view.Signal.Side), e.Rating)
+			in.FundSizeLabel = hint.Label
+			in.FundSizeAligned = hint.Aligned
+			in.FundSizeWhy = hint.Rationale
+		}
 	}
 	if view.Diagnose != nil {
 		d := view.Diagnose
