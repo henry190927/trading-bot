@@ -52,6 +52,10 @@ func main() {
 	}
 	log.Printf("scanning %d tickers (sleep %dms)", len(tickers), *sleepMS)
 
+	// Previous scan's labels → PrevLabel on each new entry for downgrade
+	// detection (the fundamental sell signal). Missing/first-run → empty.
+	prevLabel := loadPrevLabels(*out)
+
 	c := finnhub.NewClient(token)
 	var entries []fundamental.BoardEntry
 	var scored, skipped, tooSmall int
@@ -72,7 +76,7 @@ func main() {
 		} else {
 			r := fundamental.Score(*m)
 			entries = append(entries, fundamental.BoardEntry{
-				Rating: r, PE: m.PE, PS: m.PS,
+				Rating: r, PrevLabel: prevLabel[r.Symbol], PE: m.PE, PS: m.PS,
 				RevGrowthYoY: m.RevGrowthYoY, NetMargin: m.NetMargin, DebtToEquity: m.DebtToEquity,
 			})
 			scored++
@@ -87,7 +91,7 @@ func main() {
 
 	// Sort: buy → hold → avoid → unknown, then quality desc.
 	sort.SliceStable(entries, func(i, j int) bool {
-		ri, rj := rank(entries[i].Label), rank(entries[j].Label)
+		ri, rj := fundamental.LabelRank(entries[i].Label), fundamental.LabelRank(entries[j].Label)
 		if ri != rj {
 			return ri < rj
 		}
@@ -144,17 +148,22 @@ func ncskUniverse() ([]string, error) {
 	return out, nil
 }
 
-func rank(label string) int {
-	switch label {
-	case "buy":
-		return 0
-	case "hold":
-		return 1
-	case "unknown":
-		return 3
-	default:
-		return 2
+// loadPrevLabels reads the existing board (if any) into symbol→label for
+// downgrade detection on the next scan. Best-effort: missing/unreadable → empty.
+func loadPrevLabels(path string) map[string]string {
+	out := map[string]string{}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return out
 	}
+	var b fundamental.Board
+	if json.Unmarshal(data, &b) != nil {
+		return out
+	}
+	for _, e := range b.Entries {
+		out[e.Symbol] = e.Label
+	}
+	return out
 }
 
 func writeAtomic(path string, data []byte) error {

@@ -30,6 +30,7 @@ type Rating struct {
 	Profitability float64  `json:"profitability"`  // F1 sub
 	BalanceSheet  float64  `json:"balance_sheet"`  // F1 sub
 	Confidence    string   `json:"confidence"`     // "high" | "med" | "low"
+	Rich          bool     `json:"rich"`           // strong quality but VERY expensive → trim/sell-into-strength candidate
 	Notes         []string `json:"notes"`
 }
 
@@ -171,7 +172,15 @@ func Score(m finnhub.Metrics) Rating {
 		r.Notes = append(r.Notes, fmt.Sprintf("strong quality (%.0f) at a fair price (val %.0f)", quality, val))
 	case quality >= 60 && val < 40:
 		r.Label = "hold"
-		r.Notes = append(r.Notes, fmt.Sprintf("strong quality (%.0f) but rich valuation (val %.0f) — priced in", quality, val))
+		if val < 25 {
+			// Very expensive despite strong quality — flag for trimming /
+			// selling into strength (the closest thing to a spot sell signal
+			// from valuation alone).
+			r.Rich = true
+			r.Notes = append(r.Notes, fmt.Sprintf("strong quality (%.0f) but VERY rich (val %.0f) — trim / sell into strength", quality, val))
+		} else {
+			r.Notes = append(r.Notes, fmt.Sprintf("strong quality (%.0f) but rich valuation (val %.0f) — priced in", quality, val))
+		}
 	default:
 		r.Label = "hold"
 		r.Notes = append(r.Notes, fmt.Sprintf("mixed: quality %.0f / valuation %.0f", quality, val))
@@ -203,6 +212,7 @@ func round1(v float64) float64 { return float64(int(v*10+0.5)) / 10 }
 // needs no live API call.
 type BoardEntry struct {
 	Rating
+	PrevLabel    string  `json:"prev_label,omitempty"` // label from the previous scan → downgrade detection
 	PE           float64 `json:"pe"`
 	PS           float64 `json:"ps"`
 	RevGrowthYoY float64 `json:"rev_growth_yoy"`
@@ -215,6 +225,22 @@ type BoardEntry struct {
 type Board struct {
 	UpdatedUTC string       `json:"updated_utc"`
 	Entries    []BoardEntry `json:"entries"`
+}
+
+// LabelRank orders labels best→worst for sorting and downgrade detection:
+// buy(0) < hold(1) < avoid(2) < unknown(3). A move to a HIGHER rank than the
+// previous scan is a downgrade (the fundamental sell signal).
+func LabelRank(label string) int {
+	switch label {
+	case "buy":
+		return 0
+	case "hold":
+		return 1
+	case "avoid":
+		return 2
+	default: // unknown / ""
+		return 3
+	}
 }
 
 // Counts tallies entries by label for the page header.

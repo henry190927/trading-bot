@@ -69,6 +69,9 @@ type fundRow struct {
 	Profitability float64
 	BalanceSheet float64
 	Confidence   string
+	Rich         bool
+	PrevLabel    string
+	Downgraded   bool
 	Note         string
 	PE           float64
 	PS           float64
@@ -91,7 +94,7 @@ func rowFromRating(r fundamental.Rating, pe, ps, revG, netM, de float64) fundRow
 	return fundRow{
 		Symbol: r.Symbol, Label: r.Label, Quality: r.Quality, Valuation: r.Valuation,
 		Growth: r.Growth, Profitability: r.Profitability, BalanceSheet: r.BalanceSheet,
-		Confidence: r.Confidence, Note: firstNote(r.Notes),
+		Confidence: r.Confidence, Rich: r.Rich, Note: firstNote(r.Notes),
 		PE: pe, PS: ps, RevGrowthYoY: revG, NetMargin: netM, DebtToEquity: de,
 	}
 }
@@ -125,17 +128,27 @@ func (s *server) handleFundamentalsPage(c *gin.Context) {
 		var board fundamental.Board
 		if json.Unmarshal(data, &board) == nil && len(board.Entries) > 0 {
 			rows := make([]fundRow, 0, len(board.Entries))
+			var downgrades []fundRow
 			for _, e := range board.Entries {
-				if e.Label != "buy" && e.Label != "hold" {
-					continue // hide avoid/unknown from the board; counts still shown
-				}
 				row := rowFromRating(e.Rating, e.PE, e.PS, e.RevGrowthYoY, e.NetMargin, e.DebtToEquity)
+				row.PrevLabel = e.PrevLabel
+				// Downgrade = worse label than the previous scan (buy→hold→avoid).
+				// The fundamental sell signal: something's quality/valuation slipped.
+				row.Downgraded = e.PrevLabel != "" && fundamental.LabelRank(e.Label) > fundamental.LabelRank(e.PrevLabel)
+				if row.Downgraded {
+					dr := row
+					attachNextER(&dr, now)
+					downgrades = append(downgrades, dr)
+				}
+				if e.Label != "buy" && e.Label != "hold" {
+					continue // hide avoid/unknown from the main board; counts + downgrades still shown
+				}
 				attachNextER(&row, now)
 				rows = append(rows, row)
 			}
 			cnt := board.Counts()
 			c.HTML(http.StatusOK, "fundamentals.html", gin.H{
-				"Rows": rows, "Updated": board.UpdatedUTC, "NoKey": false,
+				"Rows": rows, "Downgrades": downgrades, "Updated": board.UpdatedUTC, "NoKey": false,
 				"Scanned": len(board.Entries), "Mode": "universe",
 				"CountBuy": cnt["buy"], "CountHold": cnt["hold"],
 				"CountAvoid": cnt["avoid"], "CountUnknown": cnt["unknown"],

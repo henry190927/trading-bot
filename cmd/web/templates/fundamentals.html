@@ -21,6 +21,13 @@
   .fund-note{color:#8b949e;font-size:.8rem;text-align:left;white-space:normal;max-width:22rem}
   .fund-counts{display:flex;gap:1rem;flex-wrap:wrap;margin:.2rem 0 .8rem;font-size:.9rem}
   .fund-counts b{font-variant-numeric:tabular-nums}
+  .fund-downgrades{border:1px solid rgba(248,81,73,.4);background:rgba(248,81,73,.08);border-radius:.5rem;padding:.6rem .8rem;margin:.2rem 0 .9rem}
+  .fund-dg-title{font-weight:700;color:#f85149;margin-bottom:.4rem;font-size:.9rem}
+  .fund-dg-item{display:inline-block;margin:.15rem .6rem .15rem 0;font-size:.85rem}
+  .fund-info{margin:.2rem 0 .9rem;font-size:.85rem}
+  .fund-info summary{cursor:pointer;color:#8b949e}
+  .fund-info ul{margin:.5rem 0 0;padding-left:1.1rem;line-height:1.5}
+  .fund-info li{margin:.25rem 0}
 </style>
 </head>
 <body>
@@ -49,6 +56,31 @@
       <span class="cs-dim"><span class="i18n-en">(showing buy + hold)</span><span class="i18n-zh">(僅列 buy + hold)</span></span>
     </div>
     {{end}}
+    {{if .Downgrades}}
+    <div class="fund-downgrades">
+      <div class="fund-dg-title">⚠ <span class="i18n-en">Downgrades since last scan — consider selling</span><span class="i18n-zh">上次掃描以來降級 —— 考慮賣出</span></div>
+      {{range .Downgrades}}
+        <span class="fund-dg-item"><strong>{{.Symbol}}</strong> <span class="fund-badge fund-{{.PrevLabel}}">{{.PrevLabel}}</span> → <span class="fund-badge fund-{{.Label}}">{{.Label}}</span></span>
+      {{end}}
+    </div>
+    {{end}}
+
+    <details class="fund-info">
+      <summary>ⓘ <span class="i18n-en">what these mean</span><span class="i18n-zh">欄位說明</span></summary>
+      <ul>
+        <li><b>Rating</b> — <span class="i18n-en">buy = strong quality at a fair price · hold = own/keep, don't add · <span style="color:#f85149">rich</span> = great company but very expensive, trim / sell into strength · avoid = weak fundamentals (value-trap). NOT a trade signal — spot / buy-hold only.</span><span class="i18n-zh">buy = 品質強且估值合理 · hold = 持有/續抱、別加碼 · <span style="color:#f85149">rich</span> = 好公司但太貴,減碼/逢高賣 · avoid = 基本面弱(價值陷阱)。非交易訊號 —— 純現貨。</span></li>
+        <li><b>Quality (0-100)</b> — <span class="i18n-en">composite of growth · profitability · balance-sheet. ≥60 strong, &lt;40 weak.</span><span class="i18n-zh">成長·獲利·資產負債的綜合。≥60 強、&lt;40 弱。</span></li>
+        <li><b>Valuation (0-100)</b> — <span class="i18n-en">HIGHER = cheaper (P/E + P/S vs thresholds). ≥40 fair, low = expensive.</span><span class="i18n-zh">越高越便宜(P/E+P/S)。≥40 合理,低=貴。</span></li>
+        <li><b>g/p/b</b> — <span class="i18n-en">the three quality sub-scores: growth / profitability / balance-sheet.</span><span class="i18n-zh">品質三子分:成長 / 獲利 / 資產負債。</span></li>
+        <li><b>P/E</b> — <span class="i18n-en">price ÷ earnings. Lower = cheaper; very high = priced for growth. "—" = negative/no earnings.</span><span class="i18n-zh">股價 ÷ 每股盈餘。越低越便宜;極高=市場定價成長。「—」=虧損/無盈餘。</span></li>
+        <li><b>P/S</b> — <span class="i18n-en">price ÷ sales. Useful when earnings are thin/negative.</span><span class="i18n-zh">股價 ÷ 營收。盈餘薄/負時好用。</span></li>
+        <li><b>Rev YoY</b> — <span class="i18n-en">revenue growth year-over-year.</span><span class="i18n-zh">營收年增率。</span></li>
+        <li><b>Net M</b> — <span class="i18n-en">net profit margin — how much of revenue becomes profit.</span><span class="i18n-zh">淨利率 —— 營收轉成獲利的比例。</span></li>
+        <li><b>D/E</b> — <span class="i18n-en">debt ÷ equity. ≤1 healthy, &gt;2 leveraged.</span><span class="i18n-zh">負債 ÷ 權益。≤1 健康,&gt;2 高槓桿。</span></li>
+        <li><b>Next ER</b> — <span class="i18n-en">next earnings date (Nd = days away). Expect a volatility gap around it.</span><span class="i18n-zh">下次財報日(Nd=天數)。前後易有跳空波動。</span></li>
+      </ul>
+    </details>
+
     <table class="setups-table slice-table fund-table">
       <thead>
         <tr>
@@ -71,7 +103,7 @@
           {{if .Err}}
             <td colspan="11" class="cs-dim">{{.Err}}</td>
           {{else}}
-            <td><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if eq .Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
+            <td><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if .Rich}} <span class="fund-badge fund-avoid" title="strong quality but very expensive — trim / sell into strength">rich</span>{{end}}{{if eq .Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
             <td class="{{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
             <td class="{{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
             <td class="cs-dim">{{printf "%.0f" .Growth}}/{{printf "%.0f" .Profitability}}/{{printf "%.0f" .BalanceSheet}}</td>
