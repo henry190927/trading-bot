@@ -11,15 +11,16 @@
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
 <style>
-  .fund-badge{display:inline-block;padding:.12rem .5rem;border-radius:.4rem;font-weight:700;font-size:.82rem;letter-spacing:.02em}
+  .fund-badge{display:inline-block;padding:.12rem .5rem;border-radius:.4rem;font-weight:700;font-size:.82rem}
   .fund-buy{background:rgba(46,160,67,.18);color:#3fb950}
   .fund-hold{background:rgba(210,153,34,.18);color:#d29922}
   .fund-avoid{background:rgba(248,81,73,.18);color:#f85149}
   .fund-unknown{background:rgba(139,148,158,.18);color:#8b949e}
   .fund-table td,.fund-table th{white-space:nowrap;text-align:right}
   .fund-table td:first-child,.fund-table th:first-child{text-align:left}
-  .fund-er{font-variant-numeric:tabular-nums}
   .fund-note{color:#8b949e;font-size:.8rem;text-align:left;white-space:normal;max-width:22rem}
+  .fund-counts{display:flex;gap:1rem;flex-wrap:wrap;margin:.2rem 0 .8rem;font-size:.9rem}
+  .fund-counts b{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -39,6 +40,15 @@
   <div class="stats-card"><p class="glossary-hint">FINNHUB_KEY 未設定 — 無法抓基本面。</p></div>
   {{else}}
   <div class="stats-card">
+    {{if eq .Mode "universe"}}
+    <div class="fund-counts">
+      <span><span class="i18n-en">Scanned</span><span class="i18n-zh">已掃描</span> <b>{{.Scanned}}</b></span>
+      <span class="r-pos">BUY <b>{{.CountBuy}}</b></span>
+      <span class="r-zero">HOLD <b>{{.CountHold}}</b></span>
+      <span class="cs-dim">avoid {{.CountAvoid}} · unknown {{.CountUnknown}}</span>
+      <span class="cs-dim"><span class="i18n-en">(showing buy + hold)</span><span class="i18n-zh">(僅列 buy + hold)</span></span>
+    </div>
+    {{end}}
     <table class="setups-table slice-table fund-table">
       <thead>
         <tr>
@@ -59,28 +69,27 @@
         <tr>
           <td><strong>{{.Symbol}}</strong></td>
           {{if .Err}}
-            <td colspan="10" class="cs-dim">{{.Err}}</td>
+            <td colspan="11" class="cs-dim">{{.Err}}</td>
           {{else}}
-            <td><span class="fund-badge fund-{{.Rating.Label}}">{{.Rating.Label}}</span>
-                {{if eq .Rating.Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
-            <td class="{{if ge .Rating.Quality 60.0}}r-pos{{else if lt .Rating.Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Rating.Quality}}</td>
-            <td class="{{if ge .Rating.Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Rating.Valuation}}</td>
-            <td class="cs-dim">{{printf "%.0f" .Rating.Growth}}/{{printf "%.0f" .Rating.Profitability}}/{{printf "%.0f" .Rating.BalanceSheet}}</td>
-            <td>{{if .Metrics.PE}}{{printf "%.1f" .Metrics.PE}}{{else}}—{{end}}</td>
-            <td>{{if .Metrics.PS}}{{printf "%.1f" .Metrics.PS}}{{else}}—{{end}}</td>
-            <td class="{{if ge .Metrics.RevGrowthYoY 10.0}}r-pos{{else if lt .Metrics.RevGrowthYoY 0.0}}r-neg{{end}}">{{printf "%.0f" .Metrics.RevGrowthYoY}}%</td>
-            <td class="{{if ge .Metrics.NetMargin 10.0}}r-pos{{else if lt .Metrics.NetMargin 0.0}}r-neg{{end}}">{{printf "%.0f" .Metrics.NetMargin}}%</td>
-            <td class="{{if le .Metrics.DebtToEquity 1.0}}r-pos{{else if gt .Metrics.DebtToEquity 2.0}}r-neg{{end}}">{{printf "%.2f" .Metrics.DebtToEquity}}</td>
-            <td class="fund-er">{{if .NextEarnings}}{{.NextEarnings.DatetimeUTC.Format "01-02"}} <span class="cs-dim">({{.DaysToER}}d {{.NextEarnings.When}})</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-            <td class="fund-note">{{range .Rating.Notes}}{{.}}{{end}}</td>
+            <td><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if eq .Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
+            <td class="{{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
+            <td class="{{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
+            <td class="cs-dim">{{printf "%.0f" .Growth}}/{{printf "%.0f" .Profitability}}/{{printf "%.0f" .BalanceSheet}}</td>
+            <td>{{if .PE}}{{printf "%.1f" .PE}}{{else}}—{{end}}</td>
+            <td>{{if .PS}}{{printf "%.1f" .PS}}{{else}}—{{end}}</td>
+            <td class="{{if ge .RevGrowthYoY 10.0}}r-pos{{else if lt .RevGrowthYoY 0.0}}r-neg{{end}}">{{printf "%.0f" .RevGrowthYoY}}%</td>
+            <td class="{{if ge .NetMargin 10.0}}r-pos{{else if lt .NetMargin 0.0}}r-neg{{end}}">{{printf "%.0f" .NetMargin}}%</td>
+            <td class="{{if le .DebtToEquity 1.0}}r-pos{{else if gt .DebtToEquity 2.0}}r-neg{{end}}">{{printf "%.2f" .DebtToEquity}}</td>
+            <td>{{if .NextEarnings}}{{.NextEarnings.DatetimeUTC.Format "01-02"}} <span class="cs-dim">({{.DaysToER}}d {{.NextEarnings.When}})</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+            <td class="fund-note">{{.Note}}</td>
           {{end}}
         </tr>
         {{end}}
       </tbody>
     </table>
     <p class="glossary-hint" style="margin-top:.6rem">
-      <span class="i18n-en">Quality = growth·profitability·balance-sheet (0-100). Valuation = higher is cheaper. Ratings cached 6h. Not a trade signal — spot / buy-hold only.</span>
-      <span class="i18n-zh">Quality = 成長·獲利·資產負債(0-100)。Valuation 越高越便宜。評級快取 6h。非交易訊號 —— 純現貨 / buy-hold。</span>
+      <span class="i18n-en">Quality = growth·profitability·balance-sheet (0-100). Valuation = higher is cheaper. Not a trade signal — spot / buy-hold candidates only.</span>
+      <span class="i18n-zh">Quality = 成長·獲利·資產負債(0-100)。Valuation 越高越便宜。非交易訊號 —— 現貨 / buy-hold 候選。</span>
       <br>Updated: {{.Updated}}
     </p>
   </div>

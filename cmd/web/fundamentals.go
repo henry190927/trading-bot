@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"sort"
@@ -17,16 +18,25 @@ import (
 )
 
 // Consumer B surface: /fundamentals — a standalone spot buy/hold/avoid board.
-// Fundamentals move slowly, so ratings are cached per-ticker for 6h to respect
-// Finnhub's free-tier RPM and keep the page snappy.
+// Two modes:
+//   - PRECOMPUTED (preferred): reads fundamentals.json written daily by
+//     cmd/fundamental-scan over the whole BingX NCSK universe (~400 symbols).
+//     Shows the auto-discovered buy/hold candidates + counts.
+//   - ON-DEMAND fallback (no scan file): fetches a small FUNDAMENTAL_SYMBOLS
+//     list live with a 6h cache.
 
 const fundCacheTTL = 6 * time.Hour
 
+func fundamentalsPath() string {
+	if p := strings.TrimSpace(os.Getenv("FUNDAMENTALS_FILE")); p != "" {
+		return p
+	}
+	return "/opt/trading/fundamentals.json"
+}
+
 type fundCacheEntry struct {
-	rating  fundamental.Rating
-	metrics *finnhub.Metrics
-	at      time.Time
-	err     string
+	row fundRow
+	at  time.Time
 }
 
 var (
@@ -34,8 +44,6 @@ var (
 	fundCache = map[string]fundCacheEntry{}
 )
 
-// fundamentalSymbols is the ticker list for the board (bare tickers, not
-// synthetics). Override via FUNDAMENTAL_SYMBOLS.
 func fundamentalSymbols() []string {
 	def := "NVDA,SNDK,MU,TSLA,KO"
 	if v := strings.TrimSpace(os.Getenv("FUNDAMENTAL_SYMBOLS")); v != "" {
@@ -50,16 +58,51 @@ func fundamentalSymbols() []string {
 	return out
 }
 
+// fundRow is a flat display row usable from either the precomputed board or an
+// on-demand fetch.
 type fundRow struct {
 	Symbol       string
-	Rating       fundamental.Rating
-	Metrics      *finnhub.Metrics
+	Label        string
+	Quality      float64
+	Valuation    float64
+	Growth       float64
+	Profitability float64
+	BalanceSheet float64
+	Confidence   string
+	Note         string
+	PE           float64
+	PS           float64
+	RevGrowthYoY float64
+	NetMargin    float64
+	DebtToEquity float64
 	NextEarnings *earnings.Event
 	DaysToER     int
 	Err          string
 }
 
-// ratingRank orders the board: buy, then hold, then unknown/avoid last.
+func firstNote(ns []string) string {
+	if len(ns) > 0 {
+		return ns[0]
+	}
+	return ""
+}
+
+func rowFromRating(r fundamental.Rating, pe, ps, revG, netM, de float64) fundRow {
+	return fundRow{
+		Symbol: r.Symbol, Label: r.Label, Quality: r.Quality, Valuation: r.Valuation,
+		Growth: r.Growth, Profitability: r.Profitability, BalanceSheet: r.BalanceSheet,
+		Confidence: r.Confidence, Note: firstNote(r.Notes),
+		PE: pe, PS: ps, RevGrowthYoY: revG, NetMargin: netM, DebtToEquity: de,
+	}
+}
+
+func attachNextER(row *fundRow, now time.Time) {
+	if ev := earnings.Default().NextUpcoming(row.Symbol, now, 120*24*time.Hour); ev != nil {
+		row.NextEarnings = ev
+		row.DaysToER = int(ev.DatetimeUTC.Sub(now).Hours() / 24)
+	}
+}
+
 func ratingRank(label string) int {
 	switch label {
 	case "buy":
@@ -68,27 +111,49 @@ func ratingRank(label string) int {
 		return 1
 	case "unknown":
 		return 3
-	default: // avoid
+	default:
 		return 2
 	}
 }
 
 func (s *server) handleFundamentalsPage(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	token := strings.TrimSpace(os.Getenv("FINNHUB_KEY"))
-	syms := fundamentalSymbols()
 	now := time.Now().UTC()
 
-	rows := make([]fundRow, 0, len(syms))
+	// PRECOMPUTED mode — read the daily scan if present.
+	if data, err := os.ReadFile(fundamentalsPath()); err == nil {
+		var board fundamental.Board
+		if json.Unmarshal(data, &board) == nil && len(board.Entries) > 0 {
+			rows := make([]fundRow, 0, len(board.Entries))
+			for _, e := range board.Entries {
+				if e.Label != "buy" && e.Label != "hold" {
+					continue // hide avoid/unknown from the board; counts still shown
+				}
+				row := rowFromRating(e.Rating, e.PE, e.PS, e.RevGrowthYoY, e.NetMargin, e.DebtToEquity)
+				attachNextER(&row, now)
+				rows = append(rows, row)
+			}
+			cnt := board.Counts()
+			c.HTML(http.StatusOK, "fundamentals.html", gin.H{
+				"Rows": rows, "Updated": board.UpdatedUTC, "NoKey": false,
+				"Scanned": len(board.Entries), "Mode": "universe",
+				"CountBuy": cnt["buy"], "CountHold": cnt["hold"],
+				"CountAvoid": cnt["avoid"], "CountUnknown": cnt["unknown"],
+			})
+			return
+		}
+	}
+
+	// ON-DEMAND fallback — small list, live fetch, 6h cache.
+	token := strings.TrimSpace(os.Getenv("FINNHUB_KEY"))
+	syms := fundamentalSymbols()
 	client := finnhub.NewClient(token)
+	rows := make([]fundRow, 0, len(syms))
 	for _, tk := range syms {
-		row := fundRow{Symbol: tk}
 		if token == "" {
-			row.Err = "FINNHUB_KEY not set"
-			rows = append(rows, row)
+			rows = append(rows, fundRow{Symbol: tk, Err: "FINNHUB_KEY not set"})
 			continue
 		}
-		// cache
 		fundMu.Lock()
 		ent, ok := fundCache[tk]
 		fresh := ok && now.Sub(ent.at) < fundCacheTTL
@@ -97,39 +162,30 @@ func (s *server) handleFundamentalsPage(c *gin.Context) {
 			ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 			m, err := client.FetchMetrics(ctx, tk)
 			cancel()
-			ent = fundCacheEntry{at: now}
+			var row fundRow
 			if err != nil {
-				ent.err = "fetch failed"
+				row = fundRow{Symbol: tk, Err: "fetch failed"}
 			} else {
-				ent.metrics = m
-				ent.rating = fundamental.Score(*m)
+				row = rowFromRating(fundamental.Score(*m), m.PE, m.PS, m.RevGrowthYoY, m.NetMargin, m.DebtToEquity)
 			}
+			ent = fundCacheEntry{row: row, at: now}
 			fundMu.Lock()
 			fundCache[tk] = ent
 			fundMu.Unlock()
 		}
-		row.Rating = ent.rating
-		row.Metrics = ent.metrics
-		row.Err = ent.err
-		// next earnings (consumer B awareness) from the shared earnings calendar
-		if ev := earnings.Default().NextUpcoming(tk, now, 120*24*time.Hour); ev != nil {
-			row.NextEarnings = ev
-			row.DaysToER = int(ev.DatetimeUTC.Sub(now).Hours() / 24)
-		}
+		row := ent.row
+		attachNextER(&row, now)
 		rows = append(rows, row)
 	}
-
 	sort.SliceStable(rows, func(i, j int) bool {
-		ri, rj := ratingRank(rows[i].Rating.Label), ratingRank(rows[j].Rating.Label)
+		ri, rj := ratingRank(rows[i].Label), ratingRank(rows[j].Label)
 		if ri != rj {
 			return ri < rj
 		}
-		return rows[i].Rating.Quality > rows[j].Rating.Quality
+		return rows[i].Quality > rows[j].Quality
 	})
-
 	c.HTML(http.StatusOK, "fundamentals.html", gin.H{
-		"Rows":    rows,
-		"Updated": now.Format("2006-01-02 15:04 UTC"),
-		"NoKey":   token == "",
+		"Rows": rows, "Updated": now.Format("2006-01-02 15:04 UTC"),
+		"NoKey": token == "", "Mode": "ondemand",
 	})
 }

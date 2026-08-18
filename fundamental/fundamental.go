@@ -195,3 +195,33 @@ func boolToInt(b bool) int {
 }
 
 func round1(v float64) float64 { return float64(int(v*10+0.5)) / 10 }
+
+// --- Board: precomputed universe scan (consumer B auto-scan) ---------------
+
+// BoardEntry is one rated symbol persisted to fundamentals.json by the daily
+// scan, carrying the display metrics alongside the Rating so the web page
+// needs no live API call.
+type BoardEntry struct {
+	Rating
+	PE           float64 `json:"pe"`
+	PS           float64 `json:"ps"`
+	RevGrowthYoY float64 `json:"rev_growth_yoy"`
+	NetMargin    float64 `json:"net_margin"`
+	DebtToEquity float64 `json:"debt_to_equity"`
+}
+
+// Board is the whole scored universe written by cmd/fundamental-scan and read
+// by the /fundamentals page.
+type Board struct {
+	UpdatedUTC string       `json:"updated_utc"`
+	Entries    []BoardEntry `json:"entries"`
+}
+
+// Counts tallies entries by label for the page header.
+func (b Board) Counts() map[string]int {
+	m := map[string]int{}
+	for _, e := range b.Entries {
+		m[e.Label]++
+	}
+	return m
+}
