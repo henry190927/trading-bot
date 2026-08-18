@@ -176,7 +176,7 @@ func (s *server) handleChartBias(c *gin.Context) {
 // close vs the close ~24h ago on the 1h series, matching the daily % the
 // chart header shows next to the price.
 
-var tickerSymbols = []string{"BTC", "ETH", "XAU", "XAG"}
+var tickerSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA"}
 
 type tickerCacheT struct {
 	at   time.Time
@@ -209,18 +209,28 @@ func (s *server) handleTickers(c *gin.Context) {
 		row := gin.H{"symbol": short}
 		sym, err := resolveWebSymbol(short)
 		if err == nil && s.client != nil {
-			// 26 hourly bars ≈ 25h: enough to look back a full 24h and
-			// still keep the current forming bar as the live price.
+			// Price = live mark, SAME source as the chart header, so the
+			// ticker and the header never disagree. Klines are only for the
+			// 24h reference close (change %).
+			price := 0.0
+			if fr, ferr := s.client.FundingRate(ctx, sym); ferr == nil && fr.MarkPrice > 0 {
+				price = fr.MarkPrice
+			}
+			// 26 hourly bars ≈ 25h: enough to look back a full 24h.
 			if ks, err := s.client.KlinesWithForming(ctx, sym, market.Timeframe("1h"), 26); err == nil && len(ks) > 0 {
-				last := ks[len(ks)-1].Close
-				row["price"] = last
+				if price == 0 {
+					price = ks[len(ks)-1].Close // mark fetch failed — fall back to last close
+				}
 				ref := ks[0].Close
 				if idx := len(ks) - 1 - 24; idx >= 0 {
 					ref = ks[idx].Close
 				}
-				if ref > 0 {
-					row["changePct"] = (last - ref) / ref * 100
+				if ref > 0 && price > 0 {
+					row["changePct"] = (price - ref) / ref * 100
 				}
+			}
+			if price > 0 {
+				row["price"] = price
 			}
 		}
 		out = append(out, row)
