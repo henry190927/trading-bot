@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>台股 · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+<style>
+  .fund-badge{display:inline-block;padding:.12rem .5rem;border-radius:.4rem;font-weight:700;font-size:.82rem}
+  .fund-buy{background:rgba(46,160,67,.18);color:#3fb950}
+  .fund-hold{background:rgba(210,153,34,.18);color:#d29922}
+  .fund-avoid{background:rgba(248,81,73,.18);color:#f85149}
+  .tw-yield{background:rgba(88,166,255,.18);color:#58a6ff;font-size:.75rem;padding:.05rem .35rem;border-radius:.35rem;font-weight:700}
+  .fund-table td,.fund-table th{white-space:nowrap;text-align:right}
+  .fund-table td:nth-child(1),.fund-table td:nth-child(2),.fund-table th:nth-child(1),.fund-table th:nth-child(2){text-align:left}
+  .fund-note{color:#8b949e;font-size:.8rem;text-align:left;white-space:normal;max-width:20rem}
+  .fund-counts{display:flex;gap:1rem;flex-wrap:wrap;margin:.2rem 0 .8rem;font-size:.9rem}
+  .fund-counts b{font-variant-numeric:tabular-nums}
+  .fund-info{margin:.2rem 0 .9rem;font-size:.85rem}
+  .fund-info summary{cursor:pointer;color:#8b949e}
+  .fund-info ul{margin:.5rem 0 0;padding-left:1.1rem;line-height:1.5}
+</style>
+</head>
+<body>
+
+{{template "topnav" .}}
+
+<main class="tips-main">
+  <h1 class="tips-h1">
+    <span class="i18n-en">Taiwan Stocks</span><span class="i18n-zh">台股基本面</span>
+    <span class="tips-sub">
+      <span class="i18n-en">spot buy/hold/avoid from TWSE open data — quality × valuation × yield, not a trade signal</span>
+      <span class="i18n-zh">TWSE 公開資料現貨 buy/hold/avoid —— 品質 × 估值 × 殖利率,非交易訊號</span>
+    </span>
+  </h1>
+
+  {{if .Err}}
+  <div class="stats-card"><p class="glossary-hint">{{.Err}}</p></div>
+  {{else}}
+  <div class="stats-card">
+    <div class="fund-counts">
+      <span class="r-pos">BUY <b>{{.CountBuy}}</b></span>
+      <span class="r-zero">HOLD <b>{{.CountHold}}</b></span>
+      <span class="cs-dim">avoid {{.CountAvoid}}</span>
+      <span class="cs-dim"><span class="i18n-en">(showing top {{.Shown}} buy+hold with quality data, ex-financials)</span><span class="i18n-zh">(顯示前 {{.Shown}} 檔有品質資料的 buy+hold,已排除金融保險)</span></span>
+    </div>
+
+    <details class="fund-info">
+      <summary>ⓘ <span class="i18n-en">what these mean + caveats</span><span class="i18n-zh">欄位說明 + 限制</span></summary>
+      <ul>
+        <li><b>Rating</b> — buy = <span class="i18n-en">solid quality at a fair price</span><span class="i18n-zh">品質不錯且估值合理</span> · hold = <span class="i18n-en">keep, don't add</span><span class="i18n-zh">續抱、別加碼</span> · avoid = <span class="i18n-en">weak quality (value-trap)</span><span class="i18n-zh">品質弱(價值陷阱)</span>. <span class="i18n-en">Spot buy-hold, not a trade signal.</span><span class="i18n-zh">現貨買賣、非交易訊號。</span></li>
+        <li><b>Quality (0-100)</b> — <span class="i18n-en">revenue YoY growth + gross margin (thinner than US — no ROE/debt from free TWSE data → lower confidence).</span><span class="i18n-zh">月營收 YoY + 毛利率(比美股薄 —— 免費 TWSE 沒 ROE/負債 → 信心較低)。</span></li>
+        <li><b>Valuation (0-100)</b> — <span class="i18n-en">HIGHER = cheaper (P/E + P/B). TW bands are set cheaper than US.</span><span class="i18n-zh">越高越便宜(P/E+P/B)。台股 band 設得比美股低。</span></li>
+        <li><b><span class="tw-yield">高股息</span></b> — <span class="i18n-en">dividend yield ≥ 4% (存股-friendly).</span><span class="i18n-zh">殖利率 ≥ 4%(適合存股)。</span></li>
+        <li><span class="i18n-en">⚠ Caveats: financials/insurers excluded (different statements); small-caps are noisy (Q100 off a tiny base); quality is a 2-factor proxy. A screen, not gospel.</span><span class="i18n-zh">⚠ 限制:已排除金融保險(損益表不同);小型股雜訊大(低基期 Q100);品質只有雙因子。是篩選、非聖旨。</span></li>
+      </ul>
+    </details>
+
+    <table class="setups-table slice-table fund-table">
+      <thead>
+        <tr>
+          <th><span class="i18n-en">Code</span><span class="i18n-zh">代號</span></th>
+          <th><span class="i18n-en">Name</span><span class="i18n-zh">名稱</span></th>
+          <th><span class="i18n-en">Rating</span><span class="i18n-zh">評級</span></th>
+          <th>Quality</th><th>Valuation</th>
+          <th>P/E</th><th>P/B</th>
+          <th><span class="i18n-en">Yield</span><span class="i18n-zh">殖利率</span></th>
+          <th><span class="i18n-en">Rev YoY</span><span class="i18n-zh">營收YoY</span></th>
+          <th><span class="i18n-en">Gross M</span><span class="i18n-zh">毛利率</span></th>
+          <th class="fund-note"><span class="i18n-en">Note</span><span class="i18n-zh">說明</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><strong>{{.Code}}</strong></td>
+          <td>{{.Name}}</td>
+          <td><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if .HighYield}} <span class="tw-yield">高股息</span>{{end}}</td>
+          <td class="{{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
+          <td class="{{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
+          <td>{{if .PE}}{{printf "%.1f" .PE}}{{else}}—{{end}}</td>
+          <td>{{if .PB}}{{printf "%.2f" .PB}}{{else}}—{{end}}</td>
+          <td class="{{if ge .DividendYield 4.0}}r-pos{{end}}">{{printf "%.1f" .DividendYield}}%</td>
+          <td class="{{if ge .RevYoYPct 10.0}}r-pos{{else if lt .RevYoYPct 0.0}}r-neg{{end}}">{{printf "%.0f" .RevYoYPct}}%</td>
+          <td>{{printf "%.0f" .GrossMarginPct}}%</td>
+          <td class="fund-note">{{.Note}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.Updated}} (Asia/Taipei) · TWSE open data</p>
+  </div>
+  {{end}}
+</main>
+</body>
+</html>
