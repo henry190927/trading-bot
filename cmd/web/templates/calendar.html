@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>calendar · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+<style>
+  .cal-month{margin:1.1rem 0 .3rem;font-weight:700;font-size:1.05rem;border-bottom:1px solid var(--border,#30363d);padding-bottom:.3rem}
+  .cal-row{display:flex;align-items:center;gap:.7rem;padding:.5rem .2rem;border-bottom:1px solid rgba(128,128,128,.12);flex-wrap:wrap}
+  .cal-when{font-variant-numeric:tabular-nums;min-width:8.5rem;color:#8b949e;font-size:.85rem}
+  .cal-name{flex:1;min-width:12rem;font-weight:600}
+  .cal-win{font-size:.78rem;color:#8b949e;font-variant-numeric:tabular-nums}
+  .cal-cat{font-size:.7rem;padding:.08rem .45rem;border-radius:.35rem;font-weight:700;text-transform:uppercase}
+  .cat-fomc,.cat-minutes{background:rgba(248,81,73,.18);color:#f85149}
+  .cat-jackson{background:rgba(188,140,255,.2);color:#bc8cff}
+  .cat-cpi,.cat-ppi{background:rgba(210,153,34,.18);color:#d29922}
+  .cat-nfp{background:rgba(88,166,255,.18);color:#58a6ff}
+  .cat-other{background:rgba(139,148,158,.18);color:#8b949e}
+  .cal-status{font-size:.72rem;padding:.08rem .45rem;border-radius:.35rem;font-weight:700}
+  .st-past{color:#8b949e}
+  .st-active{background:rgba(248,81,73,.22);color:#f85149}
+  .st-upcoming{background:rgba(46,160,67,.16);color:#3fb950}
+  .cal-row.is-past{opacity:.5}
+  .cal-banner{border-radius:.5rem;padding:.6rem .8rem;margin:.3rem 0 .6rem;font-size:.9rem}
+  .cal-banner.active{border:1px solid rgba(248,81,73,.5);background:rgba(248,81,73,.1);color:#f85149;font-weight:700}
+  .cal-banner.next{border:1px solid rgba(46,160,67,.4);background:rgba(46,160,67,.08)}
+</style>
+</head>
+<body>
+
+{{template "topnav" .}}
+
+<main class="tips-main">
+  <h1 class="tips-h1">
+    <span class="i18n-en">Macro Calendar</span><span class="i18n-zh">總經行事曆</span>
+    <span class="tips-sub">
+      <span class="i18n-en">the curated high-impact events that drive the engine's blackout gate</span>
+      <span class="i18n-zh">驅動引擎 blackout gate 的精選高影響事件(看得到的就是會擋單的)</span>
+    </span>
+  </h1>
+
+  <div class="stats-card">
+    {{if .ActiveName}}
+    <div class="cal-banner active">⛔ <span class="i18n-en">BLACKOUT ACTIVE</span><span class="i18n-zh">目前 BLACKOUT 中</span> — {{.ActiveName}} <span class="i18n-en">(engine signals suppressed)</span><span class="i18n-zh">(引擎訊號已停)</span></div>
+    {{end}}
+    {{if .NextName}}
+    <div class="cal-banner next">▶ <span class="i18n-en">Next</span><span class="i18n-zh">下一個</span>: <strong>{{.NextName}}</strong> — {{.NextWhen}} (Asia/Taipei) · {{.NextDays}}d</div>
+    {{end}}
+
+    {{range .Months}}
+      <div class="cal-month">{{.Label}}</div>
+      {{range .Events}}
+      <div class="cal-row is-{{.Status}}">
+        <span class="cal-cat cat-{{.Cat}}">{{.Cat}}</span>
+        <span class="cal-when">{{.WhenUTC}}<br><span style="opacity:.7">{{.WhenTPE}} TPE</span></span>
+        <span class="cal-name">{{.Name}}</span>
+        <span class="cal-win">blackout {{.Window}}</span>
+        <span class="cal-status st-{{.Status}}">{{if eq .Status "upcoming"}}{{.Days}}d{{else}}{{.Status}}{{end}}</span>
+      </div>
+      {{end}}
+    {{end}}
+
+    <p class="glossary-hint" style="margin-top:.8rem">
+      <span class="i18n-en">Curated high-impact list (CPI/FOMC/minutes/NFP/PPI/Jackson Hole) — the single source of truth for the engine blackout, not an exhaustive third-party feed. During a blackout the engine returns Flat (no signal). Times: US data in UTC + Asia/Taipei.</span>
+      <span class="i18n-zh">精選高影響清單(CPI/FOMC/會議紀要/NFP/PPI/Jackson Hole)—— 引擎 blackout 的單一資料源,非完整第三方 feed。blackout 期間引擎回 Flat(不出訊號)。時間:美國數據 UTC + 台北。</span>
+      <br>Updated: {{.UpdatedUTC}}
+    </p>
+  </div>
+</main>
+</body>
+</html>

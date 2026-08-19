@@ -1,16 +1,16 @@
 {
   "events": [
     {
-      "name": "FOMC Rate Decision",
-      "datetime_utc": "2026-07-29T18:00:00Z",
-      "blackout_before_min": 60,
-      "blackout_after_min": 120
-    },
-    {
       "name": "US CPI (June)",
       "datetime_utc": "2026-07-15T12:30:00Z",
       "blackout_before_min": 60,
       "blackout_after_min": 90
+    },
+    {
+      "name": "FOMC Rate Decision (July)",
+      "datetime_utc": "2026-07-29T18:00:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 120
     },
     {
       "name": "US NFP (July)",
@@ -31,10 +31,34 @@
       "blackout_after_min": 60
     },
     {
-      "name": "FOMC Rate Decision",
+      "name": "FOMC Minutes (July)",
+      "datetime_utc": "2026-08-19T18:00:00Z",
+      "blackout_before_min": 30,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "Jackson Hole — Warsh keynote",
+      "datetime_utc": "2026-08-21T14:00:00Z",
+      "blackout_before_min": 180,
+      "blackout_after_min": 300
+    },
+    {
+      "name": "US NFP (August)",
+      "datetime_utc": "2026-09-04T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "FOMC Rate Decision (September)",
       "datetime_utc": "2026-09-16T18:00:00Z",
       "blackout_before_min": 60,
       "blackout_after_min": 120
+    },
+    {
+      "name": "FOMC Minutes (September)",
+      "datetime_utc": "2026-10-07T18:00:00Z",
+      "blackout_before_min": 30,
+      "blackout_after_min": 90
     }
   ]
 }
