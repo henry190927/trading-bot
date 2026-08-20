@@ -5547,27 +5547,19 @@ main { overflow-x: hidden; }
     display: grid;
     grid-template-columns: 1fr 340px;
     gap: var(--sp-3);
-    align-items: start;
-    position: relative;
+    align-items: stretch;   /* side panel matches the chart's height */
 }
-.chart-grid.side-collapsed { grid-template-columns: 1fr; }
+.chart-grid.side-collapsed { grid-template-columns: 1fr; gap: 0; }
 .chart-side {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    max-height: calc(100vh - 96px);
+    min-height: 0;          /* let it shrink to the grid row + scroll inside */
     overflow-y: auto;
-    position: sticky;
-    top: var(--sp-3);
 }
 .chart-grid.side-collapsed .chart-side { display: none; }
+/* Toggle now lives in the toolbar — a normal button, no chart overlap. */
 .chart-side-toggle {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    z-index: 5;
-    width: 26px; height: 26px;
-    display: inline-flex; align-items: center; justify-content: center;
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--text-dim);
@@ -5575,8 +5567,11 @@ main { overflow-x: hidden; }
     cursor: pointer;
     font-size: var(--fs-md);
     line-height: 1;
+    padding: 6px 10px;
+    min-height: 36px;
 }
-.chart-grid.side-collapsed .chart-side-toggle { transform: scaleX(-1); }
+.chart-side-toggle:hover { color: var(--text); }
+.chart-side-toggle[aria-expanded="false"] { color: var(--cyan); border-color: var(--cyan); }
 /* header stacks vertically inside the narrow panel */
 .chart-side .chart-header { flex-direction: column; margin-bottom: 0; }
 .chart-side .chart-header-left,
