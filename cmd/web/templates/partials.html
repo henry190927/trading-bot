@@ -1,18 +1,44 @@
 {{define "topnav"}}
 <header class="topbar">
   <div class="brand">Trading</div>
-  <nav class="topnav">
+  <button type="button" class="nav-burger" id="nav-burger" aria-label="menu" aria-expanded="false">☰</button>
+  <nav class="topnav" id="topnav">
     <a href="/" data-i18n="nav.dashboard">Dashboard</a>
-    <a href="/journal" data-i18n="nav.portfolio">Portfolio</a>
-    <a href="/validate" data-i18n="nav.validate">Validate</a>
-    <a href="/chart" data-i18n="nav.chart">Chart</a>
-    <a href="/setups" data-i18n="nav.setups">Setups</a>
-    <a href="/tips" data-i18n="nav.tips">Tips</a>
-    <a href="/fundamentals" data-i18n="nav.stocks">Stocks</a>
-    <a href="/tw" data-i18n="nav.tw">台股</a>
-    <a href="/calendar" data-i18n="nav.calendar">Calendar</a>
-    <a href="/onchain" data-i18n="nav.onchain">On-chain</a>
-    <a href="/ops" data-i18n="nav.ops">Ops</a>
+    <div class="nav-group">
+      <span class="nav-group-label" data-i18n="nav.g.trade">Trade</span>
+      <a href="/chart" data-i18n="nav.chart">Chart</a>
+      <a href="/validate" data-i18n="nav.validate">Validate</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-group-label" data-i18n="nav.g.journal">Journal</span>
+      <a href="/journal" data-i18n="nav.portfolio">Portfolio</a>
+      <a href="/setups" data-i18n="nav.setups">Setups</a>
+      <a href="/tips" data-i18n="nav.tips">Tips</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-group-label" data-i18n="nav.g.research">Research</span>
+      <a href="/calendar" data-i18n="nav.calendar">Calendar</a>
+      <a href="/fundamentals" data-i18n="nav.stocks">Stocks</a>
+      <a href="/onchain" data-i18n="nav.onchain">On-chain</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-group-label" data-i18n="nav.g.system">System</span>
+      <a href="/ops" data-i18n="nav.ops">Ops</a>
+    </div>
   </nav>
 </header>
+<script>
+  (function () {
+    var b = document.getElementById('nav-burger'), n = document.getElementById('topnav');
+    if (!b || !n) return;
+    b.addEventListener('click', function () {
+      var open = n.classList.toggle('open');
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    // Close the drawer after navigating (mobile).
+    n.addEventListener('click', function (e) {
+      if (e.target.tagName === 'A') { n.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); }
+    });
+  })();
+</script>
 {{end}}

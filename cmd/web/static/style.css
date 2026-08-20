@@ -622,6 +622,39 @@ footer {
     font-weight: 600;
 }
 
+/* Grouped nav (Phase 0): cluster links into Trade / Journal / Research /
+   System with a subtle divider + tiny uppercase label. */
+.nav-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding-left: var(--sp-3);
+    margin-left: var(--sp-1);
+    border-left: 1px solid var(--border);
+}
+.nav-group-label {
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-dim);
+    opacity: .7;
+    margin-right: var(--sp-1);
+    user-select: none;
+}
+/* Burger — hidden on desktop, shown in the mobile media query. */
+.nav-burger {
+    display: none;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--r-sm);
+    font-size: var(--fs-lg);
+    line-height: 1;
+    padding: 4px 10px;
+    cursor: pointer;
+    margin-left: auto;
+}
+
 /* -------- journal stats card -------- */
 .stats-card {
     background: var(--surface);
@@ -5020,10 +5053,10 @@ footer {
    Mobile / small-viewport overflow fixes
    ───────────────────────────────────────────────────────────────────── */
 
-/* Topbars: keep items vertically centered + let the nav / tf picker
-   scroll sideways on phones if they overflow. */
+/* Topbars: keep items vertically centered. The tf-picker still scrolls
+   sideways on phones; the main nav becomes a burger drawer (below). */
 .topbar { align-items: center; }
-.topnav,
+.topnav { flex-wrap: wrap; }
 .tf-picker {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -5037,8 +5070,43 @@ footer {
     justify-content: center;
     flex: 0 0 auto;
 }
-.tf-picker::-webkit-scrollbar,
-.topnav::-webkit-scrollbar { height: 0; display: none; }
+.tf-picker::-webkit-scrollbar { height: 0; display: none; }
+
+/* ── Mobile nav: burger + slide-down drawer (fixes the old hidden-scroll
+   strip where Ops/On-chain fell off-screen). Below --bp-lg the inline nav
+   hides and every link lives in a full-width grouped drawer. ── */
+@media (max-width: 1024px) {
+    .nav-burger { display: inline-block; }
+    .topnav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--sp-1);
+        padding: var(--sp-3);
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        box-shadow: var(--shadow-2);
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    .topnav.open { display: flex; }
+    .nav-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        padding: var(--sp-2) 0 0;
+        margin: var(--sp-1) 0 0;
+    }
+    .nav-group-label { margin: 0 0 2px; }
+    .topnav a { padding: var(--sp-2) var(--sp-3); min-height: 44px; display: flex; align-items: center; border-radius: var(--r-sm); }
+    .topbar { position: relative; flex-wrap: wrap; }
+}
 
 /* Chart-style toggle lives at the right of the Symbol-scan header now,
    sitting next to the TF chip (which is already pushed right via
@@ -5424,3 +5492,23 @@ main { overflow-x: hidden; }
 .cal-banner{border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);margin:var(--sp-1) 0 var(--sp-2);font-size:var(--fs-md)}
 .cal-banner.active{border:1px solid var(--red);background:var(--wash-red);color:var(--red);font-weight:700}
 .cal-banner.next{border:1px solid var(--green);background:var(--wash-green)}
+
+/* Market segmented toggle (US ⇄ TW) on the fundamentals boards. */
+.market-toggle {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    margin: 0 0 var(--sp-3);
+}
+.market-toggle a {
+    padding: var(--sp-2) var(--sp-4);
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    background: var(--surface);
+}
+.market-toggle a + a { border-left: 1px solid var(--border); }
+.market-toggle a.active { background: var(--surface-2); color: var(--cyan); }

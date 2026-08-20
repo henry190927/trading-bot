@@ -24,6 +24,11 @@
     </span>
   </h1>
 
+  <div class="market-toggle">
+    <a href="/fundamentals">US <span class="i18n-en">Stocks</span><span class="i18n-zh">美股</span></a>
+    <a href="/tw" class="active">TW <span class="i18n-en">Taiwan</span><span class="i18n-zh">台股</span></a>
+  </div>
+
   {{if .Err}}
   <div class="stats-card"><p class="glossary-hint">{{.Err}}</p></div>
   {{else}}
