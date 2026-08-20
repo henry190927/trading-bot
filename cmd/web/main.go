@@ -55,6 +55,16 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(requestLogger())
+	// Static assets are embedded (go:embed) → zero modtime → http.FileServer
+	// emits no Last-Modified/ETag, so browsers heuristic-cache style.css and
+	// miss deploys. Force revalidation so CSS/JS changes always show up.
+	r.Use(func(c *gin.Context) {
+		p := c.Request.URL.Path
+		if len(p) >= 8 && p[:8] == "/static/" {
+			c.Header("Cache-Control", "no-cache")
+		}
+		c.Next()
+	})
 
 	// Embedded templates + static assets so the binary is self-contained.
 	tmpl := template.Must(template.New("").Funcs(templateFuncs()).ParseFS(assets, "templates/*.html"))
