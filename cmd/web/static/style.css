@@ -5243,11 +5243,19 @@ main { overflow-x: hidden; }
 }
 
 /* -------- /setups forward-log table -------- */
-.setups-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
-.setups-table th, .setups-table td { padding: 5px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-.setups-table th { color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
-.setups-table td.cs-dim { color: var(--text-dim); }
+/* Canonical data table (.dt). .setups-table shares the spec so every existing
+   board (setups/fundamentals/tw) gets the upgrade with no template churn:
+   roomier tokenized cells, sticky dim-caps header, row hover. */
+.dt, .setups-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+.dt th, .dt td, .setups-table th, .setups-table td { padding: var(--sp-2) var(--sp-3); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.dt th, .setups-table th { color: var(--text-dim); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 52px; background: var(--surface); z-index: 1; }
+.dt tbody tr:hover, .setups-table tbody tr:hover { background: var(--row-hover); }
+.dt td.cs-dim, .setups-table td.cs-dim { color: var(--text-dim); }
 .setups-table .dir-neutral { color: var(--text-dim); }
+/* Numeric cell helper: mono + tabular + right-aligned. */
+.dt .num, .setups-table .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+/* One horizontal-scroll strategy for wide tables. */
+.dt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .outcome-badge { padding: 1px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
 .oc-open    { color: var(--yellow); background: var(--yellow-bg); }
 .oc-win     { color: var(--green);  background: var(--green-bg); }
@@ -5512,3 +5520,20 @@ main { overflow-x: hidden; }
 }
 .market-toggle a + a { border-left: 1px solid var(--border); }
 .market-toggle a.active { background: var(--surface-2); color: var(--cyan); }
+
+/* =====================================================================
+   Phase 1 primitives — canonical badge + stat tile. Go-forward standards;
+   existing bespoke variants (fund-badge, outcome-badge, side-badge…) keep
+   working and migrate opportunistically.
+   ===================================================================== */
+.badge { display: inline-block; padding: 2px var(--sp-2); border-radius: var(--r-sm); font-size: var(--fs-xs); font-weight: 700; line-height: 1.4; }
+.badge.b-green  { background: var(--wash-green);  color: var(--green); }
+.badge.b-red    { background: var(--wash-red);    color: var(--red); }
+.badge.b-yellow { background: var(--wash-yellow); color: var(--yellow); }
+.badge.b-blue   { background: var(--wash-blue);   color: var(--blue); }
+.badge.b-dim    { background: var(--wash-dim);    color: var(--text-dim); }
+
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3); }
+.tile .tile-label { display: block; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
+.tile .tile-val { display: block; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-xl); font-weight: 700; margin-top: 2px; }
+.tile-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-3); }
