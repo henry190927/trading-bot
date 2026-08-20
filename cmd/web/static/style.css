@@ -48,6 +48,41 @@
 :root {
     --cjk:  "PingFang TC","PingFang SC","Microsoft JhengHei","Noto Sans TC","Hiragino Sans GB",system-ui,sans-serif;
     --mono: "SF Mono",ui-monospace,"Cascadia Code","Menlo",monospace;
+
+    /* ---- UI overhaul Phase 0: scale + semantic layer (theme-agnostic) ----
+       All new components draw from these so values stop being invented ad-hoc.
+       Space (4px base), type (7 steps), radius (3), elevation, focus ring. */
+    --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+    --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px; --fs-md: 15px;
+    --fs-lg: 18px; --fs-xl: 24px; --fs-2xl: 34px;
+    --lh-tight: 1.25; --lh-base: 1.5;
+    --r-sm: 4px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 6px 18px rgba(0,0,0,.5);
+    --t-fast: 120ms;
+    --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--blue);
+
+    /* Semantic overlays — kill hardcoded rgba/hex bypasses. Resolve per theme
+       via the *-rgb triplets, so badges finally re-theme with industrial. */
+    --on-accent: var(--chip);
+    --wash-green:  rgba(var(--green-rgb), .14);
+    --wash-red:    rgba(var(--red-rgb), .14);
+    --wash-blue:   rgba(var(--blue-rgb), .12);
+    --wash-yellow: rgba(var(--yellow-rgb), .12);
+    --wash-dim:    rgba(var(--text-dim-rgb), .16);
+    --row-hover:   rgba(var(--text-dim-rgb), .08);
+    --th-bg:       rgba(var(--text-dim-rgb), .06);
+
+    /* Data-viz namespace — DELIBERATELY un-themed (candles/charts must look the
+       same across slate/industrial). Never confuse with the UI status tokens. */
+    --dv-up:   #26a69a;
+    --dv-down: #ef5350;
+    --dv-vol:  #5b8def;
+    --dv-purple: #bc8cff;
+
+    /* Responsive breakpoints (reference; used in media queries below). */
+    /* --bp-sm:480 --bp-md:768 --bp-lg:1024 --bp-xl:1440 */
 }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -136,9 +171,9 @@ body {
 }
 
 main {
-    max-width: 720px;
+    max-width: 1440px;
     margin: 0 auto;
-    padding: 1rem;
+    padding: 1rem clamp(var(--sp-3), 4vw, var(--sp-6));
 }
 
 .symbol-card {
@@ -5342,3 +5377,50 @@ main { overflow-x: hidden; }
 /* setups: real-outcome badge (path-dependent) additions */
 .outcome-badge.oc-no-fill { background: rgba(139,148,158,0.18); color: #8b949e; }
 .oc-gap { color: #d8a657; font-weight: 700; cursor: help; margin-left: .1rem; }
+
+/* =====================================================================
+   Fundamentals / TW / Calendar boards — moved out of page-local <style>
+   blocks and re-pointed at theme tokens (Phase 0 token-bypass fix), so
+   these badges finally re-theme under industrial instead of freezing slate.
+   ===================================================================== */
+.fund-badge{display:inline-block;padding:2px var(--sp-2);border-radius:var(--r-sm);font-weight:700;font-size:var(--fs-sm)}
+.fund-buy{background:var(--wash-green);color:var(--green)}
+.fund-hold{background:var(--wash-yellow);color:var(--yellow)}
+.fund-avoid{background:var(--wash-red);color:var(--red)}
+.fund-unknown{background:var(--wash-dim);color:var(--text-dim)}
+.fund-table td,.fund-table th{white-space:nowrap;text-align:right}
+.fund-table td:first-child,.fund-table th:first-child{text-align:left}
+.fund-note{color:var(--text-dim);font-size:var(--fs-sm);text-align:left;white-space:normal;max-width:22rem}
+.fund-counts{display:flex;gap:var(--sp-4);flex-wrap:wrap;margin:var(--sp-1) 0 var(--sp-3);font-size:var(--fs-md)}
+.fund-counts b{font-variant-numeric:tabular-nums}
+.fund-downgrades{border:1px solid var(--wash-red);background:var(--wash-red);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);margin:var(--sp-1) 0 var(--sp-3)}
+.fund-dg-title{font-weight:700;color:var(--red);margin-bottom:var(--sp-1);font-size:var(--fs-md)}
+.fund-dg-item{display:inline-block;margin:2px var(--sp-2) 2px 0;font-size:var(--fs-sm)}
+.fund-info{margin:var(--sp-1) 0 var(--sp-3);font-size:var(--fs-sm)}
+.fund-info summary{cursor:pointer;color:var(--text-dim)}
+.fund-info ul{margin:var(--sp-2) 0 0;padding-left:1.1rem;line-height:var(--lh-base)}
+.fund-info li{margin:var(--sp-1) 0}
+
+/* TW-specific */
+.tw-yield{background:var(--wash-blue);color:var(--blue);font-size:var(--fs-xs);padding:2px 6px;border-radius:var(--r-sm);font-weight:700}
+
+/* Calendar */
+.cal-month{margin:var(--sp-4) 0 var(--sp-1);font-weight:700;font-size:var(--fs-md);border-bottom:1px solid var(--border);padding-bottom:var(--sp-1)}
+.cal-row{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-2) var(--sp-1);border-bottom:1px solid var(--wash-dim);flex-wrap:wrap}
+.cal-when{font-variant-numeric:tabular-nums;min-width:8.5rem;color:var(--text-dim);font-size:var(--fs-sm)}
+.cal-name{flex:1;min-width:12rem;font-weight:600}
+.cal-win{font-size:var(--fs-sm);color:var(--text-dim);font-variant-numeric:tabular-nums}
+.cal-cat{font-size:var(--fs-xs);padding:2px var(--sp-1);border-radius:var(--r-sm);font-weight:700;text-transform:uppercase}
+.cat-fomc,.cat-minutes{background:var(--wash-red);color:var(--red)}
+.cat-jackson{background:rgba(188,140,255,.18);color:var(--dv-purple)}
+.cat-cpi,.cat-ppi{background:var(--wash-yellow);color:var(--yellow)}
+.cat-nfp{background:var(--wash-blue);color:var(--blue)}
+.cat-other{background:var(--wash-dim);color:var(--text-dim)}
+.cal-status{font-size:var(--fs-xs);padding:2px var(--sp-1);border-radius:var(--r-sm);font-weight:700}
+.st-past{color:var(--text-dim)}
+.st-active{background:var(--wash-red);color:var(--red)}
+.st-upcoming{background:var(--wash-green);color:var(--green)}
+.cal-row.is-past{opacity:.5}
+.cal-banner{border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);margin:var(--sp-1) 0 var(--sp-2);font-size:var(--fs-md)}
+.cal-banner.active{border:1px solid var(--red);background:var(--wash-red);color:var(--red);font-weight:700}
+.cal-banner.next{border:1px solid var(--green);background:var(--wash-green)}
