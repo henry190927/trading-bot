@@ -5549,15 +5549,18 @@ main { overflow-x: hidden; }
     display: grid;
     grid-template-columns: 1fr 340px;
     gap: var(--sp-3);
-    align-items: stretch;   /* side panel matches the chart's height */
+    align-items: start;   /* panel hugs its content, top-aligned with the chart — no empty void below */
 }
 .chart-grid.side-collapsed { grid-template-columns: 1fr; gap: 0; }
 .chart-side {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    min-height: 0;          /* let it shrink to the grid row + scroll inside */
+    /* content-height; cap to viewport so a very long panel still scrolls */
+    max-height: calc(100vh - 72px);
     overflow-y: auto;
+    position: sticky;
+    top: var(--sp-2);
 }
 .chart-grid.side-collapsed .chart-side { display: none; }
 /* Toggle now lives in the toolbar — a normal button, no chart overlap. */
