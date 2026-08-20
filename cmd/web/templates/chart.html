@@ -36,41 +36,6 @@
             data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
   </div>
 
-  <div class="chart-header" id="chart-header">
-    <div class="chart-header-left">
-      <div class="chart-header-symrow">
-        <span class="chart-header-sym" id="chart-header-sym">{{.Symbol}}-USDT</span>
-        <span class="side-badge side-flat" id="chart-side">—</span>
-        <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
-      </div>
-      <div class="chart-header-price-row">
-        <span class="chart-header-price" id="chart-header-price">—</span>
-        <span class="chart-header-change" id="chart-header-change">—</span>
-      </div>
-      <div class="chart-header-stats" id="chart-header-stats">
-        <span>24h H <em id="chart-h24-high">—</em></span>
-        <span>L <em id="chart-h24-low">—</em></span>
-        <span>Vol <em id="chart-h24-vol">—</em></span>
-      </div>
-      <div class="chart-header-ctx" id="chart-banner-ctx"></div>
-    </div>
-    <div class="chart-header-right">
-      <div class="chart-header-scores">
-        <span class="score score-mr" id="chart-mr">MR —</span>
-        <span class="score score-mom" id="chart-mom">MOM —</span>
-        <span class="score" id="chart-total">total —</span>
-      </div>
-      <div class="chart-banner-score" id="chart-banner-score">
-        <div class="chart-banner-label">評分</div>
-        <div class="chart-banner-score-num" id="chart-banner-score-num">—</div>
-        <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
-      </div>
-      <div class="chart-banner-action" id="chart-banner-action">
-        <div class="chart-banner-action-text" id="chart-banner-action-text">Loading…</div>
-        <div class="chart-banner-note" id="chart-banner-note"></div>
-      </div>
-    </div>
-  </div>
 
   <!-- Hidden compat: preserve nodes referenced by legacy JS paths -->
   <span class="hidden" id="chart-ratio">—</span>
@@ -150,31 +115,14 @@
     </span>
   </div>
 
-  <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
 
   <!-- N 字 structure read-out. Shows only when the `struct` layer is on.
        Turns the bare zigzag into an actual long/short read: lean badge +
        trend / event / in-zone state + 樞紐區 numbers, with an ⓘ that
        explains how to read it. Populated by applyStructureVisibility(). -->
-  <div class="chart-struct-panel hidden" id="chart-struct-panel">
-    <span class="cs-lean" id="cs-lean">—</span>
-    <span class="cs-kv"><em>trend</em><span id="cs-trend">—</span></span>
-    <span class="cs-kv"><em>event</em><span id="cs-event">—</span></span>
-    <span class="cs-kv" id="cs-zone-wrap"><em>樞紐區</em><span id="cs-zone">—</span></span>
-    <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
-    <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
-    <button type="button" class="cs-record-btn" id="cs-record-btn" title="記錄這個 setup 到 forward-log(/setups),不管有沒有開單">⚑ 記</button>
-    <button type="button" class="cs-info-btn" id="cs-info-btn" aria-expanded="false" title="怎麼判讀 N 字結構">ⓘ</button>
-    <div class="cs-info hidden" id="cs-info">
-      <b>N 字判讀:</b> 推動 → 回檔 → 再推動。
-      <b>BOS</b> = 收盤突破 leg 終端 swing(續勢);
-      <b>CHoCH</b> = 收盤跌破 leg 起點(反轉警訊,樞紐區作廢)。
-      <b>樞紐區</b>(0.5–0.705 回檔帶)= 順勢進場區,<b>invalid</b> = 結構停損,<b>target</b> = 1:1 量測。
-      實戰:價格回落進<em>同向</em>樞紐區且未 CHoCH → 找續勢;收破 invalid → 這個 N 作廢。
-      <br><b>⏳</b> = event / in-zone 是拿<em>未收盤</em> bar 的即時價算的,收盤前可能變動;swing 折點與樞紐區位階是收盤確認、不變。
-    </div>
-  </div>
 
+  <div class="chart-grid" id="chart-grid">
+  <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="收合/展開分析面板" aria-expanded="true">»</button>
   <div class="chart-wrap">
     <!-- Left-side TradingView-style vertical drawing toolbar. Tool
          buttons arm a drawing mode; the trash / hide toggles sit at
@@ -258,6 +206,78 @@
       </div>
     </div>
   </div>
+  <aside class="chart-side" id="chart-sidepanel">
+  <div class="chart-header" id="chart-header">
+    <div class="chart-header-left">
+      <div class="chart-header-symrow">
+        <span class="chart-header-sym" id="chart-header-sym">{{.Symbol}}-USDT</span>
+        <span class="side-badge side-flat" id="chart-side">—</span>
+        <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
+      </div>
+      <div class="chart-header-price-row">
+        <span class="chart-header-price" id="chart-header-price">—</span>
+        <span class="chart-header-change" id="chart-header-change">—</span>
+      </div>
+      <div class="chart-header-stats" id="chart-header-stats">
+        <span>24h H <em id="chart-h24-high">—</em></span>
+        <span>L <em id="chart-h24-low">—</em></span>
+        <span>Vol <em id="chart-h24-vol">—</em></span>
+      </div>
+      <div class="chart-header-ctx" id="chart-banner-ctx"></div>
+    </div>
+    <div class="chart-header-right">
+      <div class="chart-header-scores">
+        <span class="score score-mr" id="chart-mr">MR —</span>
+        <span class="score score-mom" id="chart-mom">MOM —</span>
+        <span class="score" id="chart-total">total —</span>
+      </div>
+      <div class="chart-banner-score" id="chart-banner-score">
+        <div class="chart-banner-label">評分</div>
+        <div class="chart-banner-score-num" id="chart-banner-score-num">—</div>
+        <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
+      </div>
+      <div class="chart-banner-action" id="chart-banner-action">
+        <div class="chart-banner-action-text" id="chart-banner-action-text">Loading…</div>
+        <div class="chart-banner-note" id="chart-banner-note"></div>
+      </div>
+    </div>
+  </div>
+  <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
+  <div class="chart-struct-panel hidden" id="chart-struct-panel">
+    <span class="cs-lean" id="cs-lean">—</span>
+    <span class="cs-kv"><em>trend</em><span id="cs-trend">—</span></span>
+    <span class="cs-kv"><em>event</em><span id="cs-event">—</span></span>
+    <span class="cs-kv" id="cs-zone-wrap"><em>樞紐區</em><span id="cs-zone">—</span></span>
+    <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
+    <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
+    <button type="button" class="cs-record-btn" id="cs-record-btn" title="記錄這個 setup 到 forward-log(/setups),不管有沒有開單">⚑ 記</button>
+    <button type="button" class="cs-info-btn" id="cs-info-btn" aria-expanded="false" title="怎麼判讀 N 字結構">ⓘ</button>
+    <div class="cs-info hidden" id="cs-info">
+      <b>N 字判讀:</b> 推動 → 回檔 → 再推動。
+      <b>BOS</b> = 收盤突破 leg 終端 swing(續勢);
+      <b>CHoCH</b> = 收盤跌破 leg 起點(反轉警訊,樞紐區作廢)。
+      <b>樞紐區</b>(0.5–0.705 回檔帶)= 順勢進場區,<b>invalid</b> = 結構停損,<b>target</b> = 1:1 量測。
+      實戰:價格回落進<em>同向</em>樞紐區且未 CHoCH → 找續勢;收破 invalid → 這個 N 作廢。
+      <br><b>⏳</b> = event / in-zone 是拿<em>未收盤</em> bar 的即時價算的,收盤前可能變動;swing 折點與樞紐區位階是收盤確認、不變。
+    </div>
+  </div>
+  </aside>
+  </div><!-- /chart-grid -->
+  <script>
+    (function () {
+      var g = document.getElementById('chart-grid'), b = document.getElementById('chart-side-toggle');
+      if (!g || !b) return;
+      var KEY = 'chart-side-collapsed';
+      try { if (localStorage.getItem(KEY) === '1') g.classList.add('side-collapsed'); } catch (e) {}
+      b.setAttribute('aria-expanded', g.classList.contains('side-collapsed') ? 'false' : 'true');
+      b.addEventListener('click', function () {
+        var c = g.classList.toggle('side-collapsed');
+        b.setAttribute('aria-expanded', c ? 'false' : 'true');
+        try { localStorage.setItem(KEY, c ? '1' : '0'); } catch (e) {}
+        window.dispatchEvent(new Event('resize')); // nudge LWC autoSize
+      });
+    })();
+  </script>
 
   <!-- Quick-action modal — Record Trade / Validate at a chosen price.
        Fields mirror /journal/new + /validate; on submit we open those

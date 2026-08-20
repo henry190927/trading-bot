@@ -5537,3 +5537,64 @@ main { overflow-x: hidden; }
 .tile .tile-label { display: block; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
 .tile .tile-val { display: block; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-xl); font-weight: 700; margin-top: 2px; }
 .tile-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-3); }
+
+/* =====================================================================
+   Chart right-panel (Phase 2 crown jewel). chart-header + one-liner +
+   struct panel moved into a collapsible right column beside the chart so
+   the plot gets the width/height back. autoSize handles chart resize.
+   ===================================================================== */
+.chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: var(--sp-3);
+    align-items: start;
+    position: relative;
+}
+.chart-grid.side-collapsed { grid-template-columns: 1fr; }
+.chart-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    position: sticky;
+    top: var(--sp-3);
+}
+.chart-grid.side-collapsed .chart-side { display: none; }
+.chart-side-toggle {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 5;
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-size: var(--fs-md);
+    line-height: 1;
+}
+.chart-grid.side-collapsed .chart-side-toggle { transform: scaleX(-1); }
+/* header stacks vertically inside the narrow panel */
+.chart-side .chart-header { flex-direction: column; margin-bottom: 0; }
+.chart-side .chart-header-left,
+.chart-side .chart-header-right {
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: stretch;
+    width: 100%;
+}
+.chart-side .chart-header-right { align-items: stretch; }
+.chart-side .chart-one-liner { margin: 0; }
+.chart-side .chart-struct-panel { margin: 0; }
+
+@media (max-width: 1024px) {
+    /* mobile: side stacks below the chart, toggle hidden (always shown) */
+    .chart-grid, .chart-grid.side-collapsed { grid-template-columns: 1fr; }
+    .chart-grid.side-collapsed .chart-side { display: flex; }
+    .chart-side { position: static; max-height: none; }
+    .chart-side-toggle { display: none; }
+    .chart-side .chart-header { flex-direction: row; flex-wrap: wrap; }
+}
