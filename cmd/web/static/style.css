@@ -5681,25 +5681,32 @@ body { font-size: 15px; letter-spacing: -0.005em; }
     gap: var(--sp-1);
     overflow-y: auto;
 }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3); }
 .sidebar-brand {
     display: flex; align-items: center; gap: var(--sp-2);
     font-size: var(--fs-lg); font-weight: 800; letter-spacing: -0.02em;
-    color: var(--text); text-decoration: none; margin-bottom: var(--sp-4);
+    color: var(--text); text-decoration: none;
 }
+.sidebar-collapse, .sidebar-reopen {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-md); line-height: 1; padding: 3px 8px;
+}
+.sidebar-collapse:hover, .sidebar-reopen:hover { color: var(--text); }
+.sidebar-reopen { display: none; position: fixed; top: var(--sp-3); left: var(--sp-2); z-index: 31; padding: 6px 12px; }
 .brand-mark { color: var(--blue); font-size: 1.2em; }
 .sidebar .topnav { flex-direction: column; align-items: stretch; gap: 2px; flex: 1 1 auto; }
 .sidebar .topnav > a, .sidebar .nav-group > a {
-    display: flex; align-items: center; padding: var(--sp-2) var(--sp-3);
+    display: flex; align-items: center; padding: 6px var(--sp-3);
     border-radius: var(--r-md); color: var(--text-dim); text-decoration: none;
-    font-size: var(--fs-sm); font-weight: 600; min-height: 40px;
+    font-size: var(--fs-sm); font-weight: 600; min-height: 32px;
     transition: background var(--t-fast), color var(--t-fast);
 }
 .sidebar .topnav a:hover { background: var(--wash-dim); color: var(--text); }
-.sidebar .topnav a.active { background: var(--blue); color: var(--on-accent); font-weight: 700; }
+.sidebar .topnav a.active { background: var(--wash-blue); color: var(--text); box-shadow: inset 3px 0 0 var(--blue); font-weight: 700; }
 .sidebar .nav-group {
     display: flex; flex-direction: column; align-items: stretch; gap: 2px;
     border-left: none; border-top: 1px solid var(--border);
-    margin: var(--sp-2) 0 0; padding: var(--sp-2) 0 0;
+    margin: var(--sp-1) 0 0; padding: var(--sp-1) 0 0;
 }
 .sidebar .nav-group-label {
     font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .08em;
@@ -5712,6 +5719,9 @@ body { font-size: 15px; letter-spacing: -0.005em; }
 @media (min-width: 1024px) {
     body { padding-left: 220px; }
     .topbar-mobile, .sidebar-scrim, .nav-burger { display: none; }
+    body.nav-collapsed { padding-left: 0; }
+    body.nav-collapsed .sidebar { transform: translateX(-100%); }
+    body.nav-collapsed .sidebar-reopen { display: inline-flex; }
 }
 
 /* Mobile: rail becomes an off-canvas drawer behind a compact top bar. */
@@ -5741,3 +5751,4 @@ body { font-size: 15px; letter-spacing: -0.005em; }
 }
 /* Desktop: hide the mobile bar (redundant safety). */
 @media (min-width: 1024px) { .topbar-mobile { display: none; } }
+@media (max-width: 1023.98px) { .sidebar-collapse { display: none; } }
