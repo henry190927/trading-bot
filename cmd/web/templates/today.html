@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c10">
+<title>today · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+<style>
+  .today-hero{border-radius:var(--r-lg);padding:var(--sp-5);margin-bottom:var(--sp-4);box-shadow:var(--shadow-card);border:1px solid var(--border)}
+  .today-hero.live{background:var(--wash-green);border-color:var(--green)}
+  .today-hero.blackout{background:var(--wash-red);border-color:var(--red)}
+  .today-hero .th-status{font-size:var(--fs-xl);font-weight:800;letter-spacing:-.02em}
+  .today-hero.live .th-status{color:var(--green)} .today-hero.blackout .th-status{color:var(--red)}
+  .today-hero .th-sub{color:var(--text-dim);margin-top:var(--sp-2);font-size:var(--fs-md)}
+  .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--sp-4);align-items:start}
+  .today-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-4);box-shadow:var(--shadow-card)}
+  .today-card h2{font-size:var(--fs-lg);font-weight:800;margin-bottom:var(--sp-3);display:flex;align-items:center;gap:var(--sp-2)}
+  .daemon-row{display:flex;gap:var(--sp-4);flex-wrap:wrap}
+  .daemon{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm)}
+  .dot{width:9px;height:9px;border-radius:var(--r-pill);display:inline-block}
+  .dot.up{background:var(--green)} .dot.down{background:var(--red)}
+  .ot{display:flex;justify-content:space-between;align-items:center;padding:var(--sp-3) 0;border-bottom:1px solid var(--border)}
+  .ot:last-child{border-bottom:none}
+  .ot .sym{font-weight:700}
+  .ot .r{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--fs-lg);font-weight:800}
+  .ot .meta{color:var(--text-dim);font-size:var(--fs-xs)}
+  .pend{display:flex;justify-content:space-between;padding:var(--sp-2) 0;border-bottom:1px solid var(--border);font-size:var(--fs-sm)}
+  .pend:last-child{border-bottom:none}
+  .today-links{display:flex;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-2)}
+  .today-links a{padding:var(--sp-2) var(--sp-4);border:1px solid var(--border);border-radius:var(--r-pill);color:var(--text);text-decoration:none;font-weight:600;font-size:var(--fs-sm);background:var(--surface-2)}
+  .today-empty{color:var(--text-dim);font-size:var(--fs-sm);padding:var(--sp-3) 0}
+</style>
+</head>
+<body>
+
+{{template "topnav" .}}
+
+<main class="tips-main">
+  <h1 class="tips-h1">
+    <span class="i18n-en">Today</span><span class="i18n-zh">今日</span>
+    <span class="tips-sub">{{.NowTPE}} (Asia/Taipei)</span>
+  </h1>
+
+  {{if .MacroActive}}
+  <div class="today-hero blackout">
+    <div class="th-status">⛔ <span class="i18n-en">BLACKOUT</span><span class="i18n-zh">停訊窗</span> — {{.MacroActive.Name}}</div>
+    <div class="th-sub"><span class="i18n-en">Engine suppressed — no new signals until the window clears.</span><span class="i18n-zh">引擎停訊 —— 事件窗過了才會再出訊號,別在窗內開新單。</span></div>
+  </div>
+  {{else}}
+  <div class="today-hero live">
+    <div class="th-status">✅ <span class="i18n-en">Engine live</span><span class="i18n-zh">引擎運作中</span></div>
+    <div class="th-sub">{{if .BONext}}<span class="i18n-en">Next event</span><span class="i18n-zh">下一個事件</span>: <strong>{{.BONext.name}}</strong> — {{.BONext.when}} · {{.BONext.hours}}h{{else}}<span class="i18n-en">no macro events on the calendar</span><span class="i18n-zh">日曆上無總經事件</span>{{end}}</div>
+  </div>
+  {{end}}
+
+  <div class="today-grid">
+    <!-- Open trades -->
+    <div class="today-card">
+      <h2>💼 <span class="i18n-en">Open trades</span><span class="i18n-zh">開倉</span> <span class="cs-dim">({{len .OpenTrades}})</span></h2>
+      {{if .OpenTrades}}
+        {{range .OpenTrades}}
+        <div class="ot">
+          <div>
+            <span class="sym">{{.Trade.Symbol}} {{.Trade.Side}}</span>{{if .Trade.Leverage}} <span class="meta">{{.Trade.Leverage}}x</span>{{end}}
+            <div class="meta">entry {{printf "%.2f" .Trade.Entry}} · mark {{printf "%.2f" .MarkPrice}} · {{.Trade.TF}}</div>
+          </div>
+          <div class="r {{if gt .CurrentR 0.0}}r-pos{{else if lt .CurrentR 0.0}}r-neg{{end}}">{{if gt .CurrentR 0.0}}+{{end}}{{printf "%.2f" .CurrentR}}R</div>
+        </div>
+        {{end}}
+      {{else}}<div class="today-empty"><span class="i18n-en">No open positions.</span><span class="i18n-zh">目前無持倉。</span></div>{{end}}
+    </div>
+
+    <!-- Pending setups -->
+    <div class="today-card">
+      <h2>⚑ <span class="i18n-en">Pending setups</span><span class="i18n-zh">待決 setups</span> <span class="cs-dim">({{len .Pending}})</span></h2>
+      {{if .Pending}}
+        {{range .Pending}}
+        <div class="pend">
+          <span><strong>#{{.ID}}</strong> {{.Symbol}} {{.Dir}} <span class="cs-dim">{{.TF}}</span></span>
+          <span class="cs-dim">entry {{printf "%.2f" .Entry}}</span>
+        </div>
+        {{end}}
+        <div class="today-links"><a href="/setups">→ <span class="i18n-en">Review setups</span><span class="i18n-zh">檢視 setups</span></a></div>
+      {{else}}<div class="today-empty"><span class="i18n-en">Nothing pending.</span><span class="i18n-zh">沒有待決。</span></div>{{end}}
+    </div>
+
+    <!-- Daemon health -->
+    <div class="today-card">
+      <h2>🩺 <span class="i18n-en">Daemon health</span><span class="i18n-zh">Daemon 健康</span></h2>
+      <div class="daemon-row">
+        {{range .Daemons}}
+        <span class="daemon"><span class="dot {{if .active}}up{{else}}down{{end}}"></span>{{.name}} <span class="cs-dim">{{.state}}</span></span>
+        {{end}}
+      </div>
+      <div class="today-links">
+        <a href="/">→ <span class="i18n-en">Scan</span><span class="i18n-zh">掃描</span></a>
+        <a href="/chart">→ Chart</a>
+        <a href="/calendar">→ <span class="i18n-en">Calendar</span><span class="i18n-zh">行事曆</span></a>
+        <a href="/ops">→ Ops</a>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
