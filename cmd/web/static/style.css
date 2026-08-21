@@ -5688,3 +5688,17 @@ body { font-size: 15px; letter-spacing: -0.005em; }
     border-color: transparent;
 }
 .pf-tabs, .quick-tabs, .ops-log-tabs { gap: var(--sp-1); }
+
+/* --- reskin cont'd: Dashboard symbol scan → responsive card grid ---
+   Uses the reclaimed desktop width (2-up on wide, 1-up on phone) instead of
+   one tall stack. mini-charts read clientWidth on renderAll() at load, so they
+   size to the grid cell correctly. */
+.symbols-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: var(--sp-4);
+    align-items: start;
+}
+.symbols-section > .section-title { grid-column: 1 / -1; }
+.symbols-section > .symbol-card { margin: 0; }
+.symbol-card .copy-btn.price { font-size: var(--fs-md); font-weight: 700; }
