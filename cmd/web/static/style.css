@@ -5752,3 +5752,41 @@ body { font-size: 15px; letter-spacing: -0.005em; }
 /* Desktop: hide the mobile bar (redundant safety). */
 @media (min-width: 1024px) { .topbar-mobile { display: none; } }
 @media (max-width: 1023.98px) { .sidebar-collapse { display: none; } }
+
+/* =====================================================================
+   ⌘K command palette — jump to any page / symbol / action. Global (in the
+   shared topnav partial). Keyboard-first; modern-fintech skin.
+   ===================================================================== */
+.cmdk-backdrop {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(0,0,0,.45); backdrop-filter: blur(2px);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 12vh;
+}
+.cmdk-backdrop[hidden] { display: none; }
+.cmdk {
+    width: min(560px, 92vw);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+}
+.cmdk-input {
+    width: 100%; box-sizing: border-box;
+    padding: var(--sp-4);
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-size: var(--fs-md);
+    border-bottom: 1px solid var(--border);
+}
+.cmdk-input::placeholder { color: var(--text-dim); }
+.cmdk-list { list-style: none; margin: 0; padding: var(--sp-1); max-height: 52vh; overflow-y: auto; }
+.cmdk-item {
+    display: flex; align-items: baseline; gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+    cursor: pointer;
+}
+.cmdk-item.sel { background: var(--wash-blue); box-shadow: inset 3px 0 0 var(--blue); }
+.cmdk-item:hover { background: var(--row-hover); }
+.cmdk-t { color: var(--text); font-weight: 600; font-size: var(--fs-sm); }
+.cmdk-h { color: var(--text-dim); font-size: var(--fs-xs); }

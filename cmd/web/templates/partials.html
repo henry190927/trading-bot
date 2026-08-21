@@ -58,4 +58,54 @@
     if (reo) reo.addEventListener('click', function () { setCol(false); });
   })();
 </script>
+
+<div class="cmdk-backdrop" id="cmdk-backdrop" hidden>
+  <div class="cmdk" role="dialog" aria-label="command palette" aria-modal="true">
+    <input class="cmdk-input" id="cmdk-input" type="text" placeholder="跳到… 頁面 / 標的 / 動作 (⌘K)" autocomplete="off" spellcheck="false">
+    <ul class="cmdk-list" id="cmdk-list"></ul>
+  </div>
+</div>
+<script>
+  (function () {
+    var CMDS = [
+      {t:'Today', h:'home', u:'/today'}, {t:'Scan', h:'dashboard', u:'/'},
+      {t:'Chart', h:'', u:'/chart'}, {t:'Validate', h:'', u:'/validate'},
+      {t:'Portfolio', h:'journal', u:'/journal'}, {t:'New journal entry', h:'record', u:'/journal/new'},
+      {t:'Setups', h:'forward-log', u:'/setups'}, {t:'Tips', h:'', u:'/tips'},
+      {t:'Stocks', h:'US / TW fundamentals', u:'/fundamentals'}, {t:'Calendar', h:'macro', u:'/calendar'},
+      {t:'On-chain', h:'', u:'/onchain'}, {t:'Ops', h:'daemons', u:'/ops'},
+      {t:'Chart · BTC', h:'symbol', u:'/chart?symbol=BTC'}, {t:'Chart · ETH', h:'symbol', u:'/chart?symbol=ETH'},
+      {t:'Chart · XAU', h:'symbol', u:'/chart?symbol=XAU'}, {t:'Chart · XAG', h:'symbol', u:'/chart?symbol=XAG'},
+      {t:'Chart · SNDK', h:'symbol', u:'/chart?symbol=SNDK'}, {t:'Chart · NVDA', h:'symbol', u:'/chart?symbol=NVDA'},
+      {t:'Toggle theme', h:'slate / industrial', a:'theme'}, {t:'Toggle language', h:'EN / 繁', a:'lang'}
+    ];
+    var bd=document.getElementById('cmdk-backdrop'), inp=document.getElementById('cmdk-input'), list=document.getElementById('cmdk-list');
+    if(!bd||!inp||!list) return;
+    var sel=0, filtered=CMDS;
+    function fuzzy(q,s){ q=q.toLowerCase(); s=s.toLowerCase(); var i=0; for(var j=0;j<s.length&&i<q.length;j++){ if(s[j]===q[i]) i++; } return i===q.length; }
+    function render(){
+      list.innerHTML='';
+      filtered.forEach(function(c,i){
+        var li=document.createElement('li'); li.className='cmdk-item'+(i===sel?' sel':'');
+        li.innerHTML='<span class="cmdk-t">'+c.t+'</span>'+(c.h?'<span class="cmdk-h">'+c.h+'</span>':'');
+        li.addEventListener('click',function(){ run(c); });
+        list.appendChild(li);
+      });
+    }
+    function refilter(){ var q=inp.value.trim(); filtered=q?CMDS.filter(function(c){return fuzzy(q,c.t+' '+(c.h||''));}):CMDS; sel=0; render(); }
+    function open(){ bd.hidden=false; inp.value=''; refilter(); setTimeout(function(){inp.focus();},0); }
+    function close(){ bd.hidden=true; }
+    function run(c){ close(); if(c.u){ location.href=c.u; } else if(c.a==='theme'){ var b=document.querySelector('.theme-toggle'); if(b)b.click(); } else if(c.a==='lang'){ var b=document.querySelector('.lang-toggle'); if(b)b.click(); } }
+    document.addEventListener('keydown',function(e){
+      if((e.metaKey||e.ctrlKey)&&e.key==='k'){ e.preventDefault(); bd.hidden?open():close(); return; }
+      if(bd.hidden) return;
+      if(e.key==='Escape'){ close(); }
+      else if(e.key==='ArrowDown'){ e.preventDefault(); sel=Math.min(sel+1,filtered.length-1); render(); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); sel=Math.max(sel-1,0); render(); }
+      else if(e.key==='Enter'){ e.preventDefault(); if(filtered[sel]) run(filtered[sel]); }
+    });
+    inp.addEventListener('input',refilter);
+    bd.addEventListener('click',function(e){ if(e.target===bd) close(); });
+  })();
+</script>
 {{end}}
