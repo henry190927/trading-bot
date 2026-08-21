@@ -5790,3 +5790,65 @@ body { font-size: 15px; letter-spacing: -0.005em; }
 .cmdk-item:hover { background: var(--row-hover); }
 .cmdk-t { color: var(--text); font-weight: 600; font-size: var(--fs-sm); }
 .cmdk-h { color: var(--text-dim); font-size: var(--fs-xs); }
+
+/* =====================================================================
+   Data-board mobile card-view — fundamentals / tw wide tables (.fund-table)
+   collapse to stacked cards on phones. Standard data-label pattern: thead
+   hidden, each row → a card, each cell shows its column via ::before. Scoped
+   to .fund-table so setups / other .dt tables are untouched.
+   ===================================================================== */
+.fund-cell-name { display: none; }  /* desktop: TW name lives in its own column */
+
+@media (max-width: 640px) {
+    .dt-scroll:has(.fund-table) { border: none; overflow: visible; }
+    .fund-table thead { display: none; }
+    .fund-table, .fund-table tbody { display: block; width: 100%; }
+    .fund-table tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2px var(--sp-3);
+        padding: var(--sp-3);
+        margin-bottom: var(--sp-3);
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: var(--surface);
+    }
+    .fund-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: var(--sp-2);
+        padding: 2px 0;
+        border: none;
+        white-space: normal;
+        font-size: var(--fs-sm);
+    }
+    .fund-table td::before {
+        content: attr(data-label);
+        color: var(--text-dim);
+        font-size: var(--fs-xs);
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        flex: 0 0 auto;
+    }
+    .fund-table td[colspan] { grid-column: 1 / -1; }
+    /* Symbol = card header: full width, bigger, no label prefix */
+    .fund-table td.fund-cell-sym {
+        grid-column: 1 / -1;
+        font-size: var(--fs-lg);
+        padding-bottom: var(--sp-1);
+        margin-bottom: var(--sp-1);
+        border-bottom: 1px solid var(--border);
+        justify-content: flex-start;
+    }
+    .fund-table td.fund-cell-sym::before { display: none; }
+    .fund-table .fund-cell-name {
+        display: inline; margin-left: var(--sp-2);
+        color: var(--text-dim); font-weight: 400; font-size: var(--fs-sm);
+    }
+    .fund-table td.fund-cell-nametd { display: none; }  /* TW name folded into header */
+    /* Rating + Note span the full card width */
+    .fund-table td[data-label="Rating"],
+    .fund-table td.fund-note { grid-column: 1 / -1; justify-content: flex-start; }
+    .fund-table td.fund-note::before { margin-right: var(--sp-2); }
+}

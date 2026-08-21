@@ -86,21 +86,21 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><strong>{{.Symbol}}</strong></td>
+          <td class="fund-cell-sym"><strong>{{.Symbol}}</strong></td>
           {{if .Err}}
             <td colspan="11" class="cs-dim">{{.Err}}</td>
           {{else}}
-            <td><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if .Rich}} <span class="fund-badge fund-avoid" title="strong quality but very expensive — trim / sell into strength">rich</span>{{end}}{{if eq .Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
-            <td class="{{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
-            <td class="{{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
-            <td class="cs-dim">{{printf "%.0f" .Growth}}/{{printf "%.0f" .Profitability}}/{{printf "%.0f" .BalanceSheet}}</td>
-            <td>{{if .PE}}{{printf "%.1f" .PE}}{{else}}—{{end}}</td>
-            <td>{{if .PS}}{{printf "%.1f" .PS}}{{else}}—{{end}}</td>
-            <td class="{{if ge .RevGrowthYoY 10.0}}r-pos{{else if lt .RevGrowthYoY 0.0}}r-neg{{end}}">{{printf "%.0f" .RevGrowthYoY}}%</td>
-            <td class="{{if ge .NetMargin 10.0}}r-pos{{else if lt .NetMargin 0.0}}r-neg{{end}}">{{printf "%.0f" .NetMargin}}%</td>
-            <td class="{{if le .DebtToEquity 1.0}}r-pos{{else if gt .DebtToEquity 2.0}}r-neg{{end}}">{{printf "%.2f" .DebtToEquity}}</td>
-            <td>{{if .NextEarnings}}{{.NextEarnings.DatetimeUTC.Format "01-02"}} <span class="cs-dim">({{.DaysToER}}d {{.NextEarnings.When}})</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-            <td class="fund-note">{{.Note}}</td>
+            <td data-label="Rating"><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if .Rich}} <span class="fund-badge fund-avoid" title="strong quality but very expensive — trim / sell into strength">rich</span>{{end}}{{if eq .Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
+            <td data-label="Quality" class="{{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
+            <td data-label="Valuation" class="{{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
+            <td data-label="g/p/b" class="cs-dim">{{printf "%.0f" .Growth}}/{{printf "%.0f" .Profitability}}/{{printf "%.0f" .BalanceSheet}}</td>
+            <td data-label="P/E">{{if .PE}}{{printf "%.1f" .PE}}{{else}}—{{end}}</td>
+            <td data-label="P/S">{{if .PS}}{{printf "%.1f" .PS}}{{else}}—{{end}}</td>
+            <td data-label="Rev YoY" class="{{if ge .RevGrowthYoY 10.0}}r-pos{{else if lt .RevGrowthYoY 0.0}}r-neg{{end}}">{{printf "%.0f" .RevGrowthYoY}}%</td>
+            <td data-label="Net M" class="{{if ge .NetMargin 10.0}}r-pos{{else if lt .NetMargin 0.0}}r-neg{{end}}">{{printf "%.0f" .NetMargin}}%</td>
+            <td data-label="D/E" class="{{if le .DebtToEquity 1.0}}r-pos{{else if gt .DebtToEquity 2.0}}r-neg{{end}}">{{printf "%.2f" .DebtToEquity}}</td>
+            <td data-label="Next ER">{{if .NextEarnings}}{{.NextEarnings.DatetimeUTC.Format "01-02"}} <span class="cs-dim">({{.DaysToER}}d {{.NextEarnings.When}})</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+            <td data-label="Note" class="fund-note">{{.Note}}</td>
           {{end}}
         </tr>
         {{end}}
