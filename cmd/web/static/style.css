@@ -5666,3 +5666,25 @@ body { font-size: 15px; letter-spacing: -0.005em; }
 
 /* Chart cards inherit the rounder/softer look too. */
 .chart-header, .chart-struct-panel, .chart-one-liner, .chart-side { border-radius: var(--r-md); }
+
+/* --- reskin cont'd: headings + tab families that the first pass missed --- */
+/* Dashboard section headings */
+.section-title { font-size: var(--fs-lg); font-weight: 800; letter-spacing: -0.01em; }
+
+/* Nav "tabs" — rounded, soft hover, pill active */
+.topnav a { border-radius: var(--r-pill); padding: 6px 12px; transition: background var(--t-fast), color var(--t-fast); }
+.topnav a:hover { background: var(--wash-dim); color: var(--text); }
+.topnav a.active { background: var(--blue); color: var(--on-accent); font-weight: 700; }
+
+/* Segmented tab families (journal / chart-modal / ops logs) — pill active */
+.pf-tab, .quick-tab, .ops-log-tab {
+    border-radius: var(--r-pill);
+    transition: background var(--t-fast), color var(--t-fast);
+}
+.pf-tab.active, .quick-tab.is-active, .ops-log-tab.active {
+    background: var(--blue);
+    color: var(--on-accent);
+    font-weight: 700;
+    border-color: transparent;
+}
+.pf-tabs, .quick-tabs, .ops-log-tabs { gap: var(--sp-1); }
