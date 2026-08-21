@@ -5852,3 +5852,68 @@ body { font-size: 15px; letter-spacing: -0.005em; }
     .fund-table td.fund-note { grid-column: 1 / -1; justify-content: flex-start; }
     .fund-table td.fund-note::before { margin-right: var(--sp-2); }
 }
+
+/* =====================================================================
+   Global polish (phase 3): toast · focus-visible ring · skeleton loaders.
+   ===================================================================== */
+
+/* --- Global toast: window.toast(msg, kind, ms). Container + script live in
+   the shared topnav partial so every page can call it. --------------- */
+.toast-stack {
+    position: fixed; right: var(--sp-4); bottom: var(--sp-4); z-index: 80;
+    display: flex; flex-direction: column; gap: var(--sp-2);
+    max-width: min(360px, 90vw); pointer-events: none;
+}
+.toast {
+    pointer-events: auto;
+    display: flex; align-items: flex-start; gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--text-dim);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-2);
+    color: var(--text); font-size: var(--fs-sm);
+    animation: toast-in var(--t-fast, .15s) ease-out;
+}
+.toast.leaving { animation: toast-out .2s ease-in forwards; }
+.toast.ok   { border-left-color: var(--green); }
+.toast.err  { border-left-color: var(--red); }
+.toast.warn { border-left-color: var(--yellow); }
+.toast.info { border-left-color: var(--blue); }
+.toast-ico { flex: 0 0 auto; font-weight: 700; }
+.toast.ok .toast-ico   { color: var(--green); }
+.toast.err .toast-ico  { color: var(--red); }
+.toast.warn .toast-ico { color: var(--yellow); }
+.toast.info .toast-ico { color: var(--blue); }
+@keyframes toast-in  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(12px); } }
+@media (prefers-reduced-motion: reduce) { .toast, .toast.leaving { animation: none; } }
+
+/* --- Keyboard focus ring (only on :focus-visible, never on mouse click).
+   Uses the --focus double-ring token; appended last so it layers over the
+   intentional border-color focus styles for keyboard users. -------- */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, summary:focus-visible,
+[tabindex]:focus-visible, .cmdk-item:focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+    border-radius: var(--r-sm);
+}
+
+/* --- Skeleton loaders: .skeleton shimmer utility + .skel-line rows. --- */
+.skeleton {
+    position: relative; overflow: hidden;
+    background: var(--wash-dim);
+    border-radius: var(--r-sm);
+}
+.skeleton::after {
+    content: ''; position: absolute; inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--row-hover), transparent);
+    animation: skeleton-sweep 1.2s ease-in-out infinite;
+}
+@keyframes skeleton-sweep { 100% { transform: translateX(100%); } }
+.skel-line { height: .78em; margin: .55em 0; border-radius: var(--r-sm); }
+.skel-line.w90 { width: 90%; } .skel-line.w70 { width: 70%; } .skel-line.w50 { width: 50%; }
+@media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }

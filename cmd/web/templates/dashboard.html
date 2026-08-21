@@ -636,7 +636,12 @@ window.refreshMgr = (function () {
                 panePaused();
             }
             if (pane.dataset.loaded === '1') return;
-            pane.innerHTML = '<em class="ai-loading">Querying Quant advisor for ' + sym + ' ' + tf + '…</em>';
+            pane.innerHTML =
+                '<div class="ai-loading">Querying Quant advisor for ' + sym + ' ' + tf + '…</div>' +
+                '<div class="skeleton skel-line w90"></div>' +
+                '<div class="skeleton skel-line w70"></div>' +
+                '<div class="skeleton skel-line w90"></div>' +
+                '<div class="skeleton skel-line w50"></div>';
             btn.disabled = true;
             fetch('/ai/analyze/symbol/' + sym + '/' + tf, { method: 'POST' })
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })

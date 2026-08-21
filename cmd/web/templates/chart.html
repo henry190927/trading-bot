@@ -1209,7 +1209,7 @@
         if (!btn) return;
         btn.addEventListener('click', function () {
             var s = lastStructure;
-            if (!s) { alert('目前沒有結構資料可記'); return; }
+            if (!s) { (window.toast ? window.toast('目前沒有結構資料可記', 'warn') : alert('目前沒有結構資料可記')); return; }
             var z = s.zone;
             var body = {
                 symbol: currentSym(), tf: currentTF(),
