@@ -34,6 +34,12 @@
   };
 
   function cur() { return root.getAttribute('data-lang') === 'zh' ? 'zh' : 'en'; }
+  // Keep the real <html lang> in sync with the active UI language (a11y/SEO).
+  // Templates hardcode lang="en" server-side; this makes it authoritative &
+  // dynamic. Runs at top level (defer → after parse) so it tracks the value
+  // the no-flash inline <head> script already set.
+  function syncHtmlLang() { root.setAttribute('lang', cur() === 'zh' ? 'zh-Hant' : 'en'); }
+  syncHtmlLang();
   // Global lookup: current lang → en fallback → raw key.
   window.t = function (k) { var L = cur(); return (DICT[L] && DICT[L][k]) || DICT.en[k] || k; };
 
@@ -52,6 +58,7 @@
 
   function setLang(L) {
     root.setAttribute('data-lang', L);
+    syncHtmlLang();
     try { localStorage.setItem(KEY, L); } catch (e) {}
     apply();
   }
