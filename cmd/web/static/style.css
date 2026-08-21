@@ -5917,3 +5917,47 @@ select:focus-visible, textarea:focus-visible, summary:focus-visible,
 .skel-line { height: .78em; margin: .55em 0; border-radius: var(--r-sm); }
 .skel-line.w90 { width: 90%; } .skel-line.w70 { width: 70%; } .skel-line.w50 { width: 50%; }
 @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
+
+/* --- Density toggle (phase 3): cozy (default) <-> compact. html[data-density]
+   set by the script in the shared topnav partial; button injects into
+   #sidebar-foot next to theme/lang. Compact tightens the data tables. ----- */
+.density-toggle {
+    align-self: center;
+    background: var(--surface-2);
+    color: var(--blue);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 100ms ease, color 100ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.density-toggle:hover { border-color: var(--blue); color: var(--blue); }
+.density-toggle.floating {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 8px);
+    right: 10px; z-index: 50;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.sidebar-foot .density-toggle { position: static; }
+
+/* Compact: tighten canonical data tables (biggest density win). Scoped to
+   tables so cards/forms keep their comfortable spacing. */
+html[data-density="compact"] .dt th,
+html[data-density="compact"] .dt td,
+html[data-density="compact"] .setups-table th,
+html[data-density="compact"] .setups-table td {
+    padding: 1px var(--sp-2);
+}
+html[data-density="compact"] .dt,
+html[data-density="compact"] .setups-table {
+    font-size: var(--fs-xs);
+}
+/* Never compact the mobile card-view (it needs the roominess to read). */
+@media (max-width: 640px) {
+    html[data-density="compact"] .fund-table td { padding: 2px 0; font-size: var(--fs-sm); }
+}

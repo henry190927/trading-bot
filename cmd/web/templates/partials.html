@@ -77,7 +77,8 @@
       {t:'Chart · BTC', h:'symbol', u:'/chart?symbol=BTC'}, {t:'Chart · ETH', h:'symbol', u:'/chart?symbol=ETH'},
       {t:'Chart · XAU', h:'symbol', u:'/chart?symbol=XAU'}, {t:'Chart · XAG', h:'symbol', u:'/chart?symbol=XAG'},
       {t:'Chart · SNDK', h:'symbol', u:'/chart?symbol=SNDK'}, {t:'Chart · NVDA', h:'symbol', u:'/chart?symbol=NVDA'},
-      {t:'Toggle theme', h:'slate / industrial', a:'theme'}, {t:'Toggle language', h:'EN / 繁', a:'lang'}
+      {t:'Toggle theme', h:'slate / industrial', a:'theme'}, {t:'Toggle language', h:'EN / 繁', a:'lang'},
+      {t:'Toggle density', h:'cozy / compact', a:'density'}
     ];
     var bd=document.getElementById('cmdk-backdrop'), inp=document.getElementById('cmdk-input'), list=document.getElementById('cmdk-list');
     if(!bd||!inp||!list) return;
@@ -95,7 +96,7 @@
     function refilter(){ var q=inp.value.trim(); filtered=q?CMDS.filter(function(c){return fuzzy(q,c.t+' '+(c.h||''));}):CMDS; sel=0; render(); }
     function open(){ bd.hidden=false; inp.value=''; refilter(); setTimeout(function(){inp.focus();},0); }
     function close(){ bd.hidden=true; }
-    function run(c){ close(); if(c.u){ location.href=c.u; } else if(c.a==='theme'){ var b=document.querySelector('.theme-toggle'); if(b)b.click(); } else if(c.a==='lang'){ var b=document.querySelector('.lang-toggle'); if(b)b.click(); } }
+    function run(c){ close(); if(c.u){ location.href=c.u; } else if(c.a==='theme'){ var b=document.querySelector('.theme-toggle'); if(b)b.click(); } else if(c.a==='lang'){ var b=document.querySelector('.lang-toggle'); if(b)b.click(); } else if(c.a==='density'){ var b=document.querySelector('.density-toggle'); if(b)b.click(); } }
     document.addEventListener('keydown',function(e){
       if((e.metaKey||e.ctrlKey)&&e.key==='k'){ e.preventDefault(); bd.hidden?open():close(); return; }
       if(bd.hidden) return;
@@ -129,6 +130,26 @@
       t.addEventListener('click', dismiss);
       return t;
     };
+  })();
+</script>
+<script>
+  (function () {
+    var KEY = 'tw-density', root = document.documentElement;
+    function cur() { return root.getAttribute('data-density') === 'compact' ? 'compact' : 'cozy'; }
+    try { if (localStorage.getItem(KEY) === 'compact') root.setAttribute('data-density', 'compact'); } catch (e) {}
+    function label(d) { return d === 'compact' ? '\u25A4 Compact' : '\u25A6 Cozy'; }
+    function apply(d) {
+      if (d === 'compact') root.setAttribute('data-density', 'compact'); else root.removeAttribute('data-density');
+      try { localStorage.setItem(KEY, d); } catch (e) {}
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'density-toggle';
+      btn.textContent = label(cur()); btn.title = '\u8868\u683C\u758F\u5BC6\u5207\u63DB';
+      btn.addEventListener('click', function () { var n = cur() === 'compact' ? 'cozy' : 'compact'; apply(n); btn.textContent = label(n); });
+      var bar = document.querySelector('#sidebar-foot') || document.querySelector('header.topbar');
+      if (bar) bar.appendChild(btn); else { btn.classList.add('floating'); document.body.appendChild(btn); }
+    });
   })();
 </script>
 {{end}}
