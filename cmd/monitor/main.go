@@ -121,6 +121,8 @@ func main() {
 	// entries (separate cadence from the confluence scan). No-op if
 	// NTFY_TOPIC is unset. Zones live in /opt/trading/zones.json.
 	go runZoneAlerts(ctx, client)
+	go runMacroWarn(ctx)
+	go runStructureAlerts(ctx, client)
 
 	dedup := newDedupSet()
 	ratioMsg := "off"
