@@ -27,7 +27,7 @@
 
     // Prefer the top bar; fall back to a floating control on pages
     // without one (e.g. the full-screen chart view).
-    var bar = document.querySelector('header.topbar');
+    var bar = document.querySelector('#sidebar-foot') || document.querySelector('header.topbar');
     if (bar) {
       bar.appendChild(btn);
     } else {

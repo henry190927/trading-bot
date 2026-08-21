@@ -1,7 +1,6 @@
 {{define "topnav"}}
-<header class="topbar">
-  <div class="brand">Trading</div>
-  <button type="button" class="nav-burger" id="nav-burger" aria-label="menu" aria-expanded="false">☰</button>
+<aside class="sidebar" id="sidebar">
+  <a class="sidebar-brand" href="/today"><span class="brand-mark">◈</span><span class="brand-text">Terminal</span></a>
   <nav class="topnav" id="topnav">
     <a href="/today" data-i18n="nav.today">Today</a>
     <a href="/" data-i18n="nav.dashboard">Scan</a>
@@ -27,19 +26,25 @@
       <a href="/ops" data-i18n="nav.ops">Ops</a>
     </div>
   </nav>
+  <div class="sidebar-foot" id="sidebar-foot"></div>
+</aside>
+<header class="topbar-mobile">
+  <button type="button" class="nav-burger" id="nav-burger" aria-label="menu" aria-expanded="false">☰</button>
+  <a class="brand" href="/today"><span class="brand-mark">◈</span> Terminal</a>
 </header>
+<div class="sidebar-scrim" id="sidebar-scrim"></div>
 <script>
   (function () {
-    var b = document.getElementById('nav-burger'), n = document.getElementById('topnav');
-    if (!b || !n) return;
+    var side = document.getElementById('sidebar'), b = document.getElementById('nav-burger'), scrim = document.getElementById('sidebar-scrim');
+    if (!side || !b) return;
+    function close() { side.classList.remove('open'); if (scrim) scrim.classList.remove('show'); b.setAttribute('aria-expanded', 'false'); }
     b.addEventListener('click', function () {
-      var open = n.classList.toggle('open');
+      var open = side.classList.toggle('open');
+      if (scrim) scrim.classList.toggle('show', open);
       b.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
-    // Close the drawer after navigating (mobile).
-    n.addEventListener('click', function (e) {
-      if (e.target.tagName === 'A') { n.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); }
-    });
+    if (scrim) scrim.addEventListener('click', close);
+    side.addEventListener('click', function (e) { if (e.target.tagName === 'A') close(); });
   })();
 </script>
 {{end}}

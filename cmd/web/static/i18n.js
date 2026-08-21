@@ -73,7 +73,7 @@
     btn.textContent = window.t('lang.toggle');
     btn.title = window.t('lang.title');
     btn.addEventListener('click', function () { setLang(cur() === 'zh' ? 'en' : 'zh'); });
-    var bar = document.querySelector('header.topbar');
+    var bar = document.querySelector('#sidebar-foot') || document.querySelector('header.topbar');
     if (bar) bar.appendChild(btn);
     else { btn.classList.add('floating'); document.body.appendChild(btn); }
   });
