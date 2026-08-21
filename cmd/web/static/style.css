@@ -57,9 +57,10 @@
     --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px; --fs-md: 15px;
     --fs-lg: 18px; --fs-xl: 24px; --fs-2xl: 34px;
     --lh-tight: 1.25; --lh-base: 1.5;
-    --r-sm: 4px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+    --r-sm: 6px; --r-md: 12px; --r-lg: 18px; --r-pill: 999px;
     --shadow-1: 0 1px 2px rgba(0,0,0,.3);
     --shadow-2: 0 6px 18px rgba(0,0,0,.5);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.2), 0 10px 30px rgba(0,0,0,.22);
     --t-fast: 120ms;
     --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--blue);
 
@@ -5598,3 +5599,70 @@ main { overflow-x: hidden; }
     .chart-side-toggle { display: none; }
     .chart-side .chart-header { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* =====================================================================
+   MODERN FINTECH RESKIN (Coinbase/Robinhood direction) — global override
+   layer. Spacious, rounded, soft-shadowed, big headings, friendly.
+   Appended last so it wins on source order; dark-first + token-driven;
+   easy to revert as one block.
+   ===================================================================== */
+
+/* Softer, friendlier dark ground + a touch more surface separation. */
+:root, :root[data-theme="slate"] {
+    --bg: #0a0c10;
+    --surface: #14181f;
+    --surface-2: #1c222c;
+}
+
+body { font-size: 15px; letter-spacing: -0.005em; }
+
+/* Cards — the workhorse. Rounder, roomier, soft elevation. */
+.stats-card,
+.trade-card,
+.symbol-card,
+.tile {
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+}
+.stats-card { padding: var(--sp-5); margin-bottom: var(--sp-4); }
+
+/* Content width — free the boards/tips from the old 720px cage. */
+.tips-main { max-width: 1200px; padding: var(--sp-5) clamp(var(--sp-3), 4vw, var(--sp-6)) var(--sp-8); }
+
+/* Headings — bigger, bolder, friendly. */
+.tips-h1 { font-size: var(--fs-2xl); font-weight: 800; letter-spacing: -0.02em; gap: var(--sp-1); }
+.tips-h1 .tips-sub { font-size: var(--fs-md); }
+.page-title { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.02em; }
+
+/* Buttons — rounded, comfortable, filled primary. */
+.btn-primary {
+    border-radius: var(--r-pill);
+    padding: 10px 20px;
+    font-weight: 700;
+    background: var(--blue);
+    color: var(--on-accent);
+    border: none;
+}
+.ai-analyze-btn, .btn-cancel, .setups-refresh, .info-btn {
+    border-radius: var(--r-pill);
+}
+.copy-btn { border-radius: var(--r-md); }
+
+/* TF pills + segmented toggles — fully rounded chips. */
+.tf-pill, .tf-picker a, .tf-picker .tf-active { border-radius: var(--r-pill); }
+.market-toggle { border-radius: var(--r-pill); }
+.market-toggle a { padding: var(--sp-2) var(--sp-5); }
+
+/* Badges/chips — pill-soft. */
+.badge, .fund-badge, .outcome-badge, .side-badge, .score, .tw-yield, .cal-cat, .cal-status { border-radius: var(--r-pill); }
+
+/* Topbar — cleaner, a hair taller, soft divider. */
+.topbar { padding: var(--sp-3) clamp(var(--sp-3), 4vw, var(--sp-6)); backdrop-filter: blur(8px); background: rgba(var(--bg-rgb), .82); }
+.brand { font-size: var(--fs-md); font-weight: 800; letter-spacing: -0.01em; }
+
+/* Data tables — rounded container feel via the scroll wrapper. */
+.dt-scroll { border: 1px solid var(--border); border-radius: var(--r-md); }
+.dt-scroll .setups-table th:first-child, .dt-scroll .dt th:first-child { border-top-left-radius: var(--r-md); }
+
+/* Chart cards inherit the rounder/softer look too. */
+.chart-header, .chart-struct-panel, .chart-one-liner, .chart-side { border-radius: var(--r-md); }
