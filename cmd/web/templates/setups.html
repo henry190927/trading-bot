@@ -32,7 +32,7 @@
       <div><span class="lbl">Real hit-rate</span><span class="val {{if lt .Stats.RealHitRate .Stats.HitRate}}r-neg{{else}}r-pos{{end}}">{{printf "%.0f" .Stats.RealHitRate}}%</span></div>
       <div><span class="lbl">no-fill</span><span class="val r-zero">{{.Stats.RealNoFill}}</span></div>
     </div>
-    <p class="glossary-hint" style="margin-top:.6rem">
+    <p class="glossary-hint">
       <b>Hit-rate</b>(收盤判定)= 讀盤方向對不對:Win = 收破 target;Loss = 收破 stop;Expired = 20 根未觸;Skip = 你決定不進。
       <b>Real hit-rate</b>(盤中 first-touch + fill 判定)= 真照這 entry/stop 交易會不會賺:看 stop / target 誰先被 wick 觸及、entry 有沒有填(no-fill = 沒填到)。
       <b>兩者落差 = 執行/停損品質</b> —— Real 明顯低於 Hit-rate = 讀盤對但停損常被先掃(停太緊 / entry 時機差)。都記,避免倖存者偏差。
@@ -62,7 +62,7 @@
       </tbody>
     </table>
     </div>
-    <p class="glossary-hint" style="margin-top:.5rem">
+    <p class="glossary-hint">
       命中率 = Win ÷ (Win+Loss),只計已定案。<b>用法</b>:<b>衝突 + neutral</b> 命中低 → 聽 engine、別追 N struct;<b>衝突 + 趨勢</b> → N struct 可能對(engine 滯後);<b>同意</b> → 最高信心。樣本要夠才可信。
     </p>
   </div>
@@ -116,9 +116,12 @@
   document.getElementById('setups-refresh').addEventListener('click', function () {
     var b = this; b.disabled = true; b.textContent = '回填中…';
     fetch('/api/setups/refresh', { method: 'POST' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { location.reload(); })
-      .catch(function () { b.disabled = false; b.textContent = '↻ 回填 outcome'; });
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (d) { if (window.toast) window.toast('outcome 回填完成', 'ok'); location.reload(); })
+      .catch(function (e) {
+        b.disabled = false; b.textContent = '↻ 回填 outcome';
+        if (window.toast) window.toast('回填失敗:' + (e && e.message ? e.message : 'error'), 'err');
+      });
   });
 </script>
 </body>

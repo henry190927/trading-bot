@@ -31,7 +31,7 @@
   </div>
 
   {{if .NoKey}}
-  <div class="stats-card"><p class="glossary-hint">FINNHUB_KEY 未設定 — 無法抓基本面。</p></div>
+  <div class="stats-card"><p class="glossary-hint"><span class="i18n-en">FINNHUB_KEY not set — cannot fetch fundamentals.</span><span class="i18n-zh">FINNHUB_KEY 未設定 — 無法抓基本面。</span></p></div>
   {{else}}
   <div class="stats-card">
     {{if eq .Mode "universe"}}
@@ -108,7 +108,7 @@
       </tbody>
     </table>
     </div>
-    <p class="glossary-hint" style="margin-top:.6rem">
+    <p class="glossary-hint">
       <span class="i18n-en">Quality = growth·profitability·balance-sheet (0-100). Valuation = higher is cheaper. Not a trade signal — spot / buy-hold candidates only.</span>
       <span class="i18n-zh">Quality = 成長·獲利·資產負債(0-100)。Valuation 越高越便宜。非交易訊號 —— 現貨 / buy-hold 候選。</span>
       <br>Updated: {{.Updated}}

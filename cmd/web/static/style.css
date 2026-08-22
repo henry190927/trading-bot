@@ -1436,7 +1436,7 @@ footer {
 .glossary-arrow.up   { color: var(--green); }
 .glossary-arrow.down { color: var(--red); }
 .glossary-hint {
-    margin: 1rem 0 0;
+    margin: var(--sp-3) 0 0;
     color: var(--text-dim);
     font-size: 0.78rem;
     padding-top: 0.6rem;
@@ -6036,4 +6036,10 @@ html[data-density="compact"] .setups-table {
     }
     .chart-controls .layer-chip,
     .chart-controls .tf-pill { padding-top: 6px; padding-bottom: 6px; }
+}
+
+/* audit C2: the ⓘ legend button is a 22px circle — bump the touch target on
+   phones (visual size stays compact on desktop). */
+@media (max-width: 1023.98px) {
+    .info-btn { width: 32px; height: 32px; }
 }
