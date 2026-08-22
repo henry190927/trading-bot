@@ -5215,7 +5215,14 @@ main { overflow-x: hidden; }
    roomier tokenized cells, sticky dim-caps header, row hover. */
 .dt, .setups-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
 .dt th, .dt td, .setups-table th, .setups-table td { padding: var(--sp-2) var(--sp-3); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-.dt th, .setups-table th { color: var(--text-dim); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 52px; background: var(--surface); z-index: 1; }
+/* Sticky column header. top:0 on desktop (left-sidebar layout = NO top bar);
+   the old top:52px was for the retired horizontal topnav and left the header
+   floating 52px below the viewport (the "跑版" on setups / stock boards).
+   On mobile a compact .topbar-mobile (~48px) sits at top:0, so tuck below it. */
+.dt th, .setups-table th { color: var(--text-dim); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+@media (max-width: 1023.98px) {
+    .dt th, .setups-table th { top: 48px; }
+}
 .dt tbody tr:hover, .setups-table tbody tr:hover { background: var(--row-hover); }
 .dt td.cs-dim, .setups-table td.cs-dim { color: var(--text-dim); }
 .setups-table .dir-neutral { color: var(--text-dim); }
