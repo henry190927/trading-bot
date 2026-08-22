@@ -70,10 +70,13 @@
       if (sortCol === col) sortDir = -sortDir; else { sortCol = col; sortDir = 1; }
       rows.sort(function (r1, r2) { return cmp(cellVal(r1, col), cellVal(r2, col)) * sortDir; });
       rows.forEach(function (r) { tbody.appendChild(r); });   // reorder DOM
-      // header arrows
+      // header arrows + aria-sort (only on sortable headers)
       for (var i = 0; i < headCells.length; i++) {
         var ar = headCells[i].querySelector('.tk-arrow');
         if (ar) ar.textContent = (i === col) ? (sortDir > 0 ? ' ▲' : ' ▼') : '';
+        if (headCells[i].classList.contains('tk-sortable')) {
+          headCells[i].setAttribute('aria-sort', i === col ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
+        }
       }
       page = 1; renderPage();
     }
@@ -81,9 +84,17 @@
       var th = headCells[i];
       if (th.hasAttribute('data-nosort') || !(th.textContent || '').trim()) continue;
       th.classList.add('tk-sortable');
+      th.setAttribute('tabindex', '0');
+      th.setAttribute('role', 'button');
+      th.setAttribute('aria-sort', 'none');
       var arrow = document.createElement('span'); arrow.className = 'tk-arrow';
       th.appendChild(arrow);
-      (function (col) { th.addEventListener('click', function () { applySort(col); }); })(i);
+      (function (col) {
+        th.addEventListener('click', function () { applySort(col); });
+        th.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); applySort(col); }
+        });
+      })(i);
     }
 
     buildPager();

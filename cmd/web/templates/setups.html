@@ -41,7 +41,7 @@
 
   <div class="stats-card">
     <h2 data-i18n="setups.slice">Engine × Regime 命中率切片</h2>
-    <div style="overflow-x:auto">
+    <div class="dt-scroll">
     <table class="setups-table slice-table">
       <thead>
         <tr><th>engine ＼ regime</th><th data-i18n="setups.r_neutral">neutral 拉鋸</th><th data-i18n="setups.r_trend">趨勢 (HH-HL / LH-LL)</th></tr>
@@ -68,7 +68,7 @@
   </div>
 
   {{if .Setups}}
-  <div style="overflow-x:auto">
+  <div class="dt-scroll">
     <table class="setups-table" data-tablekit data-page="50">
       <thead>
         <tr>

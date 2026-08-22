@@ -2186,6 +2186,20 @@
         });
     })();
 
+    // Surface a data-load failure on the PROMINENT banner (not just the tiny
+    // one-liner) so a half-broken live-trade surface never looks like it's
+    // still "Loading…". Red band + score reset + a toast.
+    function showLoadError(msg) {
+        msg = msg || 'load failed';
+        linerEl.textContent = '⚠ ' + msg;
+        bannerEl.className = 'chart-header band-avoid';
+        if (bannerScoreNum)  bannerScoreNum.textContent = '—';
+        if (bannerScoreBand) bannerScoreBand.textContent = 'error';
+        if (bannerActText)   bannerActText.textContent = '⚠ ' + msg;
+        if (bannerActNote)   bannerActNote.textContent = '';
+        if (window.toast) window.toast(currentSym() + ' ' + currentTF() + ' 載入失敗:' + msg, 'err');
+    }
+
     function load() {
         linerEl.textContent = 'Loading ' + currentSym() + ' ' + currentTF() + '…';
         loadBias();
@@ -2194,7 +2208,7 @@
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
                 if (!res.ok) {
-                    linerEl.textContent = '⚠ ' + (res.body.error || 'load failed');
+                    showLoadError(res.body.error || 'load failed');
                     return;
                 }
                 // applyChart FIRST — populates allCandles + all series
@@ -2209,7 +2223,7 @@
                 applyHeader(res.body);
             })
             .catch(function (e) {
-                linerEl.textContent = '⚠ network: ' + e.message;
+                showLoadError('network: ' + e.message);
             });
     }
 

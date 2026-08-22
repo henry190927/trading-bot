@@ -1,4 +1,4 @@
-/* Theme switcher — industrial (default) <-> slate (original GitHub-dark).
+/* Theme switcher — slate (default GitHub-dark) <-> industrial (amber).
    The <head> inline script already applied the saved theme before paint;
    this only builds the toggle control and persists clicks. */
 (function () {
