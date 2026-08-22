@@ -199,6 +199,15 @@ func Evaluate(in Inputs) Signal {
 		}
 	}
 
+	// Strategy dispatch. StructMomentum symbols (per the strategyFor allowlist,
+	// or forced across the universe by StructMomentumEnabled for A/B) run the
+	// trend/structure-aligned path INSTEAD of the MR body below. The MR body is
+	// unchanged — closed-bar parity preserved. Both share the macro + earnings
+	// blackout gates above. See docs/struct_momentum_strategy_design.md.
+	if StructMomentumEnabled || strategyFor(in.Symbol) == StrategyStructMomentum {
+		return evaluateStructMomentum(in)
+	}
+
 	closes := market.Closes(in.Candles)
 	if len(closes) < 60 {
 		return Signal{Symbol: in.Symbol, Timeframe: in.Timeframe}
