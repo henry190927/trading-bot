@@ -23,6 +23,18 @@ const (
 	// survivors). See isStructureVetoSymbol / isStructureZoneVoteSymbol.
 	SNDKUSDT Symbol = "NCSKSNDK2USD-USDT"
 	NVDAUSDT Symbol = "NCSKNVDA2USD-USDT"
+
+	// Crypto-alt forward-log symbols (StructMomentum thread). Same discipline
+	// as the stock synthetics: DELIBERATELY NOT in All() (out of daemon/ntfy)
+	// until live data clears the ship-gate. SOL/LINK cleared the StructMomentum
+	// A/B strongly, SUI/HYPE marginally; NEAR runs the MR engine (it A/B'd as a
+	// mean-reversion symbol, not momentum). Strategy per (symbol,TF) is set in
+	// signal.strategyFor. See docs/struct_momentum_strategy_design.md.
+	SOLUSDT  Symbol = "SOL-USDT"
+	LINKUSDT Symbol = "LINK-USDT"
+	SUIUSDT  Symbol = "SUI-USDT"
+	HYPEUSDT Symbol = "HYPE-USDT"
+	NEARUSDT Symbol = "NEAR-USDT"
 )
 
 func (s Symbol) IsMetal() bool {

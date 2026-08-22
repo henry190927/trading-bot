@@ -204,7 +204,7 @@ func Evaluate(in Inputs) Signal {
 	// trend/structure-aligned path INSTEAD of the MR body below. The MR body is
 	// unchanged — closed-bar parity preserved. Both share the macro + earnings
 	// blackout gates above. See docs/struct_momentum_strategy_design.md.
-	if StructMomentumEnabled || strategyFor(in.Symbol) == StrategyStructMomentum {
+	if StructMomentumEnabled || strategyFor(in.Symbol, in.Timeframe) == StrategyStructMomentum {
 		return evaluateStructMomentum(in)
 	}
 
@@ -1069,6 +1069,16 @@ func shortName(s market.Symbol) string {
 		return "SNDK"
 	case market.NVDAUSDT:
 		return "NVDA"
+	case market.SOLUSDT:
+		return "SOL"
+	case market.LINKUSDT:
+		return "LINK"
+	case market.SUIUSDT:
+		return "SUI"
+	case market.HYPEUSDT:
+		return "HYPE"
+	case market.NEARUSDT:
+		return "NEAR"
 	}
 	return string(s)
 }

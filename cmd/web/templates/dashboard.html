@@ -171,6 +171,12 @@
     <span class="scan-section-note"><span class="i18n-en">engine only — not in daemon / ntfy</span><span class="i18n-zh">僅引擎讀盤 —— 不進 daemon / ntfy</span></span>
   </div>
   {{end}}
+  {{if eq $i $.AltStart}}
+  <div class="scan-section-label">
+    <span class="i18n-en">Alts · forward-log (StructMomentum)</span><span class="i18n-zh">Alt 幣 · forward-log(順勢結構)</span>
+    <span class="scan-section-note"><span class="i18n-en">SOL/LINK/SUI/HYPE = struct-momentum · NEAR = MR · not in daemon / ntfy</span><span class="i18n-zh">SOL/LINK/SUI/HYPE = 順勢結構 · NEAR = 均值回歸 · 不進 daemon / ntfy</span></span>
+  </div>
+  {{end}}
   <section id="card-{{.Short}}" class="symbol-card {{if hasPlan .Signal}}has-plan{{end}}">
     <div class="card-head">
       <span class="sym">{{.Short}}</span>

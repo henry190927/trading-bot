@@ -6,16 +6,39 @@ import (
 	"myFirstGo/trading-bot/market"
 )
 
-// Every currently-live symbol must default to the MR engine — StructMomentum
-// is opt-in per symbol and none are assigned yet (Phase 1). Locks the
-// "zero day-one behavior change" invariant.
-func TestStrategyForDefaultsToMR(t *testing.T) {
+// The core 4 + stock synthetics must run MR on EVERY timeframe — StructMomentum
+// is assigned only to specific alt (symbol,TF) pairs, and never to a market.All()
+// symbol. Locks "zero daemon/live-core behavior change".
+func TestStrategyForCoreStaysMR(t *testing.T) {
+	tfs := []market.Timeframe{"5m", "15m", "1h", "2h", "4h", "1d"}
 	for _, s := range []market.Symbol{
 		market.BTCUSDT, market.ETHUSDT, market.XAUUSDT, market.XAGUSDT,
-		market.SNDKUSDT, market.NVDAUSDT,
+		market.SNDKUSDT, market.NVDAUSDT, market.NEARUSDT,
 	} {
-		if got := strategyFor(s); got != StrategyMR {
-			t.Errorf("strategyFor(%s) = %v, want StrategyMR", s, got)
+		for _, tf := range tfs {
+			if got := strategyFor(s, tf); got != StrategyMR {
+				t.Errorf("strategyFor(%s, %s) = %v, want StrategyMR", s, tf, got)
+			}
+		}
+	}
+}
+
+// The assigned alt pairs run StructMomentum on their cleared TFs, MR elsewhere.
+func TestStrategyForAltAssignments(t *testing.T) {
+	sm := StrategyStructMomentum
+	cases := []struct {
+		sym  market.Symbol
+		tf   market.Timeframe
+		want StrategyKind
+	}{
+		{market.SOLUSDT, "1h", sm}, {market.SOLUSDT, "2h", sm}, {market.SOLUSDT, "15m", StrategyMR},
+		{market.LINKUSDT, "1h", sm}, {market.LINKUSDT, "2h", sm}, {market.LINKUSDT, "4h", StrategyMR},
+		{market.SUIUSDT, "1h", sm}, {market.SUIUSDT, "2h", StrategyMR},
+		{market.HYPEUSDT, "1h", sm}, {market.HYPEUSDT, "2h", StrategyMR},
+	}
+	for _, c := range cases {
+		if got := strategyFor(c.sym, c.tf); got != c.want {
+			t.Errorf("strategyFor(%s, %s) = %v, want %v", c.sym, c.tf, got, c.want)
 		}
 	}
 }

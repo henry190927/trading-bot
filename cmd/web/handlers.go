@@ -129,6 +129,16 @@ func shortSymbol(s market.Symbol) string {
 		return "SNDK"
 	case market.NVDAUSDT:
 		return "NVDA"
+	case market.SOLUSDT:
+		return "SOL"
+	case market.LINKUSDT:
+		return "LINK"
+	case market.SUIUSDT:
+		return "SUI"
+	case market.HYPEUSDT:
+		return "HYPE"
+	case market.NEARUSDT:
+		return "NEAR"
 	}
 	return string(s)
 }
@@ -226,36 +236,45 @@ func (s *server) handleDashboard(c *gin.Context) {
 		tradeable = append(tradeable, t)
 	}
 
-	// Forward-log US-stock engine cards (SNDK+veto / NVDA+zone). Display-only
-	// on Scan — scanned via the SAME scanOne path but deliberately NOT in
-	// market.All(), so they never enter the daemon sweep / ntfy. Appended
-	// after the core 4; the template inserts a section divider at CoreCount.
-	stockScan := uiSymbols[len(market.All()):] // SNDK, NVDA
-	stockTmp := make([]symbolView, len(stockScan))
-	var swg sync.WaitGroup
-	for i, short := range stockScan {
-		sym, err := resolveWebSymbol(short)
-		if err != nil {
-			continue
+	// Forward-log cards. Display-only on Scan — scanned via the SAME scanOne
+	// path but deliberately NOT in market.All(), so they never enter the daemon
+	// sweep / ntfy. Two labelled groups: stock synthetics, then crypto alts
+	// (StructMomentum). The template inserts a divider at CoreCount (stocks)
+	// and AltStart (alts).
+	scanGroup := func(shorts []string) []symbolView {
+		tmp := make([]symbolView, len(shorts))
+		var wg2 sync.WaitGroup
+		for i, short := range shorts {
+			sym, err := resolveWebSymbol(short)
+			if err != nil {
+				continue
+			}
+			wg2.Add(1)
+			go func(idx int, sy market.Symbol) {
+				defer wg2.Done()
+				tmp[idx] = s.scanOne(ctx, sy, timeframe)
+			}(i, sym)
 		}
-		swg.Add(1)
-		go func(idx int, sy market.Symbol) {
-			defer swg.Done()
-			stockTmp[idx] = s.scanOne(ctx, sy, timeframe)
-		}(i, sym)
+		wg2.Wait()
+		out := make([]symbolView, 0, len(tmp))
+		for _, v := range tmp {
+			if v.Short != "" { // skip unresolved / failed slots
+				out = append(out, v)
+			}
+		}
+		return out
 	}
-	swg.Wait()
+	stockViews := scanGroup(fwdStockSymbols)
+	altViews := scanGroup(fwdAltSymbols)
 	scanViews := append([]symbolView{}, views...)
-	for _, v := range stockTmp {
-		if v.Short != "" { // skip unresolved / failed slots
-			scanViews = append(scanViews, v)
-		}
-	}
+	scanViews = append(scanViews, stockViews...)
+	scanViews = append(scanViews, altViews...)
 
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"TF":              tf,
 		"Symbols":         scanViews,
 		"CoreCount":       len(views),
+		"AltStart":        len(views) + len(stockViews),
 		"Tradeable":       tradeable,
 		"OpenTrades":      openTrades,
 		"Now":             time.Now().Format("2006-01-02 15:04:05"),
@@ -3211,8 +3230,18 @@ func resolveWebSymbol(s string) (market.Symbol, error) {
 		return market.SNDKUSDT, nil
 	case "NVDA":
 		return market.NVDAUSDT, nil
+	case "SOL":
+		return market.SOLUSDT, nil
+	case "LINK":
+		return market.LINKUSDT, nil
+	case "SUI":
+		return market.SUIUSDT, nil
+	case "HYPE":
+		return market.HYPEUSDT, nil
+	case "NEAR":
+		return market.NEARUSDT, nil
 	}
-	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG / SNDK / NVDA)", s)
+	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG / SNDK / NVDA / SOL / LINK / SUI / HYPE / NEAR)", s)
 }
 
 // techSideStr renders an engine Side as the "long"/"short"/"flat" string the
@@ -3229,9 +3258,17 @@ func techSideStr(s signal.Side) string {
 }
 
 // uiSymbols is the symbol dropdown for chart + journal forms. Core 4 first,
-// then the forward-log stock synthetics (SNDK+veto / NVDA+zone). NOT the same
-// as market.All() — these stay out of the daemon scan and dashboard cards.
-var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA"}
+// then the forward-log symbols (stock synthetics + crypto-alt StructMomentum
+// candidates). NOT the same as market.All() — the forward-log ones stay out of
+// the daemon scan + ntfy until live data clears the ship-gate.
+var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SOL", "LINK", "SUI", "HYPE", "NEAR"}
+
+// Forward-log groups shown as separate labelled sections on the Scan dashboard
+// (each scanned via scanOne, none in market.All()). Stocks get the fundamental
+// overlay; alts run their assigned strategy (StructMomentum for SOL/LINK/SUI/
+// HYPE per strategyFor, MR for NEAR).
+var fwdStockSymbols = []string{"SNDK", "NVDA"}
+var fwdAltSymbols = []string{"SOL", "LINK", "SUI", "HYPE", "NEAR"}
 
 func defaultStr(v, fallback string) string {
 	if v == "" {

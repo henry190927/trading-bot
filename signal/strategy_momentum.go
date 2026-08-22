@@ -27,14 +27,28 @@ const (
 // existing symbols before any alt is added to strategyFor. Default false.
 var StructMomentumEnabled = false
 
-// strategyFor returns the strategy a symbol runs. Per-symbol allowlist, same
-// pattern as isStructureVetoSymbol. Everything defaults to MR; a symbol opts
-// into StructMomentum ONLY after passing its own A/B gate (none yet — alts are
-// added here in Phase 3 after validation, e.g. `case market.SOLUSDT: return
-// StrategyStructMomentum`).
-func strategyFor(sym market.Symbol) StrategyKind {
+// strategyFor returns the strategy a (symbol, timeframe) runs. Per-(symbol,TF)
+// allowlist — the A/B showed the StructMomentum edge is BOTH symbol- and
+// TF-specific (BTC likes it on 1h not 2h; ETH the reverse), so assignment must
+// be per-pair. Everything defaults to MR; a pair opts into StructMomentum ONLY
+// after clearing its A/B gate (Phase 3, 2026-08-22).
+//
+// Assignments (forward-log only — none of these are in market.All(), so this
+// changes NO daemon/live-core behavior; the core 4 stay MR on every TF):
+//   SOL 1h/2h, LINK 1h/2h — cleared strongly.  SUI 1h, HYPE 1h — marginal
+//   (avoid MR's bleed; forward-log to confirm).  NEAR — MR on all TFs (it
+//   A/B'd as a mean-reversion symbol).  BTC/ETH left on MR pending their own
+//   forward-log decision despite BTC-1h/ETH-2h showing promise.
+func strategyFor(sym market.Symbol, tf market.Timeframe) StrategyKind {
 	switch sym {
-	// (no symbols assigned to StructMomentum yet — Phase 1 validation first)
+	case market.SOLUSDT, market.LINKUSDT:
+		if tf == "1h" || tf == "2h" {
+			return StrategyStructMomentum
+		}
+	case market.SUIUSDT, market.HYPEUSDT:
+		if tf == "1h" {
+			return StrategyStructMomentum
+		}
 	}
 	return StrategyMR
 }
