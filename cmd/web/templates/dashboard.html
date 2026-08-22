@@ -164,7 +164,13 @@
     </div>
   </h2>
 
-{{range .Symbols}}
+{{range $i, $v := .Symbols}}
+  {{if eq $i $.CoreCount}}
+  <div class="scan-section-label">
+    <span class="i18n-en">US stocks · forward-log</span><span class="i18n-zh">美股 · forward-log</span>
+    <span class="scan-section-note"><span class="i18n-en">engine only — not in daemon / ntfy</span><span class="i18n-zh">僅引擎讀盤 —— 不進 daemon / ntfy</span></span>
+  </div>
+  {{end}}
   <section id="card-{{.Short}}" class="symbol-card {{if hasPlan .Signal}}has-plan{{end}}">
     <div class="card-head">
       <span class="sym">{{.Short}}</span>

@@ -125,6 +125,10 @@ func shortSymbol(s market.Symbol) string {
 		return "BTC"
 	case market.ETHUSDT:
 		return "ETH"
+	case market.SNDKUSDT:
+		return "SNDK"
+	case market.NVDAUSDT:
+		return "NVDA"
 	}
 	return string(s)
 }
@@ -222,9 +226,36 @@ func (s *server) handleDashboard(c *gin.Context) {
 		tradeable = append(tradeable, t)
 	}
 
+	// Forward-log US-stock engine cards (SNDK+veto / NVDA+zone). Display-only
+	// on Scan — scanned via the SAME scanOne path but deliberately NOT in
+	// market.All(), so they never enter the daemon sweep / ntfy. Appended
+	// after the core 4; the template inserts a section divider at CoreCount.
+	stockScan := uiSymbols[len(market.All()):] // SNDK, NVDA
+	stockTmp := make([]symbolView, len(stockScan))
+	var swg sync.WaitGroup
+	for i, short := range stockScan {
+		sym, err := resolveWebSymbol(short)
+		if err != nil {
+			continue
+		}
+		swg.Add(1)
+		go func(idx int, sy market.Symbol) {
+			defer swg.Done()
+			stockTmp[idx] = s.scanOne(ctx, sy, timeframe)
+		}(i, sym)
+	}
+	swg.Wait()
+	scanViews := append([]symbolView{}, views...)
+	for _, v := range stockTmp {
+		if v.Short != "" { // skip unresolved / failed slots
+			scanViews = append(scanViews, v)
+		}
+	}
+
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"TF":              tf,
-		"Symbols":         views,
+		"Symbols":         scanViews,
+		"CoreCount":       len(views),
 		"Tradeable":       tradeable,
 		"OpenTrades":      openTrades,
 		"Now":             time.Now().Format("2006-01-02 15:04:05"),
