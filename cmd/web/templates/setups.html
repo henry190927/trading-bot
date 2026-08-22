@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
+<script src="/static/tablekit.js" defer></script>
 </head>
 <body>
 
@@ -68,7 +69,7 @@
 
   {{if .Setups}}
   <div style="overflow-x:auto">
-    <table class="setups-table">
+    <table class="setups-table" data-tablekit data-page="50">
       <thead>
         <tr>
           <th>#</th><th>time</th><th>sym/tf</th><th>dir</th><th>lean</th><th>trend</th>

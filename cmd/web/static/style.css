@@ -673,8 +673,9 @@ footer {
 }
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     gap: 0.5rem 1rem;
+    align-items: start;
 }
 .stats-grid > div {
     display: flex;
@@ -686,6 +687,7 @@ footer {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    white-space: nowrap;   /* keep every label 1 line so values align across the row */
 }
 .stats-grid .val {
     font-family: ui-monospace, "SF Mono", monospace;
@@ -5996,3 +5998,24 @@ html[data-density="compact"] .setups-table {
     .chart-controls-end { border-left: 0; padding-left: 0; }
     .chart-controls-end { margin-left: 0; }
 }
+
+/* =====================================================================
+   tablekit — sortable headers + pager (tablekit.js). Applied to the
+   setups list + US/TW fundamental boards.
+   ===================================================================== */
+.tk-sortable { cursor: pointer; user-select: none; -webkit-user-select: none; }
+.tk-sortable:hover { color: var(--text); }
+.tk-arrow { color: var(--blue); font-size: .8em; }
+.tablekit-pager {
+    display: flex; align-items: center; justify-content: center; gap: var(--sp-3);
+    margin: var(--sp-3) 0; color: var(--text-dim); font-size: var(--fs-sm);
+}
+.tablekit-pager .tk-btn {
+    background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 4px 12px; cursor: pointer; font-size: var(--fs-sm);
+    -webkit-tap-highlight-color: transparent;
+}
+.tablekit-pager .tk-btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+.tablekit-pager .tk-btn:disabled { opacity: .4; cursor: default; }
+.tk-range { font-variant-numeric: tabular-nums; }
