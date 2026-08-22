@@ -5289,7 +5289,9 @@ main { overflow-x: hidden; }
 }
 
 /* setups regime slice table */
-.slice-table td { text-align: center; }
+/* Matrix cells are centered; center the headers too so col2/col3 line up
+   with their values (the .setups-table th default is left → misaligned). */
+.slice-table td, .slice-table th { text-align: center; }
 .slice-table th:first-child, .slice-table .slice-rowhead { text-align: left; }
 .slice-table .slice-rowhead { font-weight: 600; white-space: nowrap; }
 
