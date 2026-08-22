@@ -5355,7 +5355,7 @@ main { overflow-x: hidden; }
 }
 .tf-bias-panel:empty { display: none; }
 .tf-bias-title {
-  color: var(--text-dim); font-weight: 700; font-size: .6rem;
+  color: var(--text-dim); font-weight: 700; font-size: var(--fs-xs);
   text-transform: uppercase; letter-spacing: .06em;
   text-align: center; margin-bottom: 2px;
 }
@@ -5365,7 +5365,7 @@ main { overflow-x: hidden; }
   border: 1px solid transparent;
 }
 .tf-bias-row .tf-bias-tf { font-weight: 600; opacity: .92; }
-.tf-bias-row .tf-bias-dot { font-size: .66rem; line-height: 1; text-align: center; }
+.tf-bias-row .tf-bias-dot { font-size: var(--fs-xs); line-height: 1; text-align: center; }
 .tf-bias-row .tf-bias-sc { text-align: right; opacity: .7; font-variant-numeric: tabular-nums; }
 .tf-bias-row.bias-long       { background: rgba(38,166,154,0.24); border-color: rgba(38,166,154,0.55); }
 .tf-bias-row.bias-long-lean  { background: rgba(38,166,154,0.11); }
@@ -6021,3 +6021,19 @@ html[data-density="compact"] .setups-table {
 .tablekit-pager .tk-btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
 .tablekit-pager .tk-btn:disabled { opacity: .4; cursor: default; }
 .tk-range { font-variant-numeric: tabular-nums; }
+
+/* =====================================================================
+   Chart control touch targets (audit B2). /chart is a live-trade surface;
+   its layer chips / TF pills / selects were ~18-24px tall — half the ~44px
+   touch minimum. Bump to 36px on touch widths only; desktop stays compact.
+   ===================================================================== */
+@media (max-width: 1023.98px) {
+    .chart-controls .layer-chip,
+    .chart-controls .tf-pill,
+    .chart-controls .chart-select,
+    .chart-tz-select {
+        min-height: 36px;
+    }
+    .chart-controls .layer-chip,
+    .chart-controls .tf-pill { padding-top: 6px; padding-bottom: 6px; }
+}

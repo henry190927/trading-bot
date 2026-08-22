@@ -8,12 +8,22 @@
   function cur()  { return root.getAttribute('data-theme') === 'industrial' ? 'industrial' : 'slate'; }
   function label(t) { return t === 'slate' ? '◑ Slate' : '◐ Industrial'; }
 
+  // Keep the browser-chrome / PWA status-bar color in sync with the theme
+  // (the one color that can't be a CSS var). slate = GitHub-dark, industrial
+  // = warm charcoal.
+  function applyMeta(t) {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', t === 'industrial' ? '#0f0b07' : '#0d1117');
+  }
+
   function apply(t) {
     root.setAttribute('data-theme', t);
+    applyMeta(t);
     try { localStorage.setItem(KEY, t); } catch (e) {}
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    applyMeta(cur());   // sync meta to the theme the inline head script applied
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'theme-toggle';

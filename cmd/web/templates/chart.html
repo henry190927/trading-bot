@@ -94,7 +94,7 @@
       </div>
     </div>
     <span class="chart-layers-group chart-layers-actions">
-      <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?">ⓘ</button>
+      <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?" aria-label="Indicator glossary">ⓘ</button>
       <select id="chart-tz-select" class="layer-chip chart-tz-select" title="Timezone for axis / tooltip times" aria-label="Timezone">
         <option value="0">UTC</option>
         <option value="8" selected>UTC+8 Taipei</option>
@@ -138,7 +138,7 @@
            (draw-tools-menu) that reveals the three drawing tools;
            picking one arms the tool and closes the flyout. Keeps
            the sidebar visually compact — TradingView-style. -->
-      <button type="button" class="draw-btn draw-tools-toggle" id="draw-tools-toggle" title="Drawing tools" aria-haspopup="menu" aria-expanded="false">
+      <button type="button" class="draw-btn draw-tools-toggle" id="draw-tools-toggle" title="Drawing tools" aria-label="Drawing tools" aria-haspopup="menu" aria-expanded="false">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
       </button>
       <div class="draw-tools-menu hidden" id="draw-tools-menu" role="menu">
@@ -206,7 +206,7 @@
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
         <div class="chart-price-marker" id="chart-price-marker" hidden>
           <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
-          <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price">+</button>
+          <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price" aria-label="Record trade / validate at this price">+</button>
         </div>
       </div>
     </div>
@@ -256,7 +256,7 @@
     <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
     <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
     <button type="button" class="cs-record-btn" id="cs-record-btn" title="記錄這個 setup 到 forward-log(/setups),不管有沒有開單">⚑ 記</button>
-    <button type="button" class="cs-info-btn" id="cs-info-btn" aria-expanded="false" title="怎麼判讀 N 字結構">ⓘ</button>
+    <button type="button" class="cs-info-btn" id="cs-info-btn" aria-expanded="false" title="怎麼判讀 N 字結構" aria-label="怎麼判讀 N 字結構">ⓘ</button>
     <div class="cs-info hidden" id="cs-info">
       <b>N 字判讀:</b> 推動 → 回檔 → 再推動。
       <b>BOS</b> = 收盤突破 leg 終端 swing(續勢);
