@@ -19,6 +19,7 @@
 
   <div class="chart-ticker" id="chart-ticker" aria-label="all symbols ticker"></div>
 
+  <div class="chart-controls">
   <div class="chart-toolbar">
     <div class="chart-sym-group">
       <select id="chart-symbol" class="chart-select">
@@ -32,11 +33,7 @@
         {{end}}
       </div>
     </div>
-    <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
-            data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
-    <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="收合/展開分析面板" aria-expanded="true" aria-label="toggle analysis panel">⇥</button>
   </div>
-
 
   <!-- Hidden compat: preserve nodes referenced by legacy JS paths -->
   <span class="hidden" id="chart-ratio">—</span>
@@ -115,6 +112,14 @@
       <button type="button" class="layer-chip layer-all" id="layers-all" title="enable all layers">all</button>
     </span>
   </div>
+
+    <div class="chart-controls-end">
+      <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
+              data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
+      <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="收合/展開分析面板" aria-expanded="true" aria-label="toggle analysis panel">⇥</button>
+    </div>
+  </div>
+  <!-- /chart-controls -->
 
 
   <!-- N 字 structure read-out. Shows only when the `struct` layer is on.
@@ -636,30 +641,34 @@
     </div>
   </div>
 
+  <!-- Dynamic legend: each item is tagged with the layer it documents;
+       applyLegendVisibility() (in refreshLayerVisibility) shows only the
+       items whose layer is currently on, and hides empty groups + the
+       whole row when nothing is active. -->
   <div class="chart-legend-row" id="chart-legend">
     <span class="chart-legend-group">
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL</span>
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#adb5bd"></span>mid</span>
+      <span class="chart-legend-item" data-legend-layer="boll"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL</span>
+      <span class="chart-legend-item" data-legend-layer="boll"><span class="chart-legend-sw" style="background:#adb5bd"></span>mid</span>
     </span>
     <span class="chart-legend-group">
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#f59f00"></span>entry</span>
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#e03131"></span>stop</span>
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#2f9e44"></span>TP1</span>
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#0ca678"></span>TP2</span>
+      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#f59f00"></span>entry</span>
+      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#e03131"></span>stop</span>
+      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#2f9e44"></span>TP1</span>
+      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#0ca678"></span>TP2</span>
     </span>
     <span class="chart-legend-group chart-legend-markers">
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#e03131">▼</span>sweep-high</span>
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#2f9e44">▲</span>sweep-low</span>
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#ae3ec9">●</span>double top/bot</span>
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#adb5bd">■</span>RSI div</span>
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#fcc419">■</span>Δ div</span>
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#fab005">●</span>vol×</span>
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#20c997">▲</span>MACD bull ×</span>
-      <span class="chart-legend-item"><span class="chart-legend-mk" style="color:#f76707">▼</span>MACD bear ×</span>
+      <span class="chart-legend-item" data-legend-layer="sweep"><span class="chart-legend-mk" style="color:#e03131">▼</span>sweep-high</span>
+      <span class="chart-legend-item" data-legend-layer="sweep"><span class="chart-legend-mk" style="color:#2f9e44">▲</span>sweep-low</span>
+      <span class="chart-legend-item" data-legend-layer="double"><span class="chart-legend-mk" style="color:#ae3ec9">●</span>double top/bot</span>
+      <span class="chart-legend-item" data-legend-layer="div"><span class="chart-legend-mk" style="color:#adb5bd">■</span>RSI div</span>
+      <span class="chart-legend-item" data-legend-layer="delta-div"><span class="chart-legend-mk" style="color:#fcc419">■</span>Δ div</span>
+      <span class="chart-legend-item" data-legend-layer="volx"><span class="chart-legend-mk" style="color:#fab005">●</span>vol×</span>
+      <span class="chart-legend-item" data-legend-layer="macd"><span class="chart-legend-mk" style="color:#20c997">▲</span>MACD bull ×</span>
+      <span class="chart-legend-item" data-legend-layer="macd"><span class="chart-legend-mk" style="color:#f76707">▼</span>MACD bear ×</span>
     </span>
     <span class="chart-legend-group chart-legend-vp">
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#4c6ef5"></span>VP buy</span>
-      <span class="chart-legend-item"><span class="chart-legend-sw" style="background:#f59f00"></span>VP sell</span>
+      <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#4c6ef5"></span>VP buy</span>
+      <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#f59f00"></span>VP sell</span>
     </span>
   </div>
 
@@ -1112,6 +1121,31 @@
         if (tbEl) tbEl.style.display = layerOn('tf-bias') ? '' : 'none';
         applyPaneLayout();
         updateMenuActiveCounts();
+        applyLegendVisibility();
+    }
+
+    // Dynamic legend: show only the legend items whose layer is currently
+    // on (the entry/stop/TP swatches apply to both the `plan` overlay and
+    // drawn `positions` lines), hide groups that end up empty, and hide the
+    // whole row when nothing is active — so the legend documents what's on
+    // screen instead of a static wall of ~20 items.
+    function applyLegendVisibility() {
+        var legend = document.getElementById('chart-legend');
+        if (!legend) return;
+        var anyOn = false;
+        legend.querySelectorAll('.chart-legend-item[data-legend-layer]').forEach(function (it) {
+            var key = it.getAttribute('data-legend-layer');
+            var on = key === 'plan' ? (layerOn('plan') || layerOn('positions')) : layerOn(key);
+            it.style.display = on ? '' : 'none';
+            if (on) anyOn = true;
+        });
+        legend.querySelectorAll('.chart-legend-group').forEach(function (g) {
+            var hasVisible = Array.prototype.some.call(
+                g.querySelectorAll('.chart-legend-item'),
+                function (it) { return it.style.display !== 'none'; });
+            g.style.display = hasVisible ? '' : 'none';
+        });
+        legend.style.display = anyOn ? '' : 'none';
     }
 
     // ── N 字 structure overlay (swings zigzag + BOS/CHoCH + 樞紐區) ───

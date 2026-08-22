@@ -5961,3 +5961,31 @@ html[data-density="compact"] .setups-table {
 @media (max-width: 640px) {
     html[data-density="compact"] .fund-table td { padding: 2px 0; font-size: var(--fs-sm); }
 }
+
+/* =====================================================================
+   Chart "crown jewel" — single-row control bar. .chart-toolbar (symbol/tf)
+   + .chart-layers (indicator menus + actions) + .chart-controls-end (AI +
+   side-toggle) flow on ONE row via .chart-controls, reclaiming a row of
+   vertical space for the chart. Wraps gracefully on narrow screens.
+   ===================================================================== */
+.chart-controls {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: .4rem .7rem; margin-bottom: .4rem;
+}
+.chart-controls > .chart-toolbar,
+.chart-controls > .chart-layers { margin-bottom: 0; padding: 0; }
+.chart-controls > .chart-layers {
+    border-left: 1px solid var(--border); padding-left: .7rem;
+    flex: 0 1 auto;
+}
+.chart-controls-end {
+    display: flex; gap: .4rem; align-items: center;
+    margin-left: auto; padding-left: .7rem;
+    border-left: 1px solid var(--border);
+}
+@media (max-width: 720px) {
+    /* on wrap the left dividers read oddly at a line start — drop them */
+    .chart-controls > .chart-layers,
+    .chart-controls-end { border-left: 0; padding-left: 0; }
+    .chart-controls-end { margin-left: 0; }
+}
