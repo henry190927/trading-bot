@@ -176,7 +176,10 @@ func (s *server) handleChartBias(c *gin.Context) {
 // close vs the close ~24h ago on the 1h series, matching the daily % the
 // chart header shows next to the price.
 
-var tickerSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA"}
+// tickerSymbols = the full UI universe (core + stock + alt forward-log), so the
+// chart's top ticker shows everything. Aliased to uiSymbols to stay in sync
+// whenever symbols are added. The strip scrolls horizontally when it overflows.
+var tickerSymbols = uiSymbols
 
 type tickerCacheT struct {
 	at   time.Time
@@ -204,37 +207,46 @@ func (s *server) handleTickers(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
 
-	out := make([]gin.H, 0, len(tickerSymbols))
-	for _, short := range tickerSymbols {
-		row := gin.H{"symbol": short}
-		sym, err := resolveWebSymbol(short)
-		if err == nil && s.client != nil {
-			// Price = live mark, SAME source as the chart header, so the
-			// ticker and the header never disagree. Klines are only for the
-			// 24h reference close (change %).
-			price := 0.0
-			if fr, ferr := s.client.FundingRate(ctx, sym); ferr == nil && fr.MarkPrice > 0 {
-				price = fr.MarkPrice
-			}
-			// 26 hourly bars ≈ 25h: enough to look back a full 24h.
-			if ks, err := s.client.KlinesWithForming(ctx, sym, market.Timeframe("1h"), 26); err == nil && len(ks) > 0 {
-				if price == 0 {
-					price = ks[len(ks)-1].Close // mark fetch failed — fall back to last close
+	// Fan out across the (now larger) symbol set so the strip stays snappy —
+	// each symbol is 2 API calls (mark + klines); sequential over 11 symbols
+	// would crawl. Output order is preserved by index.
+	out := make([]gin.H, len(tickerSymbols))
+	var wg sync.WaitGroup
+	for i, short := range tickerSymbols {
+		wg.Add(1)
+		go func(idx int, short string) {
+			defer wg.Done()
+			row := gin.H{"symbol": short}
+			sym, err := resolveWebSymbol(short)
+			if err == nil && s.client != nil {
+				// Price = live mark, SAME source as the chart header, so the
+				// ticker and the header never disagree. Klines are only for the
+				// 24h reference close (change %).
+				price := 0.0
+				if fr, ferr := s.client.FundingRate(ctx, sym); ferr == nil && fr.MarkPrice > 0 {
+					price = fr.MarkPrice
 				}
-				ref := ks[0].Close
-				if idx := len(ks) - 1 - 24; idx >= 0 {
-					ref = ks[idx].Close
+				// 26 hourly bars ≈ 25h: enough to look back a full 24h.
+				if ks, kerr := s.client.KlinesWithForming(ctx, sym, market.Timeframe("1h"), 26); kerr == nil && len(ks) > 0 {
+					if price == 0 {
+						price = ks[len(ks)-1].Close // mark fetch failed — fall back to last close
+					}
+					ref := ks[0].Close
+					if j := len(ks) - 1 - 24; j >= 0 {
+						ref = ks[j].Close
+					}
+					if ref > 0 && price > 0 {
+						row["changePct"] = (price - ref) / ref * 100
+					}
 				}
-				if ref > 0 && price > 0 {
-					row["changePct"] = (price - ref) / ref * 100
+				if price > 0 {
+					row["price"] = price
 				}
 			}
-			if price > 0 {
-				row["price"] = price
-			}
-		}
-		out = append(out, row)
+			out[idx] = row
+		}(i, short)
 	}
+	wg.Wait()
 
 	resp := gin.H{"tickers": out}
 	tickerCacheMu.Lock()
