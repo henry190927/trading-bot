@@ -57,6 +57,41 @@
     </div>
   </details>
 
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🎚️</span>
+      <span class="tip-title">
+        <span class="i18n-en">Price pierced the BB? <em>Reversal or trap depends on regime</em></span>
+        <span class="i18n-zh">價格溢軌破 BB?<em>反轉還是陷阱,看 regime</em></span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>Range / neutral regime → YES, fade it.</b> A BB pierce = statistical overextension → high odds of snapping back to the mean. This is exactly the engine's BB-touch vote (and why MR wins on ETH).</span>
+          <span class="i18n-zh"><b>盤整 / neutral regime → YES,可以 fade。</b> 溢軌 = 統計上過度延伸 → 高機率彈回均值。這就是引擎「BB 觸帶」那一票在做的事(也是 MR 在 ETH 會贏的原因)。</span>
+        </li>
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>Strong trend → NO, it's a trap.</b> Price <em>walks the band</em> — it rides the edge for many bars while the band expands. Fading the first pierce = standing in front of the train (why MR loses on SOL → we built StructMomentum to go WITH it).</span>
+          <span class="i18n-zh"><b>強趨勢 → NO,是陷阱。</b> 價格會<em>沿著軌道走</em>——貼著邊界跑很多根、布林還擴張。去 fade 第一次溢軌 = 站在火車前面(所以 MR 在 SOL 慘賠 → 我們才做 StructMomentum 順勢)。</span>
+        </li>
+        <li class="tip-step step-neutral">
+          <span class="i18n-en"><b>How to tell the regime:</b> structure (neutral = fade OK; HH-HL / LH-LL trend = don't) + band width (flat/contracting = range; expanding = trend).</span>
+          <span class="i18n-zh"><b>怎麼分辨 regime:</b> 結構(neutral = 可 fade;HH-HL / LH-LL 趨勢 = 別 fade)+ 帶寬(平/縮 = 區間;擴張 = 趨勢)。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en"><b>BB alone is weak.</b> The engine never votes on BB alone — it needs <b>BB + RSI extreme + sweep + divergence</b> confluence. Strongest fade = a pierce that <b>immediately reclaims back inside</b> the band (failed breakout), NOT price accelerating outside it (that's trend).</span>
+          <span class="i18n-zh"><b>只靠 BB 太弱。</b> 引擎從不單靠 BB —— 要 <b>BB + RSI 極值 + sweep + 背離</b> 共振。最強的 fade 是溢軌後<b>立刻收回帶內</b>(失敗突破),不是價格加速衝出帶外(那是趨勢)。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📐 In a trend the band edge is <b>evidence of momentum, not a reversal signal.</b></span>
+        <span class="i18n-zh">📐 在趨勢裡,布林邊界是<b>動能的證據,不是反轉的訊號</b>。</span>
+      </p>
+    </div>
+  </details>
+
   <!-- Card 2: No-fill discipline — biggest leak (31% no-fill) -->
   <details class="tip-card">
     <summary class="tip-summary">
