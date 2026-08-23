@@ -5379,10 +5379,10 @@ main { overflow-x: hidden; }
 .chart-ticker {
   display: flex; flex-wrap: nowrap; gap: .4rem; padding: .1rem 0 .5rem;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;               /* Firefox: slim bar */
+  scrollbar-width: none;               /* Firefox: hide bar (still scrolls) */
+  -ms-overflow-style: none;            /* old Edge/IE */
 }
-.chart-ticker::-webkit-scrollbar { height: 6px; }
-.chart-ticker::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.chart-ticker::-webkit-scrollbar { display: none; }   /* Chrome/Safari: hide bar */
 .chart-ticker-item { flex: 0 0 auto; }  /* keep each chip's width; scroll instead of shrink/wrap */
 .chart-ticker:empty { display: none; }
 .chart-ticker-item {
