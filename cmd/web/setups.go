@@ -10,6 +10,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/signal"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,6 +50,17 @@ type Setup struct {
 	EngineSide    string `json:"engine_side"`
 	EngineScore   int    `json:"engine_score"`
 	EngineVerdict string `json:"engine_verdict"`
+
+	// Strategy tagging (auto, server-side at record time). Strategy = which
+	// engine is ACTIVE for this (symbol,TF) per signal.StrategyFor ("mr" /
+	// "struct-momentum"). StratFire = whether that active strategy produced a
+	// non-Flat signal on the last closed bar at record time; StratSide = its
+	// side. Purpose: filter StructMomentum forward-log rows to ACTUAL fires —
+	// a neutral-structure snapshot where SM's regime gate sits out records
+	// StratFire=false and must not count as an SM data point.
+	Strategy  string `json:"strategy,omitempty"`
+	StratFire bool   `json:"strat_fire,omitempty"`
+	StratSide string `json:"strat_side,omitempty"`
 
 	Opened bool   `json:"opened"` // did you actually open a trade on it?
 	Note   string `json:"note"`
@@ -259,6 +272,24 @@ func (s *server) handleAPIChartSetupRecord(c *gin.Context) {
 	}
 	in.RecordedAt = time.Now()
 	in.Outcome = ""
+
+	// Auto-tag the ACTIVE strategy for this (symbol,TF) and whether it actually
+	// fires now — server-side + authoritative (don't trust the client). Lets
+	// the forward-log distinguish a real StructMomentum fire from a neutral
+	// structure snapshot the strategy would sit out. Best-effort: on any fetch
+	// error we leave the tags empty rather than fail the record.
+	if sym, rerr := resolveWebSymbol(in.Symbol); rerr == nil && s.client != nil {
+		tf := market.Timeframe(in.TF)
+		in.Strategy = signal.StrategyFor(sym, tf).String()
+		fctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+		if cs, kerr := s.client.Klines(fctx, sym, tf, 250); kerr == nil && len(cs) >= 60 {
+			sig := signal.Evaluate(signal.Inputs{Symbol: sym, Timeframe: tf, Candles: cs})
+			in.StratFire = sig.Side != signal.Flat
+			in.StratSide = sig.Side.String()
+		}
+		cancel()
+	}
+
 	id, err := appendSetup(in)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

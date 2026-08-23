@@ -74,7 +74,7 @@
         <tr>
           <th>#</th><th>time</th><th>sym/tf</th><th>dir</th><th>lean</th><th>trend</th>
           <th>event</th><th>entry</th><th>stop</th><th>target</th><th>BOS</th><th>prot</th>
-          <th>engine</th><th>開單</th><th title="收盤價判定:讀盤方向對不對">outcome</th><th title="盤中 first-touch + fill:真實會止盈還止損">real</th><th></th>
+          <th>engine</th><th title="active strategy for this symbol/TF + whether it actually fired at record time. SM ✓ = valid StructMomentum data point; SM — = regime sat out (not an SM sample)">strat</th><th>開單</th><th title="收盤價判定:讀盤方向對不對">outcome</th><th title="盤中 first-touch + fill:真實會止盈還止損">real</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -93,6 +93,13 @@
           <td>{{if .BOSLevel}}{{printf "%.3f" .BOSLevel}}{{else}}—{{end}}</td>
           <td>{{if .Protected}}{{printf "%.3f" .Protected}}{{else}}—{{end}}</td>
           <td class="cs-dim">{{.EngineSide}} {{.EngineScore}}</td>
+          <td>
+            {{if eq .Strategy "struct-momentum"}}
+              <span class="outcome-badge oc-{{if .StratFire}}win{{else}}skip{{end}}" title="StructMomentum {{if .StratFire}}fired ({{.StratSide}}) — valid SM data point{{else}}did NOT fire (regime sat out / not in-zone) — NOT an SM data point{{end}}">SM{{if .StratFire}} ✓{{else}} —{{end}}</span>
+            {{else if eq .Strategy "mr"}}
+              <span class="cs-dim" title="mean-reversion engine{{if .StratFire}} fired ({{.StratSide}}){{end}}">MR{{if .StratFire}} ✓{{end}}</span>
+            {{else}}<span class="cs-dim">—</span>{{end}}
+          </td>
           <td>{{if .Opened}}✓{{else}}—{{end}}</td>
           <td><span class="outcome-badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
           <td>{{if .RealOutcome}}<span class="outcome-badge oc-{{.RealOutcome}}">{{.RealOutcome}}{{if .RealBars}} · {{.RealBars}}b{{end}}</span>{{if and .Outcome (ne .Outcome .RealOutcome)}} <span class="oc-gap" title="outcome≠real:讀盤對但執行會不同">⚠</span>{{end}}{{else}}<span class="cs-dim">—</span>{{end}}</td>

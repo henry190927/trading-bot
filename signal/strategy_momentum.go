@@ -53,6 +53,21 @@ func strategyFor(sym market.Symbol, tf market.Timeframe) StrategyKind {
 	return StrategyMR
 }
 
+// StrategyFor is the exported view of the per-(symbol,TF) assignment, for
+// callers (e.g. web /setups tagging) that need to know which strategy is
+// active without duplicating the allowlist.
+func StrategyFor(sym market.Symbol, tf market.Timeframe) StrategyKind {
+	return strategyFor(sym, tf)
+}
+
+// String renders the strategy for tagging/display.
+func (k StrategyKind) String() string {
+	if k == StrategyStructMomentum {
+		return "struct-momentum"
+	}
+	return "mr"
+}
+
 // StructMomentum tunables.
 const (
 	smEMAFast        = 20 // fast EMA for the momentum-alignment gate
