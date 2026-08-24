@@ -121,6 +121,19 @@ func main() {
 	// entries (separate cadence from the confluence scan). No-op if
 	// NTFY_TOPIC is unset. Zones live in /opt/trading/zones.json.
 	go runZoneAlerts(ctx, client)
+
+	// MONITOR_ZONE_ONLY=1 keeps ONLY the zone-fade + breakout-tripwire channel
+	// (zonealert) and skips the multi-TF confluence scan / structalert /
+	// macrowarn — for when the user wants the zone alerts without the confluence
+	// noise. Block on ctx so the zonealert goroutine keeps polling; never reach
+	// the confluence loop below.
+	if os.Getenv("MONITOR_ZONE_ONLY") == "1" {
+		log.Printf("MONITOR_ZONE_ONLY=1 — zonealert only (confluence / structalert / macrowarn disabled)")
+		<-ctx.Done()
+		log.Printf("monitor shutting down")
+		return
+	}
+
 	go runMacroWarn(ctx)
 	go runStructureAlerts(ctx, client)
 
