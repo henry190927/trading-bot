@@ -38,9 +38,17 @@ func TestEvaluateFire(t *testing.T) {
 			wantStatus: OutStop, wantR: -1.0, wantFill: 1, wantHeld: 1,
 		},
 		{
-			name:       "long no-fill (price ran up)",
+			// only 3 bars closed, none touch entry, expiry is 6 → still resting
+			name:       "short pending (limit above spot, not reached, within expiry)",
+			f:          PaperFire{Time: fireT, Side: "short", Entry: 2483, Stop: 2521, TP: 2446},
+			cs:         []market.Candle{b(0, 2460, 2472), b(1, 2458, 2470), b(2, 2461, 2475)},
+			wantStatus: OutPending,
+		},
+		{
+			// 6 bars closed, entry never touched → expired
+			name:       "long no-fill (price ran up, expiry elapsed)",
 			f:          PaperFire{Time: fireT, Side: "long", Entry: 100, Stop: 95, TP: 110},
-			cs:         []market.Candle{b(0, 101, 103), b(1, 102, 104), b(2, 101, 105)},
+			cs:         []market.Candle{b(0, 101, 103), b(1, 102, 104), b(2, 101, 105), b(3, 103, 106), b(4, 104, 107), b(5, 105, 108)},
 			wantStatus: OutNoFill,
 		},
 		{
@@ -65,7 +73,7 @@ func TestEvaluateFire(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := EvaluateFire(tc.f, tc.cs, 3)
+			got := EvaluateFire(tc.f, tc.cs, 6)
 			if got.Status != tc.wantStatus {
 				t.Fatalf("status = %q, want %q", got.Status, tc.wantStatus)
 			}

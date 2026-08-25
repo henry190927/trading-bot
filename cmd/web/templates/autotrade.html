@@ -28,6 +28,11 @@
       <span class="badge {{if .EnvArmed}}b-red{{else}}b-dim{{end}}">AUTOTRADE_ENABLED={{if .EnvArmed}}true{{else}}unset{{end}}</span>
       <span class="badge {{if .LiveArmed}}b-red{{else}}b-green{{end}}">{{if .LiveArmed}}⚠ REAL ORDERS ARMED{{else}}✓ no real orders{{end}}</span>
     </div>
+    {{if .Paper}}
+    <p class="glossary-hint" style="border-left:3px solid var(--yellow);padding-left:.6rem;margin-top:.5rem">
+      ⚠ <b>PAPER 模式:交易所上沒有任何真實掛單或部位。</b>下方每筆是程式「當下想掛的單」的模擬紀錄,outcome 是拿之後的 K 線回放推算的——<b>pending / open 都是模擬狀態,不是真的成交</b>。真錢啟動後,這裡才會顯示交易所實際的掛單/部位狀態。
+    </p>
+    {{end}}
     <p class="glossary-hint">
       真錢需<b>同時</b> master ON + PAPER off + AUTOTRADE_ENABLED=true。目前
       {{if .LiveArmed}}<b style="color:var(--red)">已武裝真錢</b>{{else}}<b style="color:var(--green)">不會下真單</b>{{end}}。
@@ -59,6 +64,7 @@
     <div class="stats-grid">
       <div><span class="lbl">fires</span><span class="val">{{.Sum.Total}}</span></div>
       <div><span class="lbl">filled</span><span class="val">{{.Sum.Filled}} <span class="cs-dim">({{printf "%.0f" (mulPct .Sum.FillPct)}}%)</span></span></div>
+      <div><span class="lbl">pending</span><span class="val">{{.Sum.Pending}} <span class="cs-dim">掛單中</span></span></div>
       <div><span class="lbl">no-fill</span><span class="val">{{.Sum.NoFill}}</span></div>
       <div><span class="lbl">TP / stop</span><span class="val"><span style="color:var(--green)">{{.Sum.TP}}</span> / <span style="color:var(--red)">{{.Sum.Stop}}</span></span></div>
       <div><span class="lbl">open</span><span class="val">{{.Sum.Open}}</span></div>
@@ -66,7 +72,7 @@
       <div><span class="lbl">net R <span class="cs-dim">已結算</span></span><span class="val" style="color:{{if ge .Sum.NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .Sum.NetR}}R</span></div>
       <div><span class="lbl">浮動 R <span class="cs-dim">open</span></span><span class="val" style="color:{{if ge .Sum.UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.8">{{printf "%+.2f" .Sum.UnrealR}}R*</span></div>
     </div>
-    <p class="glossary-hint" style="margin-top:.5rem">fill = 掛價被 K 線觸及(3 根內);outcome 先撞先算,同根撞到則保守算 stop;<b>net R</b> = 已結算(tp/stop),<b>浮動 R*</b> = open 單 mark-to-最後收盤的未實現損益。</p>
+    <p class="glossary-hint" style="margin-top:.5rem"><b>pending</b> = 掛價還沒被觸及、6 根內仍在等成交;<b>no-fill</b> = 6 根過了還沒觸及(視為失效);<b>open</b> = 已成交未出場;outcome 先撞先算,同根撞到保守算 stop;<b>net R</b> = 已結算(tp/stop),<b>浮動 R*</b> = open 單 mark-to-最後收盤未實現。fill% 只算已定案的(pending 不計)。</p>
   </div>
   {{end}}
 

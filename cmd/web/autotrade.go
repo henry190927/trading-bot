@@ -75,11 +75,12 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	var outs []autotrade.Outcome
 	for _, f := range fires {
 		tf := tfFor(f)
-		out := autotrade.EvaluateFire(f, candlesFor(f.Symbol, tf), 3)
+		out := autotrade.EvaluateFire(f, candlesFor(f.Symbol, tf), 6)
 		outs = append(outs, out)
 		cls := map[autotrade.OutcomeStatus]string{
 			autotrade.OutTP: "b-green", autotrade.OutStop: "b-red",
 			autotrade.OutNoFill: "b-dim", autotrade.OutOpen: "b-yellow",
+			autotrade.OutPending: "b-blue",
 		}[out.Status]
 		strat := f.Strategy
 		if strat == "" { // older records predate the strategy field — infer from the reason
