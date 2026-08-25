@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"myFirstGo/trading-bot/autotrade"
@@ -151,14 +153,95 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 	}
 }
 
-// evalAutoTrigger dispatches on strategy. Phase 1 implements range-edge; the
-// others return no-fire until wired.
+// evalAutoTrigger dispatches on strategy. "range-edge" = the box mean-reversion
+// trigger; "engine" runs the FULL confluence engine (signal.Evaluate → per-symbol
+// strategyFor, so e.g. HYPE/SOL 1h fire StructMomentum, not a box fade) and places
+// the engine's own structure-based Plan bracket.
 func evalAutoTrigger(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule) autoTrigger {
 	switch r.Strategy {
 	case "range-edge":
 		return evalRangeEdge(ctx, client, sym, r)
+	case "engine":
+		return evalEngine(ctx, client, sym, r)
 	default:
 		return autoTrigger{}
+	}
+}
+
+// autoMinScore is the confluence threshold an engine-strategy rule must clear to
+// fire (env AUTO_MIN_SCORE, default 3 — same as the daemon's MIN_SCORE).
+func autoMinScore() int {
+	if v := strings.TrimSpace(os.Getenv("AUTO_MIN_SCORE")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 3
+}
+
+// evalEngine runs the same confluence engine the daemon/web use and fires on its
+// Plan. This is the "comprehensive" path: full MR+momentum scoring, N-struct veto,
+// pivot zones, and per-symbol StructMomentum dispatch all apply. Entry/stop/TP come
+// from the engine's structure-derived Plan (NOT a box), so the stop sits on real
+// structure. Gated by side match + a minimum confluence score.
+func evalEngine(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule) autoTrigger {
+	tf := market.Timeframe(r.TF)
+	candles, err := client.Klines(ctx, sym, tf, 300)
+	if err != nil || len(candles) < 50 {
+		return autoTrigger{}
+	}
+	// HTF bias (mirror the daemon: a higher-TF directional bias enriches Evaluate).
+	bias := signal.Flat
+	if bc, berr := client.Klines(ctx, sym, engineBiasTF(tf), 100); berr == nil {
+		bias = signal.Bias(bc)
+	}
+	sigCtx := signal.Context{}
+	var markPrice float64
+	if fr, ferr := client.FundingRate(ctx, sym); ferr == nil {
+		sigCtx.FundingRate = fr.Rate
+		markPrice = fr.MarkPrice
+	}
+	if oi, oerr := client.OpenInterest(ctx, sym); oerr == nil {
+		sigCtx.OpenInterest = oi
+	}
+	s := signal.Evaluate(signal.Inputs{
+		Symbol: sym, Timeframe: tf, Candles: candles, Ctx: sigCtx, Bias: bias, LiveMarkPrice: markPrice,
+	})
+	if s.Side == signal.Flat || s.Plan.Entry <= 0 || s.Plan.StopLoss <= 0 {
+		return autoTrigger{}
+	}
+	if s.Score < autoMinScore() {
+		return autoTrigger{}
+	}
+	side := "long"
+	if s.Side == signal.Short {
+		side = "short"
+	}
+	// respect the rule's side filter (auto = both)
+	if (r.Side == "long" && side != "long") || (r.Side == "short" && side != "short") {
+		return autoTrigger{}
+	}
+	tp := s.Plan.Entry
+	if len(s.Plan.TakeProfit) > 0 {
+		tp = s.Plan.TakeProfit[0]
+	}
+	anchor := s.Plan.Anchor
+	if anchor == "" {
+		anchor = signal.StrategyFor(sym, tf).String()
+	}
+	return autoTrigger{fire: true, side: side, entry: s.Plan.Entry, stop: s.Plan.StopLoss, tp: tp,
+		why: fmt.Sprintf("engine score %d — %s", s.Score, anchor)}
+}
+
+// engineBiasTF picks the higher-TF used for directional bias in the engine call.
+func engineBiasTF(tf market.Timeframe) market.Timeframe {
+	switch tf {
+	case "5m", "15m", "30m", "1h":
+		return "4h"
+	case "2h", "4h":
+		return "1d"
+	default:
+		return "1d"
 	}
 }
 
