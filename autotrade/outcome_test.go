@@ -69,6 +69,20 @@ func TestEvaluateFire(t *testing.T) {
 			cs:         []market.Candle{b(0, 99, 101), b(1, 98, 102)},
 			wantStatus: OutOpen,
 		},
+		{
+			// marketable entry with no closed bar yet → immediately OPEN (not pending)
+			name:       "market entry, no bar yet → open",
+			f:          PaperFire{Time: fireT, Side: "long", Entry: 100, Stop: 95, TP: 110, Market: true},
+			cs:         nil,
+			wantStatus: OutOpen,
+		},
+		{
+			// marketable entry fills at fire (bar 0), tp on same bar → barsToFill 0
+			name:       "market entry hits tp same bar",
+			f:          PaperFire{Time: fireT, Side: "long", Entry: 100, Stop: 95, TP: 110, Market: true},
+			cs:         []market.Candle{b(0, 98, 112)},
+			wantStatus: OutTP, wantR: 2.0, wantFill: 0, wantHeld: 0,
+		},
 	}
 
 	for _, tc := range cases {

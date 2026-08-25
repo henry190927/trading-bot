@@ -32,17 +32,17 @@ type Outcome struct {
 }
 
 // EvaluateFire replays the closed candles that occur after the fire to classify
-// the paper trade. It models the entry as a resting limit at f.Entry: for a long
-// it fills when a later bar trades down to entry (Low <= entry), for a short when
-// a bar trades up to it (High >= entry). Because range-edge entries sit at the
-// spot price at fire time, the fill is usually immediate; if no bar touches entry
-// within fillWindow bars the trade is a no-fill (price ran away).
+// the paper trade. Fill depends on f.Market:
 //
-// A resting limit that hasn't been touched yet is PENDING while fewer than
-// expiryBars have closed since the fire, and a NO-FILL once expiryBars elapse
-// without a touch (the order is treated as cancelled/stale). This separates
-// "still waiting to fill" (e.g. an engine sweep-high short resting above spot)
-// from "the setup came and went".
+//   - Marketable entry (f.Market: range-edge box @ spot, or an engine plan already
+//     on the fillable side of price) fills AT the fire — it is OPEN immediately,
+//     even before the first bar closes.
+//   - Resting limit (!f.Market: an engine sweep level away from spot) fills only
+//     when a later bar trades to entry — Low<=entry for a long, High>=entry for a
+//     short. Until touched it is PENDING while fewer than expiryBars have closed
+//     since the fire, and NO-FILL once expiryBars elapse without a touch (the order
+//     is treated as cancelled/stale). This separates "still waiting to fill" from
+//     "the setup came and went".
 //
 // After fill it scans forward for stop/tp. Same-bar ambiguity resolves to the
 // stop (conservative). candles must be ascending by time; bars at/before the fire
@@ -66,38 +66,54 @@ func EvaluateFire(f PaperFire, candles []market.Candle, expiryBars int) Outcome 
 			fwd = append(fwd, c)
 		}
 	}
-	if len(fwd) == 0 {
-		return Outcome{Status: OutPending} // just fired, no closed bar yet — limit is resting
-	}
 
 	// --- fill ---
-	fillIdx := -1
-	limit := min(expiryBars, len(fwd))
-	for i := range limit {
-		c := fwd[i]
-		if long && c.Low <= f.Entry {
-			fillIdx = i
-			break
+	// A marketable entry (range-edge box, or an engine plan already on the fillable
+	// side of spot) fills AT the fire — no waiting for a bar to touch it. A resting
+	// limit (engine sweep level away from spot) fills only when a bar trades to it,
+	// and is pending until then.
+	fillIdx := 0
+	filledAt := f.Time
+	barsToFill := 0
+	if !f.Market {
+		if len(fwd) == 0 {
+			return Outcome{Status: OutPending} // resting limit, no closed bar yet
 		}
-		if !long && c.High >= f.Entry {
-			fillIdx = i
-			break
+		fillIdx = -1
+		limit := min(expiryBars, len(fwd))
+		for i := range limit {
+			c := fwd[i]
+			if long && c.Low <= f.Entry {
+				fillIdx = i
+				break
+			}
+			if !long && c.High >= f.Entry {
+				fillIdx = i
+				break
+			}
 		}
+		if fillIdx < 0 {
+			// Not touched yet: still resting if the expiry window hasn't elapsed,
+			// otherwise treat the order as expired/cancelled (no-fill).
+			if len(fwd) < expiryBars {
+				return Outcome{Status: OutPending}
+			}
+			return Outcome{Status: OutNoFill}
+		}
+		filledAt = fwd[fillIdx].CloseTime
+		barsToFill = fillIdx + 1
 	}
-	if fillIdx < 0 {
-		// Not touched yet: still resting if the expiry window hasn't elapsed,
-		// otherwise treat the order as expired/cancelled (no-fill).
-		if len(fwd) < expiryBars {
-			return Outcome{Status: OutPending}
-		}
-		return Outcome{Status: OutNoFill}
+
+	// Marketable entry but no closed bar yet → filled and running, nothing to mark.
+	if len(fwd) == 0 {
+		return Outcome{Status: OutOpen, FillPrice: f.Entry, ExitPrice: f.Entry, FilledAt: filledAt}
 	}
 
 	out := Outcome{
 		Status:     OutOpen,
 		FillPrice:  f.Entry,
-		FilledAt:   fwd[fillIdx].CloseTime,
-		BarsToFill: fillIdx + 1,
+		FilledAt:   filledAt,
+		BarsToFill: barsToFill,
 		ExitPrice:  fwd[len(fwd)-1].Close,
 	}
 

@@ -17,6 +17,7 @@ type PaperFire struct {
 	TF       string    `json:"tf"`       // timeframe of the box/trigger — needed to replay outcome
 	Strategy string    `json:"strategy"` // "range-edge" | "engine" — which A/B strategy fired this
 	Side     string    `json:"side"`
+	Market   bool      `json:"market"` // true = marketable entry (fills at fire), false = resting limit (pending until touched)
 	Entry  float64   `json:"entry"`
 	Stop   float64   `json:"stop"`
 	TP     float64   `json:"tp"`

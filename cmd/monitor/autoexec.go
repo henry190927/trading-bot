@@ -24,12 +24,13 @@ var autoSymbols = map[string]market.Symbol{
 }
 
 type autoTrigger struct {
-	fire  bool
-	side  string
-	entry float64
-	stop  float64
-	tp    float64
-	why   string
+	fire   bool
+	side   string
+	entry  float64
+	stop   float64
+	tp     float64
+	market bool // true = marketable at fire (fills immediately); false = resting limit
+	why    string
 }
 
 type autoState struct {
@@ -118,7 +119,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				msg := fmt.Sprintf("%s %s @%.4f stop %.4f tp %.4f (qty %.4f, %du×%d) — %s",
 					r.Symbol, trig.side, trig.entry, trig.stop, trig.tp, qty, int(r.MarginUSDT), r.Leverage, trig.why)
 				log.Printf("[AUTO-PAPER] would place %s", msg)
-				autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.side,
+				autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.side, Market: trig.market,
 					Entry: trig.entry, Stop: trig.stop, TP: trig.tp, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.why, Live: false})
 				if n != nil {
 					_ = n.Push(ctx, "🤖 auto (paper)", msg, "robot")
@@ -144,7 +145,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			}
 			log.Printf("[AUTO-LIVE] placed %s %s @%.4f stop %.4f tp %.4f qty %.4f orderId=%s",
 				r.Symbol, trig.side, trig.entry, trig.stop, trig.tp, qty, id)
-			autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.side,
+			autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.side, Market: trig.market,
 				Entry: trig.entry, Stop: trig.stop, TP: trig.tp, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.why + " id=" + id, Live: true})
 			if n != nil {
 				_ = n.Push(ctx, "🤖 auto PLACED", fmt.Sprintf("%s %s @%.4f (stop %.4f tp %.4f) id=%s", r.Symbol, trig.side, trig.entry, trig.stop, trig.tp, id), "robot")
@@ -229,7 +230,16 @@ func evalEngine(ctx context.Context, client *bingx.Client, sym market.Symbol, r 
 	if anchor == "" {
 		anchor = signal.StrategyFor(sym, tf).String()
 	}
-	return autoTrigger{fire: true, side: side, entry: s.Plan.Entry, stop: s.Plan.StopLoss, tp: tp,
+	// Marketable if the entry sits on the fillable side of the current price
+	// (long entry at/above spot, short entry at/below spot) → fills immediately.
+	// Otherwise it's a resting limit (e.g. a sweep-high short above spot) → pending
+	// until price trades to it.
+	curPx := candles[len(candles)-1].Close
+	if markPrice > 0 {
+		curPx = markPrice
+	}
+	marketable := (side == "long" && s.Plan.Entry >= curPx) || (side == "short" && s.Plan.Entry <= curPx)
+	return autoTrigger{fire: true, side: side, entry: s.Plan.Entry, stop: s.Plan.StopLoss, tp: tp, market: marketable,
 		why: fmt.Sprintf("engine score %d — %s", s.Score, anchor)}
 }
 
@@ -279,12 +289,12 @@ func evalRangeEdge(ctx context.Context, client *bingx.Client, sym market.Symbol,
 	wantShort := r.Side == "short" || r.Side == "auto"
 
 	if wantLong && pos <= 0.34 && st.Trend != signal.StructDowntrend {
-		return autoTrigger{fire: true, side: "long", entry: px,
+		return autoTrigger{fire: true, side: "long", entry: px, market: true,
 			stop: lo * (1 - stopBuf), tp: hi,
 			why: fmt.Sprintf("box %.4f-%.4f pos %.0f%% bottom-third", lo, hi, pos*100)}
 	}
 	if wantShort && pos >= 0.66 && st.Trend != signal.StructUptrend {
-		return autoTrigger{fire: true, side: "short", entry: px,
+		return autoTrigger{fire: true, side: "short", entry: px, market: true,
 			stop: hi * (1 + stopBuf), tp: lo,
 			why: fmt.Sprintf("box %.4f-%.4f pos %.0f%% top-third", lo, hi, pos*100)}
 	}
