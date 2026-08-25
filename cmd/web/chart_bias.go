@@ -163,11 +163,61 @@ func (s *server) handleChartBias(c *gin.Context) {
 		tfs = append(tfs, b)
 	}
 
-	resp := gin.H{"symbol": short, "tfs": tfs}
+	resp := gin.H{"symbol": short, "tfs": tfs, "alignment": computeAlignment(tfs)}
 	biasCacheMu.Lock()
 	biasCache[short] = biasCacheEntry{at: time.Now(), resp: resp}
 	biasCacheMu.Unlock()
 	c.JSON(http.StatusOK, resp)
+}
+
+// computeAlignment summarizes multi-TF agreement so the UI can flag a "TF
+// conflict" — higher TFs (2h/4h) leaning one way while lower TFs (5m/15m/1h)
+// lean the other. That's the low-conviction trap: e.g. buying a 4h pullback
+// zone while 1h/15m have already turned down (an M-top). Aligned = higher
+// conviction; conflict = wait / size down.
+func computeAlignment(tfs []gin.H) gin.H {
+	htf := map[string]bool{"2h": true, "4h": true}
+	htfSum, ltfSum := 0, 0
+	for _, t := range tfs {
+		sc, _ := t["score"].(int)
+		tf, _ := t["tf"].(string)
+		if htf[tf] {
+			htfSum += sc
+		} else {
+			ltfSum += sc
+		}
+	}
+	sign := func(n int) int {
+		switch {
+		case n > 0:
+			return 1
+		case n < 0:
+			return -1
+		default:
+			return 0
+		}
+	}
+	word := func(s int) string {
+		switch {
+		case s > 0:
+			return "多"
+		case s < 0:
+			return "空"
+		default:
+			return "中性"
+		}
+	}
+	h, l := sign(htfSum), sign(ltfSum)
+	switch {
+	case h != 0 && l != 0 && h != l:
+		return gin.H{"state": "conflict", "label": "⚠ TF 衝突 HTF" + word(h) + "/LTF" + word(l)}
+	case h >= 0 && l >= 0 && (h > 0 || l > 0):
+		return gin.H{"state": "aligned-long", "label": "✓ TF 一致偏多"}
+	case h <= 0 && l <= 0 && (h < 0 || l < 0):
+		return gin.H{"state": "aligned-short", "label": "✓ TF 一致偏空"}
+	default:
+		return gin.H{"state": "mixed", "label": "TF 混合/中性"}
+	}
 }
 
 // ── Top ticker bar ──────────────────────────────────────────────────

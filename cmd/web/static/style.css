@@ -6113,3 +6113,14 @@ html[data-density="compact"] .setups-table {
 /* /calendar — earnings category badge (per-symbol earnings blackout, merged
    into the macro calendar). Purple to distinguish from macro categories. */
 .cal-cat.cat-earnings { background: var(--wash-blue); color: var(--blue); }
+
+/* TF-alignment badge in the /chart tf-bias panel (read-aid: flags when higher
+   TFs and lower TFs disagree = low-conviction conflict). */
+.tf-bias-align {
+    font-size: var(--fs-xs); font-weight: 700; text-align: center;
+    padding: 2px 4px; border-radius: var(--r-sm); margin-bottom: 3px; white-space: nowrap;
+}
+.tf-bias-align.align-conflict     { background: var(--wash-red);    color: var(--red); }
+.tf-bias-align.align-aligned-long { background: var(--wash-green);  color: var(--green); }
+.tf-bias-align.align-aligned-short{ background: var(--wash-red);    color: var(--red); }
+.tf-bias-align.align-mixed        { background: var(--wash-dim);    color: var(--text-dim); }

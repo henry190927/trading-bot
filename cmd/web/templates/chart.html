@@ -2127,6 +2127,9 @@
             .then(function (d) {
                 if (!d || !d.tfs) return;
                 var html = '<div class="tf-bias-title">TF bias</div>';
+                if (d.alignment && d.alignment.label) {
+                    html += '<div class="tf-bias-align align-' + d.alignment.state + '">' + d.alignment.label + '</div>';
+                }
                 d.tfs.forEach(function (t) {
                     var m = biasMeta(t.dir);
                     var sc = (t.score >= 0 ? '+' : '') + t.score;
