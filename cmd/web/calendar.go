@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/macro"
 )
 
@@ -56,39 +57,72 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 	now := time.Now().UTC()
 	tpe := time.FixedZone("Asia/Taipei", 8*3600)
 
-	all := macro.All()
-	sorted := make([]macro.Event, len(all))
-	copy(sorted, all)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].DatetimeUTC.Before(sorted[j].DatetimeUTC) })
-
-	var months []calMonth
-	curKey := ""
-	for _, e := range sorted {
-		start, end := e.Window()
-		status := "upcoming"
+	statusOf := func(start, end time.Time) string {
 		switch {
 		case now.After(end):
-			status = "past"
+			return "past"
 		case !now.Before(start) && now.Before(end):
-			status = "active"
+			return "active"
+		default:
+			return "upcoming"
 		}
+	}
+
+	// Merge macro events + per-symbol earnings (same gates the engine uses) into
+	// one datetime-sorted stream so both show on the calendar.
+	type dated struct {
+		dt time.Time
+		ev calEvent
+	}
+	var items []dated
+
+	for _, e := range macro.All() {
+		start, end := e.Window()
 		ev := calEvent{
 			Name:    e.Name,
 			Cat:     categorizeEvent(e.Name),
 			WhenUTC: e.DatetimeUTC.Format("Jan 02 15:04"),
 			WhenTPE: e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
 			Window:  fmt.Sprintf("−%dm / +%dm", e.BeforeMinutes, e.AfterMinutes),
-			Status:  status,
+			Status:  statusOf(start, end),
 		}
-		if status == "upcoming" {
+		if ev.Status == "upcoming" {
 			ev.Days = int(e.DatetimeUTC.Sub(now).Hours() / 24)
 		}
-		key := e.DatetimeUTC.Format("2006-01")
+		items = append(items, dated{e.DatetimeUTC, ev})
+	}
+
+	for _, e := range earnings.Default().Events() {
+		start, end := e.Window()
+		name := e.Symbol + " earnings"
+		if e.When != "" {
+			name += " (" + e.When + ")"
+		}
+		ev := calEvent{
+			Name:    name,
+			Cat:     "earnings",
+			WhenUTC: e.DatetimeUTC.Format("Jan 02 15:04"),
+			WhenTPE: e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
+			Window:  fmt.Sprintf("−%dm / +%dm", e.BeforeMinutes, e.AfterMinutes),
+			Status:  statusOf(start, end),
+		}
+		if ev.Status == "upcoming" {
+			ev.Days = int(e.DatetimeUTC.Sub(now).Hours() / 24)
+		}
+		items = append(items, dated{e.DatetimeUTC, ev})
+	}
+
+	sort.Slice(items, func(i, j int) bool { return items[i].dt.Before(items[j].dt) })
+
+	var months []calMonth
+	curKey := ""
+	for _, it := range items {
+		key := it.dt.Format("2006-01")
 		if key != curKey {
-			months = append(months, calMonth{Label: e.DatetimeUTC.Format("January 2006")})
+			months = append(months, calMonth{Label: it.dt.Format("January 2006")})
 			curKey = key
 		}
-		months[len(months)-1].Events = append(months[len(months)-1].Events, ev)
+		months[len(months)-1].Events = append(months[len(months)-1].Events, it.ev)
 	}
 
 	var activeName, nextName, nextWhen string

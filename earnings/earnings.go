@@ -251,6 +251,16 @@ func (c *Calendar) UpdatedAt() time.Time {
 	return c.updated
 }
 
+// Events returns a copy of all loaded events (windows already defaulted at
+// load) — for display surfaces like the /calendar page.
+func (c *Calendar) Events() []Event {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make([]Event, len(c.events))
+	copy(out, c.events)
+	return out
+}
+
 // Symbols returns the distinct tickers present in the calendar, sorted.
 func (c *Calendar) Symbols() []string {
 	c.mu.RLock()

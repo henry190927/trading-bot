@@ -6109,3 +6109,7 @@ html[data-density="compact"] .setups-table {
 .news-item-meta { font-size: var(--fs-xs); color: var(--text-dim); }
 .news-empty { color: var(--text-dim); font-size: var(--fs-sm); padding: var(--sp-4); text-align: center; }
 .news-loading { margin: var(--sp-3) var(--sp-2); }
+
+/* /calendar — earnings category badge (per-symbol earnings blackout, merged
+   into the macro calendar). Purple to distinguish from macro categories. */
+.cal-cat.cat-earnings { background: var(--wash-blue); color: var(--blue); }
