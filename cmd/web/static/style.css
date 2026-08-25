@@ -6124,3 +6124,12 @@ html[data-density="compact"] .setups-table {
 .tf-bias-align.align-aligned-long { background: var(--wash-green);  color: var(--green); }
 .tf-bias-align.align-aligned-short{ background: var(--wash-red);    color: var(--red); }
 .tf-bias-align.align-mixed        { background: var(--wash-dim);    color: var(--text-dim); }
+
+/* HVN target line in the /chart tf-bias panel (nearest chip-concentration
+   above/below = target reference; read-aid #2). */
+.tf-bias-hvn {
+    font-size: var(--fs-xs); font-weight: 700; text-align: center;
+    color: var(--dv-purple); background: var(--wash-dim);
+    padding: 2px 4px; border-radius: var(--r-sm); margin-top: 3px;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}

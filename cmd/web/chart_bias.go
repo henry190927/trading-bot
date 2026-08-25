@@ -150,6 +150,8 @@ func (s *server) handleChartBias(c *gin.Context) {
 	defer cancel()
 
 	tfs := make([]gin.H, 0, len(biasStripTFs))
+	var refCandles []market.Candle
+	var refPrice float64
 	for _, tfStr := range biasStripTFs {
 		tf := market.Timeframe(tfStr)
 		view := s.scanOne(ctx, sym, tf)
@@ -161,9 +163,15 @@ func (s *server) handleChartBias(c *gin.Context) {
 		b := computeTFBias(st, view.Signal)
 		b["tf"] = tfStr
 		tfs = append(tfs, b)
+		if tfStr == "1h" {
+			refCandles, refPrice = view.Candles, view.Signal.Price
+		}
 	}
 
 	resp := gin.H{"symbol": short, "tfs": tfs, "alignment": computeAlignment(tfs)}
+	if h := computeHVNTargets(refCandles, refPrice); h != nil {
+		resp["hvn"] = h
+	}
 	biasCacheMu.Lock()
 	biasCache[short] = biasCacheEntry{at: time.Now(), resp: resp}
 	biasCacheMu.Unlock()
@@ -218,6 +226,45 @@ func computeAlignment(tfs []gin.H) gin.H {
 	default:
 		return gin.H{"state": "mixed", "label": "TF 混合/中性"}
 	}
+}
+
+// computeHVNTargets returns the nearest volume HVN (chip-concentration) above
+// and below the current price — the "target = 短期籌碼密集區" the SMC read uses.
+// Built from a RECENT 1h window (~100 bars) so the profile reflects current
+// positioning, not the stale multi-week accumulation range. Returns nil if
+// there isn't enough data.
+func computeHVNTargets(candles []market.Candle, price float64) gin.H {
+	if len(candles) < 40 || price <= 0 {
+		return nil
+	}
+	start := len(candles) - 100
+	if start < 0 {
+		start = 0
+	}
+	vp := indicator.BuildVolumeProfile(candles[start:], 80, 6)
+	var above, below float64
+	for _, h := range vp.HVN {
+		if h > price {
+			if above == 0 || h < above {
+				above = h
+			}
+		} else if h < price {
+			if below == 0 || h > below {
+				below = h
+			}
+		}
+	}
+	if above == 0 && below == 0 {
+		return nil
+	}
+	out := gin.H{"poc": vp.POC}
+	if above > 0 {
+		out["above"] = above // nearest HVN overhead — long target / short cap
+	}
+	if below > 0 {
+		out["below"] = below // nearest HVN underneath — short target / long floor
+	}
+	return out
 }
 
 // ── Top ticker bar ──────────────────────────────────────────────────

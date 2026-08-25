@@ -2143,6 +2143,13 @@
                           + '<span class="tf-bias-dot">' + m.dot + '</span>'
                           + '<span class="tf-bias-sc">' + sc + '</span></div>';
                 });
+                if (d.hvn && (d.hvn.above || d.hvn.below)) {
+                    var fmtH = function (v) { return v >= 1000 ? v.toFixed(0) : (v >= 1 ? v.toFixed(2) : v.toFixed(4)); };
+                    var hv = '';
+                    if (d.hvn.above) hv += '↑' + fmtH(d.hvn.above);
+                    if (d.hvn.below) hv += (hv ? '  ' : '') + '↓' + fmtH(d.hvn.below);
+                    html += '<div class="tf-bias-hvn" title="最近的籌碼密集區 (VP HVN, 近100根1h) — 目標參考:↑多單目標/空單上限  ↓空單目標/多單支撐">🎯 ' + hv + '</div>';
+                }
                 el.innerHTML = html;
             })
             .catch(function () { /* strip is best-effort; ignore failures */ });
