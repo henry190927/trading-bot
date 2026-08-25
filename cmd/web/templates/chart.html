@@ -2150,6 +2150,12 @@
                     if (d.hvn.below) hv += (hv ? '  ' : '') + '↓' + fmtH(d.hvn.below);
                     html += '<div class="tf-bias-hvn" title="最近的籌碼密集區 (VP HVN, 近100根1h) — 目標參考:↑多單目標/空單上限  ↓空單目標/多單支撐">🎯 ' + hv + '</div>';
                 }
+                if (d.range && d.range.lo) {
+                    var rf = function (v) { return v >= 1000 ? v.toFixed(0) : (v >= 1 ? v.toFixed(2) : v.toFixed(4)); };
+                    var rzcls = d.range.isRange ? ('rzone-' + d.range.zone) : 'rzone-trend';
+                    html += '<div class="tf-bias-range ' + rzcls + '" title="近24h震盪箱 · 現價在箱內位置(0=底 100=頂) · ' + d.range.action + '">'
+                          + '📦 ' + rf(d.range.lo) + '–' + rf(d.range.hi) + ' ·' + d.range.pos + '%<br><span class="tf-range-act">' + d.range.action + '</span></div>';
+                }
                 el.innerHTML = html;
             })
             .catch(function () { /* strip is best-effort; ignore failures */ });

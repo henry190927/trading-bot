@@ -6133,3 +6133,11 @@ html[data-density="compact"] .setups-table {
     padding: 2px 4px; border-radius: var(--r-sm); margin-top: 3px;
     font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+
+/* Range-box line in /chart tf-bias panel (range-mode read-aid: edge vs middle). */
+.tf-bias-range { font-size: var(--fs-xs); font-weight: 700; text-align: center; padding: 2px 4px; border-radius: var(--r-sm); margin-top: 3px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.tf-bias-range .tf-range-act { font-weight: 400; font-size: 0.9em; opacity: .9; }
+.tf-bias-range.rzone-bottom { background: var(--wash-green); color: var(--green); }   /* at floor → buy edge */
+.tf-bias-range.rzone-top    { background: var(--wash-red);   color: var(--red); }     /* at ceiling → sell edge */
+.tf-bias-range.rzone-middle { background: var(--wash-yellow);color: var(--yellow); }  /* middle → don't trade */
+.tf-bias-range.rzone-trend  { background: var(--wash-dim);   color: var(--text-dim); }

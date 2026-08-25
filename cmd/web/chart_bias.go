@@ -168,9 +168,13 @@ func (s *server) handleChartBias(c *gin.Context) {
 		}
 	}
 
-	resp := gin.H{"symbol": short, "tfs": tfs, "alignment": computeAlignment(tfs)}
+	align := computeAlignment(tfs)
+	resp := gin.H{"symbol": short, "tfs": tfs, "alignment": align}
 	if h := computeHVNTargets(refCandles, refPrice); h != nil {
 		resp["hvn"] = h
+	}
+	if rg := computeRange(refCandles, refPrice, fmt.Sprint(align["state"])); rg != nil {
+		resp["range"] = rg
 	}
 	biasCacheMu.Lock()
 	biasCache[short] = biasCacheEntry{at: time.Now(), resp: resp}
@@ -225,6 +229,61 @@ func computeAlignment(tfs []gin.H) gin.H {
 		return gin.H{"state": "aligned-short", "label": "✓ TF 一致偏空"}
 	default:
 		return gin.H{"state": "mixed", "label": "TF 混合/中性"}
+	}
+}
+
+// computeRange detects the recent trading box (last ~24×1h swing hi/lo) and
+// where price sits in it. In a NEUTRAL/chop regime (alignment mixed/conflict)
+// the right play is mean-reversion at the EDGES — buy the bottom third, short
+// the top third, DON'T trade the middle (equidistant = worst R:R, whipsawed
+// both ways). This is the "range mode" complement to trend-retrace zone entries.
+func computeRange(candles []market.Candle, price float64, alignState string) gin.H {
+	if len(candles) < 30 || price <= 0 {
+		return nil
+	}
+	n := 24
+	if len(candles) < n {
+		n = len(candles)
+	}
+	seg := candles[len(candles)-n:]
+	lo, hi := seg[0].Low, seg[0].High
+	for _, c := range seg {
+		if c.Low < lo {
+			lo = c.Low
+		}
+		if c.High > hi {
+			hi = c.High
+		}
+	}
+	if hi <= lo {
+		return nil
+	}
+	pos := (price - lo) / (hi - lo) // 0 = floor, 1 = ceiling
+	isRange := alignState == "mixed" || alignState == "conflict"
+	zone := "middle"
+	switch {
+	case pos <= 0.34:
+		zone = "bottom"
+	case pos >= 0.66:
+		zone = "top"
+	}
+	action := ""
+	if isRange {
+		switch zone {
+		case "bottom":
+			action = "邊緣做多 (止損箱外)"
+		case "top":
+			action = "邊緣做空 (止損箱外)"
+		default:
+			action = "中間別做"
+		}
+	} else {
+		action = "趨勢中 (等回踩,別 fade 邊緣)"
+	}
+	return gin.H{
+		"lo": lo, "hi": hi, "pos": int(pos*100 + 0.5),
+		"widthPct": (hi - lo) / lo * 100, "zone": zone,
+		"isRange": isRange, "action": action,
 	}
 }
 
