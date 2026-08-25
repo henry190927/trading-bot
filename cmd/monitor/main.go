@@ -121,6 +121,7 @@ func main() {
 	// entries (separate cadence from the confluence scan). No-op if
 	// NTFY_TOPIC is unset. Zones live in /opt/trading/zones.json.
 	go runZoneAlerts(ctx, client)
+	go runAutoExecutor(ctx, client) // auto-order daemon (paper by default; triple-gated for live)
 
 	// MONITOR_ZONE_ONLY=1 keeps ONLY the zone-fade + breakout-tripwire channel
 	// (zonealert) and skips the multi-TF confluence scan / structalert /
