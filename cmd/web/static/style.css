@@ -6063,3 +6063,49 @@ html[data-density="compact"] .setups-table {
     font-weight: 400; text-transform: none; letter-spacing: 0;
     color: var(--text-dim); font-size: var(--fs-xs);
 }
+
+/* =====================================================================
+   Per-stock news drawer (/fundamentals) — click a ticker → Finnhub company-news
+   ===================================================================== */
+.sym-news-link {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: var(--text); font: inherit; display: inline-flex; align-items: center; gap: 4px;
+    -webkit-tap-highlight-color: transparent;
+}
+.sym-news-link:hover { color: var(--blue); }
+.sym-news-link .sym-news-ico { font-size: .8em; opacity: .55; }
+.sym-news-link:hover .sym-news-ico { opacity: 1; }
+
+.news-backdrop {
+    position: fixed; inset: 0; z-index: 70;
+    background: rgba(0,0,0,.5); backdrop-filter: blur(2px);
+    display: flex; align-items: flex-start; justify-content: center; padding-top: 8vh;
+}
+.news-backdrop[hidden] { display: none; }
+.news-modal {
+    width: min(560px, 94vw); max-height: 80vh; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); box-shadow: var(--shadow-2); overflow: hidden;
+}
+.news-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border);
+}
+.news-title { font-weight: 700; color: var(--text); font-size: var(--fs-md); }
+.news-close {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: var(--r-sm); cursor: pointer; width: 30px; height: 30px; line-height: 1;
+}
+.news-close:hover { color: var(--text); border-color: var(--blue); }
+.news-body { overflow-y: auto; padding: var(--sp-2) var(--sp-3); }
+.news-item {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: var(--sp-3) var(--sp-2); border-bottom: 1px solid var(--border);
+    text-decoration: none; color: var(--text);
+}
+.news-item:last-child { border-bottom: none; }
+.news-item:hover { background: var(--row-hover); }
+.news-item-head { font-size: var(--fs-sm); line-height: 1.35; }
+.news-item-meta { font-size: var(--fs-xs); color: var(--text-dim); }
+.news-empty { color: var(--text-dim); font-size: var(--fs-sm); padding: var(--sp-4); text-align: center; }
+.news-loading { margin: var(--sp-3) var(--sp-2); }

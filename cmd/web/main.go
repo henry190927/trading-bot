@@ -141,6 +141,7 @@ func main() {
 	r.GET("/setups", srv.handleSetupsList)
 	r.GET("/tips", srv.handleTipsPage)
 	r.GET("/fundamentals", srv.handleFundamentalsPage)
+	r.GET("/api/stock/news", srv.handleStockNews)
 	r.GET("/tw", srv.handleTWStocksPage)
 	r.GET("/calendar", srv.handleCalendarPage)
 	r.POST("/api/setups/refresh", srv.handleAPISetupsRefresh)

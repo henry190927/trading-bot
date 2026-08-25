@@ -87,7 +87,7 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td class="fund-cell-sym"><strong>{{.Symbol}}</strong></td>
+          <td class="fund-cell-sym"><button type="button" class="sym-news-link" data-sym="{{.Symbol}}" title="看 {{.Symbol}} 近期新聞"><strong>{{.Symbol}}</strong> <span class="sym-news-ico">📰</span></button></td>
           {{if .Err}}
             <td colspan="11" class="cs-dim">{{.Err}}</td>
           {{else}}
@@ -116,5 +116,57 @@
   </div>
   {{end}}
 </main>
+
+<!-- Per-stock news drawer — click a ticker to live-fetch Finnhub company-news
+     (1h cached server-side). Separate from the table so tablekit sort/paging
+     doesn't touch it. -->
+<div class="news-backdrop" id="news-backdrop" hidden>
+  <div class="news-modal" role="dialog" aria-modal="true" aria-label="stock news">
+    <div class="news-head">
+      <span class="news-title" id="news-title">—</span>
+      <button type="button" class="news-close" id="news-close" aria-label="close">✕</button>
+    </div>
+    <div class="news-body" id="news-body"></div>
+  </div>
+</div>
+<script>
+  (function () {
+    var bd = document.getElementById('news-backdrop'),
+        titleEl = document.getElementById('news-title'),
+        bodyEl = document.getElementById('news-body');
+    if (!bd) return;
+    function close() { bd.hidden = true; }
+    function fmtDate(sec) {
+      if (!sec) return '';
+      try { var d = new Date(sec * 1000); return (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); } catch (e) { return ''; }
+    }
+    function open(sym) {
+      titleEl.textContent = sym + ' · 近期新聞';
+      bodyEl.innerHTML = '<div class="news-loading skeleton skel-line w90"></div><div class="news-loading skeleton skel-line w70"></div><div class="news-loading skeleton skel-line w90"></div>';
+      bd.hidden = false;
+      fetch('/api/stock/news?symbol=' + encodeURIComponent(sym))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var news = d.news || [];
+          if (d.error && !news.length) { bodyEl.innerHTML = '<p class="news-empty">抓取失敗:' + d.error + '</p>'; return; }
+          if (!news.length) { bodyEl.innerHTML = '<p class="news-empty">近兩週無新聞</p>'; return; }
+          bodyEl.innerHTML = news.map(function (n) {
+            return '<a class="news-item" href="' + n.url + '" target="_blank" rel="noopener noreferrer">' +
+                   '<span class="news-item-head">' + (n.headline || '') + '</span>' +
+                   '<span class="news-item-meta">' + (n.source || '') + ' · ' + fmtDate(n.datetime) + '</span>' +
+                   '</a>';
+          }).join('');
+        })
+        .catch(function (e) { bodyEl.innerHTML = '<p class="news-empty">網路錯誤:' + e.message + '</p>'; });
+    }
+    document.addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('.sym-news-link');
+      if (b) { ev.preventDefault(); open(b.getAttribute('data-sym')); return; }
+      if (ev.target === bd) close();
+    });
+    document.getElementById('news-close').addEventListener('click', close);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !bd.hidden) close(); });
+  })();
+</script>
 </body>
 </html>
