@@ -21,6 +21,7 @@ const (
 type Outcome struct {
 	Status     OutcomeStatus
 	NetR       float64   // realized R: tp = reward:risk (+), stop = -1, no-fill/open = 0
+	UnrealR    float64   // unrealized R for an OPEN trade, marked to the last close (0 otherwise)
 	FillPrice  float64   // = entry when filled
 	ExitPrice  float64   // stop/tp level, or last close if still open
 	FilledAt   time.Time
@@ -117,6 +118,12 @@ func EvaluateFire(f PaperFire, candles []market.Candle, fillWindow int) Outcome 
 	}
 	// still open: unrealized R marked-to-last-close, but NetR stays 0 (not realized).
 	out.BarsHeld = len(fwd) - 1 - fillIdx
+	mark := out.ExitPrice // = last close
+	if long {
+		out.UnrealR = (mark - f.Entry) / risk
+	} else {
+		out.UnrealR = (f.Entry - mark) / risk
+	}
 	return out
 }
 
@@ -129,6 +136,7 @@ type Summary struct {
 	TP      int
 	Stop    int
 	NetR    float64 // sum of realized R (tp + stop)
+	UnrealR float64 // sum of unrealized R across open trades (mark-to-last-close)
 	WinRate float64 // tp / (tp + stop), 0 if none resolved
 	FillPct float64 // filled / total
 }
@@ -144,6 +152,7 @@ func Summarize(outs []Outcome) Summary {
 		case OutOpen:
 			s.Filled++
 			s.Open++
+			s.UnrealR += o.UnrealR
 		case OutTP:
 			s.Filled++
 			s.TP++

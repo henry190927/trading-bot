@@ -63,9 +63,10 @@
       <div><span class="lbl">TP / stop</span><span class="val"><span style="color:var(--green)">{{.Sum.TP}}</span> / <span style="color:var(--red)">{{.Sum.Stop}}</span></span></div>
       <div><span class="lbl">open</span><span class="val">{{.Sum.Open}}</span></div>
       <div><span class="lbl">win-rate</span><span class="val">{{printf "%.0f" (mulPct .Sum.WinRate)}}%</span></div>
-      <div><span class="lbl">net R</span><span class="val" style="color:{{if ge .Sum.NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .Sum.NetR}}R</span></div>
+      <div><span class="lbl">net R <span class="cs-dim">已結算</span></span><span class="val" style="color:{{if ge .Sum.NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .Sum.NetR}}R</span></div>
+      <div><span class="lbl">浮動 R <span class="cs-dim">open</span></span><span class="val" style="color:{{if ge .Sum.UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.8">{{printf "%+.2f" .Sum.UnrealR}}R*</span></div>
     </div>
-    <p class="glossary-hint" style="margin-top:.5rem">fill = 掛價被 K 線觸及(3 根內);outcome 先撞先算,同根撞到則保守算 stop;open = 已進場未出場,netR 只計已結算(tp/stop)。</p>
+    <p class="glossary-hint" style="margin-top:.5rem">fill = 掛價被 K 線觸及(3 根內);outcome 先撞先算,同根撞到則保守算 stop;<b>net R</b> = 已結算(tp/stop),<b>浮動 R*</b> = open 單 mark-to-最後收盤的未實現損益。</p>
   </div>
   {{end}}
 
@@ -74,16 +75,18 @@
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>time</th><th>sym</th><th>tf</th><th>side</th><th>entry</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
+      <thead><tr><th>time</th><th>sym</th><th>tf</th><th>strat</th><th>side</th><th>entry</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
       <tbody>
         {{range .Fires}}
         <tr>
-          <td class="cs-dim">{{.When}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td><td class="dir-{{.Side}}">{{.Side}}</td>
+          <td class="cs-dim">{{.When}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td>
+          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
+          <td class="dir-{{.Side}}">{{.Side}}</td>
           <td class="num">{{printf "%.4f" .Entry}}</td><td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>
           <td class="num cs-dim">{{printf "%.0f" .Margin}}u×{{.Lev}}</td>
           <td>{{if .Live}}<span class="badge b-red">LIVE</span>{{else}}<span class="badge b-yellow">paper</span>{{end}}</td>
           <td><span class="badge {{.StatusClass}}">{{.Status}}</span></td>
-          <td class="num">{{if .Resolved}}<span style="color:{{if ge .NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .NetR}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td class="num">{{if .Resolved}}<span style="color:{{if ge .NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .NetR}}</span>{{else if .Open}}<span title="浮動,mark-to-close" style="color:{{if ge .UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.75;font-style:italic">{{printf "%+.2f" .UnrealR}}*</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
           <td class="cs-dim">{{.Why}}</td>
         </tr>
         {{end}}

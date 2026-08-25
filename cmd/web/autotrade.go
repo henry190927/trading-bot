@@ -59,6 +59,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		When              string
 		Symbol, Side, Why string
 		TF                string
+		Strategy          string
 		Entry, Stop, TP   float64
 		Margin            float64
 		Lev               int
@@ -66,7 +67,9 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		Status            string
 		StatusClass       string
 		NetR              float64
+		UnrealR           float64
 		Resolved          bool // has a realized netR (tp/stop)
+		Open              bool // filled, still running — show unrealized R
 	}
 	var rows []fireRow
 	var outs []autotrade.Outcome
@@ -78,11 +81,20 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 			autotrade.OutTP: "b-green", autotrade.OutStop: "b-red",
 			autotrade.OutNoFill: "b-dim", autotrade.OutOpen: "b-yellow",
 		}[out.Status]
+		strat := f.Strategy
+		if strat == "" { // older records predate the strategy field — infer from the reason
+			if strings.HasPrefix(f.Why, "engine") {
+				strat = "engine"
+			} else {
+				strat = "range-edge"
+			}
+		}
 		rows = append(rows, fireRow{
-			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tf, Side: f.Side, Why: f.Why,
+			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tf, Strategy: strat, Side: f.Side, Why: f.Why,
 			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Margin: f.Margin, Lev: f.Lev, Live: f.Live,
-			Status: string(out.Status), StatusClass: cls, NetR: out.NetR,
+			Status: string(out.Status), StatusClass: cls, NetR: out.NetR, UnrealR: out.UnrealR,
 			Resolved: out.Status == autotrade.OutTP || out.Status == autotrade.OutStop,
+			Open:     out.Status == autotrade.OutOpen,
 		})
 	}
 	sum := autotrade.Summarize(outs)

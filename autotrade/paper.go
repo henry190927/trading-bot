@@ -12,10 +12,11 @@ import (
 // to a JSONL log so the /ops autotrade panel can show what the executor is doing
 // without any real orders.
 type PaperFire struct {
-	Time   time.Time `json:"time"`
-	Symbol string    `json:"symbol"`
-	TF     string    `json:"tf"` // timeframe of the box/trigger — needed to replay outcome
-	Side   string    `json:"side"`
+	Time     time.Time `json:"time"`
+	Symbol   string    `json:"symbol"`
+	TF       string    `json:"tf"`       // timeframe of the box/trigger — needed to replay outcome
+	Strategy string    `json:"strategy"` // "range-edge" | "engine" — which A/B strategy fired this
+	Side     string    `json:"side"`
 	Entry  float64   `json:"entry"`
 	Stop   float64   `json:"stop"`
 	TP     float64   `json:"tp"`
