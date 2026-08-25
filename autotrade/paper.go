@@ -14,6 +14,7 @@ import (
 type PaperFire struct {
 	Time   time.Time `json:"time"`
 	Symbol string    `json:"symbol"`
+	TF     string    `json:"tf"` // timeframe of the box/trigger — needed to replay outcome
 	Side   string    `json:"side"`
 	Entry  float64   `json:"entry"`
 	Stop   float64   `json:"stop"`

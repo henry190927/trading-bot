@@ -1,0 +1,164 @@
+package autotrade
+
+import (
+	"time"
+
+	"myFirstGo/trading-bot/market"
+)
+
+// OutcomeStatus classifies what happened to a paper fire once its closed candles
+// are replayed forward.
+type OutcomeStatus string
+
+const (
+	OutNoFill OutcomeStatus = "no-fill" // limit entry never touched within the fill window
+	OutOpen   OutcomeStatus = "open"    // filled but neither stop nor tp hit yet
+	OutTP     OutcomeStatus = "tp"      // take-profit reached
+	OutStop   OutcomeStatus = "stop"    // stop-loss reached
+)
+
+// Outcome is the replayed result of one PaperFire.
+type Outcome struct {
+	Status     OutcomeStatus
+	NetR       float64   // realized R: tp = reward:risk (+), stop = -1, no-fill/open = 0
+	FillPrice  float64   // = entry when filled
+	ExitPrice  float64   // stop/tp level, or last close if still open
+	FilledAt   time.Time
+	ExitAt     time.Time
+	BarsToFill int // closed bars from fire → fill
+	BarsHeld   int // closed bars from fill → exit (or → last bar if open)
+}
+
+// EvaluateFire replays the closed candles that occur after the fire to classify
+// the paper trade. It models the entry as a resting limit at f.Entry: for a long
+// it fills when a later bar trades down to entry (Low <= entry), for a short when
+// a bar trades up to it (High >= entry). Because range-edge entries sit at the
+// spot price at fire time, the fill is usually immediate; if no bar touches entry
+// within fillWindow bars the trade is a no-fill (price ran away).
+//
+// After fill it scans forward for stop/tp. Same-bar ambiguity resolves to the
+// stop (conservative). candles must be ascending by time; bars at/before the fire
+// are ignored so there is no look-ahead into the bar the order was placed on.
+func EvaluateFire(f PaperFire, candles []market.Candle, fillWindow int) Outcome {
+	long := f.Side == "long"
+	var risk float64
+	if long {
+		risk = f.Entry - f.Stop
+	} else {
+		risk = f.Stop - f.Entry
+	}
+	if risk <= 0 {
+		return Outcome{Status: OutOpen} // malformed bracket — can't score
+	}
+
+	// Only bars that closed after the order existed.
+	var fwd []market.Candle
+	for _, c := range candles {
+		if c.CloseTime.After(f.Time) {
+			fwd = append(fwd, c)
+		}
+	}
+	if len(fwd) == 0 {
+		return Outcome{Status: OutOpen}
+	}
+
+	// --- fill ---
+	fillIdx := -1
+	limit := min(fillWindow, len(fwd))
+	for i := range limit {
+		c := fwd[i]
+		if long && c.Low <= f.Entry {
+			fillIdx = i
+			break
+		}
+		if !long && c.High >= f.Entry {
+			fillIdx = i
+			break
+		}
+	}
+	if fillIdx < 0 {
+		return Outcome{Status: OutNoFill}
+	}
+
+	out := Outcome{
+		Status:     OutOpen,
+		FillPrice:  f.Entry,
+		FilledAt:   fwd[fillIdx].CloseTime,
+		BarsToFill: fillIdx + 1,
+		ExitPrice:  fwd[len(fwd)-1].Close,
+	}
+
+	// --- exit scan (from the fill bar onward, stop checked before tp) ---
+	for i := fillIdx; i < len(fwd); i++ {
+		c := fwd[i]
+		if long {
+			if c.Low <= f.Stop {
+				out.Status, out.ExitPrice, out.NetR = OutStop, f.Stop, (f.Stop-f.Entry)/risk
+				out.ExitAt, out.BarsHeld = c.CloseTime, i-fillIdx
+				return out
+			}
+			if c.High >= f.TP {
+				out.Status, out.ExitPrice, out.NetR = OutTP, f.TP, (f.TP-f.Entry)/risk
+				out.ExitAt, out.BarsHeld = c.CloseTime, i-fillIdx
+				return out
+			}
+		} else {
+			if c.High >= f.Stop {
+				out.Status, out.ExitPrice, out.NetR = OutStop, f.Stop, (f.Entry-f.Stop)/risk
+				out.ExitAt, out.BarsHeld = c.CloseTime, i-fillIdx
+				return out
+			}
+			if c.Low <= f.TP {
+				out.Status, out.ExitPrice, out.NetR = OutTP, f.TP, (f.Entry-f.TP)/risk
+				out.ExitAt, out.BarsHeld = c.CloseTime, i-fillIdx
+				return out
+			}
+		}
+	}
+	// still open: unrealized R marked-to-last-close, but NetR stays 0 (not realized).
+	out.BarsHeld = len(fwd) - 1 - fillIdx
+	return out
+}
+
+// Summary aggregates outcomes across many fires for the panel header.
+type Summary struct {
+	Total   int
+	Filled  int
+	NoFill  int
+	Open    int
+	TP      int
+	Stop    int
+	NetR    float64 // sum of realized R (tp + stop)
+	WinRate float64 // tp / (tp + stop), 0 if none resolved
+	FillPct float64 // filled / total
+}
+
+// Summarize folds a slice of outcomes into a Summary.
+func Summarize(outs []Outcome) Summary {
+	var s Summary
+	s.Total = len(outs)
+	for _, o := range outs {
+		switch o.Status {
+		case OutNoFill:
+			s.NoFill++
+		case OutOpen:
+			s.Filled++
+			s.Open++
+		case OutTP:
+			s.Filled++
+			s.TP++
+			s.NetR += o.NetR
+		case OutStop:
+			s.Filled++
+			s.Stop++
+			s.NetR += o.NetR
+		}
+	}
+	if resolved := s.TP + s.Stop; resolved > 0 {
+		s.WinRate = float64(s.TP) / float64(resolved)
+	}
+	if s.Total > 0 {
+		s.FillPct = float64(s.Filled) / float64(s.Total)
+	}
+	return s
+}
