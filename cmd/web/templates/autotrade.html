@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>autotrade · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+</head>
+<body>
+
+{{template "topnav" .}}
+
+<main class="tips-main">
+  <h1 class="tips-h1">
+    🤖 Auto-executor
+    <span class="tips-sub">paper-first · 開關維持 env/config · 監控唯讀</span>
+  </h1>
+
+  <div class="stats-card">
+    <div class="at-state">
+      <span class="badge {{if .Enabled}}b-blue{{else}}b-dim{{end}}">master {{if .Enabled}}ON{{else}}off{{end}}</span>
+      <span class="badge {{if .Paper}}b-yellow{{else}}b-red{{end}}">{{if .Paper}}PAPER (mock){{else}}LIVE mode{{end}}</span>
+      <span class="badge {{if .EnvArmed}}b-red{{else}}b-dim{{end}}">AUTOTRADE_ENABLED={{if .EnvArmed}}true{{else}}unset{{end}}</span>
+      <span class="badge {{if .LiveArmed}}b-red{{else}}b-green{{end}}">{{if .LiveArmed}}⚠ REAL ORDERS ARMED{{else}}✓ no real orders{{end}}</span>
+    </div>
+    <p class="glossary-hint">
+      真錢需<b>同時</b> master ON + PAPER off + AUTOTRADE_ENABLED=true。目前
+      {{if .LiveArmed}}<b style="color:var(--red)">已武裝真錢</b>{{else}}<b style="color:var(--green)">不會下真單</b>{{end}}。
+      caps: 同時 {{.MaxConc}} 倉 · 總 {{printf "%.0f" .MaxMargin}}u · 日虧 halt {{printf "%.1f" .DailyHaltR}}R · config <code>{{.ConfigPath}}</code>
+    </p>
+  </div>
+
+  <div class="stats-card">
+    <h2 class="section-title">Rules</h2>
+    <div class="dt-scroll">
+    <table class="dt">
+      <thead><tr><th>symbol</th><th>strategy</th><th>tf</th><th>side</th><th>margin</th><th>lev</th><th>stop%</th><th>on</th></tr></thead>
+      <tbody>
+        {{range .Rules}}
+        <tr>
+          <td><strong>{{.Symbol}}</strong></td><td>{{.Strategy}}</td><td>{{.TF}}</td><td class="dir-{{.Side}}">{{.Side}}</td>
+          <td class="num">{{printf "%.0f" .MarginUSDT}}u</td><td class="num">{{.Leverage}}x</td><td class="num">{{printf "%.2f" .StopPct}}</td>
+          <td>{{if .Enabled}}✓{{else}}—{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="stats-card">
+    <h2 class="section-title">Recent fires <span class="section-meta">newest first</span></h2>
+    {{if .Fires}}
+    <div class="dt-scroll">
+    <table class="dt">
+      <thead><tr><th>time</th><th>sym</th><th>side</th><th>entry</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>why</th></tr></thead>
+      <tbody>
+        {{range .Fires}}
+        <tr>
+          <td class="cs-dim">{{.When}}</td><td><strong>{{.Symbol}}</strong></td><td class="dir-{{.Side}}">{{.Side}}</td>
+          <td class="num">{{printf "%.4f" .Entry}}</td><td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>
+          <td class="num cs-dim">{{printf "%.0f" .Margin}}u×{{.Lev}}</td>
+          <td>{{if .Live}}<span class="badge b-red">LIVE</span>{{else}}<span class="badge b-yellow">paper</span>{{end}}</td>
+          <td class="cs-dim">{{.Why}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+    {{else}}
+    <p class="empty">還沒有 fire —— 規則在跑,等 symbol 碰到箱邊(底/頂三分)才會進場。全在箱中間時不動。</p>
+    {{end}}
+    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · 每 60s 掃一次 · fires 寫入 autotrade_paper.jsonl</p>
+  </div>
+</main>
+</body>
+</html>
