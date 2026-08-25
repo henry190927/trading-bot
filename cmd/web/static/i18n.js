@@ -67,12 +67,17 @@
     apply();
     // Mark the active nav link by current path (topnav is now a shared
     // partial with no per-page active class).
+    // Activate only the MOST-SPECIFIC matching link: a bare prefix test lights up
+    // both a parent tab and its child (e.g. /ops and /ops/autotrade), so pick the
+    // longest matching href and mark just that one.
     var path = location.pathname;
+    var best = null, bestLen = -1;
     document.querySelectorAll('.topnav a').forEach(function (a) {
       var h = a.getAttribute('href');
       var on = h === '/' ? (path === '/') : (path === h || path.indexOf(h + '/') === 0);
-      if (on) a.classList.add('active');
+      if (on && h.length > bestLen) { best = a; bestLen = h.length; }
     });
+    if (best) best.classList.add('active');
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'lang-toggle';
