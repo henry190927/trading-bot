@@ -54,6 +54,28 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		klineCache[key] = cs
 		return cs
 	}
+	// Live mark price per symbol (same source as the dashboard's open-position
+	// cards) so an open trade's floating R and any tp/stop cross reflect the
+	// current price, not the last closed candle. Falls back to last close.
+	liveCache := map[string]float64{}
+	liveFor := func(sym, tf string) float64 {
+		if p, ok := liveCache[sym]; ok {
+			return p
+		}
+		var p float64
+		if ms, err := resolveWebSymbol(sym); err == nil {
+			if fr, ferr := s.client.FundingRate(ctx, ms); ferr == nil && fr.MarkPrice > 0 {
+				p = fr.MarkPrice
+			}
+		}
+		if p == 0 { // fall back to the last closed candle
+			if cs := candlesFor(sym, tf); len(cs) > 0 {
+				p = cs[len(cs)-1].Close
+			}
+		}
+		liveCache[sym] = p
+		return p
+	}
 
 	type fireRow struct {
 		When              string
@@ -75,7 +97,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	var outs []autotrade.Outcome
 	for _, f := range fires {
 		tf := tfFor(f)
-		out := autotrade.EvaluateFire(f, candlesFor(f.Symbol, tf), 6)
+		out := autotrade.EvaluateFireLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
 		outs = append(outs, out)
 		cls := map[autotrade.OutcomeStatus]string{
 			autotrade.OutTP: "b-green", autotrade.OutStop: "b-red",

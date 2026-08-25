@@ -72,7 +72,7 @@
       <div><span class="lbl">net R <span class="cs-dim">已結算</span></span><span class="val" style="color:{{if ge .Sum.NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .Sum.NetR}}R</span></div>
       <div><span class="lbl">浮動 R <span class="cs-dim">open</span></span><span class="val" style="color:{{if ge .Sum.UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.8">{{printf "%+.2f" .Sum.UnrealR}}R*</span></div>
     </div>
-    <p class="glossary-hint" style="margin-top:.5rem"><b>pending</b> = 掛價還沒被觸及、6 根內仍在等成交;<b>no-fill</b> = 6 根過了還沒觸及(視為失效);<b>open</b> = 已成交未出場;outcome 先撞先算,同根撞到保守算 stop;<b>net R</b> = 已結算(tp/stop),<b>浮動 R*</b> = open 單 mark-to-最後收盤未實現。fill% 只算已定案的(pending 不計)。</p>
+    <p class="glossary-hint" style="margin-top:.5rem"><b>pending</b> = 掛價還沒被觸及、6 根內仍在等成交;<b>no-fill</b> = 6 根過了還沒觸及(視為失效);<b>open</b> = 已成交未出場;outcome 先撞先算,同根撞到保守算 stop;<b>net R</b> = 已結算(tp/stop)。歷史 tp/stop 用收盤棒補抓 wick,<b>當前狀態疊加即時 mark 價</b>:現價已穿 tp/stop 即結算,否則 <b>浮動 R*</b> = open 單 mark-to-<b>即時價</b>(同 dashboard 開倉卡)。fill% 只算已定案的(pending 不計)。</p>
   </div>
   {{end}}
 
@@ -92,7 +92,7 @@
           <td class="num cs-dim">{{printf "%.0f" .Margin}}u×{{.Lev}}</td>
           <td>{{if .Live}}<span class="badge b-red">LIVE</span>{{else}}<span class="badge b-yellow">paper</span>{{end}}</td>
           <td><span class="badge {{.StatusClass}}">{{.Status}}</span></td>
-          <td class="num">{{if .Resolved}}<span style="color:{{if ge .NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .NetR}}</span>{{else if .Open}}<span title="浮動,mark-to-close" style="color:{{if ge .UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.75;font-style:italic">{{printf "%+.2f" .UnrealR}}*</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td class="num">{{if .Resolved}}<span style="color:{{if ge .NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .NetR}}</span>{{else if .Open}}<span title="浮動,mark-to 即時價" style="color:{{if ge .UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.75;font-style:italic">{{printf "%+.2f" .UnrealR}}*</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
           <td class="cs-dim">{{.Why}}</td>
         </tr>
         {{end}}
@@ -102,8 +102,22 @@
     {{else}}
     <p class="empty">還沒有 fire —— 規則在跑,等 symbol 碰到箱邊(底/頂三分)才會進場。全在箱中間時不動。</p>
     {{end}}
-    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · 每 60s 掃一次 · fires 寫入 autotrade_paper.jsonl</p>
+    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span id="at-refresh">每 30s 自動刷新</span> · 浮動 R 用即時 mark 價 · fires 寫入 autotrade_paper.jsonl</p>
   </div>
 </main>
+<script>
+  // Auto-refresh every 30s so floating R / outcomes stay live without a manual
+  // reload. Only fires while the tab is visible (no background churn), and shows
+  // a small countdown in the footer.
+  (function () {
+    var PERIOD = 30, left = PERIOD, el = document.getElementById('at-refresh');
+    setInterval(function () {
+      if (document.hidden) { left = PERIOD; return; }
+      left -= 1;
+      if (el) el.textContent = '自動刷新 ' + left + 's';
+      if (left <= 0) location.reload();
+    }, 1000);
+  })();
+</script>
 </body>
 </html>

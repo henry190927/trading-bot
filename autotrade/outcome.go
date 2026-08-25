@@ -155,6 +155,69 @@ func EvaluateFire(f PaperFire, candles []market.Candle, expiryBars int) Outcome 
 	return out
 }
 
+// EvaluateFireLive runs the closed-bar EvaluateFire and then overlays the LIVE
+// mark price so the panel doesn't lag a full bar. Closed bars stay authoritative
+// for history (they catch a wick between fill and now); the live price refines
+// only the CURRENT state, exactly like the dashboard's open-position R cards:
+//
+//   - open trade → unrealized R is marked to the live price (not last close), and
+//     if live has already crossed stop/tp the trade is resolved now (a real bracket
+//     tp/stop triggers intrabar, so this is more faithful than waiting for close);
+//   - pending limit → if live has reached entry it fills now and becomes open.
+//
+// Resolved (tp/stop/no-fill) outcomes are left untouched — live can't un-settle
+// them. livePrice<=0 falls back to the pure closed-bar result.
+func EvaluateFireLive(f PaperFire, candles []market.Candle, expiryBars int, livePrice float64) Outcome {
+	out := EvaluateFire(f, candles, expiryBars)
+	if livePrice <= 0 {
+		return out
+	}
+	long := f.Side == "long"
+	var risk float64
+	if long {
+		risk = f.Entry - f.Stop
+	} else {
+		risk = f.Stop - f.Entry
+	}
+	if risk <= 0 {
+		return out
+	}
+
+	// A resting limit the live price has since reached fills now.
+	if out.Status == OutPending {
+		filled := (long && livePrice <= f.Entry) || (!long && livePrice >= f.Entry)
+		if !filled {
+			return out
+		}
+		out.Status, out.FillPrice = OutOpen, f.Entry
+	}
+	if out.Status != OutOpen {
+		return out
+	}
+
+	// Mark to live: resolve if live has crossed stop/tp, else unrealized R.
+	if long {
+		switch {
+		case livePrice <= f.Stop:
+			out.Status, out.ExitPrice, out.NetR, out.UnrealR = OutStop, f.Stop, (f.Stop-f.Entry)/risk, 0
+		case livePrice >= f.TP:
+			out.Status, out.ExitPrice, out.NetR, out.UnrealR = OutTP, f.TP, (f.TP-f.Entry)/risk, 0
+		default:
+			out.ExitPrice, out.UnrealR = livePrice, (livePrice-f.Entry)/risk
+		}
+	} else {
+		switch {
+		case livePrice >= f.Stop:
+			out.Status, out.ExitPrice, out.NetR, out.UnrealR = OutStop, f.Stop, (f.Entry-f.Stop)/risk, 0
+		case livePrice <= f.TP:
+			out.Status, out.ExitPrice, out.NetR, out.UnrealR = OutTP, f.TP, (f.Entry-f.TP)/risk, 0
+		default:
+			out.ExitPrice, out.UnrealR = livePrice, (f.Entry-livePrice)/risk
+		}
+	}
+	return out
+}
+
 // Summary aggregates outcomes across many fires for the panel header.
 type Summary struct {
 	Total   int

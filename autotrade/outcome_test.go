@@ -7,6 +7,55 @@ import (
 	"myFirstGo/trading-bot/market"
 )
 
+func TestEvaluateFireLive(t *testing.T) {
+	fireT := time.Date(2026, 8, 26, 0, 0, 0, 0, time.UTC)
+	b := func(i int, lo, hi float64) market.Candle { return bar(fireT.Add(time.Duration(i)*time.Hour), lo, hi) }
+	longOpen := PaperFire{Time: fireT, Side: "long", Entry: 100, Stop: 95, TP: 110}
+	longOpenCS := []market.Candle{b(0, 99, 101)} // fills bar0, last close 100, open on closed bars
+
+	cases := []struct {
+		name       string
+		f          PaperFire
+		cs         []market.Candle
+		live       float64
+		wantStatus OutcomeStatus
+		wantR      float64 // netR for resolved, UnrealR for open
+	}{
+		{"open marks unreal to live", longOpen, longOpenCS, 105, OutOpen, 1.0},
+		{"live past tp resolves tp", longOpen, longOpenCS, 111, OutTP, 2.0},
+		{"live past stop resolves stop", longOpen, longOpenCS, 94, OutStop, -1.0},
+		{
+			// resting short limit above spot; live rallies to entry → fills → open
+			name: "pending fills when live reaches entry", live: 2484,
+			f:          PaperFire{Time: fireT, Side: "short", Entry: 2483, Stop: 2521, TP: 2446},
+			cs:         []market.Candle{b(0, 2460, 2472)},
+			wantStatus: OutOpen, wantR: (2483.0 - 2484.0) / (2521.0 - 2483.0),
+		},
+		{
+			// closed-bar already stopped; a live spike above tp must NOT un-resolve it
+			name: "resolved stop stays stop despite live spike", live: 120,
+			f:          longOpen,
+			cs:         []market.Candle{b(0, 100, 100), b(1, 94, 101)},
+			wantStatus: OutStop, wantR: -1.0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EvaluateFireLive(tc.f, tc.cs, 6, tc.live)
+			if got.Status != tc.wantStatus {
+				t.Fatalf("status = %q, want %q", got.Status, tc.wantStatus)
+			}
+			gotR := got.NetR
+			if tc.wantStatus == OutOpen {
+				gotR = got.UnrealR
+			}
+			if d := gotR - tc.wantR; d > 1e-9 || d < -1e-9 {
+				t.Errorf("R = %v, want %v", gotR, tc.wantR)
+			}
+		})
+	}
+}
+
 func bar(open time.Time, lo, hi float64) market.Candle {
 	return market.Candle{OpenTime: open, CloseTime: open.Add(time.Hour), Low: lo, High: hi, Close: (lo + hi) / 2}
 }
