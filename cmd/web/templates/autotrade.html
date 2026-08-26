@@ -89,7 +89,7 @@
           <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
           <td class="dir-{{.Side}}">{{.Side}}</td>
           <td class="num">{{printf "%.4f" .Entry}}</td>
-          <td class="num">{{if .Cur}}<span style="color:{{if or (and (eq .Side "long") (ge .Cur .Entry)) (and (eq .Side "short") (le .Cur .Entry))}}var(--green){{else}}var(--red){{end}}">{{printf "%.4f" .Cur}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td class="num">{{if .Cur}}<span style="color:{{if .CurUp}}var(--green){{else}}var(--red){{end}}">{{printf "%.4f" .Cur}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
           <td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>
           <td class="num cs-dim">{{printf "%.0f" .Margin}}u×{{.Lev}}</td>
           <td>{{if .Live}}<span class="badge b-red">LIVE</span>{{else}}<span class="badge b-yellow">paper</span>{{end}}</td>

@@ -84,6 +84,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		Strategy          string
 		Entry, Stop, TP   float64
 		Cur               float64 // live mark price
+		CurUp             bool    // current price is on the profitable side of entry
 		Margin            float64
 		Lev               int
 		Live              bool
@@ -132,9 +133,11 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		p := positions[i]
 		f, out := p.Fire, p.Outcome
 		outs = append(outs, out)
+		cur := liveFor(f.Symbol, tfFor(f))
+		curUp := (f.Side == "long" && cur >= f.Entry) || (f.Side == "short" && cur <= f.Entry)
 		rows = append(rows, fireRow{
 			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tfFor(f), Strategy: f.Strategy, Side: f.Side, Why: f.Why,
-			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Cur: liveFor(f.Symbol, tfFor(f)), Margin: f.Margin, Lev: f.Lev, Live: f.Live,
+			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Cur: cur, CurUp: curUp, Margin: f.Margin, Lev: f.Lev, Live: f.Live,
 			Status: string(out.Status), StatusClass: clsFor[out.Status], NetR: out.NetR, UnrealR: out.UnrealR,
 			Absorbed: p.Absorbed,
 			Resolved: out.Status == autotrade.OutTP || out.Status == autotrade.OutStop,
