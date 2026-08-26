@@ -81,14 +81,16 @@
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>time</th><th>sym</th><th>tf</th><th>strat</th><th>side</th><th>entry</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
+      <thead><tr><th>time</th><th>sym</th><th>tf</th><th>strat</th><th>side</th><th>entry</th><th>現價</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
       <tbody>
         {{range .Fires}}
         <tr>
           <td class="cs-dim">{{.When}}{{if .Absorbed}} <span class="badge b-dim" title="收合了 {{.Absorbed}} 筆同 setup 的每小時重複進場">＋{{.Absorbed}}</span>{{end}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td>
           <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
           <td class="dir-{{.Side}}">{{.Side}}</td>
-          <td class="num">{{printf "%.4f" .Entry}}</td><td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>
+          <td class="num">{{printf "%.4f" .Entry}}</td>
+          <td class="num">{{if .Cur}}<span style="color:{{if or (and (eq .Side "long") (ge .Cur .Entry)) (and (eq .Side "short") (le .Cur .Entry))}}var(--green){{else}}var(--red){{end}}">{{printf "%.4f" .Cur}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>
           <td class="num cs-dim">{{printf "%.0f" .Margin}}u×{{.Lev}}</td>
           <td>{{if .Live}}<span class="badge b-red">LIVE</span>{{else}}<span class="badge b-yellow">paper</span>{{end}}</td>
           <td><span class="badge {{.StatusClass}}">{{.Status}}</span></td>

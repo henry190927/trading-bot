@@ -83,6 +83,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		TF                string
 		Strategy          string
 		Entry, Stop, TP   float64
+		Cur               float64 // live mark price
 		Margin            float64
 		Lev               int
 		Live              bool
@@ -133,7 +134,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		outs = append(outs, out)
 		rows = append(rows, fireRow{
 			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tfFor(f), Strategy: f.Strategy, Side: f.Side, Why: f.Why,
-			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Margin: f.Margin, Lev: f.Lev, Live: f.Live,
+			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Cur: liveFor(f.Symbol, tfFor(f)), Margin: f.Margin, Lev: f.Lev, Live: f.Live,
 			Status: string(out.Status), StatusClass: clsFor[out.Status], NetR: out.NetR, UnrealR: out.UnrealR,
 			Absorbed: p.Absorbed,
 			Resolved: out.Status == autotrade.OutTP || out.Status == autotrade.OutStop,
