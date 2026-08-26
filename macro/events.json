@@ -37,6 +37,12 @@
       "blackout_after_min": 90
     },
     {
+      "name": "US PCE (July)",
+      "datetime_utc": "2026-08-26T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
       "name": "Jackson Hole — Warsh keynote",
       "datetime_utc": "2026-08-28T14:00:00Z",
       "blackout_before_min": 180,
@@ -55,9 +61,33 @@
       "blackout_after_min": 120
     },
     {
+      "name": "US PCE (August)",
+      "datetime_utc": "2026-09-30T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
       "name": "FOMC Minutes (September)",
       "datetime_utc": "2026-10-07T18:00:00Z",
       "blackout_before_min": 30,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "US PCE (September)",
+      "datetime_utc": "2026-10-29T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "US PCE (October)",
+      "datetime_utc": "2026-11-25T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "US PCE (November)",
+      "datetime_utc": "2026-12-23T12:30:00Z",
+      "blackout_before_min": 60,
       "blackout_after_min": 90
     }
   ]
