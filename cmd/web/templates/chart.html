@@ -1214,11 +1214,17 @@
             // neutral-trend zone is drawn here for reference but the alert system
             // won't act on it. Flag it so the chart and ntfy never seem to disagree.
             var zoneDirectional = (s.trend === 'HH-HL uptrend' || s.trend === 'LH-LL downtrend');
+            // Label the zone by leg direction so it's unambiguous which SIDE it's an
+            // entry for: up-leg = buy-the-pullback (多區), down-leg = sell-the-rally (空區).
+            var zoneSide = s.zone.dir === 'up' ? '多區(買回檔)' : '空區(賣反彈)';
             var zoneWrap = document.getElementById('cs-zone-wrap');
-            if (zoneWrap) zoneWrap.title = zoneDirectional
+            if (zoneWrap) zoneWrap.title = (zoneDirectional
                 ? '方向性樞紐區 — auto ntfy 會採用'
-                : 'neutral 趨勢:僅參考,auto ntfy 不會對此區發警報';
-            csSet('cs-zone', csFmt(s.zone.lo) + '–' + csFmt(s.zone.hi) + (zoneDirectional ? '' : ' ⚪參考'));
+                : 'neutral 趨勢:僅參考,auto ntfy 不會對此區發警報')
+                + ' ｜ ' + zoneSide + '(可能與 bias 動能方向相反 = 反彈進 fade 區)';
+            csSet('cs-zone', csFmt(s.zone.lo) + '–' + csFmt(s.zone.hi)
+                + ' ' + (s.zone.dir === 'up' ? '🟢多區' : '🔴空區')
+                + (zoneDirectional ? '' : ' ⚪參考'));
             csSet('cs-inzone', (s.inZone ? '✓ 區內' : '✗ 區外') + (zoneLive ? ' ⏳' : ''));
             csMark('cs-inzone', zoneLive);
             csSet('cs-target', csFmt(s.zone.target) + ' / inv ' + csFmt(s.zone.invalidate));
