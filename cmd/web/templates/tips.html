@@ -252,6 +252,99 @@
     </div>
   </details>
 
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🪝</span>
+      <span class="tip-title">
+        <span class="i18n-en">Don't put the stop at the invalidate — it's a sweep magnet</span>
+        <span class="i18n-zh">止損別貼 invalidate —— 那是掃損磁鐵</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>Touch-entry into the pivot zone + stop just past the invalidate = you ARE the liquidity.</b> The invalidate line only breaks structure on a <em>close</em>, but intrabar wicks routinely spear through it to grab stops, then reverse.</span>
+          <span class="i18n-zh"><b>樞紐區觸價進 + 止損貼 invalidate = 你就是被掃的流動性。</b> invalidate 只有<em>收盤</em>破才算結構失效,但盤中影線常常插穿它去吃停損、再反轉。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>Fix:</b> enter on <b>close-reclaim confirmation</b> (a bar closes back below/above after tagging the zone — so you're positioned AFTER the sweep), and place the hard stop <b>beyond the sweep high/low</b> (invalidate + buffer / past the swing), not on the line itself.</span>
+          <span class="i18n-zh"><b>修法:</b>等<b>收回確認</b>才進(碰過區後一根收回,你就站在 sweep <em>之後</em>),硬止損放在 <b>sweep 高/低之外</b>(invalidate + 緩衝 / 過 swing),不是貼在線上。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en"><b>Not "widen the stop" — reposition it.</b> Same direction, same target, only the entry timing + stop location change → the difference between −1R and +4R.</span>
+          <span class="i18n-zh"><b>不是「拉寬」,是「換位置」。</b> 同方向同目標,只改進場時機 + 止損位 → 就是 −1R 和 +4R 的差別。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 Live example (ETH, PCE day): zone-touch short 2461–2465 stop 2472 → swept by the 2474.6 wick (−1R). Confirmed short after the 2467.7 close, stop above 2474.6 → rode to 2428 (≈+4R). Ties to your "stop-then-reverse = fix execution, not stop width".</span>
+        <span class="i18n-zh">📊 活例(ETH,PCE 當天):樞紐觸價空 2461–2465、止損 2472 → 被 2474.6 插針掃(−1R)。等 2467.7 收盤確認後空、止損放 2474.6 上 → 吃到 2428(≈+4R)。呼應你「stop-then-reverse = 修執行,不是拉寬停損」。</span>
+      </p>
+    </div>
+  </details>
+
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🎯</span>
+      <span class="tip-title">
+        <span class="i18n-en">Trade the edges of a range, never the middle</span>
+        <span class="i18n-zh">箱體只做邊,不做中</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>Mid-range entry (pos ~50%) has no edge.</b> You're close to BOTH stop and target, so normal chop shakes you out — the "awkward entry" feeling is real, it's a structural problem, not bad luck.</span>
+          <span class="i18n-zh"><b>箱中進場(pos ~50%)沒有 edge。</b> 離止損和目標都近,一般洗盤就把你甩出去——那種「尷尬」的感覺是真的,是結構問題不是運氣。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>Only act at the edges:</b> long the bottom third, short the top third. Middle = hang a "no-trade" sign and wait.</span>
+          <span class="i18n-zh"><b>只在邊緣動手:</b>下緣三分做多、上緣三分做空。中間 = 掛「不交易」牌,等。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en">Can't reach the edge? Then there's no trade — patience is the position.</span>
+          <span class="i18n-zh">摸不到邊?那就沒有單——空手等待也是一種部位。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 ETH long entered 2463 at box pos ~47% (middle) → chopped, nearly stopped, scratched near breakeven. Good management rescued a bad entry.</span>
+        <span class="i18n-zh">📊 ETH 多進在 2463、箱體 pos ~47%(中間)→ 被洗、差點停損、勉強保本出。是好管理救了爛進場。</span>
+      </p>
+    </div>
+  </details>
+
+  <details class="tip-card">
+    <summary class="tip-summary">
+      <span class="tip-icon">🔄</span>
+      <span class="tip-title">
+        <span class="i18n-en">Reverse only when a level breaks — not when price wiggles</span>
+        <span class="i18n-zh">反手 = 位階作廢才反,不是價格晃</span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>Frequent reversals = reacting to the last candle.</b> Flipping because price moved 15 pts against you pays spread + fees and never lets a thesis play out.</span>
+          <span class="i18n-zh"><b>頻繁反手 = 在反應上一根 K。</b> 因為它逆你走 15 點就翻,付了價差 + 手續費,又不讓任何劇本走完。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>Reverse only when your pre-defined invalidation breaks on a close.</b> Write that line down BEFORE you enter — the flip trigger is a level, not a feeling.</span>
+          <span class="i18n-zh"><b>只有進場前定好的作廢線被收盤攻破才反手。</b> 進場前就把那條線寫死——反手觸發是「位階」,不是「感覺」。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en"><b>One regime, one thesis, one side.</b> Don't buy the middle and simultaneously plan to short slightly higher — that's two half-theses colliding.</span>
+          <span class="i18n-zh"><b>一個 regime、一個劇本、一邊。</b> 別「中間買多、又計劃小漲一點反手空」——那是兩個半套劇本對撞。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 Same session: short → flip long 2463 → plan flip short 2481. Each flip chased the last move instead of a level. Manage the leak: define the flip level up front.</span>
+        <span class="i18n-zh">📊 同一場:空 → 反手多 2463 → 又計劃反手空 2481。每次翻都在追上一個動作、不是位階。修法:進場前就定好反手位。</span>
+      </p>
+    </div>
+  </details>
+
   <p class="tips-more"><span class="i18n-en">More cards land here as we distill them.</span><span class="i18n-zh">之後萃取出的原則會陸續加成小卡。</span></p>
 </main>
 
