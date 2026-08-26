@@ -104,11 +104,15 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			if autoInBlackout(sym, barTime) {
 				continue
 			}
-			// one-position-per-symbol (live only; paper Phase 1 relies on per-bar dedup)
+			// one-position-per-rule: live checks the exchange; paper replays the
+			// prior fire so a persistent setup doesn't re-enter every bar. Also
+			// enforces the post-stop cooldown.
 			if live {
 				if pos, perr := client.OpenPositions(ctx, sym); perr == nil && len(pos) > 0 {
 					continue
 				}
+			} else if paperBlocked(ctx, client, sym, r, barTime) {
+				continue
 			}
 
 			qty := r.MarginUSDT * float64(r.Leverage) / trig.entry
@@ -151,6 +155,61 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				_ = n.Push(ctx, "🤖 auto PLACED", fmt.Sprintf("%s %s @%.4f (stop %.4f tp %.4f) id=%s", r.Symbol, trig.side, trig.entry, trig.stop, trig.tp, id), "robot")
 			}
 		}
+	}
+}
+
+// paperBlocked reports whether a PAPER fire should be suppressed because the rule
+// already holds a live position (the prior fire is still open/pending) or is inside
+// its post-stop cooldown. This makes paper behave like one-position-per-rule instead
+// of re-entering the same persistent setup on every bar close.
+func paperBlocked(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule, barTime time.Time) bool {
+	var latest *autotrade.PaperFire
+	for _, f := range autotrade.ReadFires(300) { // newest-first
+		if f.Symbol == r.Symbol && f.Strategy == r.Strategy {
+			ff := f
+			latest = &ff
+			break
+		}
+	}
+	if latest == nil {
+		return false
+	}
+	cs, err := client.Klines(ctx, sym, market.Timeframe(r.TF), 300)
+	if err != nil {
+		return false // can't determine — don't block
+	}
+	oc := autotrade.EvaluateFire(*latest, cs, 6)
+	switch oc.Status {
+	case autotrade.OutOpen, autotrade.OutPending:
+		return true // still in a position / waiting to fill
+	case autotrade.OutStop:
+		return barTime.Before(oc.ExitAt.Add(time.Duration(r.CooldownBars) * barDurationTF(r.TF)))
+	default:
+		return false // tp / no-fill → free to re-enter
+	}
+}
+
+// barDurationTF maps a timeframe string to its bar duration for cooldown math.
+func barDurationTF(tf string) time.Duration {
+	switch tf {
+	case "1m":
+		return time.Minute
+	case "5m":
+		return 5 * time.Minute
+	case "15m":
+		return 15 * time.Minute
+	case "30m":
+		return 30 * time.Minute
+	case "1h":
+		return time.Hour
+	case "2h":
+		return 2 * time.Hour
+	case "4h":
+		return 4 * time.Hour
+	case "1d":
+		return 24 * time.Hour
+	default:
+		return time.Hour
 	}
 }
 

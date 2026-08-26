@@ -77,7 +77,7 @@
   {{end}}
 
   <div class="stats-card">
-    <h2 class="section-title">Recent fires <span class="section-meta">newest first</span></h2>
+    <h2 class="section-title">Positions <span class="section-meta">一倉一單 · newest first · ＋N = 收合的每小時重複進場</span></h2>
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">
@@ -85,7 +85,7 @@
       <tbody>
         {{range .Fires}}
         <tr>
-          <td class="cs-dim">{{.When}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td>
+          <td class="cs-dim">{{.When}}{{if .Absorbed}} <span class="badge b-dim" title="收合了 {{.Absorbed}} 筆同 setup 的每小時重複進場">＋{{.Absorbed}}</span>{{end}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td>
           <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
           <td class="dir-{{.Side}}">{{.Side}}</td>
           <td class="num">{{printf "%.4f" .Entry}}</td><td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>

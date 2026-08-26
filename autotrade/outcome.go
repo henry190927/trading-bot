@@ -218,6 +218,54 @@ func EvaluateFireLive(f PaperFire, candles []market.Candle, expiryBars int, live
 	return out
 }
 
+// Position is one deduped position: the fire that opened it, its outcome, and how
+// many raw re-fires of the same still-live setup were absorbed into it.
+type Position struct {
+	Fire    PaperFire
+	Outcome Outcome
+	Absorbed int
+}
+
+// DedupFires collapses the raw fire log into realistic positions: one position per
+// (symbol, strategy) at a time. A later fire for the same rule is a NEW position
+// only once the prior one has left the book — resolved (tp/stop, then a stop adds
+// cooldownBars), or a limit that expired (no-fill after expiryBars). While the
+// prior fire is still open/pending, subsequent fires are absorbed (they are the
+// same setup re-evaluated each bar, not new trades). `fires` must be oldest-first;
+// resolve(f) returns the outcome for a fire (the caller supplies it because it
+// needs klines).
+func DedupFires(fires []PaperFire, expiryBars, cooldownBars int, barDur time.Duration, resolve func(PaperFire) Outcome) []Position {
+	openUntil := map[string]time.Time{}
+	curIdx := map[string]int{}
+	var out []Position
+	for _, f := range fires {
+		key := f.Symbol + "|" + f.Strategy
+		if u, ok := openUntil[key]; ok && f.Time.Before(u) {
+			if i, ok := curIdx[key]; ok {
+				out[i].Absorbed++
+			}
+			continue
+		}
+		oc := resolve(f)
+		out = append(out, Position{Fire: f, Outcome: oc})
+		curIdx[key] = len(out) - 1
+
+		var hold time.Time
+		switch oc.Status {
+		case OutTP:
+			hold = oc.ExitAt
+		case OutStop:
+			hold = oc.ExitAt.Add(time.Duration(cooldownBars) * barDur)
+		case OutNoFill:
+			hold = f.Time.Add(time.Duration(expiryBars) * barDur)
+		default: // open / pending — still in the position or waiting to fill
+			hold = f.Time.Add(1_000_000 * time.Hour)
+		}
+		openUntil[key] = hold
+	}
+	return out
+}
+
 // Summary aggregates outcomes across many fires for the panel header.
 type Summary struct {
 	Total   int

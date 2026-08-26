@@ -90,32 +90,52 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		StatusClass       string
 		NetR              float64
 		UnrealR           float64
+		Absorbed          int  // raw re-fires collapsed into this position
 		Resolved          bool // has a realized netR (tp/stop)
 		Open              bool // filled, still running — show unrealized R
 	}
-	var rows []fireRow
-	var outs []autotrade.Outcome
-	for _, f := range fires {
-		tf := tfFor(f)
-		out := autotrade.EvaluateFireLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
-		outs = append(outs, out)
-		cls := map[autotrade.OutcomeStatus]string{
-			autotrade.OutTP: "b-green", autotrade.OutStop: "b-red",
-			autotrade.OutNoFill: "b-dim", autotrade.OutOpen: "b-yellow",
-			autotrade.OutPending: "b-blue",
-		}[out.Status]
-		strat := f.Strategy
-		if strat == "" { // older records predate the strategy field — infer from the reason
+
+	// Normalise older records that predate the strategy field, then dedup the raw
+	// fire log into realistic one-position-per-rule trades (a persistent setup that
+	// re-fired every bar is ONE position, not N). fires come newest-first; DedupFires
+	// wants oldest-first.
+	oldest := make([]autotrade.PaperFire, len(fires))
+	for i, f := range fires {
+		if f.Strategy == "" {
 			if strings.HasPrefix(f.Why, "engine") {
-				strat = "engine"
+				f.Strategy = "engine"
 			} else {
-				strat = "range-edge"
+				f.Strategy = "range-edge"
 			}
 		}
+		oldest[len(fires)-1-i] = f
+	}
+	cooldown := 6
+	if len(cfg.Rules) > 0 && cfg.Rules[0].CooldownBars > 0 {
+		cooldown = cfg.Rules[0].CooldownBars
+	}
+	resolve := func(f autotrade.PaperFire) autotrade.Outcome {
+		tf := tfFor(f)
+		return autotrade.EvaluateFireLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
+	}
+	positions := autotrade.DedupFires(oldest, 6, cooldown, time.Hour, resolve)
+
+	var rows []fireRow
+	var outs []autotrade.Outcome
+	clsFor := map[autotrade.OutcomeStatus]string{
+		autotrade.OutTP: "b-green", autotrade.OutStop: "b-red",
+		autotrade.OutNoFill: "b-dim", autotrade.OutOpen: "b-yellow",
+		autotrade.OutPending: "b-blue",
+	}
+	for i := len(positions) - 1; i >= 0; i-- { // newest-first for display
+		p := positions[i]
+		f, out := p.Fire, p.Outcome
+		outs = append(outs, out)
 		rows = append(rows, fireRow{
-			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tf, Strategy: strat, Side: f.Side, Why: f.Why,
+			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tfFor(f), Strategy: f.Strategy, Side: f.Side, Why: f.Why,
 			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Margin: f.Margin, Lev: f.Lev, Live: f.Live,
-			Status: string(out.Status), StatusClass: cls, NetR: out.NetR, UnrealR: out.UnrealR,
+			Status: string(out.Status), StatusClass: clsFor[out.Status], NetR: out.NetR, UnrealR: out.UnrealR,
+			Absorbed: p.Absorbed,
 			Resolved: out.Status == autotrade.OutTP || out.Status == autotrade.OutStop,
 			Open:     out.Status == autotrade.OutOpen,
 		})
