@@ -123,9 +123,14 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 				case "LONG":
 					dirEmoji, tags = "🟢", "green_circle,chart_with_upwards_trend"
 				}
+				// Timestamp the push: the zone is a SNAPSHOT of the structure at
+				// send time (directional-trend only). The live chart recomputes on
+				// each load and also shows neutral-trend zones, so the two can differ
+				// — the stamp makes clear this is a point-in-time value.
+				snap := time.Now().In(time.FixedZone("Asia/Taipei", 8*3600)).Format("01/02 15:04")
 				title := fmt.Sprintf("%s%s 進%s區 %s–%s", short, tfTag, dirWord(dir), zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi))
-				body := fmt.Sprintf("%s %s%s ｜ 現價 %s\n🟡 樞紐區 %s–%s（%s %s）\n%s\n→ 判斷 reject / 進場",
-					dirEmoji, short, tfTag, zone.FmtPrice(px), zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), dirEmoji, dir, z.Note)
+				body := fmt.Sprintf("%s %s%s ｜ 現價 %s\n🟡 樞紐區 %s–%s（%s %s）\n%s\n⏱ %s 快照（方向性結構,圖表即時值可能不同）\n→ 判斷 reject / 進場",
+					dirEmoji, short, tfTag, zone.FmtPrice(px), zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), dirEmoji, dir, z.Note, snap)
 				if err := n.Push(ctx, title, body, tags); err != nil {
 					log.Printf("zonealert: push failed: %v", err)
 				} else {

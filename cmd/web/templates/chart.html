@@ -1210,7 +1210,15 @@
         csSet('cs-event', hasEvent ? (s.event + (eventLive ? ' ⏳' : '')) : '—');
         csMark('cs-event', eventLive);
         if (s.zone) {
-            csSet('cs-zone', csFmt(s.zone.lo) + '–' + csFmt(s.zone.hi));
+            // Auto zone-fade alerts (ntfy) only fire on a DIRECTIONAL trend — a
+            // neutral-trend zone is drawn here for reference but the alert system
+            // won't act on it. Flag it so the chart and ntfy never seem to disagree.
+            var zoneDirectional = (s.trend === 'HH-HL uptrend' || s.trend === 'LH-LL downtrend');
+            var zoneWrap = document.getElementById('cs-zone-wrap');
+            if (zoneWrap) zoneWrap.title = zoneDirectional
+                ? '方向性樞紐區 — auto ntfy 會採用'
+                : 'neutral 趨勢:僅參考,auto ntfy 不會對此區發警報';
+            csSet('cs-zone', csFmt(s.zone.lo) + '–' + csFmt(s.zone.hi) + (zoneDirectional ? '' : ' ⚪參考'));
             csSet('cs-inzone', (s.inZone ? '✓ 區內' : '✗ 區外') + (zoneLive ? ' ⏳' : ''));
             csMark('cs-inzone', zoneLive);
             csSet('cs-target', csFmt(s.zone.target) + ' / inv ' + csFmt(s.zone.invalidate));
