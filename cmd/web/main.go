@@ -190,5 +190,11 @@ func requestLogger() gin.HandlerFunc {
 		}
 		log.Printf("%s %s %d %s", c.Request.Method, c.Request.URL.Path,
 			c.Writer.Status(), time.Since(start))
+		// Surface handler/render errors (gin appends template-execution failures to
+		// c.Errors) — otherwise a template error silently truncates the page with a
+		// 200 and no log line.
+		for _, e := range c.Errors {
+			log.Printf("  ⚠ %s %s: %v", c.Request.Method, c.Request.URL.Path, e.Err)
+		}
 	}
 }
