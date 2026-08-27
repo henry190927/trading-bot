@@ -31,6 +31,7 @@ func main() {
 	tol := flag.Float64("tol", 0.15, "EQH/EQL cluster tolerance (%)")
 	bufATR := flag.Float64("buf-atr", 0.15, "stop buffer beyond the sweep wick, in ATR(14)")
 	rMult := flag.Float64("r", 2.0, "take-profit as R multiple of the stop distance")
+	liqTP := flag.Bool("liq-tp", false, "A/B (a): TP at the nearest OPPOSITE liquidity pool (magnet) instead of fixed R; fall back to R if none / if it's a worse-than-1R target")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -54,7 +55,7 @@ func main() {
 			continue
 		}
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
-		fires := genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult)
+		fires := genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult, *liqTP)
 		positions := autotrade.DedupFires(fires, 6, 6, time.Hour, func(f autotrade.PaperFire) autotrade.Outcome {
 			return autotrade.EvaluateFire(f, cs, 6)
 		})
@@ -91,12 +92,13 @@ func main() {
 
 // genSweepFires walks closed bars; at each bar it detects a sweep-and-reject of a
 // pre-existing EQH/EQL pool and emits a marketable fire at the reject close.
-func genSweepFires(cs []market.Candle, atr []float64, short string, tolFrac, bufATR, rMult float64) []autotrade.PaperFire {
+func genSweepFires(cs []market.Candle, atr []float64, short string, tolFrac, bufATR, rMult float64, liqTP bool) []autotrade.PaperFire {
 	var out []autotrade.PaperFire
 	for i := 60; i < len(cs); i++ {
 		pools := signal.FindLiquidity(cs[:i], 2, 20, tolFrac) // pools formed BEFORE this bar
 		bar := cs[i]
 		a := atr[i]
+		above, below := signal.NearestLiquidity(pools, bar.Close)
 		for _, p := range pools {
 			if p.Kind == signal.EQH && bar.High > p.Hi && bar.Close < p.Lo {
 				// swept buy-side liquidity above, closed back below → short
@@ -105,9 +107,13 @@ func genSweepFires(cs []market.Candle, atr []float64, short string, tolFrac, buf
 				if risk <= 0 {
 					continue
 				}
+				tp := bar.Close - rMult*risk
+				if liqTP && below != nil && below.Price < bar.Close-risk { // magnet at least 1R away
+					tp = below.Price
+				}
 				out = append(out, autotrade.PaperFire{
 					Time: bar.CloseTime, Symbol: short, TF: "1h", Strategy: "sweep-reject", Side: "short",
-					Market: true, Entry: bar.Close, Stop: stop, TP: bar.Close - rMult*risk,
+					Market: true, Entry: bar.Close, Stop: stop, TP: tp,
 				})
 				break // one setup per bar
 			}
@@ -117,9 +123,13 @@ func genSweepFires(cs []market.Candle, atr []float64, short string, tolFrac, buf
 				if risk <= 0 {
 					continue
 				}
+				tp := bar.Close + rMult*risk
+				if liqTP && above != nil && above.Price > bar.Close+risk {
+					tp = above.Price
+				}
 				out = append(out, autotrade.PaperFire{
 					Time: bar.CloseTime, Symbol: short, TF: "1h", Strategy: "sweep-reject", Side: "long",
-					Market: true, Entry: bar.Close, Stop: stop, TP: bar.Close + rMult*risk,
+					Market: true, Entry: bar.Close, Stop: stop, TP: tp,
 				})
 				break
 			}
