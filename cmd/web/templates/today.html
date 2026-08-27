@@ -132,14 +132,17 @@
 <script>
 (function () {
   var EMOJI = { BTC:'₿', ETH:'Ξ', SOL:'◎', LINK:'🔗', SUI:'🌊', HYPE:'🚀', NEAR:'Ⓝ', XAU:'🥇', XAG:'🥈', SNDK:'💾', NVDA:'🟩' };
-  // coincap ticker-slug for a logo CDN; missing → emoji. onerror also falls back.
-  var SLUG = { BTC:'btc', ETH:'eth', SOL:'sol', LINK:'link', SUI:'sui', NEAR:'near', HYPE:'hype' };
   var cat = 'all', last = [];
   function fmtPx(v){ if(v>=1000) return v.toLocaleString('en-US',{maximumFractionDigits:2}); if(v>=1) return v.toFixed(2); return v.toFixed(4); }
+  // verified-working logo CDNs: crypto → coincap (lower@2x); metals → coinglass
+  // lowercase; stocks → coinglass UPPERCASE. onerror still falls back to emoji.
+  function iconURL(sym){
+    if (sym==='XAU'||sym==='XAG') return 'https://cdn.coinglasscdn.com/static/img/coins/'+sym.toLowerCase()+'.png';
+    if (sym==='SNDK'||sym==='NVDA') return 'https://cdn.coinglasscdn.com/static/img/coins/'+sym+'.png';
+    return 'https://assets.coincap.io/assets/icons/'+sym.toLowerCase()+'@2x.png';
+  }
   function icon(sym){
-    var e = EMOJI[sym] || '•';
-    if (SLUG[sym]) return '<img class="mkt-logo" data-fb="'+e+'" alt="" src="https://assets.coincap.io/assets/icons/'+SLUG[sym]+'@2x.png">';
-    return '<span class="mkt-ico">'+e+'</span>';
+    return '<img class="mkt-logo" data-fb="'+(EMOJI[sym]||'•')+'" alt="" src="'+iconURL(sym)+'">';
   }
   function render(){
     var body = document.getElementById('mkt-body'); if(!body) return;
