@@ -5222,8 +5222,12 @@ main { overflow-x: hidden; }
    floating 52px below the viewport (the "跑版" on setups / stock boards).
    On mobile a compact .topbar-mobile (~48px) sits at top:0, so tuck below it. */
 .dt th, .setups-table th { color: var(--text-dim); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+/* On mobile .dt-scroll is a scroll container (overflow-x:auto → overflow-y
+   computes to auto), so sticky `top` is relative to THAT box, not the page —
+   a 48px offset floats the header down over the first rows (跑版). top:0 sticks
+   it to the container top, aligned with the table. */
 @media (max-width: 1023.98px) {
-    .dt th, .setups-table th { top: 48px; }
+    .dt th, .setups-table th { top: 0; }
 }
 .dt tbody tr:hover, .setups-table tbody tr:hover { background: var(--row-hover); }
 .dt td.cs-dim, .setups-table td.cs-dim { color: var(--text-dim); }
