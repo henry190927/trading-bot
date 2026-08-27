@@ -6154,3 +6154,13 @@ html[data-density="compact"] .setups-table {
 .mkt-sym:hover { color: var(--blue); }
 .mkt-ico { width: 1.3em; text-align: center; opacity: .9; }
 .mkt-logo { width: 18px; height: 18px; border-radius: 50%; vertical-align: middle; }
+
+/* market-overview: push down + larger, more readable text */
+.market-overview { margin-top: 2.5rem; }
+.mkt-title { font-size: 1.25rem; }
+.mkt-table { font-size: 1rem; }
+.mkt-table th, .mkt-table td { padding: .6rem .8rem; }
+.mkt-table .mkt-sym b { font-size: 1.02rem; }
+.mkt-logo { width: 22px; height: 22px; }
+.mkt-ico { font-size: 1.15rem; }
+.mkt-tab { font-size: .92rem; padding: .32rem .85rem; }
