@@ -312,6 +312,71 @@
   </section>
 {{end}}
 </section>{{/* /symbols-section */}}
+
+<section class="dashboard-section market-overview">
+  <div class="mkt-head">
+    <h2 class="mkt-title"><span class="i18n-en">Market</span><span class="i18n-zh">市場總覽</span></h2>
+    <div class="mkt-tabs" id="mkt-tabs">
+      <button type="button" class="mkt-tab active" data-cat="all"><span class="i18n-en">All</span><span class="i18n-zh">全部</span></button>
+      <button type="button" class="mkt-tab" data-cat="crypto"><span class="i18n-en">Crypto</span><span class="i18n-zh">加密</span></button>
+      <button type="button" class="mkt-tab" data-cat="metal"><span class="i18n-en">Metals</span><span class="i18n-zh">貴金屬</span></button>
+      <button type="button" class="mkt-tab" data-cat="stock"><span class="i18n-en">Stocks</span><span class="i18n-zh">股票</span></button>
+    </div>
+  </div>
+  <div class="dt-scroll">
+    <table class="dt mkt-table">
+      <thead><tr>
+        <th>Symbol</th><th class="num">Price</th><th class="num">24h %</th>
+        <th class="num">Funding</th><th class="num">24h Range</th>
+      </tr></thead>
+      <tbody id="mkt-body"><tr><td colspan="5" class="cs-dim">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="glossary-hint"><span id="mkt-updated">—</span> · <span class="i18n-en">every 10s · live mark · funding as %/interval</span><span class="i18n-zh">每 10s · 即時 mark 價 · funding 為當期 %</span></p>
+</section>
+
+<script>
+(function () {
+  var ICON = { BTC:'₿', ETH:'Ξ', SOL:'◎', LINK:'🔗', SUI:'🌊', HYPE:'🚀', NEAR:'Ⓝ', XAU:'🥇', XAG:'🥈', SNDK:'💾', NVDA:'🟩' };
+  var cat = 'all', last = [];
+  function fmtPx(v){ if(v>=1000) return v.toLocaleString('en-US',{maximumFractionDigits:2}); if(v>=1) return v.toFixed(2); return v.toFixed(4); }
+  function render(){
+    var body = document.getElementById('mkt-body'); if(!body) return;
+    var rows = last.filter(function(r){ return cat==='all' || r.cat===cat; });
+    if(!rows.length){ body.innerHTML = '<tr><td colspan="5" class="cs-dim">—</td></tr>'; return; }
+    body.innerHTML = rows.map(function(r){
+      var chg = (r.changePct==null) ? '' : (r.changePct>=0?'+':'') + r.changePct.toFixed(2) + '%';
+      var chgc = (r.changePct==null) ? 'cs-dim' : (r.changePct>=0 ? 'up' : 'down');
+      var fund = (r.funding==null) ? '<span class="cs-dim">—</span>' : '<span style="color:'+(r.funding>=0?'var(--green)':'var(--red)')+'">'+(r.funding>=0?'+':'')+r.funding.toFixed(4)+'%</span>';
+      var rng = (r.low24==null||r.high24==null) ? '<span class="cs-dim">—</span>' : '<span class="cs-dim">'+fmtPx(r.low24)+' – '+fmtPx(r.high24)+'</span>';
+      var px = (r.price==null) ? '<span class="cs-dim">—</span>' : fmtPx(r.price);
+      return '<tr>'+
+        '<td><a href="/chart?symbol='+r.symbol+'" class="mkt-sym"><span class="mkt-ico">'+(ICON[r.symbol]||'•')+'</span> <b>'+r.symbol+'</b></a></td>'+
+        '<td class="num">'+px+'</td>'+
+        '<td class="num '+chgc+'">'+chg+'</td>'+
+        '<td class="num">'+fund+'</td>'+
+        '<td class="num">'+rng+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+  function poll(){
+    fetch('/api/tickers?_='+Date.now(), {cache:'no-store'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ last = (d && d.tickers) || []; render();
+        var u=document.getElementById('mkt-updated'); if(u) u.textContent = new Date().toLocaleTimeString('en-GB',{hour12:false}); })
+      .catch(function(){});
+  }
+  var tabs = document.getElementById('mkt-tabs');
+  if(tabs) tabs.addEventListener('click', function(e){
+    var b = e.target.closest('.mkt-tab'); if(!b) return;
+    cat = b.getAttribute('data-cat');
+    tabs.querySelectorAll('.mkt-tab').forEach(function(x){ x.classList.toggle('active', x===b); });
+    render();
+  });
+  poll();
+  setInterval(function(){ if(!document.hidden) poll(); }, 10000);
+})();
+</script>
 </main>
 
 <div class="legend-modal hidden" id="legend-modal">

@@ -6141,3 +6141,15 @@ html[data-density="compact"] .setups-table {
 .tf-bias-range.rzone-top    { background: var(--wash-red);   color: var(--red); }     /* at ceiling → sell edge */
 .tf-bias-range.rzone-middle { background: var(--wash-yellow);color: var(--yellow); }  /* middle → don't trade */
 .tf-bias-range.rzone-trend  { background: var(--wash-dim);   color: var(--text-dim); }
+
+/* ── Market overview table (dashboard) ────────────────────────────── */
+.market-overview .mkt-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .6rem; }
+.mkt-title { margin: 0; font-size: 1.05rem; }
+.mkt-tabs { display: flex; gap: .3rem; flex-wrap: wrap; }
+.mkt-tab { padding: .25rem .7rem; border: 1px solid var(--chip-border); background: var(--chip); color: var(--text-dim); border-radius: 999px; cursor: pointer; font-size: .85rem; }
+.mkt-tab.active { color: var(--text); border-color: var(--blue); background: rgba(var(--blue-rgb), .12); }
+.mkt-table td.up, .mkt-table th.up { color: var(--green); }
+.mkt-table td.down { color: var(--red); }
+.mkt-sym { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); text-decoration: none; }
+.mkt-sym:hover { color: var(--blue); }
+.mkt-ico { width: 1.3em; text-align: center; opacity: .9; }

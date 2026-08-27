@@ -347,7 +347,19 @@ var (
 	tickerCache   tickerCacheT
 )
 
-const tickerCacheTTL = 12 * time.Second
+const tickerCacheTTL = 9 * time.Second
+
+// symbolCategory buckets a short ticker for the market-overview table tabs.
+func symbolCategory(short string) string {
+	switch short {
+	case "XAU", "XAG":
+		return "metal"
+	case "SNDK", "NVDA":
+		return "stock"
+	default:
+		return "crypto"
+	}
+}
 
 // handleTickers — GET /api/tickers
 func (s *server) handleTickers(c *gin.Context) {
@@ -372,15 +384,17 @@ func (s *server) handleTickers(c *gin.Context) {
 		wg.Add(1)
 		go func(idx int, short string) {
 			defer wg.Done()
-			row := gin.H{"symbol": short}
+			row := gin.H{"symbol": short, "cat": symbolCategory(short)}
 			sym, err := resolveWebSymbol(short)
 			if err == nil && s.client != nil {
 				// Price = live mark, SAME source as the chart header, so the
 				// ticker and the header never disagree. Klines are only for the
-				// 24h reference close (change %).
+				// 24h reference close (change %) + 24h range. Funding is free
+				// (same FundingRate call) — surfaced for the market-overview table.
 				price := 0.0
 				if fr, ferr := s.client.FundingRate(ctx, sym); ferr == nil && fr.MarkPrice > 0 {
 					price = fr.MarkPrice
+					row["funding"] = fr.Rate * 100 // as %
 				}
 				// 26 hourly bars ≈ 25h: enough to look back a full 24h.
 				if ks, kerr := s.client.KlinesWithForming(ctx, sym, market.Timeframe("1h"), 26); kerr == nil && len(ks) > 0 {
@@ -394,6 +408,21 @@ func (s *server) handleTickers(c *gin.Context) {
 					if ref > 0 && price > 0 {
 						row["changePct"] = (price - ref) / ref * 100
 					}
+					// 24h high/low over the looked-back window.
+					hi, lo := ks[0].High, ks[0].Low
+					start := len(ks) - 25
+					if start < 0 {
+						start = 0
+					}
+					for _, k := range ks[start:] {
+						if k.High > hi {
+							hi = k.High
+						}
+						if k.Low < lo {
+							lo = k.Low
+						}
+					}
+					row["high24"], row["low24"] = hi, lo
 				}
 				if price > 0 {
 					row["price"] = price
