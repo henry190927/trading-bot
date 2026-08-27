@@ -21,6 +21,19 @@ const (
 	StrategyStructMomentum
 )
 
+// SMStopBufferATR, when >0, pushes the StructMomentum stop this many ATR(14)
+// BEYOND the leg-origin invalidate (long: lower, short: higher) instead of sitting
+// exactly on it — the "don't stop on the sweep magnet" idea.
+//
+// A/B RESULT (2026-08-27, --sm-stop-buffer 0.5, SOL+LINK, 60/90/120d): WORSE in
+// every window (SOL +0.72/+6.78/+7.64 → −1.18/+5.21/+6.11; LINK −1.71/+4.20/+1.27
+// → −3.25/+1.87/−2.11). Stop-on-the-invalidate wins. Joins --stop-buffer-r and
+// --slide-offset-pct as tested-and-rejected stop refinements: widening pays more
+// on the majority real-move losers than it saves on the minority sweep-reclaims.
+// Kept as an off-by-default variant. The 🪝 "stop off the magnet" edge is
+// DISCRETIONARY (manual confirm-entry below the wall), not a systematic engine stop.
+var SMStopBufferATR = 0.0
+
 // StructMomentumEnabled forces the StructMomentum strategy ON for ALL symbols.
 // Mirrors StructureVetoEnabled / StructureZoneVoteEnabled — the A/B backtest
 // switch (cmd/backtest --struct-momentum) used to validate the strategy on
@@ -148,6 +161,17 @@ func evaluateStructMomentum(in Inputs) Signal {
 	// take it); stop = leg-origin invalidation; target = 1:1 measured move.
 	z := st.Zone
 	entry, stop, target := sig.Price, z.Invalidate, z.Target
+	// Optional sweep buffer: push the stop past the leg-origin magnet by N×ATR.
+	if SMStopBufferATR > 0 {
+		if atrs := indicator.ATR(cs, 14); len(atrs) > 0 {
+			a := atrs[len(atrs)-1]
+			if want == Long {
+				stop -= SMStopBufferATR * a
+			} else {
+				stop += SMStopBufferATR * a
+			}
+		}
+	}
 	// Sanity: stop/target must bracket entry in the right direction.
 	if want == Long && !(stop < entry && entry < target) {
 		return sig
