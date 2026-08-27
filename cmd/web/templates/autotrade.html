@@ -104,7 +104,7 @@
     {{else}}
     <p class="empty">還沒有 fire —— 規則在跑,等 symbol 碰到箱邊(底/頂三分)才會進場。全在箱中間時不動。</p>
     {{end}}
-    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span id="at-refresh">每 30s 自動刷新</span> · 浮動 R 用即時 mark 價 · fires 寫入 autotrade_paper.jsonl</p>
+    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span id="at-refresh">每 15s 自動刷新</span> · 浮動 R 用即時 mark 價 · fires 寫入 autotrade_paper.jsonl</p>
   </div>
 </main>
 <script>
@@ -112,7 +112,7 @@
   // reload. Only fires while the tab is visible (no background churn), and shows
   // a small countdown in the footer.
   (function () {
-    var PERIOD = 30, left = PERIOD, el = document.getElementById('at-refresh');
+    var PERIOD = 15, left = PERIOD, el = document.getElementById('at-refresh');
     setInterval(function () {
       if (document.hidden) { left = PERIOD; return; }
       left -= 1;

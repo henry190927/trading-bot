@@ -43,6 +43,7 @@ func main() {
 	tfStr := flag.String("tf", "1h", "timeframe")
 	stopPct := flag.Float64("stop-pct", 0.5, "stop buffer beyond box edge (%)")
 	volThresh := flag.Float64("vol-thresh", 1.2, "ATR%% ceiling for the vol gate")
+	concTest := flag.Bool("conc-test", false, "A/B max-concurrent 1 vs 2 vs 3 on baseline (relax one-position)")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -82,6 +83,16 @@ func main() {
 		ema := alignRight(indicator.EMA(closes, 20), len(cs))
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
 
+		if *concTest {
+			base := genFires(cs, ema, atr, variant{"V0", false, false}, *stopPct/100.0, *volThresh/100.0, s.short)
+			for _, n := range []int{1, 2, 3} {
+				sum := summarize(scoreConcurrent(base, n, cs))
+				fmt.Printf("%-5s conc=%-2d %6d %5.0f%% %5d %5d %6.0f%% %+7.2f\n",
+					s.short, n, sum.total, sum.fillPct*100, sum.tp, sum.stop, sum.winPct*100, sum.netR)
+			}
+			fmt.Println()
+			continue
+		}
 		for _, v := range variants {
 			fires := genFires(cs, ema, atr, v, *stopPct/100.0, *volThresh/100.0, s.short)
 			resolve := func(f autotrade.PaperFire) autotrade.Outcome {
@@ -158,6 +169,38 @@ func genFires(cs []market.Candle, ema, atr []float64, v variant, stopBuf, volThr
 				})
 			}
 		}
+	}
+	return out
+}
+
+// scoreConcurrent allows up to maxN open positions per rule at once (vs DedupFires'
+// strict 1) to A/B whether relaxing the one-position rule helps. Fires oldest-first.
+// A new fire is taken if fewer than maxN positions are still open at its time.
+func scoreConcurrent(fires []autotrade.PaperFire, maxN int, cs []market.Candle) []autotrade.Position {
+	type openPos struct{ exit time.Time }
+	var open []openPos
+	var out []autotrade.Position
+	for _, f := range fires {
+		// purge resolved
+		live := open[:0]
+		for _, o := range open {
+			if o.exit.After(f.Time) {
+				live = append(live, o)
+			}
+		}
+		open = live
+		if len(open) >= maxN {
+			continue
+		}
+		oc := autotrade.EvaluateFire(f, cs, 6)
+		out = append(out, autotrade.Position{Fire: f, Outcome: oc})
+		exit := f.Time.Add(1_000_000 * time.Hour) // open/no-fill hold the slot ~forever
+		if oc.Status == autotrade.OutTP || oc.Status == autotrade.OutStop {
+			exit = oc.ExitAt
+		} else if oc.Status == autotrade.OutNoFill {
+			exit = f.Time.Add(6 * time.Hour)
+		}
+		open = append(open, openPos{exit})
 	}
 	return out
 }
