@@ -23,6 +23,7 @@ import (
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/earnings"
+	"myFirstGo/trading-bot/econcal"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/onchain"
 )
@@ -172,6 +173,10 @@ func main() {
 	// the daily cron-written earnings.json is picked up without a restart. A
 	// missing file just leaves the gate a no-op — never fatal.
 	earnings.LoadDefaultAndWatch(context.Background(), earnings.Path(), 10*time.Minute, log.Printf)
+
+	// Economic-data-release calendar (ForexFactory feed) — display layer for
+	// /calendar, refreshed hourly. Never fatal: feed down = calendar minus this row.
+	econcal.LoadAndWatch(context.Background(), time.Hour, log.Printf)
 
 	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
 	if err := r.Run(bind); err != nil {

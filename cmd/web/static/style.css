@@ -6168,3 +6168,4 @@ html[data-density="compact"] .setups-table {
 .mkt-logo { width: 22px; height: 22px; }
 .mkt-ico { font-size: 1.15rem; }
 .mkt-tab { font-size: .92rem; padding: .32rem .85rem; }
+.cal-cat.cat-data { background: rgba(var(--blue-rgb), .15); color: var(--blue); }

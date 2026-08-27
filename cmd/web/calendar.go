@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"myFirstGo/trading-bot/earnings"
+	"myFirstGo/trading-bot/econcal"
 	"myFirstGo/trading-bot/macro"
 )
 
@@ -19,13 +20,16 @@ import (
 // grouped by month, with each event's blackout window + past/active/upcoming.
 
 type calEvent struct {
-	Name    string
-	Cat     string // fomc / minutes / cpi / ppi / nfp / jackson / other
-	WhenUTC string
-	WhenTPE string
-	Window  string
-	Status  string // past / active / upcoming
-	Days    int    // days away (upcoming only)
+	Name     string
+	Cat      string // fomc / minutes / cpi / ppi / nfp / jackson / earnings / data / other
+	WhenUTC  string
+	WhenTPE  string
+	Window   string
+	Status   string // past / active / upcoming
+	Days     int    // days away (upcoming only)
+	Impact   string // data releases only: High / Medium
+	Forecast string // data releases only
+	Previous string // data releases only
 }
 
 type calMonth struct {
@@ -105,6 +109,30 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 			WhenTPE: e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
 			Window:  fmt.Sprintf("−%dm / +%dm", e.BeforeMinutes, e.AfterMinutes),
 			Status:  statusOf(start, end),
+		}
+		if ev.Status == "upcoming" {
+			ev.Days = int(e.DatetimeUTC.Sub(now).Hours() / 24)
+		}
+		items = append(items, dated{e.DatetimeUTC, ev})
+	}
+
+	// Economic-data releases (ForexFactory feed) — display layer, NOT a blackout
+	// gate. Shows impact/forecast/previous like an FX calendar.
+	for _, e := range econcal.All() {
+		name := e.Title
+		if e.Country != "" && e.Country != "USD" {
+			name = e.Country + " · " + name
+		}
+		ev := calEvent{
+			Name:     name,
+			Cat:      "data",
+			WhenUTC:  e.DatetimeUTC.Format("Jan 02 15:04"),
+			WhenTPE:  e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
+			Window:   e.Impact,
+			Status:   statusOf(e.DatetimeUTC, e.DatetimeUTC.Add(30*time.Minute)),
+			Impact:   e.Impact,
+			Forecast: e.Forecast,
+			Previous: e.Previous,
 		}
 		if ev.Status == "upcoming" {
 			ev.Days = int(e.DatetimeUTC.Sub(now).Hours() / 24)

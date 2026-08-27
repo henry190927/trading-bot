@@ -39,7 +39,11 @@
         <span class="cal-cat cat-{{.Cat}}">{{.Cat}}</span>
         <span class="cal-when">{{.WhenUTC}}<br><span style="opacity:.7">{{.WhenTPE}} TPE</span></span>
         <span class="cal-name">{{.Name}}</span>
+        {{if eq .Cat "data"}}
+        <span class="cal-win">{{.Impact}}{{if .Forecast}} · <b>fc</b> {{.Forecast}}{{end}}{{if .Previous}} · prev {{.Previous}}{{end}}</span>
+        {{else}}
         <span class="cal-win">blackout {{.Window}}</span>
+        {{end}}
         <span class="cal-status st-{{.Status}}">{{if eq .Status "upcoming"}}{{.Days}}d{{else}}{{.Status}}{{end}}</span>
       </div>
       {{end}}
