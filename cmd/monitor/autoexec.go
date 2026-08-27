@@ -11,6 +11,7 @@ import (
 
 	"myFirstGo/trading-bot/autotrade"
 	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/notify"
 	"myFirstGo/trading-bot/signal"
@@ -223,9 +224,61 @@ func evalAutoTrigger(ctx context.Context, client *bingx.Client, sym market.Symbo
 		return evalRangeEdge(ctx, client, sym, r)
 	case "engine":
 		return evalEngine(ctx, client, sym, r)
+	case "sweep-reject":
+		return evalSweepReject(ctx, client, sym, r)
 	default:
 		return autoTrigger{}
 	}
+}
+
+// evalSweepReject fires the SMC sweep-and-reject on the last CLOSED bar: price ran
+// beyond an EQH/EQL liquidity pool then closed back inside (failed breakout) →
+// fade it. Entry at that close, stop just BEYOND the sweep wick (🪝 off the magnet),
+// TP a fixed R multiple. A/B-validated on SOL/ETH (cmd/sweepbt, +R across 60/90/120d
+// and robust to R∈[1.5,3] / tol∈[0.10,0.20]); params fixed at the sweet spot.
+func evalSweepReject(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule) autoTrigger {
+	const (
+		tolFrac = 0.0015 // 0.15% EQH/EQL cluster tolerance
+		bufATR  = 0.15   // stop buffer beyond the sweep wick, in ATR(14)
+		rMult   = 2.0    // TP = 2R
+	)
+	cs, err := client.Klines(ctx, sym, market.Timeframe(r.TF), 300)
+	if err != nil || len(cs) < 80 {
+		return autoTrigger{}
+	}
+	atrs := indicator.ATR(cs, 14)
+	if len(atrs) == 0 {
+		return autoTrigger{}
+	}
+	a := atrs[len(atrs)-1]
+	bar := cs[len(cs)-1]                                   // last CLOSED bar = the sweep-reject candidate
+	pools := signal.FindLiquidity(cs[:len(cs)-1], 2, 20, tolFrac) // pools formed BEFORE it
+
+	wantShort := r.Side == "short" || r.Side == "auto"
+	wantLong := r.Side == "long" || r.Side == "auto"
+	for _, p := range pools {
+		if wantShort && p.Kind == signal.EQH && bar.High > p.Hi && bar.Close < p.Lo {
+			stop := bar.High + bufATR*a
+			risk := stop - bar.Close
+			if risk <= 0 {
+				continue
+			}
+			return autoTrigger{fire: true, side: "short", entry: bar.Close, market: true,
+				stop: stop, tp: bar.Close - rMult*risk,
+				why: fmt.Sprintf("sweep-reject EQH %.4f (band %.4f-%.4f, %dx)", p.Price, p.Lo, p.Hi, p.Touches)}
+		}
+		if wantLong && p.Kind == signal.EQL && bar.Low < p.Lo && bar.Close > p.Hi {
+			stop := bar.Low - bufATR*a
+			risk := bar.Close - stop
+			if risk <= 0 {
+				continue
+			}
+			return autoTrigger{fire: true, side: "long", entry: bar.Close, market: true,
+				stop: stop, tp: bar.Close + rMult*risk,
+				why: fmt.Sprintf("sweep-reject EQL %.4f (band %.4f-%.4f, %dx)", p.Price, p.Lo, p.Hi, p.Touches)}
+		}
+	}
+	return autoTrigger{}
 }
 
 // autoMinScore is the confluence threshold an engine-strategy rule must clear to
