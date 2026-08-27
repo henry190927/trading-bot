@@ -160,6 +160,6 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"Fires":      rows,
 		"Sum":        sum,
 		"ConfigPath": autotrade.Path(),
-		"UpdatedUTC": time.Now().UTC().Format("2006-01-02 15:04 UTC"),
+		"UpdatedUTC": time.Now().In(tpe).Format("2006-01-02 15:04 UTC+8"),
 	})
 }
