@@ -41,7 +41,7 @@ func main() {
 	syms := []struct {
 		short string
 		sym   market.Symbol
-	}{{"BTC", market.BTCUSDT}, {"ETH", market.ETHUSDT}, {"SOL", market.SOLUSDT}, {"LINK", market.LINKUSDT}}
+	}{{"BTC", market.BTCUSDT}, {"ETH", market.ETHUSDT}, {"SOL", market.SOLUSDT}, {"LINK", market.LINKUSDT}, {"XAU", market.XAUUSDT}, {"XAG", market.XAGUSDT}}
 
 	fmt.Printf("=== sweep-reject A/B · %dd · %s · tol %.2f%% · stop=sweep+%.2fATR · TP %.1fR ===\n", *days, *tfStr, *tol, *bufATR, *rMult)
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR")
