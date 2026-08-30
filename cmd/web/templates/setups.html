@@ -74,7 +74,7 @@
         <tr>
           <th>#</th><th>time</th><th>sym/tf</th><th>dir</th><th>lean</th><th>trend</th>
           <th>event</th><th>entry</th><th>stop</th><th>target</th><th>BOS</th><th>prot</th>
-          <th>engine</th><th title="active strategy for this symbol/TF + whether it actually fired at record time. SM ✓ = valid StructMomentum data point; SM — = regime sat out (not an SM sample)">strat</th><th>開單</th><th title="收盤價判定:讀盤方向對不對">outcome</th><th title="盤中 first-touch + fill:真實會止盈還止損">real</th><th></th>
+          <th>engine</th><th title="active strategy for this symbol/TF + whether it actually fired at record time. SM ✓ = valid StructMomentum data point; SM — = regime sat out (not an SM sample)">strat</th><th>開單</th><th class="cs-dim" title="收盤價判定(嚴格·參考):20 根內收盤沒穿 tp/stop 就記 expired — 常見,別被灰色嚇到,以 real 為準">outcome<br><span style="font-size:.8em;font-weight:400">收盤·參考</span></th><th title="盤中 first-touch + fill:真實掛單會止盈還止損 — 這欄才對得上手動回填">real<br><span style="font-size:.8em;font-weight:400">實戰·主判定</span></th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -101,8 +101,8 @@
             {{else}}<span class="cs-dim">—</span>{{end}}
           </td>
           <td>{{if .Opened}}✓{{else}}—{{end}}</td>
-          <td><span class="outcome-badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
-          <td>{{if .RealOutcome}}<span class="outcome-badge oc-{{.RealOutcome}}">{{.RealOutcome}}{{if .RealBars}} · {{.RealBars}}b{{end}}</span>{{if and .Outcome (ne .Outcome .RealOutcome)}} <span class="oc-gap" title="outcome≠real:讀盤對但執行會不同">⚠</span>{{end}}{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td style="opacity:.4"><span class="outcome-badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}" style="font-size:.85em">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
+          <td>{{if .RealOutcome}}<span class="outcome-badge oc-{{.RealOutcome}}"><b>{{.RealOutcome}}</b>{{if .RealBars}} · {{.RealBars}}b{{end}}</span>{{if and .Outcome (ne .Outcome .RealOutcome)}} <span class="oc-gap" title="outcome≠real:讀盤對但執行會不同">⚠</span>{{end}}{{else}}<span class="cs-dim">—</span>{{end}}</td>
           <td class="setup-actions">
             {{if not .Outcome}}<form method="post" action="/setups/{{.ID}}/skip"><button class="setup-skip" title="標記不進 skip">skip</button></form>{{end}}
             <form method="post" action="/setups/{{.ID}}/delete" onsubmit="return confirm('刪除 setup #{{.ID}}?')"><button class="setup-del" title="delete">✕</button></form>

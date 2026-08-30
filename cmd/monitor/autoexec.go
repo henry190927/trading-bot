@@ -15,7 +15,26 @@ import (
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/notify"
 	"myFirstGo/trading-bot/signal"
+	"myFirstGo/trading-bot/validator"
 )
+
+// fireScore100 computes the validator structural-fit score (rescaled /100) for
+// an entry at fire time — a uniform quality number across ALL strategies
+// (range-edge / engine / sweep-reject / htf-snr), even the ones that don't gate
+// on a score. Best-effort: 0 on any error. Only called when a fire actually
+// triggers (rare), so the extra Klines fetch is cheap.
+func fireScore100(ctx context.Context, client *bingx.Client, sym market.Symbol, tf, sideStr string, entry float64) float64 {
+	cs, err := client.Klines(ctx, sym, market.Timeframe(tf), 300)
+	if err != nil || len(cs) < 50 {
+		return 0
+	}
+	side := signal.Long
+	if sideStr == "short" {
+		side = signal.Short
+	}
+	r := validator.Validate(sym, market.Timeframe(tf), side, entry, 6.0, cs)
+	return r.Total * 10
+}
 
 // autoSymbols maps the friendly ticker in autotrade.json to the BingX symbol.
 var autoSymbols = map[string]market.Symbol{
@@ -118,6 +137,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 
 			qty := r.MarginUSDT * float64(r.Leverage) / trig.entry
 			st.lastFireBar = barTime
+			score := fireScore100(ctx, client, sym, r.TF, trig.side, trig.entry)
 
 			if !live {
 				// PAPER: log + ntfy the intended order, no API call.
@@ -125,7 +145,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 					r.Symbol, trig.side, trig.entry, trig.stop, trig.tp, qty, int(r.MarginUSDT), r.Leverage, trig.why)
 				log.Printf("[AUTO-PAPER] would place %s", msg)
 				autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.side, Market: trig.market,
-					Entry: trig.entry, Stop: trig.stop, TP: trig.tp, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.why, Live: false})
+					Entry: trig.entry, Stop: trig.stop, TP: trig.tp, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.why, Score: score, Live: false})
 				if n != nil {
 					_ = n.Push(ctx, "🤖 auto (paper)", msg, "robot")
 				}
@@ -151,7 +171,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			log.Printf("[AUTO-LIVE] placed %s %s @%.4f stop %.4f tp %.4f qty %.4f orderId=%s",
 				r.Symbol, trig.side, trig.entry, trig.stop, trig.tp, qty, id)
 			autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.side, Market: trig.market,
-				Entry: trig.entry, Stop: trig.stop, TP: trig.tp, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.why + " id=" + id, Live: true})
+				Entry: trig.entry, Stop: trig.stop, TP: trig.tp, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.why + " id=" + id, Score: score, Live: true})
 			if n != nil {
 				_ = n.Push(ctx, "🤖 auto PLACED", fmt.Sprintf("%s %s @%.4f (stop %.4f tp %.4f) id=%s", r.Symbol, trig.side, trig.entry, trig.stop, trig.tp, id), "robot")
 			}

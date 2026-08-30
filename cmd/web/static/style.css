@@ -1823,6 +1823,31 @@ footer {
     z-index: 6;
     overflow: hidden; /* safety net: never let a label overrun the plot */
 }
+/* Support/resistance bands (支撐帶) — shaded Lo–Hi zones over the candles.
+   Low opacity so candles read through; sits below labels/lines (z-index 3). */
+.chart-zone-bands {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    overflow: hidden;
+}
+.chart-zone-band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    min-height: 2px;
+}
+.chart-zone-band.zone-eqh {
+    background: rgba(250, 82, 82, 0.10);
+    border-top: 1px solid rgba(250, 82, 82, 0.30);
+    border-bottom: 1px solid rgba(250, 82, 82, 0.30);
+}
+.chart-zone-band.zone-eql {
+    background: rgba(55, 178, 77, 0.10);
+    border-top: 1px solid rgba(55, 178, 77, 0.30);
+    border-bottom: 1px solid rgba(55, 178, 77, 0.30);
+}
 .chart-poc-label {
     position: absolute;
     left: 0;

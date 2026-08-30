@@ -81,13 +81,14 @@
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>time</th><th>sym</th><th>tf</th><th>strat</th><th>side</th><th>entry</th><th>現價</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
+      <thead><tr><th>time</th><th>sym</th><th>tf</th><th>strat</th><th>side</th><th title="validator 結構適合度 /100 (開單當下算,四種策略統一比較)">評分</th><th>entry</th><th>現價</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
       <tbody>
         {{range .Fires}}
         <tr>
           <td class="cs-dim">{{.When}}{{if .Absorbed}} <span class="badge b-dim" title="收合了 {{.Absorbed}} 筆同 setup 的每小時重複進場">＋{{.Absorbed}}</span>{{end}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td>
           <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
           <td class="dir-{{.Side}}">{{.Side}}</td>
+          <td class="num">{{if .Score}}<span style="color:{{if ge .Score 60.0}}var(--green){{else if lt .Score 40.0}}var(--red){{else}}var(--text){{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
           <td class="num">{{printf "%.4f" .Entry}}</td>
           <td class="num">{{if .Cur}}<span style="color:{{if .CurUp}}var(--green){{else}}var(--red){{end}}">{{printf "%.4f" .Cur}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
           <td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>

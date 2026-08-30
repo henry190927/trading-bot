@@ -25,6 +25,7 @@ type PaperFire struct {
 	Margin float64   `json:"margin"`
 	Lev    int       `json:"lev"`
 	Why    string    `json:"why"`
+	Score  float64   `json:"score,omitempty"` // validator structural-fit score /100 at fire time (0 = not scored / legacy)
 	Live   bool      `json:"live"` // false = paper, true = real order placed
 }
 
