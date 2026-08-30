@@ -63,3 +63,4 @@ trading-web
 vendor/
 go.work
 go.work.sum
+/openbt
