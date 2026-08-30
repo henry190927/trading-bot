@@ -5325,20 +5325,30 @@ main { overflow-x: hidden; }
 }
 .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
 .cs-record-btn:disabled { opacity: 0.6; cursor: wait; }
-/* Standalone bar version (decoupled from the N-struct panel): a touch more
-   present since it's now an always-visible primary action. */
-.chart-setup-bar {
-    margin-bottom: 0.5rem;
+/* One-liner + record button on one row (decoupled from the N-struct panel;
+   the button rides the right edge of the summary line so it isn't a lonely
+   button floating on its own). */
+.chart-oneliner-row {
     display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+    margin-bottom: 0.5rem;
 }
-.chart-setup-bar .cs-record-btn {
+.chart-oneliner-row .chart-one-liner {
+    flex: 1 1 auto;
+    min-width: 0;      /* allow the summary to shrink instead of pushing the button off */
+    margin-bottom: 0;  /* row owns the spacing now */
+}
+.chart-oneliner-row .cs-record-btn {
+    flex: 0 0 auto;
+    align-self: stretch;   /* match the one-liner's height */
     padding: 5px 14px;
     font-size: 0.78rem;
     border-radius: 6px;
     background: rgba(77, 171, 247, 0.12); /* solid fallback before color-mix (iOS Safari <16.4) */
     background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
-.chart-setup-bar .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
+.chart-oneliner-row .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
 
 /* setups skip state + action buttons */
 .oc-skip { color: var(--text-dim); background: var(--surface-2); border: 1px dashed var(--border); }
