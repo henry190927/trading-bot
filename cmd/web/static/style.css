@@ -1506,11 +1506,6 @@ footer {
     border-radius: 0 4px 4px 0;
     margin-bottom: 0.5rem;
 }
-/* Record-setup button, decoupled from the N-struct layer so it's always
-   available (records the current structure snapshot to /setups). */
-.chart-setup-bar {
-    margin-bottom: 0.5rem;
-}
 /* Phase-1 unified score: bullet factors behind the /100 headline.
    Lives as a full-width row at the bottom of .chart-header (the score card),
    separated by a hairline divider so header + factors read as one card. */
@@ -5312,20 +5307,38 @@ main { overflow-x: hidden; }
 .setup-del:hover { color: var(--red); }
 
 /* /chart struct-panel "記 setup" button */
-.chart-struct-panel .cs-record-btn {
+.cs-record-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     background: transparent;
     border: 1px solid var(--blue);
     color: var(--blue);
-    border-radius: 4px;
-    padding: 2px 8px;
+    border-radius: 5px;
+    padding: 3px 10px;
     font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     flex: 0 0 auto;
     white-space: nowrap;
+    transition: background 0.12s, color 0.12s;
 }
-.chart-struct-panel .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
-.chart-struct-panel .cs-record-btn:disabled { opacity: 0.6; cursor: wait; }
+.cs-record-btn:hover { background: var(--blue); color: var(--bg); }
+.cs-record-btn:disabled { opacity: 0.6; cursor: wait; }
+/* Standalone bar version (decoupled from the N-struct panel): a touch more
+   present since it's now an always-visible primary action. */
+.chart-setup-bar {
+    margin-bottom: 0.5rem;
+    display: flex;
+}
+.chart-setup-bar .cs-record-btn {
+    padding: 5px 14px;
+    font-size: 0.78rem;
+    border-radius: 6px;
+    background: rgba(77, 171, 247, 0.12); /* solid fallback before color-mix (iOS Safari <16.4) */
+    background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+.chart-setup-bar .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
 
 /* setups skip state + action buttons */
 .oc-skip { color: var(--text-dim); background: var(--surface-2); border: 1px dashed var(--border); }
