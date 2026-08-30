@@ -1506,10 +1506,11 @@ footer {
     border-radius: 0 4px 4px 0;
     margin-bottom: 0.5rem;
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
 }
-.chart-one-liner #chart-oneliner-text { flex: 1 1 auto; min-width: 0; }
+.chart-one-liner #chart-oneliner-text { width: 100%; }
 /* Phase-1 unified score: bullet factors behind the /100 headline.
    Lives as a full-width row at the bottom of .chart-header (the score card),
    separated by a hairline divider so header + factors read as one card. */
