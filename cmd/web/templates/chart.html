@@ -264,15 +264,6 @@
     <span class="cs-kv" id="cs-zone-wrap"><em>樞紐區</em><span id="cs-zone">—</span></span>
     <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
     <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
-    <button type="button" class="cs-info-btn" id="cs-info-btn" aria-expanded="false" title="怎麼判讀 N 字結構" aria-label="怎麼判讀 N 字結構">ⓘ</button>
-    <div class="cs-info hidden" id="cs-info">
-      <b>N 字判讀:</b> 推動 → 回檔 → 再推動。
-      <b>BOS</b> = 收盤突破 leg 終端 swing(續勢);
-      <b>CHoCH</b> = 收盤跌破 leg 起點(反轉警訊,樞紐區作廢)。
-      <b>樞紐區</b>(0.5–0.705 回檔帶)= 順勢進場區,<b>invalid</b> = 結構停損,<b>target</b> = 1:1 量測。
-      實戰:價格回落進<em>同向</em>樞紐區且未 CHoCH → 找續勢;收破 invalid → 這個 N 作廢。
-      <br><b>⏳</b> = event / in-zone 是拿<em>未收盤</em> bar 的即時價算的,收盤前可能變動;swing 折點與樞紐區位階是收盤確認、不變。
-    </div>
   </div>
   </aside>
   </div><!-- /chart-grid -->
@@ -559,6 +550,18 @@
             <div class="lang-zh">
               <b>開盤價</b> — 日開（00:00 UTC，= 亞洲開）、週開（週一 00:00 UTC）、倫敦開（07:00 UTC）、紐約開（13:00 UTC）。機構錨點。
               <p class="glossary-how"><b>方向解讀：</b>站上日開<b>且</b>週開 =<span class="dir-long">做多</span>偏好；都在下 =<span class="dir-short">做空</span>。開盤價當<b>支撐/壓力</b>（做反彈/拒絕）+ <b>回歸磁鐵</b>（離太遠常回測）。收盤收復開盤價 = 性格轉變。多條開盤價擠一起 = 更強的牆。</p>
+            </div>
+          </dd>
+
+          <dt><span class="glossary-tag">N字 struct</span></dt>
+          <dd>
+            <div class="lang-en">
+              <b>N-structure</b> — push → pullback → push (the N-leg). Zigzag labels each turning point HH/HL (bullish) or LH/LL (bearish).
+              <p class="glossary-how"><b>BOS</b> = close beyond the leg's terminal swing (continuation); <b>CHoCH</b> = close back through the leg's origin (reversal warning — pivot zone voided). <b>樞紐區</b> (0.5–0.705 retrace band) = trend-aligned entry zone; <b>invalid</b> = structural stop; <b>target</b> = 1:1 measured move. <b>Playbook:</b> price pulls into the <em>same-direction</em> pivot zone without a CHoCH → look for continuation; a close through <b>invalid</b> → this N is void. <b>⏳</b> = event / in-zone are computed off the <em>unclosed</em> bar (can repaint before close); swing points &amp; pivot-zone levels are close-confirmed and fixed.</p>
+            </div>
+            <div class="lang-zh">
+              <b>N 字結構</b> — 推動 → 回檔 → 再推動。zigzag 把每個折點標 HH/HL(多)或 LH/LL(空)。
+              <p class="glossary-how"><b>BOS</b> = 收盤突破 leg 終端 swing(續勢);<b>CHoCH</b> = 收盤跌破 leg 起點(反轉警訊,樞紐區作廢)。<b>樞紐區</b>(0.5–0.705 回檔帶)= 順勢進場區,<b>invalid</b> = 結構停損,<b>target</b> = 1:1 量測。<b>實戰:</b>價格回落進<em>同向</em>樞紐區且未 CHoCH → 找續勢;收破 <b>invalid</b> → 這個 N 作廢。<b>⏳</b> = event / in-zone 是拿<em>未收盤</em> bar 即時價算的,收盤前可能變動;swing 折點與樞紐區位階是收盤確認、不變。</p>
             </div>
           </dd>
 
