@@ -253,8 +253,8 @@
     </div>
     <div class="chart-factors" id="chart-factors" aria-label="主要評分因素"></div>
   </div>
-  <div class="chart-oneliner-row">
-    <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
+  <div class="chart-one-liner" id="chart-oneliner">
+    <span id="chart-oneliner-text">Loading…</span>
     <button type="button" class="cs-record-btn" id="cs-record-btn" title="記錄目前 setup 到 forward-log(/setups),不管有沒有開單 — 獨立於 N字圖層">⚑ 記 setup</button>
   </div>
   <div class="chart-struct-panel hidden" id="chart-struct-panel">
@@ -726,7 +726,7 @@
     var totalEl  = document.getElementById('chart-total');
     var ratioEl  = document.getElementById('chart-ratio');
     var verdEl   = document.getElementById('chart-verdict');
-    var linerEl  = document.getElementById('chart-oneliner');
+    var linerEl  = document.getElementById('chart-oneliner-text'); // text span; sibling ⚑ button stays put
     var aiBtn    = document.getElementById('chart-ai-btn');
     var aiPane   = document.getElementById('chart-ai-result');
     var refreshBtn = document.getElementById('chart-refresh');

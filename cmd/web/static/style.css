@@ -1505,7 +1505,11 @@ footer {
     border-left: 3px solid var(--blue);
     border-radius: 0 4px 4px 0;
     margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
+.chart-one-liner #chart-oneliner-text { flex: 1 1 auto; min-width: 0; }
 /* Phase-1 unified score: bullet factors behind the /100 headline.
    Lives as a full-width row at the bottom of .chart-header (the score card),
    separated by a hairline divider so header + factors read as one card. */
@@ -5325,30 +5329,17 @@ main { overflow-x: hidden; }
 }
 .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
 .cs-record-btn:disabled { opacity: 0.6; cursor: wait; }
-/* One-liner + record button on one row (decoupled from the N-struct panel;
-   the button rides the right edge of the summary line so it isn't a lonely
-   button floating on its own). */
-.chart-oneliner-row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: stretch;
-    margin-bottom: 0.5rem;
-}
-.chart-oneliner-row .chart-one-liner {
-    flex: 1 1 auto;
-    min-width: 0;      /* allow the summary to shrink instead of pushing the button off */
-    margin-bottom: 0;  /* row owns the spacing now */
-}
-.chart-oneliner-row .cs-record-btn {
+/* ⚑ 記 setup button lives INSIDE the one-liner box, pinned to the right edge —
+   one unified block (summary text + action) instead of a lonely button. */
+.chart-one-liner .cs-record-btn {
     flex: 0 0 auto;
-    align-self: stretch;   /* match the one-liner's height */
-    padding: 5px 14px;
-    font-size: 0.78rem;
+    padding: 3px 12px;
+    font-size: 0.75rem;
     border-radius: 6px;
     background: rgba(77, 171, 247, 0.12); /* solid fallback before color-mix (iOS Safari <16.4) */
     background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
-.chart-oneliner-row .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
+.chart-one-liner .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
 
 /* setups skip state + action buttons */
 .oc-skip { color: var(--text-dim); background: var(--surface-2); border: 1px dashed var(--border); }
