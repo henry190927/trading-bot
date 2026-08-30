@@ -4069,10 +4069,12 @@ func (s *server) handleChartData(c *gin.Context) {
 
 	// Session opens + liquidity pools change slowly and each costs a dedicated
 	// Klines fetch — compute them only on full loads, not the frequent light poll.
-	var opens, liquidity []map[string]any
+	var opens, liquidity, bands []map[string]any
 	if !light {
 		opens = s.computeChartOpens(ctx, sym)
-		liquidity = s.computeChartLiquidity(ctx, sym, tf)
+		pools, px := s.chartLiquidityPools(ctx, sym, tf)
+		liquidity = liquidityLines(pools)
+		bands = mergeBands(pools, px)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -4106,6 +4108,7 @@ func (s *server) handleChartData(c *gin.Context) {
 		"structure":     computeChartStructure(candles),
 		"opens":         opens,
 		"liquidity":     liquidity,
+		"bands":         bands,
 	})
 }
 
@@ -4142,35 +4145,33 @@ func topFactors(factors []validator.Factor, n int) []map[string]any {
 // compute different pools and the lines would jump every tick. Pools are then
 // filtered to within ~5% of the last price and capped to the nearest few each
 // side so the chart stays readable. Best-effort: nil on fetch error.
-func (s *server) computeChartLiquidity(ctx context.Context, sym market.Symbol, tf market.Timeframe) []map[string]any {
+func (s *server) chartLiquidityPools(ctx context.Context, sym market.Symbol, tf market.Timeframe) ([]signal.LiquidityLevel, float64) {
 	if s.client == nil {
-		return nil
+		return nil, 0
 	}
 	candles, err := s.client.Klines(ctx, sym, tf, 300)
 	if err != nil || len(candles) < 30 {
-		return nil
+		return nil, 0
 	}
 	price := candles[len(candles)-1].Close
 	if price <= 0 {
-		return nil
+		return nil, 0
 	}
 	pools := signal.FindLiquidity(candles, 2, 40, 0.0015)
-	// Keep only pools within 5% of price; rank by nearness; cap each side.
 	type scored struct {
 		p    signal.LiquidityLevel
 		dist float64
 	}
 	var near []scored
 	for _, p := range pools {
-		d := math.Abs(p.Price-price) / price
-		if d <= 0.05 {
+		if d := math.Abs(p.Price-price) / price; d <= 0.05 {
 			near = append(near, scored{p, d})
 		}
 	}
 	sort.Slice(near, func(i, j int) bool { return near[i].dist < near[j].dist })
 	const capEach = 4
 	above, below := 0, 0
-	out := make([]map[string]any, 0, capEach*2)
+	out := make([]signal.LiquidityLevel, 0, capEach*2)
 	for _, s := range near {
 		if s.p.Price >= price {
 			if above >= capEach {
@@ -4183,9 +4184,68 @@ func (s *server) computeChartLiquidity(ctx context.Context, sym market.Symbol, t
 			}
 			below++
 		}
+		out = append(out, s.p)
+	}
+	return out, price
+}
+
+// liquidityLines formats near-price pools as individual EQH/EQL lines (the
+// precise-level view). Pure — caller supplies the pools (one fetch shared with
+// the bands view).
+func liquidityLines(pools []signal.LiquidityLevel) []map[string]any {
+	if len(pools) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(pools))
+	for _, p := range pools {
 		out = append(out, map[string]any{
-			"kind": string(s.p.Kind), "price": s.p.Price,
-			"lo": s.p.Lo, "hi": s.p.Hi, "touches": s.p.Touches,
+			"kind": string(p.Kind), "price": p.Price,
+			"lo": p.Lo, "hi": p.Hi, "touches": p.Touches,
+		})
+	}
+	return out
+}
+
+// mergeBands merges near-price pools into consolidated S/R SHELVES: adjacent
+// pools (any kind) whose gap is under mergeTol collapse into one wider zone
+// (Lo=min, Hi=max, touches summed). This is the decluttered "支撐帶" view — a
+// few meaningful zones instead of many thin lines. Each shelf is tagged support
+// (below price) / resistance (above) / pivot (straddles price), since a level's
+// role depends on where price sits now, not whether the swings were highs/lows.
+func mergeBands(pools []signal.LiquidityLevel, price float64) []map[string]any {
+	if len(pools) == 0 || price <= 0 {
+		return nil
+	}
+	sort.Slice(pools, func(i, j int) bool { return pools[i].Price < pools[j].Price })
+	const mergeFrac = 0.004 // pools within 0.4% collapse into one shelf
+	type shelf struct {
+		lo, hi  float64
+		touches int
+		count   int
+	}
+	var shelves []shelf
+	for _, p := range pools {
+		if n := len(shelves); n > 0 && p.Lo <= shelves[n-1].hi+shelves[n-1].hi*mergeFrac {
+			shelves[n-1].hi = math.Max(shelves[n-1].hi, p.Hi)
+			if p.Lo < shelves[n-1].lo {
+				shelves[n-1].lo = p.Lo
+			}
+			shelves[n-1].touches += p.Touches
+			shelves[n-1].count++
+			continue
+		}
+		shelves = append(shelves, shelf{lo: p.Lo, hi: p.Hi, touches: p.Touches, count: 1})
+	}
+	out := make([]map[string]any, 0, len(shelves))
+	for _, sh := range shelves {
+		role := "pivot"
+		if sh.hi < price {
+			role = "support"
+		} else if sh.lo > price {
+			role = "resistance"
+		}
+		out = append(out, map[string]any{
+			"lo": sh.lo, "hi": sh.hi, "touches": sh.touches, "count": sh.count, "role": role,
 		})
 	}
 	return out

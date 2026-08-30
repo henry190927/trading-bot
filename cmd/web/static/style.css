@@ -1838,15 +1838,20 @@ footer {
     right: 0;
     min-height: 2px;
 }
-.chart-zone-band.zone-eqh {
+.chart-zone-band.zone-resistance {
     background: rgba(250, 82, 82, 0.10);
     border-top: 1px solid rgba(250, 82, 82, 0.30);
     border-bottom: 1px solid rgba(250, 82, 82, 0.30);
 }
-.chart-zone-band.zone-eql {
+.chart-zone-band.zone-support {
     background: rgba(55, 178, 77, 0.10);
     border-top: 1px solid rgba(55, 178, 77, 0.30);
     border-bottom: 1px solid rgba(55, 178, 77, 0.30);
+}
+.chart-zone-band.zone-pivot {
+    background: rgba(240, 173, 78, 0.12);
+    border-top: 1px solid rgba(240, 173, 78, 0.35);
+    border-bottom: 1px solid rgba(240, 173, 78, 0.35);
 }
 .chart-poc-label {
     position: absolute;

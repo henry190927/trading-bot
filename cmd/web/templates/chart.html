@@ -1107,7 +1107,7 @@
         counts['hvn']       = (lastHVN || []).length;
         counts['opens']     = (lastOpens || []).length;
         counts['liquidity'] = (lastLiq || []).length;
-        counts['zones']     = (lastLiq || []).length;
+        counts['zones']     = (lastBands || []).length;
         counts['struct']    = (lastStructure && lastStructure.swings) ? lastStructure.swings.length : 0;
         document.querySelectorAll('[data-layer-count]').forEach(function (span) {
             var k = span.dataset.layerCount;
@@ -1499,25 +1499,27 @@
     // (HTML overlay synced to the price scale) so the pools read as ZONES /
     // boxes — the way the levels are drawn by hand. EQH = red tint (resistance),
     // EQL = green tint (support). Repaints on any price-scale change.
+    var lastBands = [];
     function drawZoneBands() {
         var host = document.getElementById('chart-zone-bands');
         if (!host) return;
         while (host.firstChild) host.removeChild(host.firstChild);
-        if (!layerOn('zones') || !lastLiq.length) return;
+        if (!layerOn('zones') || !lastBands.length) return;
         var plotH = host.clientHeight || 600;
-        lastLiq.forEach(function (q) {
-            if (!q || !q.lo || !q.hi) return;
-            var yHi = candleSeries.priceToCoordinate(q.hi);
-            var yLo = candleSeries.priceToCoordinate(q.lo);
+        lastBands.forEach(function (b) {
+            if (!b || !b.lo || !b.hi) return;
+            var yHi = candleSeries.priceToCoordinate(b.hi);
+            var yLo = candleSeries.priceToCoordinate(b.lo);
             if (yHi == null || yLo == null) return;
             var top = Math.min(yHi, yLo), h = Math.abs(yLo - yHi);
             if (top > plotH || top + h < 0) return;   // fully off-screen
-            if (h < 2) h = 2;                          // keep a hairline visible for tight pools
+            if (h < 2) h = 2;                          // hairline for a razor-thin shelf
             var el = document.createElement('div');
-            el.className = 'chart-zone-band ' + (q.kind === 'EQH' ? 'zone-eqh' : 'zone-eql');
+            el.className = 'chart-zone-band zone-' + (b.role || 'pivot');
             el.style.top = top + 'px';
             el.style.height = h + 'px';
-            el.title = q.kind + ' ' + q.lo.toFixed(0) + '–' + q.hi.toFixed(0) + ' (' + (q.touches || 2) + 'x)';
+            el.title = (b.role || 'zone') + ' ' + b.lo.toFixed(0) + '–' + b.hi.toFixed(0)
+                + ' (' + (b.touches || 0) + 'x' + (b.count > 1 ? ', ' + b.count + ' 池合併' : '') + ')';
             host.appendChild(el);
         });
     }
@@ -2204,6 +2206,7 @@
         applyOpenLinesVisibility();
         lastLiq = data.liquidity || [];
         applyLiqLinesVisibility();
+        lastBands = data.bands || [];
         drawZoneBands();
         lastPOCMig = data.pocMigration || null;
         applyPOCMigLinesVisibility();
@@ -2555,6 +2558,10 @@
                 if (Array.isArray(data.liquidity)) {
                     lastLiq = data.liquidity;
                     applyLiqLinesVisibility();
+                    updateLayerCounts();
+                }
+                if (Array.isArray(data.bands)) {
+                    lastBands = data.bands;
                     drawZoneBands();
                     updateLayerCounts();
                 }
