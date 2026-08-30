@@ -1506,6 +1506,11 @@ footer {
     border-radius: 0 4px 4px 0;
     margin-bottom: 0.5rem;
 }
+/* Record-setup button, decoupled from the N-struct layer so it's always
+   available (records the current structure snapshot to /setups). */
+.chart-setup-bar {
+    margin-bottom: 0.5rem;
+}
 /* Phase-1 unified score: bullet factors behind the /100 headline.
    Lives as a full-width row at the bottom of .chart-header (the score card),
    separated by a hairline divider so header + factors read as one card. */
