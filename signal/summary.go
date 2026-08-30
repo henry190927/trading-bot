@@ -17,8 +17,8 @@ import (
 //
 // Examples:
 //
-//	"falling POC -4.98% + stacked regime · 2 MR + 0 MOM (below MIN_SCORE=3) · 4.9/10 NEUTRAL · LOW-CONVICTION SHORT — discretionary or wait"
-//	"sweep-high anchor · 1 MR + 0 MOM · 6.4/10 TAKE · MEAN-REV SHORT candidate — vote count thin"
+//	"falling POC -4.98% + stacked regime · 2 MR + 0 MOM (below MIN_SCORE=3) · 49.0/100 NEUTRAL · LOW-CONVICTION SHORT — discretionary or wait"
+//	"sweep-high anchor · 1 MR + 0 MOM · 64.0/100 TAKE · MEAN-REV SHORT candidate — vote count thin"
 //	"flat — no setup · 0 MR + 0 MOM · — · NO TRADE"
 //
 // diag may be nil (no validator result available); the summary degrades
@@ -31,7 +31,7 @@ func BuildSummary(sig Signal, diag DiagnoseView) string {
 	}
 	parts = append(parts, scoreFragment(sig))
 	if diag.Has {
-		parts = append(parts, fmt.Sprintf("%.1f/10 %s", diag.Total, diag.VerdictShort))
+		parts = append(parts, fmt.Sprintf("%.1f/100 %s", diag.Total*10, diag.VerdictShort))
 	}
 	parts = append(parts, suggestionFragment(sig, diag))
 

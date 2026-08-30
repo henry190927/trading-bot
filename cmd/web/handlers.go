@@ -2622,6 +2622,7 @@ func templateFuncs() template.FuncMap {
 			return fmt.Sprintf("%+.4f%%", v*100)
 		},
 		"mulPct": func(v float64) float64 { return v * 100 },
+		"score100": func(v float64) float64 { return v * 10 }, // validator /10 → unified /100
 		"fmtSigned1": func(v float64) string {
 			return fmt.Sprintf("%+.1f", v)
 		},
@@ -3810,6 +3811,12 @@ func (s *server) handleChartData(c *gin.Context) {
 	}
 	tf := market.Timeframe(tfStr)
 
+	// light=1 (used by the 2s auto-poll) skips the slowly-changing extras —
+	// session opens + liquidity pools — which each cost a dedicated Klines
+	// fetch. They're refreshed only on full loads / TF switches; the frequent
+	// poll stays lean so the live price line keeps up.
+	light := c.Query("light") == "1"
+
 	limit := 400
 	if v := c.Query("limit"); v != "" {
 		fmt.Sscanf(v, "%d", &limit)
@@ -4015,6 +4022,12 @@ func (s *server) handleChartData(c *gin.Context) {
 			"total":    d.Total,
 			"totalMR":  d.TotalMR,
 			"totalMOM": d.TotalMOM,
+			// Phase-1 unified score: the same validator score rescaled to /100
+			// (linear ×10, decimals kept). No engine-logic change — pure display.
+			"total100": d.Total * 10,
+			"mr100":    d.TotalMR * 10,
+			"mom100":   d.TotalMOM * 10,
+			"factors":  topFactors(d.Factors, 6),
 			"verdict":  verdictShortHelper(d.Verdict),
 			"atVAH":    d.AtVAH,
 			"atVAL":    d.AtVAL,
@@ -4054,6 +4067,14 @@ func (s *server) handleChartData(c *gin.Context) {
 		topHVN = append(topHVN, h)
 	}
 
+	// Session opens + liquidity pools change slowly and each costs a dedicated
+	// Klines fetch — compute them only on full loads, not the frequent light poll.
+	var opens, liquidity []map[string]any
+	if !light {
+		opens = s.computeChartOpens(ctx, sym)
+		liquidity = s.computeChartLiquidity(ctx, sym, tf)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"symbol":        short,
 		"tf":            tfStr,
@@ -4083,7 +4104,149 @@ func (s *server) handleChartData(c *gin.Context) {
 		"marketCtx":     ctxSnap,
 		"openPositions": openPositions,
 		"structure":     computeChartStructure(candles),
+		"opens":         opens,
+		"liquidity":     liquidity,
 	})
+}
+
+// topFactors picks the N most-impactful validator factors (by absolute point
+// weight), rescales each to the /100 headline (×10), and returns them for the
+// engine card's bullet breakdown. Zero-point factors are dropped. This is the
+// "few bullet reasons behind the weighted score" — pure display, the factor
+// set + weights come straight from validator.scoreFactors (unchanged).
+func topFactors(factors []validator.Factor, n int) []map[string]any {
+	kept := make([]validator.Factor, 0, len(factors))
+	for _, f := range factors {
+		if math.Abs(f.Points) >= 0.05 {
+			kept = append(kept, f)
+		}
+	}
+	sort.Slice(kept, func(i, j int) bool { return math.Abs(kept[i].Points) > math.Abs(kept[j].Points) })
+	if len(kept) > n {
+		kept = kept[:n]
+	}
+	out := make([]map[string]any, 0, len(kept))
+	for _, f := range kept {
+		out = append(out, map[string]any{
+			"name": f.Name, "points": f.Points * 10, "detail": f.Detail, "axis": f.Axis,
+		})
+	}
+	return out
+}
+
+// computeChartLiquidity returns EQH/EQL liquidity pools (equal highs/lows —
+// resting-liquidity magnets, the SMC concept behind the sweep-reject strategy)
+// for the chart's liquidity layer. Uses a DEDICATED fixed-size fetch (not the
+// display candles) so the pool set is stable regardless of the caller's limit —
+// otherwise the 3s poll (limit≈60) and the initial load (limit 400) would
+// compute different pools and the lines would jump every tick. Pools are then
+// filtered to within ~5% of the last price and capped to the nearest few each
+// side so the chart stays readable. Best-effort: nil on fetch error.
+func (s *server) computeChartLiquidity(ctx context.Context, sym market.Symbol, tf market.Timeframe) []map[string]any {
+	if s.client == nil {
+		return nil
+	}
+	candles, err := s.client.Klines(ctx, sym, tf, 300)
+	if err != nil || len(candles) < 30 {
+		return nil
+	}
+	price := candles[len(candles)-1].Close
+	if price <= 0 {
+		return nil
+	}
+	pools := signal.FindLiquidity(candles, 2, 40, 0.0015)
+	// Keep only pools within 5% of price; rank by nearness; cap each side.
+	type scored struct {
+		p    signal.LiquidityLevel
+		dist float64
+	}
+	var near []scored
+	for _, p := range pools {
+		d := math.Abs(p.Price-price) / price
+		if d <= 0.05 {
+			near = append(near, scored{p, d})
+		}
+	}
+	sort.Slice(near, func(i, j int) bool { return near[i].dist < near[j].dist })
+	const capEach = 4
+	above, below := 0, 0
+	out := make([]map[string]any, 0, capEach*2)
+	for _, s := range near {
+		if s.p.Price >= price {
+			if above >= capEach {
+				continue
+			}
+			above++
+		} else {
+			if below >= capEach {
+				continue
+			}
+			below++
+		}
+		out = append(out, map[string]any{
+			"kind": string(s.p.Kind), "price": s.p.Price,
+			"lo": s.p.Lo, "hi": s.p.Hi, "touches": s.p.Touches,
+		})
+	}
+	return out
+}
+
+// computeChartOpens returns the session/period opening prices the group
+// references as intraday S/R — daily (00:00 UTC), weekly (Mon 00:00 UTC),
+// London (07:00 UTC) and New York (13:00 UTC) opens. Computed from a
+// dedicated 1h fetch so the levels are exact regardless of the display TF
+// (a 4h chart has no candle at 07:00/13:00, so we can't derive them from
+// the display candles). Each entry is the OPEN of the first 1h candle
+// whose OpenTime falls on that boundary. Session boundaries roll back a
+// day when today's has not occurred yet. Best-effort: returns whatever it
+// can resolve, or nil on fetch error (the layer simply renders empty).
+func (s *server) computeChartOpens(ctx context.Context, sym market.Symbol) []map[string]any {
+	if s.client == nil {
+		return nil
+	}
+	// ~9 days of 1h bars — enough to reach this week's Monday 00:00.
+	cs, err := s.client.Klines(ctx, sym, market.Timeframe("1h"), 220)
+	if err != nil || len(cs) == 0 {
+		return nil
+	}
+	now := time.Now().UTC()
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	weekday := (int(now.Weekday()) + 6) % 7 // 0=Mon
+	week := day.AddDate(0, 0, -weekday)
+	// Session boundaries — roll back one day if today's hasn't passed.
+	london := day.Add(7 * time.Hour)
+	if now.Before(london) {
+		london = london.AddDate(0, 0, -1)
+	}
+	ny := day.Add(13 * time.Hour)
+	if now.Before(ny) {
+		ny = ny.AddDate(0, 0, -1)
+	}
+	// openAt: exact-hour match on 1h candles (OpenTime lands on the hour).
+	openAt := func(b time.Time) float64 {
+		for _, k := range cs {
+			if k.OpenTime.Equal(b) {
+				return k.Open
+			}
+		}
+		return 0
+	}
+	defs := []struct {
+		label, kind string
+		at          time.Time
+	}{
+		{"日開", "daily", day},
+		{"週開", "weekly", week},
+		{"倫敦開", "london", london},
+		{"紐約開", "ny", ny},
+	}
+	out := make([]map[string]any, 0, len(defs))
+	for _, d := range defs {
+		if p := openAt(d.at); p > 0 {
+			out = append(out, map[string]any{"label": d.label, "kind": d.kind, "price": p})
+		}
+	}
+	return out
 }
 
 // collectOpenPositionsForChart reads the journal, filters to open

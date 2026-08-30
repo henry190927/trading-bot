@@ -149,3 +149,96 @@ Key SD decisions baked in above:
 
 Bottom line: fan-out is the right pattern for **breadth (many items at once)**; for a single
 setup, the prompt+context upgrade already gets you most of the way.
+
+---
+
+## 8. Review notes (2026-08-24) — gaps to close before shipping
+
+Applying the same review discipline used on SD-01/SD-02 (state-explicitly checklist).
+**Provisional grade against the SD-02 rubric: ~62/100 (C+).** Fixes below → 75-80.
+
+### 8.1 Missing sections
+
+- **§0 Scope (IN / OUT) — mandatory.** State explicitly what this design covers vs excludes.
+  - IN: batch analyze for `/setups` + `/chart`; single-symbol on-demand
+  - OUT: streaming synthesis, real-time push, cross-symbol correlation lens, cross-tf hierarchical fan-out
+- **§5.5 Capacity Estimation — mandatory.** Requests/day, peak QPS, headroom vs Gemini free-tier RPM.
+  - Napkin: 4 symbols × 3 workers × 1 synth = 16 calls per batch analyze. At 5-req/min RPM, that's ~3 min wall-clock per batch. Batch cadence?
+- **§9 Data Model.** Commit Go structs for the three worker outputs (not just inline JSON).
+- **§10 API Surface.** Does `/api/ai/analyze` gain `?mode=fanout`? New endpoint `/api/ai/batch`? Not decided.
+
+### 8.2 Cross-cutting concerns — checklist status
+
+| Concern | Present? | Gap |
+|---------|----------|-----|
+| Rate limit (RPM) | ✅ semaphore | |
+| Timeout | ✅ per-worker | |
+| Retry / backoff | 🟡 mentioned | No per-error-class policy: 429 → retry w/ backoff; 400 → drop worker; timeout → drop and note |
+| **Observability** | ❌ | No metrics/tracing per worker — need worker latency, error rate, synth conflict count for debugging |
+| **API key mgmt** | ❌ | Per-user API key requirement (from user's own constraint) not addressed here — where does user key vs system key resolve? |
+| **Cost cap** | 🟡 "≈$0" | No per-request budget ceiling; if free-tier expires or user hits paid tier, uncapped cost |
+| **Prompt caching** | ❌ | Each worker gets full `SystemPromptQuantAdvisor` → 3-4× token multiplier. Confirm whether Gemini caches system prompts across sibling calls; if not, fan-out may cost MORE tokens than single-shot |
+| Idempotency | 🟡 | Cache-by-(symbol, tf, candle-close) mentioned; no explicit idempotency-key pattern for the batch endpoint |
+| **Sync vs async** | ❌ | Batch of 4 symbols × 15s per worker = 60s worst-case; sync-wait or fire-and-poll? Undecided |
+
+### 8.3 Concurrency correctness — subtle bug in §4 code
+
+```go
+go func(i int, w workerSpec) {
+    defer wg.Done()
+    sem <- struct{}{}    // ← BUG: blocks INSIDE goroutine
+    ...
+}(i, w)
+```
+
+Two issues:
+1. **All N goroutines spawn**, then N-cap wait on the semaphore. For 4 workers, harmless. For batch of 40 setups × 3 workers = 120 goroutines idle-waiting → wasted memory + scheduler churn.
+2. **Cancel-aware acquire missing** — `sem <- struct{}{}` blocks even if ctx already cancelled. Should be:
+   ```go
+   select {
+   case sem <- struct{}{}:
+       defer func() { <-sem }()
+   case <-ctx.Done():
+       outs[i] = workerOut{Role: w.Role, Err: ctx.Err()}
+       return
+   }
+   ```
+
+**Fix**: use `errgroup.SetLimit()` (already noted as alt in §4). It bounds goroutines at the source and integrates with ctx.
+
+### 8.4 Retry policy — expand §6
+
+Current row "Gemini 429 → bounded concurrency + backoff/retry" is one line. Concretize as a table:
+
+| Error class | Action | Max retries | Backoff |
+|-------------|--------|-------------|---------|
+| 429 (rate limit) | retry | 3 | exp: 1s → 2s → 4s + jitter |
+| 5xx server | retry | 2 | exp: 1s → 2s |
+| 4xx (schema, auth) | drop worker + note | 0 | — |
+| timeout | drop worker + note | 0 | — |
+| network | retry | 2 | fixed: 500ms |
+
+### 8.5 Prompt-cost sanity check
+
+Napkin math before committing to fan-out:
+```
+Single-shot:  1 × (system_prompt + ground_truth + query) = 1× baseline
+Fan-out:      3 × (system_prompt + role_addendum + ground_truth_slice)
+              + 1 × (system_prompt + synth_addendum + 3 worker JSONs)
+              ≈ 4× system_prompt duplication (unless cached)
+```
+If Gemini doesn't cache system prompts across sibling calls, **fan-out costs ~4× tokens** for a 15% quality improvement. Not a slam-dunk. **Action**: measure before defaulting to fan-out.
+
+### 8.6 Top 3 fixes (priority order)
+
+1. **Add §0 Scope + §5.5 Capacity Estimation** — 10 min of writing, biggest grade impact.
+2. **Concretize §6 retry policy** — per-error-class table above.
+3. **Verify prompt caching** — if not cached, redesign to share ground truth via a shorter "context bundle" reference instead of full-prompt duplication.
+
+### 8.7 What to preserve
+
+Don't touch these on the next revision — they're solid:
+- §1 "when NOT to" honesty
+- §3 structured hand-off enforcement (critical for synth determinism)
+- §7 batch-first staging (correct call, aligns with existing memory)
+- §5 tier split (cheap workers, strong synth)

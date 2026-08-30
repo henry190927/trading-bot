@@ -347,7 +347,7 @@ var (
 	tickerCache   tickerCacheT
 )
 
-const tickerCacheTTL = 9 * time.Second
+const tickerCacheTTL = 3 * time.Second
 
 // symbolCategory buckets a short ticker for the market-overview table tabs.
 func symbolCategory(short string) string {

@@ -226,9 +226,80 @@ func evalAutoTrigger(ctx context.Context, client *bingx.Client, sym market.Symbo
 		return evalEngine(ctx, client, sym, r)
 	case "sweep-reject":
 		return evalSweepReject(ctx, client, sym, r)
+	case "htf-snr":
+		return evalHTFSNR(ctx, client, sym, r)
 	default:
 		return autoTrigger{}
 	}
+}
+
+// evalHTFSNR fades a HIGHER-timeframe support/resistance level on the last
+// CLOSED entry-TF bar — the mechanized "2553 short" the group draws by hand.
+// Levels = swing highs/lows from the HTF (engineBiasTF, e.g. 1h→4h, strength 3,
+// confirmed `strength` bars after they form). Fire when the last closed bar tags
+// a confirmed level (High ≥ resistance−tol, approached from below) and closes
+// back below it → short; mirror for HTF support → long. Stop = tag wick + ATR
+// buffer; TP 2R. A/B-validated on ETH only (cmd/snrbt, +18/+18/+11R across
+// 60/90/120d, WR 35-39%); other symbols rejected, so keep this rule ETH-scoped.
+func evalHTFSNR(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule) autoTrigger {
+	const (
+		strength = 3      // HTF swing strength
+		tolFrac  = 0.0020 // 0.20% tag tolerance beyond the level
+		bufATR   = 0.25   // stop buffer beyond the tag wick, in ATR(14)
+		rMult    = 2.0    // TP = 2R
+	)
+	tf := market.Timeframe(r.TF)
+	cs, err := client.Klines(ctx, sym, tf, 300)
+	if err != nil || len(cs) < 30 {
+		return autoTrigger{}
+	}
+	hcs, herr := client.Klines(ctx, sym, engineBiasTF(tf), 200)
+	if herr != nil || len(hcs) < 40 {
+		return autoTrigger{}
+	}
+	atrs := indicator.ATR(cs, 14)
+	if len(atrs) == 0 {
+		return autoTrigger{}
+	}
+	a := atrs[len(atrs)-1]
+	bar := cs[len(cs)-1]   // last CLOSED entry bar = the fade candidate
+	prev := cs[len(cs)-2]  // the bar before it (approach direction)
+
+	// HTF swing levels, each usable only once confirmed (strength bars later).
+	sw := signal.FindSwingPoints(hcs, strength, 0)
+	wantShort := r.Side == "short" || r.Side == "auto"
+	wantLong := r.Side == "long" || r.Side == "auto"
+	for _, p := range sw {
+		ci := p.Index + strength
+		if ci >= len(hcs) {
+			ci = len(hcs) - 1
+		}
+		if !hcs[ci].CloseTime.Before(bar.OpenTime) {
+			continue // level not yet confirmed at this bar
+		}
+		tolAbs := p.Price * tolFrac
+		if wantShort && p.IsTop && prev.Close < p.Price && bar.High >= p.Price-tolAbs && bar.Close < p.Price {
+			stop := bar.High + bufATR*a
+			risk := stop - bar.Close
+			if risk <= 0 {
+				continue
+			}
+			return autoTrigger{fire: true, side: "short", entry: bar.Close, market: true,
+				stop: stop, tp: bar.Close - rMult*risk,
+				why: fmt.Sprintf("HTF-S/R fade: reject %s swing high %.4f", engineBiasTF(tf), p.Price)}
+		}
+		if wantLong && !p.IsTop && prev.Close > p.Price && bar.Low <= p.Price+tolAbs && bar.Close > p.Price {
+			stop := bar.Low - bufATR*a
+			risk := bar.Close - stop
+			if risk <= 0 {
+				continue
+			}
+			return autoTrigger{fire: true, side: "long", entry: bar.Close, market: true,
+				stop: stop, tp: bar.Close + rMult*risk,
+				why: fmt.Sprintf("HTF-S/R fade: hold %s swing low %.4f", engineBiasTF(tf), p.Price)}
+		}
+	}
+	return autoTrigger{}
 }
 
 // evalSweepReject fires the SMC sweep-and-reject on the last CLOSED bar: price ran

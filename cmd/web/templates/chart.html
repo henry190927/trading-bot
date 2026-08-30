@@ -60,6 +60,8 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="plan">plan</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="opens">開盤線 <span class="layer-count" data-layer-count="opens">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="liquidity">流動性 EQH/EQL <span class="layer-count" data-layer-count="liquidity">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">POC migration</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="struct">N字 struct <span class="layer-count" data-layer-count="struct">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="tf-bias">TF bias 表</button>
@@ -203,6 +205,7 @@
              edge of the plot. Kept off the right axis so the VP
              histogram there stays uncluttered. -->
         <div id="chart-poc-labels" class="chart-poc-labels" aria-hidden="true"></div>
+        <div id="chart-open-labels" class="chart-poc-labels" aria-hidden="true"></div>
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
         <div class="chart-price-marker" id="chart-price-marker" hidden>
           <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
@@ -234,10 +237,10 @@
       <div class="chart-header-scores">
         <span class="score score-mr" id="chart-mr">MR —</span>
         <span class="score score-mom" id="chart-mom">MOM —</span>
-        <span class="score" id="chart-total">total —</span>
+        <span class="score score-votes" id="chart-total" title="系統A 共識票數(每票+1,MIN=3)">— 票</span>
       </div>
       <div class="chart-banner-score" id="chart-banner-score">
-        <div class="chart-banner-label">評分</div>
+        <div class="chart-banner-label">評分 /100</div>
         <div class="chart-banner-score-num" id="chart-banner-score-num">—</div>
         <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
       </div>
@@ -246,6 +249,7 @@
         <div class="chart-banner-note" id="chart-banner-note"></div>
       </div>
     </div>
+    <div class="chart-factors" id="chart-factors" aria-label="主要評分因素"></div>
   </div>
   <div class="chart-one-liner" id="chart-oneliner">Loading…</div>
   <div class="chart-struct-panel hidden" id="chart-struct-panel">
@@ -530,6 +534,30 @@
             </div>
           </dd>
 
+          <dt><span class="glossary-tag">流動性 EQH/EQL</span></dt>
+          <dd>
+            <div class="lang-en">
+              <b>Liquidity pools</b> — clusters of equal highs (<span class="dir-short">EQH, red</span>) / equal lows (<span class="dir-long">EQL, green</span>) where stop orders rest. The label shows touch count (e.g. <code>EQL ·4x</code>).
+              <p class="glossary-how"><b>Direction:</b> pools are <b>magnets</b> — price is drawn to them, then often reverses. <b>EQH above</b> = buy-side liquidity → resistance / a magnet overhead. <b>EQL below</b> = sell-side liquidity → support. <b>Old EQL sitting ABOVE price</b> (lows made during a prior decline) flips to <b>resistance</b> on the retest — that's why you see green lines overhead after a drop. <b>Strength = touches</b> (4× &gt; 2×) + tightness of the band. <b>Entry:</b> a sweep-and-reject of a pool = fade it (the sweep-reject strategy). <b>Failure:</b> a decisive close THROUGH the pool = liquidity genuinely taken → continuation, not reversal.</p>
+            </div>
+            <div class="lang-zh">
+              <b>流動性池</b> — 等高（<span class="dir-short">EQH，紅</span>）/ 等低（<span class="dir-long">EQL，綠</span>）聚集處，止損單囤積的地方。標籤顯示觸及次數（如 <code>EQL ·4x</code>）。
+              <p class="glossary-how"><b>方向解讀：</b>池子是<b>磁鐵</b> — 價格被吸過去，然後常反轉。<b>上方 EQH</b> = 買方流動性 → 壓力 / 頭上磁鐵。<b>下方 EQL</b> = 賣方流動性 → 支撐。<b>舊 EQL 跑到現價上方</b>（下跌途中做的低）回測時翻成<b>壓力</b> — 這就是為什麼殺盤後會看到綠線在頭上。<b>強度看觸及次數</b>（4× &gt; 2×）+ 帶越窄越硬。<b>進場：</b>掃池後反收 = 反向 fade（就是 sweep-reject 策略）。<b>失敗訊號：</b>果斷收盤<b>穿過</b>池子 = 流動性真的被吃掉 → 續勢,不是反轉。</p>
+            </div>
+          </dd>
+
+          <dt><span class="glossary-tag">開盤線</span></dt>
+          <dd>
+            <div class="lang-en">
+              <b>Session opens</b> — daily (00:00 UTC, = Asia open), weekly (Mon 00:00 UTC), London (07:00 UTC), NY (13:00 UTC). Institutional anchors.
+              <p class="glossary-how"><b>Direction:</b> price above BOTH daily &amp; weekly open = <span class="dir-long">long</span> bias; below both = <span class="dir-short">short</span>. Opens act as <b>S/R</b> (trade the bounce/reject) and as <b>mean-reversion magnets</b> (price far from an open tends to revert to it). A close reclaiming an open = character shift. Several opens clustered at one price = a stronger wall.</p>
+            </div>
+            <div class="lang-zh">
+              <b>開盤價</b> — 日開（00:00 UTC，= 亞洲開）、週開（週一 00:00 UTC）、倫敦開（07:00 UTC）、紐約開（13:00 UTC）。機構錨點。
+              <p class="glossary-how"><b>方向解讀：</b>站上日開<b>且</b>週開 =<span class="dir-long">做多</span>偏好；都在下 =<span class="dir-short">做空</span>。開盤價當<b>支撐/壓力</b>（做反彈/拒絕）+ <b>回歸磁鐵</b>（離太遠常回測）。收盤收復開盤價 = 性格轉變。多條開盤價擠一起 = 更強的牆。</p>
+            </div>
+          </dd>
+
           <dt><span class="glossary-tag">2× top/bot</span></dt>
           <dd>
             <div class="lang-en">
@@ -787,6 +815,8 @@
         priceFormat: { type: 'volume' },
         priceScaleId: '',
         color: 'rgba(180,180,180,0.4)',
+        lastValueVisible: false, // hide the live volume tag stuck in the bottom-right
+        priceLineVisible: false,
     });
     // ── RSI overlay series on the main chart ─────────────────────
     var rsiSeries = chart.addLineSeries({
@@ -941,7 +971,7 @@
         boll: false, vol: false, vp: false, plan: false, positions: true,
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
-        rsi: false, 'macd-pane': false, hvn: false, 'poc-mig': false,
+        rsi: false, 'macd-pane': false, hvn: false, opens: true, liquidity: true, 'poc-mig': false,
         'delta-div': false, struct: true, 'tf-bias': true,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
@@ -1073,6 +1103,8 @@
         });
         counts['positions'] = (lastPositions || []).length;
         counts['hvn']       = (lastHVN || []).length;
+        counts['opens']     = (lastOpens || []).length;
+        counts['liquidity'] = (lastLiq || []).length;
         counts['struct']    = (lastStructure && lastStructure.swings) ? lastStructure.swings.length : 0;
         document.querySelectorAll('[data-layer-count]').forEach(function (span) {
             var k = span.dataset.layerCount;
@@ -1084,7 +1116,7 @@
     // Each category toggle button shows "how many of my layers are
     // currently ON". Recomputed on every layers-state change.
     var MENU_MEMBERS = {
-        overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn', 'struct'],
+        overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn', 'opens', 'liquidity', 'struct'],
         osc:      ['rsi', 'macd-pane'],
         events:   ['sweep', 'double', 'div', 'delta-div', 'volx', 'bb-events', 'macd', 'flags'],
     };
@@ -1115,6 +1147,8 @@
         applyPlanLinesVisibility();
         applyPositionLinesVisibility();
         applyHVNLinesVisibility();
+        applyOpenLinesVisibility();
+        applyLiqLinesVisibility();
         applyPOCMigLinesVisibility();
         applyStructureVisibility();
         var tbEl = document.getElementById('tf-bias');
@@ -1374,6 +1408,84 @@
                 lineStyle: 3,      // sparsely dotted
                 axisLabelVisible: true,
                 title: i === 0 ? 'POC' : 'HVN',
+            }));
+        });
+    }
+
+    // ── Session / period opens ───────────────────────────────────
+    // 日開 / 週開 / 倫敦開 / 紐約開 — institutional intraday S/R the
+    // group references. Backend ships exact levels from a 1h fetch.
+    var openLines = [];
+    var lastOpens = [];
+    var OPEN_COLORS = { daily: '#22b8cf', weekly: '#f59f00', london: '#7048e8', ny: '#e64980' };
+    function clearOpenLines() {
+        openLines.forEach(function (l) { candleSeries.removePriceLine(l); });
+        openLines = [];
+    }
+    function applyOpenLinesVisibility() {
+        clearOpenLines();
+        if (!layerOn('opens') || !lastOpens.length) { drawOpenLabels(); return; }
+        lastOpens.forEach(function (o) {
+            if (!o || !o.price) return;
+            openLines.push(candleSeries.createPriceLine({
+                price: o.price,
+                color: OPEN_COLORS[o.kind] || '#adb5bd',
+                lineWidth: 1,
+                lineStyle: 2,      // dashed — distinct from HVN dotted
+                axisLabelVisible: false, // label drawn on the LEFT (like POC), keeps right axis clean
+                title: o.label,
+            }));
+        });
+        drawOpenLabels();
+    }
+    // Left-side HTML labels for the session opens — mirrors the POC-migration
+    // overlay so the right price axis / VP histogram stays uncluttered when
+    // several price layers are on at once.
+    function drawOpenLabels() {
+        var host = document.getElementById('chart-open-labels');
+        if (!host) return;
+        while (host.firstChild) host.removeChild(host.firstChild);
+        if (!layerOn('opens') || !lastOpens.length) return;
+        var plotH = host.clientHeight || 600;
+        var ohlc = document.getElementById('chart-ohlc');
+        var upper = (ohlc ? ohlc.offsetTop + ohlc.offsetHeight : 8) + 18;
+        var lower = plotH - 30;
+        lastOpens.forEach(function (o) {
+            if (!o || !o.price) return;
+            var y = candleSeries.priceToCoordinate(o.price);
+            if (y == null || y < -40 || y > plotH + 40) return;
+            y = Math.max(upper, Math.min(y, lower));
+            var el = document.createElement('div');
+            el.className = 'chart-poc-label';
+            el.style.top = y + 'px';
+            el.style.backgroundColor = OPEN_COLORS[o.kind] || '#adb5bd';
+            el.textContent = o.label + ' ' + (o.price >= 1000 ? o.price.toFixed(1) : o.price.toFixed(3));
+            host.appendChild(el);
+        });
+    }
+
+    // ── Liquidity pools (EQH / EQL) ───────────────────────────────
+    // Equal-highs / equal-lows resting-liquidity magnets — the SMC concept
+    // behind sweep-reject. Backend ships the nearest pools each side.
+    // EQH (buy-side liquidity above) = red; EQL (sell-side below) = green.
+    var liqLines = [];
+    var lastLiq = [];
+    function clearLiqLines() {
+        liqLines.forEach(function (l) { candleSeries.removePriceLine(l); });
+        liqLines = [];
+    }
+    function applyLiqLinesVisibility() {
+        clearLiqLines();
+        if (!layerOn('liquidity') || !lastLiq.length) return;
+        lastLiq.forEach(function (q) {
+            if (!q || !q.price) return;
+            liqLines.push(candleSeries.createPriceLine({
+                price: q.price,
+                color: q.kind === 'EQH' ? '#fa5252' : '#37b24d', // EQH red / EQL green
+                lineWidth: 1,
+                lineStyle: 0,      // solid — distinct from opens (dashed) & HVN (dotted)
+                axisLabelVisible: true,
+                title: q.kind + ' ·' + (q.touches || 2) + 'x',
             }));
         });
     }
@@ -1770,10 +1882,13 @@
 
         sideEl.className = 'side-badge ' + sideClass(sig.side);
         sideEl.textContent = sig.side || '—';
-        mrEl.textContent    = 'MR ' + (sig.mrScore   != null ? sig.mrScore   : '—');
-        momEl.textContent   = 'MOM ' + (sig.momScore != null ? sig.momScore  : '—');
-        totalEl.textContent = 'total ' + (sig.score  != null ? sig.score     : '—');
-        totalEl.className   = 'score ' + scoreClass(sig.score);
+        // Phase-1 unified score: MR/MOM sub-scores now show the /100 weighted
+        // sub-totals (validator), not the System-A integer vote counts. The
+        // raw vote count is demoted to the small "N 票" chip (System A, MIN=3).
+        mrEl.textContent    = 'MR ' + (diag.mr100  != null ? diag.mr100.toFixed(0)  : '—');
+        momEl.textContent   = 'MOM ' + (diag.mom100 != null ? diag.mom100.toFixed(0) : '—');
+        totalEl.textContent = (sig.score != null ? sig.score : '—') + ' 票';
+        totalEl.className   = 'score score-votes ' + scoreClass(sig.score);
         // Legacy hidden nodes — kept for older code paths that may
         // still read them; header no longer displays these directly.
         if (diag.total != null) {
@@ -1791,8 +1906,8 @@
         // left border on .chart-header — keep base classes intact.
         var band = verdictBandClass(diag.total);
         bannerEl.className = 'chart-header ' + band;
-        if (diag.total != null) {
-            bannerScoreNum.textContent = diag.total.toFixed(1);
+        if (diag.total100 != null) {
+            bannerScoreNum.textContent = diag.total100.toFixed(1);
             bannerScoreBand.textContent = diag.verdict || '';
         } else {
             bannerScoreNum.textContent = '—';
@@ -1802,6 +1917,31 @@
         var act = actionText(sig, diag);
         bannerActText.textContent = act.text;
         bannerActNote.textContent = act.note;
+
+        // Top scoring factors — the bullet reasons behind the /100 number.
+        var facEl = document.getElementById('chart-factors');
+        if (facEl) {
+            facEl.innerHTML = '';
+            (diag.factors || []).forEach(function (f) {
+                if (f == null || f.points == null) return;
+                var pos = f.points >= 0;
+                var chip = document.createElement('span');
+                chip.className = 'factor-chip ' + (pos ? 'factor-pos' : 'factor-neg')
+                    + (f.axis ? ' factor-axis-' + f.axis : '');
+                if (f.detail) chip.title = f.detail;
+                var pts = document.createElement('span');
+                pts.className = 'factor-pts';
+                pts.textContent = (pos ? '+' : '') + Math.round(f.points) + ' ';
+                // Name goes through i18n: data-i18n lets i18nApply() re-translate
+                // it live on a language toggle; window.t sets the initial text.
+                var nm = document.createElement('span');
+                nm.setAttribute('data-i18n', f.name);
+                nm.textContent = (window.t ? window.t(f.name) : f.name);
+                chip.appendChild(pts);
+                chip.appendChild(nm);
+                facEl.appendChild(chip);
+            });
+        }
 
         // Live-market context chips (funding + OI). Historical OI is
         // unavailable on BingX free tier — see ROADMAP OI-delta note.
@@ -1961,6 +2101,7 @@
             // POC-mig labels ride the same rAF — they need to
             // re-position on any price-scale change too.
             if (typeof drawPOCMigLabels === 'function') drawPOCMigLabels();
+            if (typeof drawOpenLabels === 'function') drawOpenLabels();
         });
     }
 
@@ -2026,6 +2167,10 @@
         applyPositionLinesVisibility();
         lastHVN = data.hvn || [];
         applyHVNLinesVisibility();
+        lastOpens = data.opens || [];
+        applyOpenLinesVisibility();
+        lastLiq = data.liquidity || [];
+        applyLiqLinesVisibility();
         lastPOCMig = data.pocMigration || null;
         applyPOCMigLinesVisibility();
         lastRecordCtx = {
@@ -2293,7 +2438,7 @@
         if (window.__chartDebug) console.log('[chart poll] tick', new Date().toISOString());
         fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym())
               + '&tf=' + encodeURIComponent(currentTF())
-              + '&limit=30&_=' + Date.now(),
+              + '&limit=30&light=1&_=' + Date.now(),
               {cache: 'no-store'})
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) {
@@ -2368,6 +2513,16 @@
                     applyHVNLinesVisibility();
                     updateLayerCounts();
                 }
+                if (Array.isArray(data.opens)) {
+                    lastOpens = data.opens;
+                    applyOpenLinesVisibility();
+                    updateLayerCounts();
+                }
+                if (Array.isArray(data.liquidity)) {
+                    lastLiq = data.liquidity;
+                    applyLiqLinesVisibility();
+                    updateLayerCounts();
+                }
                 if (data.pocMigration) {
                     lastPOCMig = data.pocMigration;
                     applyPOCMigLinesVisibility();
@@ -2417,7 +2572,7 @@
         // immediately so the header doesn't feel stuck after a
         // symbol/TF switch.
         pollTick();
-        pollTimer = setInterval(pollTick, 3000);
+        pollTimer = setInterval(pollTick, 2000);
     }
     function stopPoll() {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

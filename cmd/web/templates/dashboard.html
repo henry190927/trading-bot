@@ -58,7 +58,7 @@
         <span class="tb-sym">{{.Short}} {{.TF}}</span>
         <span class="tb-side">{{.Side}}</span>
         <span class="tb-score">MR {{.MRScore}} · MOM {{.MOMScore}} · total {{.Score}}</span>
-        {{if gt .Ratio 0.0}}<span class="tb-ratio">{{printf "%.1f" .Ratio}}/10 {{.Verdict}}</span>{{end}}
+        {{if gt .Ratio 0.0}}<span class="tb-ratio">{{printf "%.1f" (score100 .Ratio)}}/100 {{.Verdict}}</span>{{end}}
         {{if .Anchor}}<span class="tb-anchor">{{.Anchor}}</span>{{end}}
       </a>
     {{end}}
@@ -118,13 +118,13 @@
         <div class="ot-diagnose {{verdictClass .Diagnose.Total}}">
           live diagnose:
           <span class="{{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
-          <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.1f" .Diagnose.TotalMR}}/10" title="mean-reversion axis — tap to copy">MR {{printf "%.1f" .Diagnose.TotalMR}}</button>
-          <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.1f" .Diagnose.TotalMOM}}/10" title="momentum axis — tap to copy">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</button>
-          <button type="button" class="copy-btn ot-ratio" data-copy="ratio {{printf "%.1f" .Diagnose.Total}}/10" title="combined total — tap to copy"><strong>{{printf "%.1f" .Diagnose.Total}}/10</strong></button>
+          <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}/100" title="mean-reversion axis — tap to copy">MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}</button>
+          <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}/100" title="momentum axis — tap to copy">MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}</button>
+          <button type="button" class="copy-btn ot-ratio" data-copy="ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100" title="combined total — tap to copy"><strong>{{printf "%.1f" (score100 .Diagnose.Total)}}/100</strong></button>
           {{verdictShort .Diagnose.Verdict}}
           <button type="button"
                   class="copy-btn copy-row"
-                  data-copy="#{{.Trade.ID}} {{.Trade.Symbol}} {{or .Trade.TF "—"}} {{sideStr .Trade.Side}} entry {{fmtPrice .Trade.Entry}} mark {{fmtPrice .MarkPrice}} R {{fmtSigned1 .CurrentR}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.1f" .Diagnose.TotalMR}} MOM {{printf "%.1f" .Diagnose.TotalMOM}} ratio {{printf "%.1f" .Diagnose.Total}}/10 {{verdictShort .Diagnose.Verdict}}"
+                  data-copy="#{{.Trade.ID}} {{.Trade.Symbol}} {{or .Trade.TF "—"}} {{sideStr .Trade.Side}} entry {{fmtPrice .Trade.Entry}} mark {{fmtPrice .MarkPrice}} R {{fmtSigned1 .CurrentR}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}} MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}} ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100 {{verdictShort .Diagnose.Verdict}}"
                   title="copy whole-row snapshot for trade notes (id · symbol · TF · side · entry · mark · R · diagnose)">copy row</button>
           {{if .Diagnose.AtVAH}}<span class="ot-flag va">at VAH</span>
           {{else if .Diagnose.AtVAL}}<span class="ot-flag va">at VAL</span>
@@ -138,7 +138,7 @@
         </div>
         {{if .HasDiff}}
           <div class="ot-diff diff-{{or .DiffClass "flat"}}" title="how the validator picture has shifted since you committed">
-            Δ /10 <strong>{{fmtSigned1 .ScoreDelta}}</strong> vs entry · {{.DiffCause}}
+            Δ /100 <strong>{{fmtSigned1 (score100 .ScoreDelta)}}</strong> vs entry · {{.DiffCause}}
           </div>
         {{end}}
       {{end}}
@@ -194,7 +194,7 @@
       <button type="button" class="copy-btn score {{scoreClass .Signal.Score $.MinTradeable}}" data-copy="total {{.Signal.Score}}" title="total = MR + MOM — tap to copy">total {{.Signal.Score}}</button>
       <button type="button"
               class="copy-btn copy-row"
-              data-copy="{{.Short}} {{$.TF}} {{sideText .Signal.Side}} @ {{fmtPrice .Signal.Price}} | MR {{.Signal.MRScore}} MOM {{.Signal.MomentumScore}} total {{.Signal.Score}}{{if .Signal.POCMig.POCShort}} | drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}{{end}}{{if .Diagnose}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.1f" .Diagnose.TotalMR}} MOM {{printf "%.1f" .Diagnose.TotalMOM}} ratio {{printf "%.1f" .Diagnose.Total}}/10 {{verdictShort .Diagnose.Verdict}}{{end}}"
+              data-copy="{{.Short}} {{$.TF}} {{sideText .Signal.Side}} @ {{fmtPrice .Signal.Price}} | MR {{.Signal.MRScore}} MOM {{.Signal.MomentumScore}} total {{.Signal.Score}}{{if .Signal.POCMig.POCShort}} | drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}{{end}}{{if .Diagnose}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}} MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}} ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100 {{verdictShort .Diagnose.Verdict}}{{end}}"
               title="copy the whole-row snapshot in one paste (symbol · TF · side · price · MR · MOM · total · drift · diagnose)">copy row</button>
     </div>
 
@@ -246,9 +246,9 @@
     <div class="diagnose-row {{verdictClass .Diagnose.Total}}">
       <span class="diag-label">trade now?</span>
       <span class="diag-side {{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
-      <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.1f" .Diagnose.TotalMR}}/10" title="mean-reversion axis (mr + shared factors) — tap to copy">MR {{printf "%.1f" .Diagnose.TotalMR}}</button>
-      <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.1f" .Diagnose.TotalMOM}}/10" title="momentum axis (mom + shared factors) — tap to copy">MOM {{printf "%.1f" .Diagnose.TotalMOM}}</button>
-      <button type="button" class="copy-btn diag-score" data-copy="ratio {{printf "%.1f" .Diagnose.Total}}/10" title="combined total — all factors — tap to copy">{{printf "%.1f" .Diagnose.Total}}/10</button>
+      <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}/100" title="mean-reversion axis (mr + shared factors) — tap to copy">MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}</button>
+      <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}/100" title="momentum axis (mom + shared factors) — tap to copy">MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}</button>
+      <button type="button" class="copy-btn diag-score" data-copy="ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100" title="combined total — all factors — tap to copy">{{printf "%.1f" (score100 .Diagnose.Total)}}/100</button>
       <span class="diag-verdict">{{verdictShort .Diagnose.Verdict}}</span>
       <a class="diag-link" href="{{diagnoseHref . $.TF}}" title="full validator breakdown">↗</a>
       {{if .Diagnose.AtVAH}}<span class="diag-flag va">at VAH</span>
@@ -378,10 +378,10 @@
         <dd><b>Momentum / trend votes</b>: volume anomaly (BTC), LH-LL / HH-HL structure (ETH), NY-session bullish/bearish body (XAU), double-top / double-bottom retest (XAU). Per-symbol gating after backtest A/B — not every symbol enables every MOM vote.</dd>
         <dt>total N <span class="lg-meta">(meta row, integer; total = MR + MOM)</span></dt>
         <dd>Combined vote count. <b>3</b> is the engine's <code>MIN_SCORE</code> tradeable threshold (daemon + monitor filter on this). What the journal stores in the legacy <code>score</code> column.</dd>
-        <dt>X.X/10 <span class="lg-meta">(diagnose row, float 0–10)</span></dt>
-        <dd>Validator's <i>structural fit</i> for a specific entry at the current price. Weighted sum of ~20 factors: engine alignment (+2), sweep / fib / HVN proximity (+1.5–2), VA edge (+0.5), POC drift alignment (+0.5–0.7), minus penalties for entry chase, falling knife, counter-regime, inside-VA chop, etc.</dd>
-        <dt><span class="diag-score-axis diag-axis-mr">MR x.x</span> <span class="diag-score-axis diag-axis-mom">MOM x.x</span> <span class="lg-meta">(diagnose row sub-totals)</span></dt>
-        <dd><b>MR sub-total</b> = MR-tagged + shared factors capped /10. <b>MOM sub-total</b> = MOM-tagged + shared factors capped /10. Shared factors (engine alignment, fees, market chase) count toward both — these sub-totals are NOT additive to the combined /10.</dd>
+        <dt>X.X/100 <span class="lg-meta">(diagnose row, float 0–100)</span></dt>
+        <dd>Validator's <i>structural fit</i> for a specific entry at the current price, rescaled to /100. Weighted sum of ~20 factors: engine alignment (+20), sweep / fib / HVN proximity (+15–20), VA edge (+5), POC drift alignment (+5–7), minus penalties for entry chase, falling knife, counter-regime, inside-VA chop, etc.</dd>
+        <dt><span class="diag-score-axis diag-axis-mr">MR xx</span> <span class="diag-score-axis diag-axis-mom">MOM xx</span> <span class="lg-meta">(diagnose row sub-totals)</span></dt>
+        <dd><b>MR sub-total</b> = MR-tagged + shared factors capped /100. <b>MOM sub-total</b> = MOM-tagged + shared factors capped /100. Shared factors (engine alignment, fees, market chase) count toward both — these sub-totals are NOT additive to the combined /100.</dd>
       </dl>
 
       <h3>Sizing by axis (discretionary guide)</h3>
@@ -402,10 +402,10 @@
       <h3>Verdict colors</h3>
       <table class="legend-table">
         <tbody>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 7.5/10 — take it.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>5.5 – 7.5 — good setup.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>3.5 – 5.5 — marginal.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 3.5 — skip.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 75/100 — take it.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>55 – 75 — good setup.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>35 – 55 — marginal.</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 35 — skip.</td></tr>
         </tbody>
       </table>
 
@@ -471,10 +471,10 @@
         <dd><b>Momentum / trend 票</b>：vol anomaly (BTC)、LH-LL / HH-HL 結構 (ETH)、NY 盤陽陰體 (XAU)、雙頂 / 雙底回測 (XAU)。經 backtest A/B 過的 per-symbol 開關，不是每個 symbol 都啟用每個 MOM vote。</dd>
         <dt>total N <span class="lg-meta">(meta row, 整數；total = MR + MOM)</span></dt>
         <dd>合計票數。<b>3</b> 是 engine 的 <code>MIN_SCORE</code> 執行門檻（daemon + monitor 都以此過濾)。Journal 舊 <code>score</code> 欄位存的值。</dd>
-        <dt>X.X/10 <span class="lg-meta">(diagnose row, 浮點 0–10)</span></dt>
-        <dd>Validator 對「這個 entry」的<i>結構適合度</i>。~20 個 factor 的加權合：engine 一致 (+2)、sweep/fib/HVN 近距 (+1.5–2)、VA 邊緣 (+0.5)、POC 漂移一致 (+0.5–0.7)，減去追市、接刀、逆 regime、內盤整等扣分。</dd>
-        <dt><span class="diag-score-axis diag-axis-mr">MR x.x</span> <span class="diag-score-axis diag-axis-mom">MOM x.x</span> <span class="lg-meta">(diagnose row 分軸小計)</span></dt>
-        <dd><b>MR 小計</b> = MR-tagged + 共用 factor，capped /10。<b>MOM 小計</b> = MOM-tagged + 共用 factor，capped /10。共用 factor（engine 一致、fee、追市）算兩邊 — 因此小計不是總分的線性加總。</dd>
+        <dt>X.X/100 <span class="lg-meta">(diagnose row, 浮點 0–100)</span></dt>
+        <dd>Validator 對「這個 entry」的<i>結構適合度</i>,rescale 成 /100。~20 個 factor 的加權合：engine 一致 (+20)、sweep/fib/HVN 近距 (+15–20)、VA 邊緣 (+5)、POC 漂移一致 (+5–7)，減去追市、接刀、逆 regime、內盤整等扣分。</dd>
+        <dt><span class="diag-score-axis diag-axis-mr">MR xx</span> <span class="diag-score-axis diag-axis-mom">MOM xx</span> <span class="lg-meta">(diagnose row 分軸小計)</span></dt>
+        <dd><b>MR 小計</b> = MR-tagged + 共用 factor，capped /100。<b>MOM 小計</b> = MOM-tagged + 共用 factor，capped /100。共用 factor（engine 一致、fee、追市）算兩邊 — 因此小計不是總分的線性加總。</dd>
       </dl>
 
       <h3>依軸調整倉位（discretionary 指南)</h3>
@@ -495,10 +495,10 @@
       <h3>Verdict 顏色</h3>
       <table class="legend-table">
         <tbody>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 7.5/10 — 進場。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>5.5 – 7.5 — setup 尚可。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>3.5 – 5.5 — 邊際、猶豫。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 3.5 — 跳過。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 75/100 — 進場。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>55 – 75 — setup 尚可。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>35 – 55 — 邊際、猶豫。</td></tr>
+          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 35 — 跳過。</td></tr>
         </tbody>
       </table>
 

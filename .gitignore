@@ -37,6 +37,14 @@ trading-web
 /web
 /monitor
 /mcp
+# A/B harness binaries (go build ./cmd/{rangebt,sweepbt,breakbt,snrbt} at root)
+/rangebt
+/sweepbt
+/breakbt
+/snrbt
+# scratch
+/s7.html
+/refs/
 
 # But `journal/`, `backtest/`, and similar names are also Go package
 # directories at root (journal/journal.go, backtest/backtest.go). Re-
