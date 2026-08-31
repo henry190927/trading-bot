@@ -2281,6 +2281,11 @@
                 // Prepend older candles that predate earliestTime.
                 var newer = res.body.candles.filter(function (c) { return c.time < earliestTime; });
                 if (newer.length === 0) { noMoreHistory = true; return; }
+                // setData() refits the view; capture the current logical range so
+                // we can shift it by the number of prepended bars and keep the
+                // user parked on exactly the bars they were looking at (otherwise
+                // the chart jumps and the data seems to vanish mid-scroll).
+                var vr = chart.timeScale().getVisibleLogicalRange();
                 allCandles  = newer.concat(allCandles);
                 allVol      = volFrom(newer).concat(allVol);
                 var bb = res.body.bollinger || {};
@@ -2293,6 +2298,9 @@
                 lowerSeries.setData(allLower);
                 volSeries.setData(allVol);
                 earliestTime = allCandles[0].time;
+                if (vr) {
+                    chart.timeScale().setVisibleLogicalRange({ from: vr.from + newer.length, to: vr.to + newer.length });
+                }
                 // Older candles are now in allCandles — VP recomputes
                 // from the currently-visible slice automatically on
                 // the next scheduleVPUpdate. Also fire immediately in
