@@ -109,16 +109,37 @@
   </div>
 </main>
 <script>
-  // Auto-refresh every 30s so floating R / outcomes stay live without a manual
-  // reload. Only fires while the tab is visible (no background churn), and shows
-  // a small countdown in the footer.
+  // Auto-refresh every 10s so floating R / current price / outcomes stay live.
+  // SOFT refresh (fetch + swap <main>) instead of location.reload() so the
+  // horizontal scroll position of the fires table is preserved — a full reload
+  // used to snap the table back to the leftmost column mid-read. Only runs while
+  // the tab is visible.
   (function () {
-    var PERIOD = 10, left = PERIOD, el = document.getElementById('at-refresh');
+    var PERIOD = 10, left = PERIOD;
+    function softRefresh() {
+      var sc = document.querySelector('.dt-scroll');
+      var sx = sc ? sc.scrollLeft : 0;
+      var wy = window.scrollY;
+      fetch(location.href, { cache: 'no-store' })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('main');
+          var cur = document.querySelector('main');
+          if (!fresh || !cur) return;
+          cur.innerHTML = fresh.innerHTML;
+          // restore scroll after the swapped DOM lays out
+          var sc2 = document.querySelector('.dt-scroll');
+          if (sc2) sc2.scrollLeft = sx;
+          window.scrollTo(0, wy);
+        })
+        .catch(function () {});
+    }
     setInterval(function () {
       if (document.hidden) { left = PERIOD; return; }
       left -= 1;
-      if (el) el.textContent = '每 10s 自動刷新(下次 ' + left + 's)';
-      if (left <= 0) location.reload();
+      var el = document.getElementById('at-refresh'); // re-query: <main> is swapped each cycle
+      if (el) el.textContent = '每 10s 自動更新(下次 ' + Math.max(left, 0) + 's,捲軸不跳)';
+      if (left <= 0) { left = PERIOD; softRefresh(); }
     }, 1000);
   })();
 </script>
