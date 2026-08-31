@@ -158,6 +158,7 @@ func main() {
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/scan", srv.handleScanSetups)
 	r.POST("/scan/record", srv.handleScanRecord)
+	r.GET("/ops/verify", srv.handleVerifyExchange)
 	r.GET("/ops/autotrade", srv.handleOpsAutotrade)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/zones", srv.handleOpsZones)

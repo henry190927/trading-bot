@@ -371,3 +371,48 @@ func (c *Client) SetLeverage(ctx context.Context, sym market.Symbol, side string
 	q.Set("leverage", strconv.Itoa(leverage))
 	return c.signedRequest(ctx, "POST", PathLeverage, q, nil)
 }
+
+// OpenOrder is a resting (unfilled) order — used to verify a stop/TP is actually
+// live on the exchange (don't trust local bookkeeping).
+type OpenOrder struct {
+	OrderID      string
+	Type         string // LIMIT / STOP_MARKET / TAKE_PROFIT_MARKET / ...
+	Side         string // BUY / SELL
+	PositionSide string
+	Price        float64
+	StopPrice    float64
+	Quantity     float64
+	ReduceOnly   bool
+}
+
+// OpenOrders lists the resting orders for a symbol (GET /trade/openOrders).
+func (c *Client) OpenOrders(ctx context.Context, sym market.Symbol) ([]OpenOrder, error) {
+	q := url.Values{}
+	q.Set("symbol", string(sym))
+	var resp struct {
+		Orders []struct {
+			OrderID      int64  `json:"orderId"`
+			Type         string `json:"type"`
+			Side         string `json:"side"`
+			PositionSide string `json:"positionSide"`
+			Price        string `json:"price"`
+			StopPrice    string `json:"stopPrice"`
+			Quantity     string `json:"quantity"`
+			ReduceOnly   bool   `json:"reduceOnly"`
+		} `json:"orders"`
+	}
+	if err := c.signedRequest(ctx, "GET", "/openApi/swap/v2/trade/openOrders", q, &resp); err != nil {
+		return nil, err
+	}
+	out := make([]OpenOrder, 0, len(resp.Orders))
+	for _, o := range resp.Orders {
+		price, _ := strconv.ParseFloat(o.Price, 64)
+		stopPrice, _ := strconv.ParseFloat(o.StopPrice, 64)
+		qty, _ := strconv.ParseFloat(o.Quantity, 64)
+		out = append(out, OpenOrder{
+			OrderID: strconv.FormatInt(o.OrderID, 10), Type: o.Type, Side: o.Side, PositionSide: o.PositionSide,
+			Price: price, StopPrice: stopPrice, Quantity: qty, ReduceOnly: o.ReduceOnly,
+		})
+	}
+	return out, nil
+}

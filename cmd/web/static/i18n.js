@@ -13,7 +13,7 @@
   var DICT = {
     en: {
       'nav.today': 'Today', 'nav.dashboard': 'Scan', 'nav.portfolio': 'Portfolio', 'nav.validate': 'Validate',
-      'nav.chart': 'Chart', 'nav.scan': '🎯 Live', 'nav.setups': 'Setups', 'nav.tips': 'Tips', 'nav.stocks': 'Stocks', 'nav.tw': 'TW', 'nav.calendar': 'Calendar', 'nav.onchain': 'On-chain',
+      'nav.chart': 'Chart', 'nav.scan': '🎯 Live', 'nav.verify': '🔎 Verify', 'nav.setups': 'Setups', 'nav.tips': 'Tips', 'nav.stocks': 'Stocks', 'nav.tw': 'TW', 'nav.calendar': 'Calendar', 'nav.onchain': 'On-chain',
       'nav.g.trade': 'Trade', 'nav.g.journal': 'Journal', 'nav.g.research': 'Research', 'nav.g.system': 'System', 'nav.ops': 'Ops',
       'setups.total': 'Total', 'setups.open': 'Open', 'setups.win': 'Win ✓', 'setups.loss': 'Loss ✗',
       'setups.expired': 'Expired', 'setups.skip': 'Skip', 'setups.hitrate': 'Hit-rate',
@@ -23,7 +23,7 @@
     },
     zh: {
       'nav.today': '今日', 'nav.dashboard': '掃描', 'nav.portfolio': '投資組合', 'nav.validate': '驗證',
-      'nav.chart': '圖表', 'nav.scan': '🎯 機會', 'nav.setups': 'Setups', 'nav.tips': '小卡', 'nav.stocks': '個股', 'nav.tw': '台股', 'nav.calendar': '行事曆', 'nav.onchain': '鏈上',
+      'nav.chart': '圖表', 'nav.scan': '🎯 機會', 'nav.verify': '🔎 查證', 'nav.setups': 'Setups', 'nav.tips': '小卡', 'nav.stocks': '個股', 'nav.tw': '台股', 'nav.calendar': '行事曆', 'nav.onchain': '鏈上',
       'nav.g.trade': '交易', 'nav.g.journal': '紀錄', 'nav.g.research': '研究', 'nav.g.system': '維運', 'nav.ops': '維運',
       'setups.total': 'Total', 'setups.open': 'Open', 'setups.win': '勝 ✓', 'setups.loss': '負 ✗',
       'setups.expired': 'Expired', 'setups.skip': 'Skip', 'setups.hitrate': '命中率',
