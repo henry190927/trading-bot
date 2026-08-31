@@ -23,6 +23,8 @@
   </h1>
 
   <div class="stats-card">
+    {{if .Recorded}}<div class="cal-banner next">✓ <span class="i18n-en">Recorded setup</span><span class="i18n-zh">已記錄 setup</span> #{{.Recorded}} → <a href="/setups">/setups</a></div>{{end}}
+    {{if .RecErr}}<div class="cal-banner active">⚠ <span class="i18n-en">record failed</span><span class="i18n-zh">記錄失敗</span></div>{{end}}
     <div class="at-state">
       <span class="badge {{if .FiringN}}b-green{{else}}b-dim{{end}}">{{.FiringN}} <span class="i18n-en">firing now</span><span class="i18n-zh">正在觸發</span></span>
       <span class="badge b-dim">{{.Watching}} <span class="i18n-en">rules watching</span><span class="i18n-zh">規則監控中</span></span>
@@ -32,7 +34,7 @@
     <h2 class="section-title" style="margin-top:.6rem">🟢 <span class="i18n-en">Firing now</span><span class="i18n-zh">現在有 setup</span></h2>
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>side</th><th title="validator /100">評分</th><th>entry</th><th>stop</th><th>tp</th><th>R:R</th><th>mode</th><th>why</th></tr></thead>
+      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>side</th><th title="validator /100">評分</th><th>entry</th><th>stop</th><th>tp</th><th>R:R</th><th>mode</th><th>記</th><th>why</th></tr></thead>
       <tbody>
         {{range .Firing}}
         <tr>
@@ -46,6 +48,20 @@
           <td class="num">{{printf "%.4f" .TP}}</td>
           <td class="num">{{printf "%.1f" .RR}}</td>
           <td>{{if .Market}}<span class="badge b-yellow">market</span>{{else}}<span class="badge b-blue">limit</span>{{end}}</td>
+          <td>
+            <form method="post" action="/scan/record" style="margin:0">
+              <input type="hidden" name="symbol" value="{{.Symbol}}">
+              <input type="hidden" name="tf" value="{{.TF}}">
+              <input type="hidden" name="strategy" value="{{.Strategy}}">
+              <input type="hidden" name="side" value="{{.Side}}">
+              <input type="hidden" name="entry" value="{{printf "%.4f" .Entry}}">
+              <input type="hidden" name="stop" value="{{printf "%.4f" .Stop}}">
+              <input type="hidden" name="tp" value="{{printf "%.4f" .TP}}">
+              <input type="hidden" name="score" value="{{printf "%.0f" .Score}}">
+              <input type="hidden" name="why" value="{{.Why}}">
+              <button type="submit" class="setup-skip" title="記進 /setups forward-log">⚑ 記</button>
+            </form>
+          </td>
           <td class="cs-dim">{{.Why}}</td>
         </tr>
         {{end}}

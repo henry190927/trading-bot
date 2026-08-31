@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +15,39 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// handleScanRecord records a firing scan row into the /setups forward-log — the
+// same tracker N-struct setups use, so /setups is now multi-strategy. Outcome +
+// RealOutcome backfill generically from entry/stop/target, so these strategy
+// setups get the same win/loss/no-fill scoring.
+func (s *server) handleScanRecord(c *gin.Context) {
+	pf := func(k string) float64 { v, _ := strconv.ParseFloat(strings.TrimSpace(c.PostForm(k)), 64); return v }
+	side := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
+	su := Setup{
+		RecordedAt: time.Now(),
+		Symbol:     strings.ToUpper(strings.TrimSpace(c.PostForm("symbol"))),
+		TF:         strings.TrimSpace(c.PostForm("tf")),
+		Strategy:   strings.TrimSpace(c.PostForm("strategy")),
+		Dir:        side,
+		StratSide:  side,
+		StratFire:  true,
+		Price:      pf("entry"),
+		Entry:      pf("entry"),
+		Stop:       pf("stop"),
+		Target:     pf("tp"),
+		Note:       fmt.Sprintf("scan · %s/100 · %s", strings.TrimSpace(c.PostForm("score")), strings.TrimSpace(c.PostForm("why"))),
+	}
+	if su.Symbol == "" || su.Entry <= 0 {
+		c.Redirect(http.StatusSeeOther, "/ops/scan?err=1")
+		return
+	}
+	id, err := appendSetup(su)
+	if err != nil {
+		c.Redirect(http.StatusSeeOther, "/ops/scan?err=1")
+		return
+	}
+	c.Redirect(http.StatusSeeOther, fmt.Sprintf("/ops/scan?recorded=%d", id))
+}
 
 // scanRow is one strategy×symbol evaluation for the live "current setups" scan.
 type scanRow struct {
@@ -93,6 +129,8 @@ func (s *server) renderScan(c *gin.Context, rows []scanRow) {
 		"Firing":     firing,
 		"Watching":   len(rows),
 		"FiringN":    len(firing),
+		"Recorded":   c.Query("recorded"),
+		"RecErr":     c.Query("err"),
 		"UpdatedUTC": time.Now().In(time.FixedZone("Asia/Taipei", 8*3600)).Format("2006-01-02 15:04 UTC+8"),
 	})
 }
