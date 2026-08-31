@@ -61,7 +61,7 @@
   {{if .Sum.Total}}
   <div class="stats-card">
     <h2 class="section-title">Paper P&amp;L <span class="section-meta">replayed from closed candles</span></h2>
-    <div class="stats-grid">
+    <div class="stats-grid" id="at-pnl-grid">
       <div><span class="lbl">fires</span><span class="val">{{.Sum.Total}}</span></div>
       <div><span class="lbl">filled</span><span class="val">{{.Sum.Filled}} <span class="cs-dim">({{printf "%.0f" (mulPct .Sum.FillPct)}}%)</span></span></div>
       <div><span class="lbl">pending</span><span class="val">{{.Sum.Pending}} <span class="cs-dim">掛單中</span></span></div>
@@ -82,7 +82,7 @@
     <div class="dt-scroll">
     <table class="dt">
       <thead><tr><th>time</th><th>sym</th><th>tf</th><th>strat</th><th>side</th><th title="validator 結構適合度 /100 (開單當下算,四種策略統一比較)">評分</th><th>entry</th><th>現價</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
-      <tbody>
+      <tbody id="at-fires-body">
         {{range .Fires}}
         <tr>
           <td class="cs-dim">{{.When}}{{if .Absorbed}} <span class="badge b-dim" title="收合了 {{.Absorbed}} 筆同 setup 的每小時重複進場">＋{{.Absorbed}}</span>{{end}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td>
@@ -105,7 +105,7 @@
     {{else}}
     <p class="empty">還沒有 fire —— 規則在跑,等 symbol 碰到箱邊(底/頂三分)才會進場。全在箱中間時不動。</p>
     {{end}}
-    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span id="at-refresh">每 10s 自動刷新</span> · 浮動 R 用即時 mark 價 · fires 寫入 autotrade_paper.jsonl</p>
+    <p class="glossary-hint" style="margin-top:.6rem">Updated: <span id="at-updated">{{.UpdatedUTC}}</span> · <span id="at-refresh">每 10s 自動刷新</span> · 浮動 R 用即時 mark 價 · fires 寫入 autotrade_paper.jsonl</p>
   </div>
 </main>
 <script>
@@ -117,24 +117,22 @@
   (function () {
     var PERIOD = 10, left = PERIOD;
     function softRefresh() {
-      // Capture the horizontal scroll of EVERY .dt-scroll (there are two: the
-      // rules table and the fires table) by index, plus the page scroll.
-      var xs = Array.prototype.map.call(document.querySelectorAll('.dt-scroll'), function (el) { return el.scrollLeft; });
-      var wy = window.scrollY;
+      // SURGICAL swap: only replace the bits that change — the fires <tbody>,
+      // the P&L grid, and the timestamp. The .dt-scroll containers + <table>
+      // are NEVER recreated, so their horizontal scroll is preserved natively
+      // (no save/restore, no 1-frame flicker, no full-DOM reflow flash).
       fetch(location.href, { cache: 'no-store' })
         .then(function (r) { return r.text(); })
         .then(function (html) {
-          var fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('main');
-          var cur = document.querySelector('main');
-          if (!fresh || !cur) return;
-          cur.innerHTML = fresh.innerHTML;
-          // Restore AFTER layout (rAF) — setting scrollLeft synchronously right
-          // after innerHTML doesn't stick until the new table has laid out.
-          requestAnimationFrame(function () {
-            var els = document.querySelectorAll('.dt-scroll');
-            for (var i = 0; i < els.length; i++) { if (xs[i] != null) els[i].scrollLeft = xs[i]; }
-            window.scrollTo(0, wy);
-          });
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          function swap(id) {
+            var a = document.getElementById(id), b = doc.getElementById(id);
+            if (a && b && a.innerHTML !== b.innerHTML) a.innerHTML = b.innerHTML;
+          }
+          swap('at-fires-body');
+          swap('at-pnl-grid');
+          var u = document.getElementById('at-updated'), fu = doc.getElementById('at-updated');
+          if (u && fu) u.textContent = fu.textContent;
         })
         .catch(function () {});
     }
