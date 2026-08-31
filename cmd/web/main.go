@@ -156,6 +156,7 @@ func main() {
 	r.GET("/api/chart/bias", srv.handleChartBias)
 	r.GET("/api/tickers", srv.handleTickers)
 	r.GET("/ops", srv.handleOpsPage)
+	r.GET("/ops/scan", srv.handleScanSetups)
 	r.GET("/ops/autotrade", srv.handleOpsAutotrade)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/zones", srv.handleOpsZones)

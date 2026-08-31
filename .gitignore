@@ -64,3 +64,4 @@ vendor/
 go.work
 go.work.sum
 /openbt
+/basebt

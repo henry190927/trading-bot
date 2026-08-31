@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>current setups · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+</head>
+<body>
+{{template "topnav" .}}
+<main class="tips-main">
+  <h1 class="tips-h1">
+    🎯 <span class="i18n-en">Current setups</span><span class="i18n-zh">當下 setups</span>
+    <span class="tips-sub">
+      <span class="i18n-en">every auto rule's trigger evaluated on the current closed bar — what could fire right now (same logic as the paper daemon)</span>
+      <span class="i18n-zh">每條 auto 規則在「當前收 K」上的觸發評估 —— 現在四種策略誰會進場(跟 paper daemon 同一套邏輯)</span>
+    </span>
+  </h1>
+
+  <div class="stats-card">
+    <div class="at-state">
+      <span class="badge {{if .FiringN}}b-green{{else}}b-dim{{end}}">{{.FiringN}} <span class="i18n-en">firing now</span><span class="i18n-zh">正在觸發</span></span>
+      <span class="badge b-dim">{{.Watching}} <span class="i18n-en">rules watching</span><span class="i18n-zh">規則監控中</span></span>
+    </div>
+
+    {{if .Firing}}
+    <h2 class="section-title" style="margin-top:.6rem">🟢 <span class="i18n-en">Firing now</span><span class="i18n-zh">現在有 setup</span></h2>
+    <div class="dt-scroll">
+    <table class="dt">
+      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>side</th><th title="validator /100">評分</th><th>entry</th><th>stop</th><th>tp</th><th>R:R</th><th>mode</th><th>why</th></tr></thead>
+      <tbody>
+        {{range .Firing}}
+        <tr>
+          <td><strong>{{.Symbol}}</strong></td>
+          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
+          <td class="cs-dim">{{.TF}}</td>
+          <td class="dir-{{.Side}}">{{.Side}}</td>
+          <td class="num">{{if .Score}}<span style="color:{{if ge .Score 60.0}}var(--green){{else if lt .Score 40.0}}var(--red){{else}}var(--text){{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td class="num">{{printf "%.4f" .Entry}}</td>
+          <td class="num">{{printf "%.4f" .Stop}}</td>
+          <td class="num">{{printf "%.4f" .TP}}</td>
+          <td class="num">{{printf "%.1f" .RR}}</td>
+          <td>{{if .Market}}<span class="badge b-yellow">market</span>{{else}}<span class="badge b-blue">limit</span>{{end}}</td>
+          <td class="cs-dim">{{.Why}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+    {{else}}
+    <p class="empty"><span class="i18n-en">Nothing setting up right now — all rules are watching but none triggered on the current closed bar. Check back after the next close.</span><span class="i18n-zh">現在沒有 setup —— 規則都在監控,但當前收 K 沒有觸發。下一根收盤後再看。</span></p>
+    {{end}}
+
+    <h2 class="section-title" style="margin-top:1rem"><span class="i18n-en">All rules (watching)</span><span class="i18n-zh">全部規則(監控中)</span></h2>
+    <div class="dt-scroll">
+    <table class="dt">
+      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>rule-side</th><th>status</th></tr></thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><strong>{{.Symbol}}</strong></td>
+          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
+          <td class="cs-dim">{{.TF}}</td>
+          <td class="cs-dim">{{.RuleSide}}</td>
+          <td>{{if .Fire}}<span class="badge b-green">🟢 {{.Side}} setup</span>{{else}}<span class="cs-dim">— 監控中</span>{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span class="i18n-en">cached 20s · read-only preview of what the auto rules would place · not the paper log (that's <a href="/ops/autotrade">/ops/autotrade</a>)</span><span class="i18n-zh">快取 20s · 這是 auto 規則「會下什麼」的唯讀預覽 · 不是已開單紀錄(那在 <a href="/ops/autotrade">/ops/autotrade</a>)</span></p>
+  </div>
+</main>
+</body>
+</html>
