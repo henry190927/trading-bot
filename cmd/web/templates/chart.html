@@ -1459,16 +1459,27 @@
         var ohlc = document.getElementById('chart-ohlc');
         var upper = (ohlc ? ohlc.offsetTop + ohlc.offsetHeight : 8) + 18;
         var lower = plotH - 30;
+        // Merge opens that sit at the SAME price into one label — e.g. on a
+        // Monday the daily open (Mon 00:00 UTC) IS the weekly open, so they'd
+        // otherwise draw two labels stacked on top of each other ("日開" hidden
+        // under "週開"). Grouped → "日開/週開 77638.2".
+        var groups = {}, order = [];
         lastOpens.forEach(function (o) {
             if (!o || !o.price) return;
-            var y = candleSeries.priceToCoordinate(o.price);
+            var key = o.price >= 1000 ? o.price.toFixed(1) : o.price.toFixed(3);
+            if (!groups[key]) { groups[key] = { price: o.price, kind: o.kind, labels: [] }; order.push(key); }
+            groups[key].labels.push(o.label);
+        });
+        order.forEach(function (key) {
+            var g = groups[key];
+            var y = candleSeries.priceToCoordinate(g.price);
             if (y == null || y < -40 || y > plotH + 40) return;
             y = Math.max(upper, Math.min(y, lower));
             var el = document.createElement('div');
             el.className = 'chart-poc-label';
             el.style.top = y + 'px';
-            el.style.backgroundColor = OPEN_COLORS[o.kind] || '#adb5bd';
-            el.textContent = o.label + ' ' + (o.price >= 1000 ? o.price.toFixed(1) : o.price.toFixed(3));
+            el.style.backgroundColor = OPEN_COLORS[g.kind] || '#adb5bd';
+            el.textContent = g.labels.join('/') + ' ' + key;
             host.appendChild(el);
         });
     }
