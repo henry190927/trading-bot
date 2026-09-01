@@ -32,6 +32,17 @@ func main() {
 	bufATR := flag.Float64("buf-atr", 0.15, "stop buffer beyond the sweep wick, in ATR(14)")
 	rMult := flag.Float64("r", 2.0, "take-profit as R multiple of the stop distance")
 	liqTP := flag.Bool("liq-tp", false, "A/B (a): TP at the nearest OPPOSITE liquidity pool (magnet) instead of fixed R; fall back to R if none / if it's a worse-than-1R target")
+	// TESTED 2026-09-02 → REJECTED, kept off-by-default as documentation.
+	// Worse in EVERY window on BOTH metrics: aggregate netR +58/+58/+78 →
+	// +26/+34/+42 (60/90/120d) and R/trade +0.175/+0.113/+0.112 →
+	// +0.110/+0.098/+0.099. On the live-wired subset (SOL/ETH/SUI) it cuts
+	// netR 60-68% every window and flips ETH from +17/+19/+19 to -2/-3/-4.
+	// WHY cmd/openbt suggested otherwise: its "mixed" bucket was a post-hoc
+	// partition of ALREADY-DEDUPED positions. Gating at generation frees the
+	// one-position slot, so different, later fires enter that were never in
+	// that bucket (60d SOL: gated n=40 vs openbt mixed n=20). A bucket split
+	// does not transfer to a strategy change under a one-position constraint.
+	openGate := flag.Bool("open-gate", false, "A/B (c): only fire when entry sits BETWEEN the daily and weekly open (the \"mixed\" bucket cmd/openbt found best). Suppresses fires beyond BOTH opens.")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -44,7 +55,7 @@ func main() {
 	}{{"BTC", market.BTCUSDT}, {"ETH", market.ETHUSDT}, {"SOL", market.SOLUSDT}, {"LINK", market.LINKUSDT}, {"SUI", market.SUIUSDT}, {"NEAR", market.NEARUSDT}}
 
 	fmt.Printf("=== sweep-reject A/B · %dd · %s · tol %.2f%% · stop=sweep+%.2fATR · TP %.1fR ===\n", *days, *tfStr, *tol, *bufATR, *rMult)
-	fmt.Printf("%-5s %6s %6s %5s %5s %7s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR")
+	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
 	var aggR float64
 	var aggN int
 
@@ -55,7 +66,7 @@ func main() {
 			continue
 		}
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
-		fires := genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult, *liqTP)
+		fires := genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult, *liqTP, *openGate)
 		positions := autotrade.DedupFires(fires, 6, 6, time.Hour, func(f autotrade.PaperFire) autotrade.Outcome {
 			return autotrade.EvaluateFire(f, cs, 6)
 		})
@@ -83,22 +94,50 @@ func main() {
 		if len(positions) > 0 {
 			fp = float64(filled) / float64(len(positions)) * 100
 		}
-		fmt.Printf("%-5s %6d %5.0f%% %5d %5d %6.0f%% %+8.2f\n", s.short, len(positions), fp, tp, stop, win, netR)
+		rpt, tpd := 0.0, 0.0
+		if len(positions) > 0 {
+			rpt = netR / float64(len(positions))
+			tpd = float64(len(positions)) / float64(*days)
+		}
+		fmt.Printf("%-5s %6d %5.0f%% %5d %5d %6.0f%% %+9.2f %+8.3f %8.2f\n", s.short, len(positions), fp, tp, stop, win, netR, rpt, tpd)
 		aggR += netR
 		aggN += len(positions)
 	}
-	fmt.Printf("--- aggregate: %d positions, netR %+.2f ---\n", aggN, aggR)
+	aggRPT, aggTPD := 0.0, 0.0
+	if aggN > 0 {
+		aggRPT = aggR / float64(aggN)
+		aggTPD = float64(aggN) / float64(*days)
+	}
+	fmt.Printf("--- aggregate: %d positions, netR %+.2f, R/trade %+.3f, trd/day %.2f (open-gate=%v) ---\n", aggN, aggR, aggRPT, aggTPD, *openGate)
 }
 
 // genSweepFires walks closed bars; at each bar it detects a sweep-and-reject of a
 // pre-existing EQH/EQL pool and emits a marketable fire at the reject close.
-func genSweepFires(cs []market.Candle, atr []float64, short string, tolFrac, bufATR, rMult float64, liqTP bool) []autotrade.PaperFire {
+func genSweepFires(cs []market.Candle, atr []float64, short string, tolFrac, bufATR, rMult float64, liqTP, openGate bool) []autotrade.PaperFire {
 	var out []autotrade.PaperFire
 	for i := 60; i < len(cs); i++ {
 		pools := signal.FindLiquidity(cs[:i], 2, 20, tolFrac) // pools formed BEFORE this bar
 		bar := cs[i]
 		a := atr[i]
 		above, below := signal.NearestLiquidity(pools, bar.Close)
+		// A/B (c): the open-gate. Applied HERE, at generation, not as a
+		// post-hoc filter on positions — in live the gate stops the ORDER, so
+		// the one-position slot stays free and a later fire can take it. That
+		// makes these numbers legitimately different from cmd/openbt's bucket
+		// split (which partitioned already-deduped positions).
+		// Opens are computed from cs[:i+1] so the boundary candle can never be
+		// in the future.
+		if openGate {
+			o := signal.ComputeOpens(cs[:i+1], bar.CloseTime)
+			if o.Daily == 0 || o.Weekly == 0 {
+				continue // can't classify → don't trade it
+			}
+			px := bar.Close
+			beyondBoth := (px > o.Daily && px > o.Weekly) || (px < o.Daily && px < o.Weekly)
+			if beyondBoth {
+				continue
+			}
+		}
 		for _, p := range pools {
 			if p.Kind == signal.EQH && bar.High > p.Hi && bar.Close < p.Lo {
 				// swept buy-side liquidity above, closed back below → short
