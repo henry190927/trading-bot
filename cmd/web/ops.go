@@ -2,11 +2,14 @@
 // and an SSE log tail. Designed for mobile use over Tailscale — gives the
 // trader full daemon control without having to SSH from the iPhone.
 //
-// Security model is unchanged from the rest of the app: Tailscale-only +
-// ufw + interface-bound socket. Sudoers on the VPS scopes `ubuntu` to
-// systemctl{start,stop,restart,status} trading-bot and journalctl -u
-// trading-bot — nothing else. .env edits go through validation here so
-// a typo can't write garbage into /opt/trading/.env.
+// Security model: Tailscale-only + ufw + interface-bound socket, and
+// sudoers on the VPS grants `ubuntu` exactly `systemctl start|stop|restart`
+// on the three trading units — nothing else. Everything else this file runs
+// is unprivileged: `systemctl is-active` / `status` are read-only D-Bus
+// queries, and journal reads come from adm group membership. That matters,
+// because the narrow grant is only a real boundary if nothing here needs
+// more than it. .env edits go through validation so a typo can't write
+// garbage into /opt/trading/.env.
 package main
 
 import (
@@ -67,7 +70,9 @@ type opsStatus struct {
 func readDaemonStatus(service string) opsStatus {
 	st := opsStatus{Service: service, State: "unknown"}
 
-	out, _ := exec.Command("sudo", "systemctl", "is-active", service).CombinedOutput()
+	// Unprivileged: is-active is a read-only D-Bus query. Keeping sudo here
+	// meant the status card depended on a blanket NOPASSWD grant.
+	out, _ := exec.Command("systemctl", "is-active", service).CombinedOutput()
 	state := strings.TrimSpace(string(out))
 	st.State = state
 	st.Active = state == "active"
@@ -171,8 +176,10 @@ func updateEnvConfig(tf string, minScore int) error {
 }
 
 // systemctlAction runs `sudo systemctl <action> <service>`. Both
-// arguments must be in their respective allowlists (the VPS sudoers
-// scope already enforces the same, but reject early for clean errors).
+// arguments must be in their respective allowlists. The VPS sudoers scope
+// enforces the same set independently — this is defence in depth, not the
+// only gate — but rejecting early gives a clean error instead of a sudo
+// permission failure.
 func systemctlAction(service, action string) error {
 	switch action {
 	case "start", "stop", "restart":
@@ -282,7 +289,9 @@ func (s *server) handleOpsZoneConfig(c *gin.Context) {
 // handleOpsZoneLogs returns the recent zone-alert log lines (filtered from
 // the trading-monitor journal).
 func (s *server) handleOpsZoneLogs(c *gin.Context) {
-	out, _ := exec.Command("sudo", "journalctl", "-u", "trading-monitor",
+	// No sudo: the service account is in the adm group, which is what
+	// grants journal access.
+	out, _ := exec.Command("journalctl", "-u", "trading-monitor",
 		"-n", "300", "--no-pager", "--output=short-iso").CombinedOutput()
 	var lines []string
 	for _, l := range strings.Split(string(out), "\n") {
@@ -553,7 +562,8 @@ func (s *server) handleOpsLogs(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	cmd := exec.CommandContext(ctx, "sudo", "journalctl",
+	// No sudo — adm group membership covers journal reads.
+	cmd := exec.CommandContext(ctx, "journalctl",
 		"-u", svc,
 		"-n", "50",
 		"-f",

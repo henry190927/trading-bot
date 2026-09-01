@@ -158,7 +158,7 @@ deploy:
 	@echo "▶ uploading to $(ORACLE_HOST)..."
 	@$(SCP) /tmp/trading-serve-linux $(ORACLE_USER)@$(ORACLE_HOST):/tmp/trading-serve
 	@echo "▶ installing + restarting systemd unit..."
-	@$(SSH) 'sudo mv /tmp/trading-serve /opt/trading/trading-serve && sudo chown ubuntu:ubuntu /opt/trading/trading-serve && sudo systemctl restart trading-bot && sleep 1 && sudo systemctl status trading-bot --no-pager | head -5'
+	@$(SSH) 'mv /tmp/trading-serve /opt/trading/trading-serve && chown ubuntu:ubuntu /opt/trading/trading-serve && sudo systemctl restart trading-bot && sleep 1 && systemctl status trading-bot --no-pager | head -5'
 
 # ---- deploy-all: also redeploy analyze/validate/backtest/price/journal binaries
 deploy-all:
@@ -172,24 +172,24 @@ deploy-all:
 	@echo "▶ uploading to $(ORACLE_HOST)..."
 	@$(SCP) /tmp/trading-serve-linux /tmp/trading-analyze-linux /tmp/trading-validate-linux /tmp/trading-backtest-linux /tmp/trading-price-linux /tmp/trading-journal-linux $(ORACLE_USER)@$(ORACLE_HOST):/tmp/
 	@echo "▶ installing + restarting daemon..."
-	@$(SSH) 'sudo mv /tmp/trading-serve-linux    /opt/trading/trading-serve    && \
-	          sudo mv /tmp/trading-analyze-linux  /opt/trading/trading-analyze  && \
-	          sudo mv /tmp/trading-validate-linux /opt/trading/trading-validate && \
-	          sudo mv /tmp/trading-backtest-linux /opt/trading/trading-backtest && \
-	          sudo mv /tmp/trading-price-linux    /opt/trading/trading-price    && \
-	          sudo mv /tmp/trading-journal-linux  /opt/trading/trading-journal  && \
-	          sudo chown ubuntu:ubuntu /opt/trading/trading-* && \
+	@$(SSH) 'mv /tmp/trading-serve-linux    /opt/trading/trading-serve    && \
+	          mv /tmp/trading-analyze-linux  /opt/trading/trading-analyze  && \
+	          mv /tmp/trading-validate-linux /opt/trading/trading-validate && \
+	          mv /tmp/trading-backtest-linux /opt/trading/trading-backtest && \
+	          mv /tmp/trading-price-linux    /opt/trading/trading-price    && \
+	          mv /tmp/trading-journal-linux  /opt/trading/trading-journal  && \
+	          chown ubuntu:ubuntu /opt/trading/trading-* && \
 	          sudo systemctl restart trading-bot && \
-	          sleep 1 && sudo systemctl status trading-bot --no-pager | head -5'
+	          sleep 1 && systemctl status trading-bot --no-pager | head -5'
 
 ssh:
 	@$(SSH)
 
 remote-status:
-	@$(SSH) 'sudo systemctl status trading-bot --no-pager'
+	@$(SSH) 'systemctl status trading-bot --no-pager'
 
 remote-logs:
-	@$(SSH) 'sudo journalctl -u trading-bot -n 30 -f'
+	@$(SSH) 'journalctl -u trading-bot -n 30 -f'
 
 # ---- web UI deployment + ops ----
 deploy-web:
@@ -198,16 +198,16 @@ deploy-web:
 	@echo "▶ uploading to $(ORACLE_HOST)..."
 	@$(SCP) /tmp/trading-web-linux $(ORACLE_USER)@$(ORACLE_HOST):/tmp/trading-web
 	@echo "▶ installing + restarting trading-web unit..."
-	@$(SSH) 'sudo mv /tmp/trading-web /opt/trading/trading-web && sudo chown ubuntu:ubuntu /opt/trading/trading-web && sudo systemctl restart trading-web && sleep 1 && sudo systemctl status trading-web --no-pager | head -5'
+	@$(SSH) 'mv /tmp/trading-web /opt/trading/trading-web && chown ubuntu:ubuntu /opt/trading/trading-web && sudo systemctl restart trading-web && sleep 1 && systemctl status trading-web --no-pager | head -5'
 
 web-status:
-	@$(SSH) 'sudo systemctl status trading-web --no-pager'
+	@$(SSH) 'systemctl status trading-web --no-pager'
 
 web-logs:
-	@$(SSH) 'sudo journalctl -u trading-web -n 30 -f'
+	@$(SSH) 'journalctl -u trading-web -n 30 -f'
 
 web-restart:
-	@$(SSH) 'sudo systemctl restart trading-web && sudo systemctl status trading-web --no-pager | head -4'
+	@$(SSH) 'sudo systemctl restart trading-web && systemctl status trading-web --no-pager | head -4'
 
 # ---- trading-monitor: multi-TF confluence daemon ----
 deploy-monitor:
@@ -216,16 +216,16 @@ deploy-monitor:
 	@echo "▶ uploading to $(ORACLE_HOST)..."
 	@$(SCP) /tmp/trading-monitor-linux $(ORACLE_USER)@$(ORACLE_HOST):/tmp/trading-monitor
 	@echo "▶ installing + restarting trading-monitor unit..."
-	@$(SSH) 'sudo mv /tmp/trading-monitor /opt/trading/trading-monitor && sudo chown ubuntu:ubuntu /opt/trading/trading-monitor && sudo chmod +x /opt/trading/trading-monitor && sudo systemctl restart trading-monitor && sleep 1 && sudo systemctl status trading-monitor --no-pager | head -5'
+	@$(SSH) 'mv /tmp/trading-monitor /opt/trading/trading-monitor && chown ubuntu:ubuntu /opt/trading/trading-monitor && chmod +x /opt/trading/trading-monitor && sudo systemctl restart trading-monitor && sleep 1 && systemctl status trading-monitor --no-pager | head -5'
 
 monitor-status:
-	@$(SSH) 'sudo systemctl status trading-monitor --no-pager'
+	@$(SSH) 'systemctl status trading-monitor --no-pager'
 
 monitor-logs:
-	@$(SSH) 'sudo journalctl -u trading-monitor -n 30 -f'
+	@$(SSH) 'journalctl -u trading-monitor -n 30 -f'
 
 monitor-restart:
-	@$(SSH) 'sudo systemctl restart trading-monitor && sudo systemctl status trading-monitor --no-pager | head -4'
+	@$(SSH) 'sudo systemctl restart trading-monitor && systemctl status trading-monitor --no-pager | head -4'
 
 # ---- MCP server for Claude Code (zero-cost AI advisor path) ----
 #
@@ -286,13 +286,17 @@ jdelete:
 janchors:
 	@$(SSH) "/opt/trading/trading-journal anchors"
 
-# ---- daemon control on the VPS (uses NOPASSWD sudoers, no prompt) ----
+# ---- daemon control on the VPS ----
+# start/stop/restart are the only VPS operations needing root; sudoers
+# grants ubuntu exactly those three verbs on the three trading units.
+# status / journalctl / mv / chown run unprivileged (adm group +
+# ubuntu-owned /opt/trading), so they carry no sudo.
 tstart:
-	@$(SSH) "sudo systemctl start trading-bot && sudo systemctl status trading-bot --no-pager | head -4"
+	@$(SSH) "sudo systemctl start trading-bot && systemctl status trading-bot --no-pager | head -4"
 tstop:
 	@$(SSH) "sudo systemctl stop trading-bot && echo stopped"
 trestart:
-	@$(SSH) "sudo systemctl restart trading-bot && sudo systemctl status trading-bot --no-pager | head -4"
+	@$(SSH) "sudo systemctl restart trading-bot && systemctl status trading-bot --no-pager | head -4"
 
 # `make tconfig TF=15m MS=3` updates .env and restarts the daemon.
 # `make tconfig TF=1h`        keeps current MS.
