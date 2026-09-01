@@ -187,18 +187,17 @@ func (s *server) handleChartBias(c *gin.Context) {
 // lean the other. That's the low-conviction trap: e.g. buying a 4h pullback
 // zone while 1h/15m have already turned down (an M-top). Aligned = higher
 // conviction; conflict = wait / size down.
+//
+// CONVICTION GATE: an earlier version only looked at the SIGN of the HTF/LTF
+// score sums, so a single leaning TF (15m -1) with four neutrals printed a
+// green "✓ TF 一致偏空" — and because computeRange keys isRange off this state,
+// that phantom trend also switched the range read-aid OFF in a dead-flat chop
+// ("趨勢中,別 fade 邊緣" while price sat mid-box). A real "一致" now needs
+// breadth: ≥2 TFs leaning the same way, more agreeing than opposing, and
+// either an HTF on board or the whole LTF stack (≥3). Anything thinner is
+// weak-long/weak-short — treated as no-trend, which lets range mode engage.
 func computeAlignment(tfs []gin.H) gin.H {
 	htf := map[string]bool{"2h": true, "4h": true}
-	htfSum, ltfSum := 0, 0
-	for _, t := range tfs {
-		sc, _ := t["score"].(int)
-		tf, _ := t["tf"].(string)
-		if htf[tf] {
-			htfSum += sc
-		} else {
-			ltfSum += sc
-		}
-	}
 	sign := func(n int) int {
 		switch {
 		case n > 0:
@@ -209,6 +208,20 @@ func computeAlignment(tfs []gin.H) gin.H {
 			return 0
 		}
 	}
+
+	htfSum, ltfSum := 0, 0
+	signs := make(map[string]int, len(tfs))
+	for _, t := range tfs {
+		sc, _ := t["score"].(int)
+		tf, _ := t["tf"].(string)
+		signs[tf] = sign(sc)
+		if htf[tf] {
+			htfSum += sc
+		} else {
+			ltfSum += sc
+		}
+	}
+
 	word := func(s int) string {
 		switch {
 		case s > 0:
@@ -219,16 +232,61 @@ func computeAlignment(tfs []gin.H) gin.H {
 			return "中性"
 		}
 	}
+
 	h, l := sign(htfSum), sign(ltfSum)
-	switch {
-	case h != 0 && l != 0 && h != l:
-		return gin.H{"state": "conflict", "label": "⚠ TF 衝突 HTF" + word(h) + "/LTF" + word(l)}
-	case h >= 0 && l >= 0 && (h > 0 || l > 0):
-		return gin.H{"state": "aligned-long", "label": "✓ TF 一致偏多"}
-	case h <= 0 && l <= 0 && (h < 0 || l < 0):
-		return gin.H{"state": "aligned-short", "label": "✓ TF 一致偏空"}
-	default:
-		return gin.H{"state": "mixed", "label": "TF 混合/中性"}
+	// HTF and LTF pulling opposite ways is a real signal at any magnitude —
+	// it stays the top-priority read, unchanged.
+	if h != 0 && l != 0 && h != l {
+		return gin.H{
+			"state": "conflict", "label": "⚠ TF 衝突 HTF" + word(h) + "/LTF" + word(l),
+			"htfSum": htfSum, "ltfSum": ltfSum, "tfCount": len(tfs),
+		}
+	}
+
+	dom := sign(htfSum + ltfSum)
+	if dom == 0 {
+		return gin.H{
+			"state": "mixed", "label": "TF 混合/中性",
+			"htfSum": htfSum, "ltfSum": ltfSum, "tfCount": len(tfs),
+		}
+	}
+
+	agree, against, htfAgree := 0, 0, 0
+	for tf, s := range signs {
+		switch s {
+		case dom:
+			agree++
+			if htf[tf] {
+				htfAgree++
+			}
+		case -dom:
+			against++
+		}
+	}
+
+	// Breadth test: enough TFs leaning, a clear majority of the ones that do,
+	// and either an HTF participating or the entire LTF stack agreeing.
+	strong := agree >= 2 && agree > against && (htfAgree >= 1 || agree >= 3)
+
+	breadth := fmt.Sprintf(" (%d/%d)", agree, len(tfs))
+	if against > 0 {
+		breadth = fmt.Sprintf(" (%d/%d·反%d)", agree, len(tfs), against)
+	}
+
+	state, label := "weak-", "⚠ TF 弱共識偏"
+	if strong {
+		state, label = "aligned-", "✓ TF 一致偏"
+	}
+	if dom > 0 {
+		state += "long"
+	} else {
+		state += "short"
+	}
+
+	return gin.H{
+		"state": state, "label": label + word(dom) + breadth,
+		"agree": agree, "against": against, "htfAgree": htfAgree,
+		"htfSum": htfSum, "ltfSum": ltfSum, "tfCount": len(tfs),
 	}
 }
 
@@ -259,7 +317,11 @@ func computeRange(candles []market.Candle, price float64, alignState string) gin
 		return nil
 	}
 	pos := (price - lo) / (hi - lo) // 0 = floor, 1 = ceiling
-	isRange := alignState == "mixed" || alignState == "conflict"
+	// No usable trend = range mode. "weak-*" counts: a thin one-TF lean is
+	// not a trend, and treating it as one used to suppress this read-aid
+	// exactly when chop made it most useful.
+	isRange := alignState == "mixed" || alignState == "conflict" ||
+		strings.HasPrefix(alignState, "weak-")
 	zone := "middle"
 	switch {
 	case pos <= 0.34:

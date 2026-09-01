@@ -2350,7 +2350,22 @@
                 if (!d || !d.tfs) return;
                 var html = '<div class="tf-bias-title">TF bias</div>';
                 if (d.alignment && d.alignment.label) {
-                    html += '<div class="tf-bias-align align-' + d.alignment.state + '">' + d.alignment.label + '</div>';
+                    var al = d.alignment, atip;
+                    if (al.state === 'conflict') {
+                        atip = 'HTF(2h/4h) 與 LTF(5m/15m/1h) 方向相反 = 低信心,等對齊或縮小部位。';
+                    } else if (al.state.indexOf('weak-') === 0) {
+                        atip = '弱共識:只有 ' + (al.agree || 0) + '/' + (al.tfCount || 5) + ' 個 TF 有方向'
+                             + (al.against ? '(另有 ' + al.against + ' 個反向)' : ',其餘中性')
+                             + '。不算趨勢 → 套用區間規則(邊緣做、中間別做),別當順勢單進。';
+                    } else if (al.state.indexOf('aligned-') === 0) {
+                        atip = (al.agree || 0) + '/' + (al.tfCount || 5) + ' 個 TF 同向'
+                             + (al.against ? '(反向 ' + al.against + ')' : '')
+                             + ',含 HTF ' + (al.htfAgree || 0) + ' 個 → 順勢等回踩。';
+                    } else {
+                        atip = '各 TF 無明確方向 → 視為盤整,套用區間規則。';
+                    }
+                    html += '<div class="tf-bias-align align-' + al.state + '" title="'
+                          + atip.replace(/"/g, '&quot;') + '">' + al.label + '</div>';
                 }
                 d.tfs.forEach(function (t) {
                     var m = biasMeta(t.dir);

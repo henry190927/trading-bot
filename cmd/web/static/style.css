@@ -6210,6 +6210,11 @@ html[data-density="compact"] .setups-table {
 .tf-bias-align.align-aligned-long { background: var(--wash-green);  color: var(--green); }
 .tf-bias-align.align-aligned-short{ background: var(--wash-red);    color: var(--red); }
 .tf-bias-align.align-mixed        { background: var(--wash-dim);    color: var(--text-dim); }
+/* weak-* = a lean too thin to call a trend (see computeAlignment breadth
+   gate). Yellow, not green/red: directional but low-conviction, and range
+   rules apply. */
+.tf-bias-align.align-weak-long    { background: var(--wash-yellow); color: var(--yellow); }
+.tf-bias-align.align-weak-short   { background: var(--wash-yellow); color: var(--yellow); }
 
 /* HVN target line in the /chart tf-bias panel (nearest chip-concentration
    above/below = target reference; read-aid #2). */
