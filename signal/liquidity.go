@@ -1,6 +1,7 @@
 package signal
 
 import (
+	"fmt"
 	"sort"
 
 	"myFirstGo/trading-bot/market"
@@ -30,6 +31,90 @@ type LiquidityLevel struct {
 	Lo, Hi  float64 // cluster band (min/max swing price in it)
 	Touches int     // number of swings forming the pool (>=2)
 	LastIdx int     // most-recent candle index in the cluster (freshness)
+}
+
+// LiqVoteProxPct, when > 0, turns EQH/EQL pool PROXIMITY into a mean-reversion
+// confluence vote inside Evaluate: an EQH within this many percent ABOVE price
+// votes bear, an EQL within it BELOW price votes bull. 0 = off (the shipped
+// default — pools stay an entry trigger via sweep-reject and a display layer,
+// contributing nothing to the engine score).
+//
+// The polarity matches the only pool use that has ever passed an A/B
+// (sweep-reject: run above an EQH then close back below → short; mirror for
+// EQL → long), i.e. EQH reads bearish and EQL bullish.
+//
+// A/B-gated per [[feedback_strategy_changes]]: wire via cmd/backtest --liq-vote
+// and prove +R across 60/90/120d per symbol before considering a default.
+// TESTED 2026-09-02 → REJECTED in BOTH polarities, at two tolerances, across
+// 60/90/120d on the core four. Core-4 total netR:
+//
+//	variant        60d      90d      120d
+//	baseline    -11.27    -4.62    +4.36
+//	wall 0.5    -17.50   -40.44   -39.89
+//	magnet 0.5   -1.59    -7.08   -22.86
+//	magnet 0.2  -16.53    -5.25   -12.08
+//
+// wall is worse every window and worsens with data; magnet flatters only the
+// shortest window then degrades monotonically, and swings 15R on a tolerance
+// tweak (60d: -1.59 at 0.5 → -16.53 at 0.2) with each window preferring a
+// different param. Metals are worse under every variant. Kept off-by-default
+// as documentation, alongside cmd/sweepbt's rejected-flag pile.
+//
+// WHY, and it generalises: signal counts scale monotonically with the tolerance
+// (BTC 60d n=47 baseline → 56 at 0.2 → 64 at 0.5), so the vote reliably DILUTES
+// a fixed count-threshold with marginal setups — the identical failure mode
+// already documented for HVN-proximity voting at engine.go's HVN note, now
+// reproduced independently on a different level type. Performance is not even
+// monotone in the param, meaning the added votes carry ~no information.
+// Proximity to a level is a DISTANCE; the pool edge that works (sweep-reject)
+// is an EVENT — crossing then closing back. Distances don't score here.
+var LiqVoteProxPct = 0.0
+
+// LiqVoteMagnet inverts LiqVoteProxPct's polarity to test the competing
+// "liquidity magnet" reading — that an unswept pool DRAWS price toward it, so
+// an EQH above is bullish (price wants to run the stops) and an EQL below is
+// bearish. Only meaningful when LiqVoteProxPct > 0. Testing both signs avoids
+// concluding "pools don't score" from one arbitrary direction choice.
+var LiqVoteMagnet = false
+
+// liqVoteVerdict reports the MR votes pool proximity implies at `price`, given
+// pools computed from bars STRICTLY BEFORE the evaluated bar (no look-ahead).
+// Returns (bull, bear) increments and a reason string for whichever fired.
+func liqVoteVerdict(pools []LiquidityLevel, price float64) (bull, bear int, reason string) {
+	if LiqVoteProxPct <= 0 || price <= 0 {
+		return 0, 0, ""
+	}
+	above, below := NearestLiquidity(pools, price)
+	tol := LiqVoteProxPct / 100.0
+	// Only the pool on each side that is actually within tolerance counts, and
+	// only EQH-above / EQL-below are considered — an EQH that price has already
+	// traded through sits BELOW and is a spent pool, which is a different
+	// (untested) polarity-flip idea, deliberately not folded in here.
+	if above != nil && above.Kind == EQH && (above.Price-price)/price <= tol {
+		if LiqVoteMagnet {
+			bull++
+			reason = fmt.Sprintf("EQH pool %.4f within %.2f%% above (magnet: draws price up)", above.Price, LiqVoteProxPct)
+		} else {
+			bear++
+			reason = fmt.Sprintf("EQH pool %.4f within %.2f%% above (overhead supply)", above.Price, LiqVoteProxPct)
+		}
+	}
+	if below != nil && below.Kind == EQL && (price-below.Price)/price <= tol {
+		if LiqVoteMagnet {
+			bear++
+			if reason != "" {
+				reason += " · "
+			}
+			reason += fmt.Sprintf("EQL pool %.4f within %.2f%% below (magnet: draws price down)", below.Price, LiqVoteProxPct)
+		} else {
+			bull++
+			if reason != "" {
+				reason += " · "
+			}
+			reason += fmt.Sprintf("EQL pool %.4f within %.2f%% below (underlying demand)", below.Price, LiqVoteProxPct)
+		}
+	}
+	return bull, bear, reason
 }
 
 // FindLiquidity returns EQH and EQL pools from the last `lookback` swings, where a

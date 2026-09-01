@@ -33,6 +33,8 @@ func main() {
 	htfStruct := flag.Bool("htf-struct", false, "STRATEGY VARIANT (Phase 2 降維入局): fetch 4h HTF candles and require each base-TF entry to sit inside an aligned 4h 樞紐區 (same direction). Take/skip gate for ALL symbols. Default OFF. Run at -tf=1h for the 4h→1h design; A/B vs baseline per symbol.")
 	structOff := flag.Bool("struct-off", false, "Short-circuit ALL live structure allowlists (metals veto + BTC/ETH zone) to establish a clean no-structure baseline. Combine with a single --struct-* flag to A/B that feature in isolation on any TF.")
 	structMomentum := flag.Bool("struct-momentum", false, "STRATEGY: replace the MR engine with the trend/structure-aligned StructMomentum strategy (BOS-continuation retrace into 樞紐區) for ALL symbols. A/B vs the MR baseline per symbol/TF before assigning it in strategyFor. See docs/struct_momentum_strategy_design.md.")
+	liqVote := flag.Float64("liq-vote", 0, "STRATEGY VARIANT: EQH/EQL pool proximity as an MR confluence vote — an EQH within this many percent ABOVE price votes bear, an EQL that close BELOW votes bull (polarity matches sweep-reject, the only pool use that passed an A/B). Default 0 = off; pools score nothing. Try 0.3/0.5/0.8 and check nearby params, not just one.")
+	liqVoteMagnet := flag.Bool("liq-vote-magnet", false, "invert --liq-vote's polarity to test the competing liquidity-MAGNET reading (EQH above = bullish pull, EQL below = bearish pull). Only meaningful with --liq-vote > 0.")
 	smStopBuffer := flag.Float64("sm-stop-buffer", 0, "STRATEGY VARIANT: push the StructMomentum stop this many ATR(14) beyond the leg-origin invalidate (sweep buffer). Only affects --struct-momentum. Default 0 = stop on the invalidate line. A/B on SOL/LINK before shipping.")
 	useDXY := flag.Bool("dxy", false, "enable DXY macro veto on XAU/XAG signals. Default OFF — 2026-05-27 backtest showed it hurt by ~46R (vetoed trades were the best ones; mean-reversion thrives on macro-divergent dips)")
 	bodyWeight := flag.Float64("body-weight", 0, "POC/HVN body-weighted distribution: fraction (0,1) of each candle's volume routed to its body range. Default 0 = legacy uniform-over-HL. Try 0.7 to damp wick-hunt distortion during whipsaw.")
@@ -73,6 +75,8 @@ func main() {
 		signal.StructMomentumEnabled = true
 	}
 	signal.SMStopBufferATR = *smStopBuffer
+	signal.LiqVoteProxPct = *liqVote
+	signal.LiqVoteMagnet = *liqVoteMagnet
 	indicator.BodyWeight = *bodyWeight
 
 	timeframe := market.Timeframe(*tf)

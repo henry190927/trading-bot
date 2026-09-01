@@ -414,6 +414,21 @@ func Evaluate(in Inputs) Signal {
 		}
 	}
 
+	// EQH/EQL pool-proximity vote (A/B VARIANT, off unless LiqVoteProxPct > 0).
+	// Pools are otherwise an ENTRY trigger only (sweep-reject) plus a display
+	// layer — they contribute nothing to the engine score by default. Pools are
+	// built from bars STRICTLY BEFORE the evaluated bar, matching what
+	// autostrat/sweepbt do, so this can't peek at the bar it is scoring.
+	if LiqVoteProxPct > 0 && last >= 60 {
+		pools := FindLiquidity(in.Candles[:last], 2, 20, 0.0015)
+		lb, lr, lreason := liqVoteVerdict(pools, price)
+		bullMR += lb
+		bearMR += lr
+		if lreason != "" {
+			sig.Reasons = append(sig.Reasons, lreason)
+		}
+	}
+
 	// Volume anomaly vote — catches momentum/breakout situations the
 	// mean-reversion votes structurally miss. Trigger: signal bar volume
 	// > 3.0× 20-bar average (a much stronger threshold than the
