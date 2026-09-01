@@ -19,6 +19,33 @@
 
 <h1 class="page-title">Daemon control</h1>
 
+<!-- ── Health card: what is actually running right now ──
+     Answers the question that used to need an SSH session: are the units up,
+     which of the monitor's goroutines are live, and is push muted. -->
+<section class="ops-health" id="ops-health">
+  <h2 class="ops-svc-title">
+    <span class="ops-svc-name">系統狀態</span>
+    <span class="ops-svc-tag">services · loops · 推播</span>
+  </h2>
+
+  <div class="ops-health-svcs" id="ops-health-svcs">
+    <div class="hint">載入中…</div>
+  </div>
+
+  <div class="ops-health-ntfy" id="ops-health-ntfy">
+    <span class="ops-ntfy-state" id="ops-ntfy-state">—</span>
+    <span class="ops-state-flex"></span>
+    <button type="button" class="btn-ops" id="ops-ntfy-toggle" disabled>—</button>
+  </div>
+  <div class="hint ops-ntfy-note" id="ops-ntfy-note"></div>
+
+  <div class="ops-health-loops">
+    <div class="ops-loops-title">trading-monitor 子迴圈</div>
+    <div class="ops-loops-grid" id="ops-health-loops"></div>
+  </div>
+</section>
+
+
 <!-- ── Primary daemon: trading-bot ── -->
 <section class="ops-svc-block" data-service="trading-bot">
   <h2 class="ops-svc-title">
@@ -335,6 +362,89 @@
         applyMutexUI();
     })();
     setInterval(fetchAll, 5000);
+
+    // ─── Health card: unit states + monitor loops + ntfy mute ─────────
+    // Deliberately its own poll: it shells out to systemctl three times and
+    // the answer changes on the scale of deploys, not seconds.
+    var ntfyBusy = false;
+    function renderHealth(d) {
+        var wrap = document.getElementById('ops-health-svcs');
+        wrap.innerHTML = (d.services || []).map(function (v) {
+            var cls = v.active ? 'on' : (v.state === 'failed' ? 'fail' : 'off');
+            return '<div class="ops-hsvc">'
+                 + '<span class="ops-state-dot ' + cls + '"></span>'
+                 + '<code class="ops-hsvc-name">' + v.unit + '</code>'
+                 + '<span class="ops-hsvc-state ' + cls + '">' + (v.active ? 'ACTIVE' : (v.state || 'unknown')) + '</span>'
+                 + (v.since ? '<span class="ops-hsvc-since" title="上次進入 active 的時間起算 — 有人重啟過就會歸零">' + v.since + '</span>' : '')
+                 + '<span class="ops-hsvc-enabled" title="開機自動啟動">' + (v.enabled || '') + '</span>'
+                 + (v.read_only ? '<span class="ops-hsvc-ro" title="這個服務就是提供本頁的行程,不提供啟停按鈕">唯讀</span>' : '')
+                 + '</div>';
+        }).join('') || '<div class="hint">無資料</div>';
+
+        var on = d.ntfy && d.ntfy.on;
+        var st = document.getElementById('ops-ntfy-state');
+        st.textContent = on ? '🔔 推播開啟' : '🔇 推播靜音';
+        st.className = 'ops-ntfy-state ' + (on ? 'on' : 'off');
+
+        var btn = document.getElementById('ops-ntfy-toggle');
+        btn.textContent = on ? '🔇 靜音' : '🔔 取消靜音';
+        btn.disabled = ntfyBusy || (!on && !(d.ntfy && d.ntfy.muted));
+        btn.dataset.mute = on ? '1' : '0';
+
+        var note = document.getElementById('ops-ntfy-note');
+        if (!on && !(d.ntfy && d.ntfy.muted)) {
+            note.textContent = 'NTFY_TOPIC 未設定過,面板沒有可還原的值 — 請手動寫入 .env。';
+        } else if (!on) {
+            note.textContent = '靜音中(topic 已暫存於 .env)。autoexec 仍在跑,但 zonealert 等推播迴圈全部停擺。';
+        } else {
+            note.textContent = '靜音會清空 NTFY_TOPIC 並重啟 trading-monitor;topic 會暫存在 .env 內以便還原。';
+        }
+
+        var lw = document.getElementById('ops-health-loops');
+        lw.innerHTML = (d.loops || []).map(function (l) {
+            return '<div class="ops-loop ' + (l.on ? 'on' : 'off') + '" title="' + (l.reason || '').replace(/"/g, '&quot;') + '">'
+                 + '<span class="ops-state-dot ' + (l.on ? 'on' : 'off') + '"></span>'
+                 + '<code>' + l.name + '</code>'
+                 + '<span class="ops-loop-reason">' + (l.reason || '') + '</span>'
+                 + '</div>';
+        }).join('');
+    }
+    function fetchHealth() {
+        fetch('/ops/services?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(renderHealth)
+            .catch(function () { /* best-effort card */ });
+    }
+    document.getElementById('ops-ntfy-toggle').addEventListener('click', function () {
+        var mute = this.dataset.mute === '1';
+        if (!confirm(mute
+                ? '靜音推播?會清空 NTFY_TOPIC 並重啟 trading-monitor。'
+                : '恢復推播?會還原 NTFY_TOPIC 並重啟 trading-monitor。')) return;
+        ntfyBusy = true;
+        this.disabled = true;
+        var body = new URLSearchParams({ mute: mute ? '1' : '0' });
+        fetch('/ops/ntfy', { method: 'POST', body: body })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                ntfyBusy = false;
+                if (!res.ok || res.j.error) {
+                    showToast(res.j.error || '切換失敗', 'error');
+                } else if (res.j.changed === false) {
+                    showToast(res.j.note || '沒有改動', 'info');
+                } else {
+                    showToast(res.j.on ? '推播已恢復,monitor 已重啟' : '推播已靜音,monitor 已重啟', 'ok');
+                }
+                fetchHealth();
+                fetchAll();
+            })
+            .catch(function (e) {
+                ntfyBusy = false;
+                showToast('切換失敗: ' + e, 'error');
+                fetchHealth();
+            });
+    });
+    fetchHealth();
+    setInterval(fetchHealth, 30000);
 
     // ─── Zone-fade alert status (recomputes structure, so slower cadence) ──
     function zFmt(v) {

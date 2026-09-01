@@ -4934,6 +4934,66 @@ footer {
 .ops-state-dot.off {
     background: var(--text-dim);
 }
+.ops-state-dot.fail {
+    background: var(--red);
+    box-shadow: 0 0 8px rgba(var(--red-rgb), 0.6);
+}
+
+/* ── /ops health card ──────────────────────────────────────────────────
+   "Is anything actually running?" — unit states, the monitor's live
+   goroutines, and the push-mute switch, at the top of the page because it
+   is the first thing worth knowing. */
+.ops-health {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 1.2rem;
+}
+.ops-health .ops-svc-title { margin-bottom: 0.6rem; }
+.ops-health-svcs { display: flex; flex-direction: column; gap: 0.35rem; }
+.ops-hsvc {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+    font-size: var(--fs-sm);
+}
+.ops-hsvc-name { font-weight: 700; }
+.ops-hsvc-state {
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;
+}
+.ops-hsvc-state.on   { color: var(--green); }
+.ops-hsvc-state.off  { color: var(--text-dim); }
+.ops-hsvc-state.fail { color: var(--red); }
+.ops-hsvc-since {
+    font-variant-numeric: tabular-nums; color: var(--text-dim);
+    font-size: var(--fs-xs);
+}
+.ops-hsvc-enabled, .ops-hsvc-ro {
+    font-size: var(--fs-xs); color: var(--text-dim);
+    background: var(--wash-dim); border-radius: var(--r-sm); padding: 1px 5px;
+}
+
+.ops-health-ntfy {
+    display: flex; align-items: center; gap: 0.6rem;
+    margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--border);
+}
+.ops-ntfy-state { font-weight: 700; font-size: var(--fs-sm); }
+.ops-ntfy-state.on  { color: var(--green); }
+.ops-ntfy-state.off { color: var(--yellow); }
+.ops-ntfy-note { margin-top: 0.3rem; line-height: 1.4; }
+
+.ops-health-loops { margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
+.ops-loops-title {
+    font-size: var(--fs-xs); color: var(--text-dim); font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;
+}
+.ops-loops-grid { display: flex; flex-direction: column; gap: 0.25rem; }
+.ops-loop {
+    display: flex; align-items: center; gap: 0.5rem; font-size: var(--fs-sm);
+}
+.ops-loop code { font-weight: 700; min-width: 6.5em; }
+.ops-loop.off code { color: var(--text-dim); }
+.ops-loop-reason { color: var(--text-dim); font-size: var(--fs-xs); }
 .ops-state-label {
     font-weight: 700;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
