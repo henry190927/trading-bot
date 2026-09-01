@@ -36,6 +36,7 @@ import (
 
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/notify"
@@ -116,6 +117,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go waitForShutdown(cancel)
+
+	// Earnings-blackout calendar (F3). signal.Evaluate reads earnings.Default()
+	// to gate stock symbols around a report; without this load that gate is a
+	// SILENT no-op here — autoInBlackout dutifully checks for an "earnings"
+	// reason that the engine could never produce, because this process's
+	// calendar was empty. Only the web binary loaded it before, so the gate
+	// looked armed while the auto-executor ran unprotected. A missing file is
+	// still fine (empty calendar = no-op by construction, not by omission).
+	earnings.LoadDefaultAndWatch(ctx, earnings.Path(), 10*time.Minute, log.Printf)
 
 	// Zone-alert channel: fast live-price watcher for pivot-zone-fade
 	// entries (separate cadence from the confluence scan). No-op if
