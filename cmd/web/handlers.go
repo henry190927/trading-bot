@@ -4300,10 +4300,25 @@ func (s *server) computeChartOpens(ctx context.Context, sym market.Symbol) []map
 		{"倫敦開", "london", london},
 		{"紐約開", "ny", ny},
 	}
-	out := make([]map[string]any, 0, len(defs))
+	out := make([]map[string]any, 0, len(defs)+1)
 	for _, d := range defs {
 		if p := openAt(d.at); p > 0 {
 			out = append(out, map[string]any{"label": d.label, "kind": d.kind, "price": p})
+		}
+	}
+	// Monthly open (1st 00:00 UTC) — a major institutional level for the month.
+	// The 1h window can't reach the 1st past day ~9, so resolve it from daily
+	// candles (the 1st-of-month bar's open).
+	month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	// KlinesWithForming so the current (forming) daily bar is included — on the
+	// 1st of the month THAT bar IS the month open; plain Klines returns only
+	// closed dailies (max = yesterday) and would miss it early in the month.
+	if dc, derr := s.client.KlinesWithForming(ctx, sym, market.Timeframe("1d"), 40); derr == nil {
+		for _, k := range dc {
+			if !k.OpenTime.Before(month) {
+				out = append(out, map[string]any{"label": "月開", "kind": "monthly", "price": k.Open})
+				break
+			}
 		}
 	}
 	return out
