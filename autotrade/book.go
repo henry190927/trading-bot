@@ -23,9 +23,13 @@ type CandleFn func(symbol, tf string) []market.Candle
 // open book. Both OutOpen and OutPending occupy a slot — a resting limit has
 // committed the capital just as much as a fill has.
 //
-// RealizedRToday: every fire whose settled exit falls on `now`'s UTC date.
-// Scanning fires rather than deduped positions keeps this independent of dedup
-// bookkeeping; a fire that never filled contributes 0R by construction.
+// RealizedRToday: from DEDUPED POSITIONS, not raw fires. A rule whose setup
+// persists re-fires every bar while its position is open, so ONE trade can leave
+// several fires in the log (verified: BTC range-edge 09-01 16:00→17:00, ETH
+// htf-snr 08-30 17:00→18:00, SUI sweep-reject 08-28 01:00→03:00). Counting each
+// one's -1R would trip the breaker EARLIER than its configured threshold — the
+// dangerous direction for a control the trader relies on. DedupFires collapses
+// them the same way the panel's position list does.
 //
 // FAIL-SAFE on missing candles: if a rule's newest fire can't be scored (API
 // hiccup, unknown symbol), it is counted as OPEN rather than skipped. Skipping
@@ -36,46 +40,110 @@ type CandleFn func(symbol, tf string) []market.Candle
 // fires MUST be newest-first (autotrade.ReadFires guarantees this by reversing
 // the file); the open book is "newest fire per rule", so a reversed order would
 // silently score the oldest fire instead.
-func BuildBook(fires []PaperFire, candles CandleFn, now time.Time) (Book, int) {
+// FireTrace records one fire's contribution to the book. Diagnostics only —
+// the book itself is just the aggregate. Exists because a realized-R value was
+// observed moving TOWARD zero between ticks, which for a circuit breaker is the
+// dangerous direction (a tripped halt could un-trip within the day), and the
+// aggregate alone can't say which fire moved.
+type FireTrace struct {
+	Symbol, Strategy, TF string
+	FireTime             time.Time
+	Status               OutcomeStatus
+	ExitAt               time.Time
+	NetR                 float64
+	Bars                 int // candles supplied for this fire
+	NewestForRule        bool
+	CountedOpen          bool
+	CountedToday         bool
+	Unscoreable          bool
+}
+
+// BuildBook is the aggregate-only form; see BuildBookTraced.
+func BuildBook(fires []PaperFire, candles CandleFn, now time.Time, cooldownBars int) (Book, int) {
+	bk, un, _ := BuildBookTraced(fires, candles, now, cooldownBars)
+	return bk, un
+}
+
+// BuildBookTraced is BuildBook plus a per-fire trace, in input order.
+func BuildBookTraced(fires []PaperFire, candles CandleFn, now time.Time, cooldownBars int) (Book, int, []FireTrace) {
 	today := now.UTC().Format("2006-01-02")
 
 	var bk Book
 	unscored := 0
 	seen := map[string]bool{} // symbol|strategy → newest already counted
+	trace := make([]FireTrace, 0, len(fires))
 
 	for _, f := range fires {
 		key := f.Symbol + "|" + f.Strategy
 		newestForRule := !seen[key]
+		tr := FireTrace{Symbol: f.Symbol, Strategy: f.Strategy, TF: f.TF,
+			FireTime: f.Time, NewestForRule: newestForRule}
 
 		cs := candles(f.Symbol, f.TF)
+		tr.Bars = len(cs)
 		if len(cs) == 0 {
 			// Unscoreable. Only the newest fire per rule matters for the open
 			// book, and for that one we assume the worst.
+			tr.Unscoreable = true
 			if newestForRule {
 				seen[key] = true
 				bk.OpenCount++
 				bk.OpenMargin += f.Margin
 				unscored++
+				tr.CountedOpen = true
 			}
+			trace = append(trace, tr)
 			continue
 		}
 
 		oc := EvaluateFire(f, cs, 6)
+		tr.Status, tr.ExitAt, tr.NetR = oc.Status, oc.ExitAt, oc.NetR
 
 		if newestForRule {
 			seen[key] = true
 			if oc.Status == OutOpen || oc.Status == OutPending {
 				bk.OpenCount++
 				bk.OpenMargin += f.Margin
+				tr.CountedOpen = true
 			}
 		}
 
-		// Circuit breaker — settled outcomes dated today, across all rules.
-		if oc.Status == OutTP || oc.Status == OutStop {
-			if !oc.ExitAt.IsZero() && oc.ExitAt.UTC().Format("2006-01-02") == today {
-				bk.RealizedRToday += oc.NetR
-			}
-		}
+		trace = append(trace, tr)
 	}
-	return bk, unscored
+
+	// --- circuit breaker input: deduped positions settled today ---
+	// DedupFires needs oldest-first, so walk the newest-first input backwards.
+	oldest := make([]PaperFire, 0, len(fires))
+	for i := len(fires) - 1; i >= 0; i-- {
+		oldest = append(oldest, fires[i])
+	}
+	resolve := func(f PaperFire) Outcome {
+		cs := candles(f.Symbol, f.TF)
+		if len(cs) == 0 {
+			return Outcome{Status: OutOpen} // unscoreable → holds its slot, books no R
+		}
+		return EvaluateFire(f, cs, 6)
+	}
+	// barDur is 1h for all rules, matching the panel's convention. Only XAG
+	// runs on 2h, where this makes the post-stop absorb window half as long —
+	// conservative for the breaker (fewer absorbed = more R counted), so it
+	// errs toward tripping rather than toward missing a bad day.
+	counted := map[string]bool{}
+	for _, pos := range DedupFires(oldest, 6, cooldownBars, time.Hour, resolve) {
+		oc := pos.Outcome
+		if oc.Status != OutTP && oc.Status != OutStop {
+			continue
+		}
+		if oc.ExitAt.IsZero() || oc.ExitAt.UTC().Format("2006-01-02") != today {
+			continue
+		}
+		bk.RealizedRToday += oc.NetR
+		counted[pos.Fire.Symbol+"|"+pos.Fire.Strategy+"|"+pos.Fire.Time.String()] = true
+	}
+	// Mark the trace so diagnostics show which fires actually fed the breaker.
+	for i := range trace {
+		k := trace[i].Symbol + "|" + trace[i].Strategy + "|" + trace[i].FireTime.String()
+		trace[i].CountedToday = counted[k]
+	}
+	return bk, unscored, trace
 }

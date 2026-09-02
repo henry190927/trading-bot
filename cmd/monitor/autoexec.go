@@ -63,7 +63,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		// otherwise refetches the same candles per rule.
 		now := time.Now().UTC()
 		kc := newKlineCache(ctx, client)
-		book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), kc.forFire, now)
+		book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), kc.forFire, now, maxCooldownBars(cfg))
 		logBook(book, cfg, unscored)
 
 		// The daily-loss breaker is a whole-executor stop, not a per-rule one:

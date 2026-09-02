@@ -66,6 +66,22 @@ func (k *klineCache) get(sym market.Symbol, tf string) []market.Candle {
 
 // candleFn resolves candles for a fire's (symbol, TF). Injected so buildBook is
 // testable without an exchange — the production caller passes the tick's cache.
+// maxCooldownBars is the most conservative post-stop absorb window across the
+// rules — the same choice the /ops panel makes, so both compute one number from
+// per-rule settings and stay in agreement.
+func maxCooldownBars(cfg autotrade.Config) int {
+	out := 6
+	for i, r := range cfg.Rules {
+		if r.CooldownBars <= 0 {
+			continue
+		}
+		if i == 0 || r.CooldownBars > out {
+			out = r.CooldownBars
+		}
+	}
+	return out
+}
+
 // haltState remembers which UTC day the breaker has already been announced for,
 // so a tripped halt logs and pushes once rather than on every 60s tick.
 // Re-arming is implicit: a new date has no record, and buildBook's realized-R

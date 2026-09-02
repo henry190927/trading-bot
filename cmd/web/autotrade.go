@@ -135,7 +135,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// Read the SAME depth the executor does (it uses 500) — the display list
 	// above is capped at 60, and computing the book off that shorter slice
 	// could truncate today's realized R and disagree with what gates a trade.
-	book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), candlesFor, time.Now().UTC())
+	book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), candlesFor, time.Now().UTC(), cooldown)
 
 	resolve := func(f autotrade.PaperFire) autotrade.Outcome {
 		tf := tfFor(f)
