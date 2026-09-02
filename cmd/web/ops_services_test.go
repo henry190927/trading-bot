@@ -130,7 +130,7 @@ func TestMonitorLoops(t *testing.T) {
 	}
 
 	t.Run("zone-only with ntfy on: zonealert + autoexec", func(t *testing.T) {
-		ls := monitorLoops(true, true)
+		ls := monitorLoops(true, true, true)
 		if !get(ls, "autoexec").On || !get(ls, "zonealert").On {
 			t.Error("autoexec and zonealert should both be live")
 		}
@@ -142,7 +142,7 @@ func TestMonitorLoops(t *testing.T) {
 	})
 
 	t.Run("muted under zone-only: autoexec alone", func(t *testing.T) {
-		ls := monitorLoops(true, false)
+		ls := monitorLoops(true, false, true)
 		on := 0
 		for _, l := range ls {
 			if l.On {
@@ -161,7 +161,7 @@ func TestMonitorLoops(t *testing.T) {
 	})
 
 	t.Run("full mode with ntfy on: everything live", func(t *testing.T) {
-		for _, l := range monitorLoops(false, true) {
+		for _, l := range monitorLoops(false, true, true) {
 			if !l.On {
 				t.Errorf("%s should be live", l.Name)
 			}
@@ -171,12 +171,39 @@ func TestMonitorLoops(t *testing.T) {
 	t.Run("autoexec survives muting in every mode", func(t *testing.T) {
 		for _, zo := range []bool{true, false} {
 			for _, nt := range []bool{true, false} {
-				if !get(monitorLoops(zo, nt), "autoexec").On {
+				if !get(monitorLoops(zo, nt, true), "autoexec").On {
 					t.Errorf("autoexec off at zoneOnly=%v ntfy=%v — it has no ntfy dependency", zo, nt)
 				}
 			}
 		}
 	})
+}
+
+// The gate this card originally missed: the goroutine is up (NTFY_TOPIC set)
+// but zone-config's master switch short-circuits its body every cycle.
+func TestMonitorLoopsZoneChannelGate(t *testing.T) {
+	find := func(loops []monitorLoop, name string) monitorLoop {
+		for _, l := range loops {
+			if l.Name == name {
+				return l
+			}
+		}
+		t.Fatalf("loop %q missing", name)
+		return monitorLoop{}
+	}
+	za := find(monitorLoops(true, true, false), "zonealert")
+	if za.On {
+		t.Error("zonealert must read OFF when the zone channel master is disabled")
+	}
+	if !strings.Contains(za.Reason, "enabled=false") {
+		t.Errorf("reason should name the zone-config gate, got %q", za.Reason)
+	}
+	if !find(monitorLoops(true, true, false), "autoexec").On {
+		t.Error("autoexec is independent of the zone channel and must stay ON")
+	}
+	if !find(monitorLoops(true, true, true), "zonealert").On {
+		t.Error("both gates open → zonealert ON")
+	}
 }
 
 func TestHumanSince(t *testing.T) {

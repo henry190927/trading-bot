@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"myFirstGo/trading-bot/zone"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -110,7 +112,7 @@ type monitorLoop struct {
 //	runAutoExecutor  — always started, ntfy only decorates it
 //	macrowarn / structalert / confluence scan — skipped entirely when
 //	MONITOR_ZONE_ONLY=1, and ntfy-dependent otherwise
-func monitorLoops(zoneOnly, ntfyOn bool) []monitorLoop {
+func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn bool) []monitorLoop {
 	pushOff := "NTFY_TOPIC 空白 → 這個 loop 直接 return"
 	zoneOnlyOff := "MONITOR_ZONE_ONLY=1 → 沒啟動"
 
@@ -118,9 +120,18 @@ func monitorLoops(zoneOnly, ntfyOn bool) []monitorLoop {
 		{Name: "autoexec", On: true, Reason: "自動執行器(paper) — 不依賴 ntfy,靜音時照跑"},
 	}
 
-	za := monitorLoop{Name: "zonealert", On: ntfyOn, Reason: "樞紐區/突破警報 · 25s 輪詢現價"}
-	if !ntfyOn {
+	// zonealert has TWO gates, and the first version of this card only knew
+	// about one: NTFY_TOPIC decides whether the goroutine starts at all, but
+	// zone-config.json's `enabled` is re-read every cycle and short-circuits
+	// the body (`if !cfg.Enabled { continue }`). With the channel master off
+	// the loop is up and doing nothing — which this card reported as "ON" for
+	// a full day. Report both gates.
+	za := monitorLoop{Name: "zonealert", On: ntfyOn && zoneChannelOn, Reason: "樞紐區/突破警報 · 25s 輪詢現價"}
+	switch {
+	case !ntfyOn:
 		za.Reason = pushOff
+	case !zoneChannelOn:
+		za.Reason = "zone-config.json enabled=false → loop 每輪短路,不發警報"
 	}
 	loops = append(loops, za)
 
@@ -228,6 +239,7 @@ func (s *server) handleOpsServices(c *gin.Context) {
 		svcs = append(svcs, readServiceHealth(u))
 	}
 	on, muted := ntfyState()
+	zoneCfg := zone.ReadConfig()
 	zoneOnly := false
 	if data, err := os.ReadFile(envPath()); err == nil {
 		for _, line := range strings.Split(string(data), "\n") {
@@ -237,10 +249,11 @@ func (s *server) handleOpsServices(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"services":  svcs,
-		"ntfy":      gin.H{"on": on, "muted": muted},
-		"zone_only": zoneOnly,
-		"loops":     monitorLoops(zoneOnly, on),
+		"services":     svcs,
+		"ntfy":         gin.H{"on": on, "muted": muted},
+		"zone_only":    zoneOnly,
+		"zone_channel": gin.H{"enabled": zoneCfg.Enabled, "auto": zoneCfg.Auto, "tfs": zoneCfg.TFs},
+		"loops":        monitorLoops(zoneOnly, on, zoneCfg.Enabled),
 	})
 }
 
