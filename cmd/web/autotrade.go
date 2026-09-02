@@ -132,6 +132,11 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 			cooldown = r.CooldownBars
 		}
 	}
+	// Read the SAME depth the executor does (it uses 500) — the display list
+	// above is capped at 60, and computing the book off that shorter slice
+	// could truncate today's realized R and disagree with what gates a trade.
+	book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), candlesFor, time.Now().UTC())
+
 	resolve := func(f autotrade.PaperFire) autotrade.Outcome {
 		tf := tfFor(f)
 		return autotrade.EvaluateFireLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
@@ -165,10 +170,16 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	envArmed := strings.EqualFold(strings.TrimSpace(os.Getenv("AUTOTRADE_ENABLED")), "true")
 
 	c.HTML(http.StatusOK, "autotrade.html", gin.H{
-		"Enabled":         cfg.Enabled,
-		"Paper":           cfg.Paper,
-		"EnvArmed":        envArmed,
-		"LiveArmed":       cfg.Enabled && !cfg.Paper && envArmed,
+		"Enabled":   cfg.Enabled,
+		"Paper":     cfg.Paper,
+		"EnvArmed":  envArmed,
+		"LiveArmed": cfg.Enabled && !cfg.Paper && envArmed,
+		// Computed with autotrade.BuildBook — the SAME function the executor
+		// gates on — so the panel cannot drift from what actually blocks a
+		// trade. candlesFor is already the panel's cached kline source.
+		"Book":            book,
+		"BookUnscored":    unscored,
+		"CapsEnforced":    true,
 		"Cooldown":        cooldown,
 		"CooldownUniform": cooldownUniform,
 		"MaxConc":         cfg.MaxConcurrentTotal,

@@ -41,6 +41,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		n = notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
 	}
 	state := map[string]*autoState{}
+	var halt haltState
 
 	tick := time.NewTicker(60 * time.Second)
 	defer tick.Stop()
@@ -56,6 +57,27 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			continue
 		}
 		live := cfg.LiveArmed()
+
+		// Global risk caps need a whole-book view, so assemble it ONCE per
+		// tick. The kline cache is shared with paperBlocked below, which
+		// otherwise refetches the same candles per rule.
+		now := time.Now().UTC()
+		kc := newKlineCache(ctx, client)
+		book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), kc.forFire, now)
+		logBook(book, cfg, unscored)
+
+		// The daily-loss breaker is a whole-executor stop, not a per-rule one:
+		// evaluate it before touching any rule so a halted day does no work
+		// and makes no API calls for triggers.
+		if v := autotrade.CheckCaps(cfg, book, 0); v.Halt {
+			if halt.announce(now) {
+				log.Printf("autoexec: HALTED — %s", v.Reason)
+				if n != nil {
+					_ = n.Push(ctx, "🛑 auto HALTED", v.Reason, "octagonal_sign")
+				}
+			}
+			continue
+		}
 
 		for i := range cfg.Rules {
 			r := cfg.Rules[i]
@@ -100,12 +122,27 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				if pos, perr := client.OpenPositions(ctx, sym); perr == nil && len(pos) > 0 {
 					continue
 				}
-			} else if paperBlocked(ctx, client, sym, r, barTime) {
+			} else if paperBlocked(kc, r, barTime) {
+				continue
+			}
+
+			// Global caps, with THIS rule's margin as the candidate. Checked
+			// after the per-rule guards so a rule that was going to be skipped
+			// anyway doesn't consume a slot in the reasoning, and re-checked
+			// per rule because an earlier rule in this same tick may have just
+			// taken the last slot.
+			if v := autotrade.CheckCaps(cfg, book, r.MarginUSDT); v.Blocked {
+				log.Printf("autoexec: %s %s/%s BLOCKED by caps — %s", r.Symbol, r.TF, r.Strategy, v.Reason)
 				continue
 			}
 
 			qty := r.MarginUSDT * float64(r.Leverage) / trig.Entry
 			st.lastFireBar = barTime
+			// Account for it immediately: buildBook only runs once per tick, so
+			// without this two rules firing in the same tick would both see an
+			// empty slot and the cap would be breached by one.
+			book.OpenCount++
+			book.OpenMargin += r.MarginUSDT
 			score := autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry)
 
 			if !live {
@@ -152,7 +189,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 // already holds a live position (the prior fire is still open/pending) or is inside
 // its post-stop cooldown. This makes paper behave like one-position-per-rule instead
 // of re-entering the same persistent setup on every bar close.
-func paperBlocked(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule, barTime time.Time) bool {
+func paperBlocked(kc *klineCache, r autotrade.Rule, barTime time.Time) bool {
 	var latest *autotrade.PaperFire
 	for _, f := range autotrade.ReadFires(300) { // newest-first
 		if f.Symbol == r.Symbol && f.Strategy == r.Strategy {
@@ -164,9 +201,11 @@ func paperBlocked(ctx context.Context, client *bingx.Client, sym market.Symbol, 
 	if latest == nil {
 		return false
 	}
-	cs, err := client.Klines(ctx, sym, market.Timeframe(r.TF), 300)
-	if err != nil {
-		return false // can't determine — don't block
+	// Shared with the tick's book assembly, so these candles are already
+	// fetched by the time we get here.
+	cs := kc.forFire(r.Symbol, r.TF)
+	if len(cs) == 0 {
+		return true // can't determine → assume still in a position (fail-safe)
 	}
 	oc := autotrade.EvaluateFire(*latest, cs, 6)
 	switch oc.Status {

@@ -275,10 +275,10 @@ func tfRank(tf market.Timeframe) int {
 // ─── Scanning ──────────────────────────────────────────────────────
 
 type tfHit struct {
-	TF       market.Timeframe
-	Sig      sig.Signal
-	Candle   time.Time // last closed bar's CloseTime
-	Validator float64  // validator.Result.Total at signal moment; 0 if minRatio gating disabled
+	TF        market.Timeframe
+	Sig       sig.Signal
+	Candle    time.Time // last closed bar's CloseTime
+	Validator float64   // validator.Result.Total at signal moment; 0 if minRatio gating disabled
 }
 
 // scanTick evaluates every (symbol, tf) in parallel, groups hits by

@@ -49,7 +49,9 @@ func runStructureAlerts(ctx context.Context, client interface {
 	check := func() {
 		for _, symbol := range market.All() {
 			short := shortOf[symbol]
-			if short == "" { short = string(symbol) }
+			if short == "" {
+				short = string(symbol)
+			}
 			for _, tf := range tfs {
 				candles, err := client.Klines(ctx, symbol, tf, 200)
 				if err != nil || len(candles) < 60 {

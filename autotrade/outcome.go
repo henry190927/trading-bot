@@ -21,10 +21,10 @@ const (
 // Outcome is the replayed result of one PaperFire.
 type Outcome struct {
 	Status     OutcomeStatus
-	NetR       float64   // realized R: tp = reward:risk (+), stop = -1, no-fill/open = 0
-	UnrealR    float64   // unrealized R for an OPEN trade, marked to the last close (0 otherwise)
-	FillPrice  float64   // = entry when filled
-	ExitPrice  float64   // stop/tp level, or last close if still open
+	NetR       float64 // realized R: tp = reward:risk (+), stop = -1, no-fill/open = 0
+	UnrealR    float64 // unrealized R for an OPEN trade, marked to the last close (0 otherwise)
+	FillPrice  float64 // = entry when filled
+	ExitPrice  float64 // stop/tp level, or last close if still open
 	FilledAt   time.Time
 	ExitAt     time.Time
 	BarsToFill int // closed bars from fire → fill
@@ -221,8 +221,8 @@ func EvaluateFireLive(f PaperFire, candles []market.Candle, expiryBars int, live
 // Position is one deduped position: the fire that opened it, its outcome, and how
 // many raw re-fires of the same still-live setup were absorbed into it.
 type Position struct {
-	Fire    PaperFire
-	Outcome Outcome
+	Fire     PaperFire
+	Outcome  Outcome
 	Absorbed int
 }
 

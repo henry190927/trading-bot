@@ -6285,6 +6285,9 @@ html[data-density="compact"] .setups-table {
     border-radius: var(--r-sm); padding: 1px 6px; margin-right: 0.4rem;
 }
 .ops-caps-vals { color: var(--text-dim); text-decoration: line-through; }
+.ops-caps-live { font-variant-numeric: tabular-nums; }
+.ops-caps-live strong { color: var(--text); }
+.ops-caps-warn { color: var(--yellow); font-weight: 700; }
 .ops-caps-note { margin-top: 0.3rem; line-height: 1.45; }
 .ops-na { color: var(--yellow); font-weight: 400; }
 

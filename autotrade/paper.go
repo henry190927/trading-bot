@@ -18,15 +18,15 @@ type PaperFire struct {
 	Strategy string    `json:"strategy"` // "range-edge" | "engine" — which A/B strategy fired this
 	Side     string    `json:"side"`
 	Market   bool      `json:"market"` // true = marketable entry (fills at fire), false = resting limit (pending until touched)
-	Entry  float64   `json:"entry"`
-	Stop   float64   `json:"stop"`
-	TP     float64   `json:"tp"`
-	Qty    float64   `json:"qty"`
-	Margin float64   `json:"margin"`
-	Lev    int       `json:"lev"`
-	Why    string    `json:"why"`
-	Score  float64   `json:"score,omitempty"` // validator structural-fit score /100 at fire time (0 = not scored / legacy)
-	Live   bool      `json:"live"` // false = paper, true = real order placed
+	Entry    float64   `json:"entry"`
+	Stop     float64   `json:"stop"`
+	TP       float64   `json:"tp"`
+	Qty      float64   `json:"qty"`
+	Margin   float64   `json:"margin"`
+	Lev      int       `json:"lev"`
+	Why      string    `json:"why"`
+	Score    float64   `json:"score,omitempty"` // validator structural-fit score /100 at fire time (0 = not scored / legacy)
+	Live     bool      `json:"live"`            // false = paper, true = real order placed
 }
 
 // PaperLogPath is the on-disk JSONL store (env AUTOTRADE_PAPER_LOG or default).
