@@ -238,7 +238,18 @@ func (s *server) handleOpsZones(c *gin.Context) {
 			}
 		}
 	}
-	armed := zone.LoadManual()
+	// "armed" must mean ARMED. runZoneAlerts skips any zone with an explicit
+	// enabled:false, so listing those here overstated the channel — 13 rows
+	// shown while 2 could fire. Retired zones are counted, not hidden.
+	var armed []zone.Zone
+	var retired int
+	for _, z := range zone.LoadManual() {
+		if z.Enabled != nil && !*z.Enabled {
+			retired++
+			continue
+		}
+		armed = append(armed, z)
+	}
 	if cfg.Enabled && cfg.Auto && s.client != nil {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
 		defer cancel()
@@ -251,6 +262,7 @@ func (s *server) handleOpsZones(c *gin.Context) {
 		"ntfy":    ntfyOn,
 		"poll":    "25s",
 		"armed":   armed,
+		"retired": retired,
 	})
 }
 
