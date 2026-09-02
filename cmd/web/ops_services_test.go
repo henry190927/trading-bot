@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -221,5 +222,42 @@ func TestHumanSince(t *testing.T) {
 		if got := humanSince(tc.d); got != tc.want {
 			t.Errorf("humanSince(%v) = %q, want %q", tc.d, got, tc.want)
 		}
+	}
+}
+
+// zoneOnlyActive decides whether /ops refuses to write monitor config and
+// bounce a live daemon for settings the running process cannot consume. Its
+// only input is .env, so drive it through TRADING_ENV_PATH.
+func TestZoneOnlyActive(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/.env"
+	t.Setenv("TRADING_ENV_PATH", path)
+
+	for _, tc := range []struct {
+		name, content string
+		want          bool
+	}{
+		{"set to 1", "A=1\nMONITOR_ZONE_ONLY=1\nB=2\n", true},
+		{"set to 0", "MONITOR_ZONE_ONLY=0\n", false},
+		{"blank value", "MONITOR_ZONE_ONLY=\n", false},
+		{"key absent entirely", "A=1\n", false},
+		// A trailing-space value must not read as enabled by accident.
+		{"whitespace around 1", "MONITOR_ZONE_ONLY= 1 \n", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if got := zoneOnlyActive(); got != tc.want {
+				t.Errorf("zoneOnlyActive() = %v, want %v for %q", got, tc.want, tc.content)
+			}
+		})
+	}
+
+	// An unreadable .env must not claim the gate is active — that would block
+	// config edits on a filesystem hiccup.
+	t.Setenv("TRADING_ENV_PATH", dir+"/does-not-exist")
+	if zoneOnlyActive() {
+		t.Error("missing .env should read false, not true")
 	}
 }

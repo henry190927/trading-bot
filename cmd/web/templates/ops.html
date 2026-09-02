@@ -107,7 +107,7 @@
       <span class="ops-state-label" data-role="zone-label">{{if .Zone.Enabled}}ARMED{{else}}DISABLED{{end}}</span>
       <span class="ops-state-flex"></span>
       <span class="ops-config-pill">auto <strong data-role="zone-auto">{{if .Zone.Auto}}on{{else}}off{{end}}</strong></span>
-      <span class="ops-config-pill">TFs <strong data-role="zone-tfs">{{.Zone.TFs}}</strong></span>
+      <span class="ops-config-pill" title="TFs 只餵給自動樞紐區推導 (zone.ComputeAuto);auto 關閉時不影響手動區">TFs <strong data-role="zone-tfs">{{.Zone.TFs}}</strong>{{if not .Zone.Auto}} <span class="ops-na">· auto 關閉,不適用</span>{{end}}</span>
       <span class="ops-config-pill">poll <strong data-role="zone-poll">25s</strong></span>
     </div>
     <div class="ops-zone-armed" data-role="zone-armed"><span class="ops-zone-hint">loading…</span></div>
@@ -187,6 +187,13 @@
 
 <section class="ops-block">
   <h2>trading-monitor config <span class="hint">(restarts monitor if running)</span></h2>
+  {{if .MonitorZoneOnly}}
+  <div class="ops-warn ops-inert-warn">
+    ⚠ <strong>目前無效</strong> — <code>MONITOR_ZONE_ONLY=1</code>,cmd/monitor 在 confluence 掃描迴圈之前就 return。
+    下面四個參數<strong>只有那個迴圈會讀</strong>,所以修改不會改變任何行為,而 Apply 會白白重啟 monitor
+    (中斷 autoexec / zonealert)。要調這些,先取消 <code>MONITOR_ZONE_ONLY</code>。
+  </div>
+  {{end}}
   <form id="ops-monitor-config-form" class="trade-form" onsubmit="return false;">
     <div class="field">
       <label>Monitored timeframes <span class="hint">(15m is poison per backtest — leave unchecked unless experimenting)</span></label>
@@ -216,7 +223,7 @@
       </div>
     </div>
     <div class="form-actions">
-      <button type="button" class="btn-primary" id="ops-monitor-apply-config">Apply monitor config</button>
+      <button type="button" class="btn-primary" id="ops-monitor-apply-config"{{if .MonitorZoneOnly}} disabled title="MONITOR_ZONE_ONLY=1 — 這些參數目前無效"{{end}}>Apply monitor config</button>
     </div>
   </form>
 </section>

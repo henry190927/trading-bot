@@ -6276,6 +6276,18 @@ html[data-density="compact"] .setups-table {
 .tf-bias-align.align-weak-long    { background: var(--wash-yellow); color: var(--yellow); }
 .tf-bias-align.align-weak-short   { background: var(--wash-yellow); color: var(--yellow); }
 
+/* /ops honesty markers — a control that reads as a guard but isn't wired, or
+   a config the running process can't consume. Yellow, never green. */
+.ops-inert-warn { margin-bottom: 0.6rem; line-height: 1.5; }
+.ops-caps-unenforced {
+    background: var(--wash-yellow); color: var(--yellow);
+    font-size: var(--fs-xs); font-weight: 700;
+    border-radius: var(--r-sm); padding: 1px 6px; margin-right: 0.4rem;
+}
+.ops-caps-vals { color: var(--text-dim); text-decoration: line-through; }
+.ops-caps-note { margin-top: 0.3rem; line-height: 1.45; }
+.ops-na { color: var(--yellow); font-weight: 400; }
+
 /* HVN target line in the /chart tf-bias panel (nearest chip-concentration
    above/below = target reference; read-aid #2). */
 .tf-bias-hvn {

@@ -113,9 +113,24 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		}
 		oldest[len(fires)-1-i] = f
 	}
-	cooldown := 6
-	if len(cfg.Rules) > 0 && cfg.Rules[0].CooldownBars > 0 {
-		cooldown = cfg.Rules[0].CooldownBars
+	// Cooldown is per-RULE, but the outcome replay below is one pass over all
+	// fires, so it needs a single value. Taking rules[0] silently presented one
+	// rule's setting as global — fine while every rule agrees, misleading the
+	// moment one doesn't. Use the max (the most conservative dedup) and report
+	// whether the rules actually agree so the panel can say so.
+	cooldown, cooldownUniform := 6, true
+	for i, r := range cfg.Rules {
+		if r.CooldownBars <= 0 {
+			continue
+		}
+		if i == 0 || r.CooldownBars == cooldown {
+			cooldown = r.CooldownBars
+			continue
+		}
+		cooldownUniform = false
+		if r.CooldownBars > cooldown {
+			cooldown = r.CooldownBars
+		}
 	}
 	resolve := func(f autotrade.PaperFire) autotrade.Outcome {
 		tf := tfFor(f)
@@ -150,17 +165,19 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	envArmed := strings.EqualFold(strings.TrimSpace(os.Getenv("AUTOTRADE_ENABLED")), "true")
 
 	c.HTML(http.StatusOK, "autotrade.html", gin.H{
-		"Enabled":    cfg.Enabled,
-		"Paper":      cfg.Paper,
-		"EnvArmed":   envArmed,
-		"LiveArmed":  cfg.Enabled && !cfg.Paper && envArmed,
-		"MaxConc":    cfg.MaxConcurrentTotal,
-		"MaxMargin":  cfg.MaxMarginTotalUSDT,
-		"DailyHaltR": cfg.DailyLossHaltR,
-		"Rules":      cfg.Rules,
-		"Fires":      rows,
-		"Sum":        sum,
-		"ConfigPath": autotrade.Path(),
-		"UpdatedUTC": time.Now().In(tpe).Format("2006-01-02 15:04 UTC+8"),
+		"Enabled":         cfg.Enabled,
+		"Paper":           cfg.Paper,
+		"EnvArmed":        envArmed,
+		"LiveArmed":       cfg.Enabled && !cfg.Paper && envArmed,
+		"Cooldown":        cooldown,
+		"CooldownUniform": cooldownUniform,
+		"MaxConc":         cfg.MaxConcurrentTotal,
+		"MaxMargin":       cfg.MaxMarginTotalUSDT,
+		"DailyHaltR":      cfg.DailyLossHaltR,
+		"Rules":           cfg.Rules,
+		"Fires":           rows,
+		"Sum":             sum,
+		"ConfigPath":      autotrade.Path(),
+		"UpdatedUTC":      time.Now().In(tpe).Format("2006-01-02 15:04 UTC+8"),
 	})
 }

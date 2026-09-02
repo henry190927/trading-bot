@@ -136,6 +136,21 @@ func readDaemonStatus(service string) opsStatus {
 	return st
 }
 
+// zoneOnlyActive reports whether MONITOR_ZONE_ONLY=1 is set in .env, i.e.
+// whether cmd/monitor short-circuits before the confluence loop.
+func zoneOnlyActive() bool {
+	data, err := os.ReadFile(envPath())
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "MONITOR_ZONE_ONLY=") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "MONITOR_ZONE_ONLY=")) == "1"
+		}
+	}
+	return false
+}
+
 // parseService extracts and validates the ?service= query param.
 // Defaults to trading-bot for backwards compatibility with existing
 // /ops/* calls that don't pass a service.
@@ -202,7 +217,20 @@ func systemctlAction(service, action string) error {
 // Both services are rendered side-by-side at first paint; the JS polls
 // each independently to refresh.
 func (s *server) handleOpsPage(c *gin.Context) {
+	// MONITOR_ZONE_ONLY=1 makes cmd/monitor return before the confluence loop,
+	// which is the ONLY consumer of MONITOR_TFS / MIN_SCORE / MIN_TFS /
+	// MIN_RATIO. The form below therefore writes .env and restarts a live
+	// daemon for zero behavioural change — so the page needs to know.
+	zoneOnly := false
+	if data, err := os.ReadFile(envPath()); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "MONITOR_ZONE_ONLY=") {
+				zoneOnly = strings.TrimSpace(strings.TrimPrefix(line, "MONITOR_ZONE_ONLY=")) == "1"
+			}
+		}
+	}
 	c.HTML(http.StatusOK, "ops.html", gin.H{
+		"MonitorZoneOnly":  zoneOnly,
 		"Primary":          readDaemonStatus("trading-bot"),
 		"Monitor":          readDaemonStatus("trading-monitor"),
 		"ValidTFs":         validTFs,
@@ -496,6 +524,15 @@ func (s *server) opsConfigMonitor(c *gin.Context) {
 		return
 	}
 
+	// Refuse rather than restart a live daemon for nothing. The UI disables the
+	// button too, but the endpoint is the real gate — a stale tab must not be
+	// able to bounce autoexec/zonealert for a config that cannot apply.
+	if zoneOnlyActive() {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "MONITOR_ZONE_ONLY=1 — 這些參數只有 confluence 掃描迴圈會讀,而該迴圈目前未啟動。改動不會生效,且 Apply 會白白重啟 monitor。先取消 MONITOR_ZONE_ONLY 再設定。",
+		})
+		return
+	}
 	if err := updateMonitorEnvConfig(selectedTFs, score, mtfs, ratioPtr); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

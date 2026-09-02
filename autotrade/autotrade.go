@@ -15,17 +15,26 @@ import (
 
 // Rule is one per-symbol auto-trade setup the user pre-fills once.
 type Rule struct {
-	Enabled       bool    `json:"enabled"`
-	Symbol        string  `json:"symbol"`   // BTC / ETH / SOL / ...
-	Strategy      string  `json:"strategy"` // "range-edge" | "zone-retrace" | "struct-momentum"
-	TF            string  `json:"tf"`       // "1h" etc
-	Side          string  `json:"side"`     // "long" | "short" | "auto"
-	MarginUSDT    float64 `json:"margin_usdt"`
-	Leverage      int     `json:"leverage"`
-	MaxConcurrent int     `json:"max_concurrent"`       // per-symbol
-	StopPct       float64 `json:"stop_pct"`             // buffer beyond box/structure for the stop
-	CooldownBars  int     `json:"cooldown_bars_after_stop"`
-	RequireAligned bool   `json:"require_aligned"`
+	Enabled      bool    `json:"enabled"`
+	Symbol       string  `json:"symbol"`   // BTC / ETH / SOL / ...
+	Strategy     string  `json:"strategy"` // "range-edge" | "zone-retrace" | "struct-momentum"
+	TF           string  `json:"tf"`       // "1h" etc
+	Side         string  `json:"side"`     // "long" | "short" | "auto"
+	MarginUSDT   float64 `json:"margin_usdt"`
+	Leverage     int     `json:"leverage"`
+	StopPct      float64 `json:"stop_pct"` // buffer beyond box/structure for the stop; ONLY the range-edge path reads it — the engine/sweep-reject/htf-snr paths use their own Plan.StopLoss
+	CooldownBars int     `json:"cooldown_bars_after_stop"`
+
+	// REMOVED 2026-09-02, do not re-add without an implementation:
+	//   MaxConcurrent  (per-symbol) — had zero consumers anywhere. One position
+	//     per RULE is already enforced structurally (live: client.OpenPositions,
+	//     paper: paperBlocked), so the value 1 matched behaviour by accident and
+	//     any other value would have done nothing.
+	//   RequireAligned — had zero consumers anywhere, while every rule set it
+	//     true, so it read as a TF-alignment safety filter and was decoration.
+	//     Note that gating range-edge on trend/alignment was A/B-tested on
+	//     2026-08-27 and made results WORSE in every window, so this is not a
+	//     missing feature — it is a knob that should never have been declared.
 }
 
 // Config is the whole auto-executor config (autotrade.json).
