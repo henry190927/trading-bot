@@ -132,6 +132,12 @@ func shortSymbol(s market.Symbol) string {
 		return "ETH"
 	case market.SNDKUSDT:
 		return "SNDK"
+	case market.SPCXUSDT:
+		return "SPCX"
+	case market.MSTRUSDT:
+		return "MSTR"
+	case market.APPUSDT:
+		return "APP"
 	case market.NVDAUSDT:
 		return "NVDA"
 	case market.SOLUSDT:
@@ -1107,6 +1113,8 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 // The JS PnL preview mirrors this map; keep them in sync if BingX changes.
 var qtyPrecision = map[string]int{
 	"BTC": 4, "ETH": 2, "XAU": 4, "XAG": 4, "SNDK": 5, "NVDA": 3,
+	// From cmd/contracts (quantityPrecision), 2026-09-04.
+	"SPCX": 5, "MSTR": 3, "APP": 3,
 }
 
 func floorTo(v float64, decimals int) float64 {
@@ -3306,6 +3314,12 @@ func resolveWebSymbol(s string) (market.Symbol, error) {
 		return market.XAGUSDT, nil
 	case "SNDK":
 		return market.SNDKUSDT, nil
+	case "SPCX":
+		return market.SPCXUSDT, nil
+	case "MSTR":
+		return market.MSTRUSDT, nil
+	case "APP":
+		return market.APPUSDT, nil
 	case "NVDA":
 		return market.NVDAUSDT, nil
 	case "SOL":
@@ -3339,13 +3353,13 @@ func techSideStr(s signal.Side) string {
 // then the forward-log symbols (stock synthetics + crypto-alt StructMomentum
 // candidates). NOT the same as market.All() — the forward-log ones stay out of
 // the daemon scan + ntfy until live data clears the ship-gate.
-var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SOL", "LINK", "SUI", "HYPE", "NEAR"}
+var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SPCX", "MSTR", "APP", "SOL", "LINK", "SUI", "HYPE", "NEAR"}
 
 // Forward-log groups shown as separate labelled sections on the Scan dashboard
 // (each scanned via scanOne, none in market.All()). Stocks get the fundamental
 // overlay; alts run their assigned strategy (StructMomentum for SOL/LINK/SUI/
 // HYPE per strategyFor, MR for NEAR).
-var fwdStockSymbols = []string{"SNDK", "NVDA"}
+var fwdStockSymbols = []string{"SNDK", "NVDA", "SPCX", "MSTR", "APP"}
 var fwdAltSymbols = []string{"SOL", "LINK", "SUI", "HYPE", "NEAR"}
 
 func defaultStr(v, fallback string) string {

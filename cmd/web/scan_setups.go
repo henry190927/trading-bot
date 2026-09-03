@@ -267,6 +267,7 @@ func webScanSymbol(short string) (market.Symbol, bool) {
 	m := map[string]market.Symbol{
 		"BTC": market.BTCUSDT, "ETH": market.ETHUSDT, "XAU": market.XAUUSDT, "XAG": market.XAGUSDT,
 		"SNDK": market.SNDKUSDT, "NVDA": market.NVDAUSDT,
+		"SPCX": market.SPCXUSDT, "MSTR": market.MSTRUSDT, "APP": market.APPUSDT,
 		"SOL": market.SOLUSDT, "LINK": market.LINKUSDT, "SUI": market.SUIUSDT, "NEAR": market.NEARUSDT, "HYPE": market.HYPEUSDT,
 	}
 	sym, ok := m[short]

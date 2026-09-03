@@ -416,7 +416,7 @@ func symbolCategory(short string) string {
 	switch short {
 	case "XAU", "XAG":
 		return "metal"
-	case "SNDK", "NVDA":
+	case "SNDK", "NVDA", "SPCX", "MSTR", "APP":
 		return "stock"
 	default:
 		return "crypto"

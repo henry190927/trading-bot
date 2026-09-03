@@ -23,6 +23,14 @@ const (
 	// survivors). See isStructureVetoSymbol / isStructureZoneVoteSymbol.
 	SNDKUSDT Symbol = "NCSKSNDK2USD-USDT"
 	NVDAUSDT Symbol = "NCSKNVDA2USD-USDT"
+	// Added 2026-09-04 after a 4-arm x 3-window strategy-fit A/B. Codes read
+	// off BingX's contract list with cmd/contracts, never inferred: the
+	// prefix varies by asset class (NCSK stocks, NCCO commodities, NCSI
+	// indices) and the ticker sits mid-string, so a guessed code resolves to
+	// nothing and fails silently.
+	SPCXUSDT Symbol = "NCSKSPCX2USD-USDT" // SpaceX
+	MSTRUSDT Symbol = "NCSKMSTR2USD-USDT" // MicroStrategy — the BTC-correlated one
+	APPUSDT  Symbol = "NCSKAPP2USD-USDT"  // AppLovin
 
 	// Crypto-alt forward-log symbols (StructMomentum thread). Same discipline
 	// as the stock synthetics: DELIBERATELY NOT in All() (out of daemon/ntfy)

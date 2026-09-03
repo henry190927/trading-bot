@@ -1008,7 +1008,21 @@ func isStructureVetoSymbol(s market.Symbol) bool {
 	}
 	// SNDK: counter-trend structure veto was the robust 2026-08-15 A/B
 	// survivor (+7.4/+5.8/+4.9R across 60/90/120d). Forward-log only.
-	return isPreciousMetal(s) || s == market.SNDKUSDT
+	//
+	// SPCX + MSTR added 2026-09-04. Both cleared the gate (netR positive in
+	// ALL of 60/90/120d) on mr+veto, and it was their best arm by R/trade:
+	//
+	//	SPCX  +7.94/+9.59/+5.87   R/trade +0.259  WR 52%
+	//	MSTR  +8.34/+7.42/+3.92   R/trade +0.371  WR 54%
+	//
+	// MSTR is the sharper case: plain MR is MIXED there (-2.29/+3.28/+0.83)
+	// and the zone vote is negative in every window, so the veto is not a
+	// marginal improvement — it is the only arm that works. Equity synthetics
+	// keep preferring the counter-trend veto, which is the same result SNDK
+	// gave. APP is deliberately NOT here: it fails every MR arm badly and
+	// belongs on sweep-reject instead (see autotrade.json).
+	return isPreciousMetal(s) || s == market.SNDKUSDT ||
+		s == market.SPCXUSDT || s == market.MSTRUSDT
 }
 
 // isStructureZoneVoteSymbol returns true for symbols where the N 字
@@ -1084,6 +1098,12 @@ func shortName(s market.Symbol) string {
 		return "XAG"
 	case market.SNDKUSDT:
 		return "SNDK"
+	case market.SPCXUSDT:
+		return "SPCX"
+	case market.MSTRUSDT:
+		return "MSTR"
+	case market.APPUSDT:
+		return "APP"
 	case market.NVDAUSDT:
 		return "NVDA"
 	case market.SOLUSDT:

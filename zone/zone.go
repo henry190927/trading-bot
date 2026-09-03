@@ -155,12 +155,14 @@ var ShortToSym = map[string]market.Symbol{
 	"BTC": market.BTCUSDT, "ETH": market.ETHUSDT,
 	"XAU": market.XAUUSDT, "XAG": market.XAGUSDT,
 	"SNDK": market.SNDKUSDT, "NVDA": market.NVDAUSDT,
+	"SPCX": market.SPCXUSDT, "MSTR": market.MSTRUSDT, "APP": market.APPUSDT,
 }
 
 var SymToShort = map[market.Symbol]string{
 	market.BTCUSDT: "BTC", market.ETHUSDT: "ETH",
 	market.XAUUSDT: "XAU", market.XAGUSDT: "XAG",
 	market.SNDKUSDT: "SNDK", market.NVDAUSDT: "NVDA",
+	market.SPCXUSDT: "SPCX", market.MSTRUSDT: "MSTR", market.APPUSDT: "APP",
 }
 
 // Path — zones.json location (ZONES_PATH env override).

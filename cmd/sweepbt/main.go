@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"myFirstGo/trading-bot/autotrade"
@@ -42,6 +43,7 @@ func main() {
 	// one-position slot, so different, later fires enter that were never in
 	// that bucket (60d SOL: gated n=40 vs openbt mixed n=20). A bucket split
 	// does not transfer to a strategy change under a one-position constraint.
+	symbols := flag.String("symbols", "", "comma-separated symbols to test instead of the default universe; accepts short names (BTC) or raw contract codes (NCSKSPCX2USD-USDT)")
 	openGate := flag.Bool("open-gate", false, "A/B (c): only fire when entry sits BETWEEN the daily and weekly open (the \"mixed\" bucket cmd/openbt found best). Suppresses fires beyond BOTH opens.")
 	flag.Parse()
 
@@ -53,6 +55,29 @@ func main() {
 		short string
 		sym   market.Symbol
 	}{{"BTC", market.BTCUSDT}, {"ETH", market.ETHUSDT}, {"SOL", market.SOLUSDT}, {"LINK", market.LINKUSDT}, {"SUI", market.SUIUSDT}, {"NEAR", market.NEARUSDT}}
+	// --symbols vets candidates without touching the default universe. Codes
+	// may be short names or raw contract codes, so an equity synthetic
+	// (NCSKSPCX2USD-USDT) can be A/B'd before it is added anywhere.
+	if strings.TrimSpace(*symbols) != "" {
+		syms = syms[:0]
+		for _, tok := range strings.Split(*symbols, ",") {
+			tok = strings.ToUpper(strings.TrimSpace(tok))
+			if tok == "" {
+				continue
+			}
+			code := tok
+			short := tok
+			if !strings.Contains(tok, "-USDT") {
+				code = tok + "-USDT"
+			} else if i := strings.Index(tok, "2USD-USDT"); i > 4 {
+				short = strings.TrimPrefix(tok[:i], "NCSK")
+			}
+			syms = append(syms, struct {
+				short string
+				sym   market.Symbol
+			}{short, market.Symbol(code)})
+		}
+	}
 
 	fmt.Printf("=== sweep-reject A/B · %dd · %s · tol %.2f%% · stop=sweep+%.2fATR · TP %.1fR ===\n", *days, *tfStr, *tol, *bufATR, *rMult)
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
