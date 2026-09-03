@@ -102,17 +102,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// fire log into realistic one-position-per-rule trades (a persistent setup that
 	// re-fired every bar is ONE position, not N). fires come newest-first; DedupFires
 	// wants oldest-first.
-	oldest := make([]autotrade.PaperFire, len(fires))
-	for i, f := range fires {
-		if f.Strategy == "" {
-			if strings.HasPrefix(f.Why, "engine") {
-				f.Strategy = "engine"
-			} else {
-				f.Strategy = "range-edge"
-			}
-		}
-		oldest[len(fires)-1-i] = f
-	}
+	oldest := reverseNormalised(fires)
 	// Cooldown is per-RULE, but the outcome replay below is one pass over all
 	// fires, so it needs a single value. Taking rules[0] silently presented one
 	// rule's setting as global — fine while every rule agrees, misleading the
@@ -142,6 +132,16 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		return autotrade.EvaluateFireLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
 	}
 	positions := autotrade.DedupFires(oldest, 6, cooldown, time.Hour, resolve)
+
+	// Portfolio views (equity / calendar / distribution) run over the FULL log
+	// depth the executor reads, not the 60-row display slice — a curve built
+	// from the visible page would silently restart every time the log grew.
+	// Same three builders the journal uses (rstats.go), so the two surfaces
+	// cannot render "cumulative R" two different ways.
+	statPositions := autotrade.DedupFires(
+		reverseNormalised(autotrade.ReadFires(500)), 6, cooldown, time.Hour, resolve)
+	statTrades, statUnscoreable := rTradesFromPositions(statPositions)
+	statOpenR, statOpenN := openUnrealR(statPositions)
 
 	var rows []fireRow
 	var outs []autotrade.Outcome
@@ -188,7 +188,35 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"Rules":           cfg.Rules,
 		"Fires":           rows,
 		"Sum":             sum,
+		"Equity":          buildEquityCurve(statTrades),
+		"Histogram":       buildRHistogram(statTrades),
+		"Calendar":        buildDailyCalendar(statTrades, 42),
+		"StatN":           len(statTrades),
+		// perfPanels labels its distribution panel with .ClosedCount.
+		"ClosedCount":     len(statTrades),
+		"StatUnscoreable": statUnscoreable,
+		"StatOpenR":       statOpenR,
+		"StatOpenN":       statOpenN,
 		"ConfigPath":      autotrade.Path(),
 		"UpdatedUTC":      time.Now().In(tpe).Format("2006-01-02 15:04 UTC+8"),
 	})
+}
+
+// reverseNormalised backfills the strategy field on records that predate it,
+// then flips the newest-first log into the oldest-first order DedupFires
+// needs. Shared by the display list and the portfolio views so the two can
+// never normalise the same log differently.
+func reverseNormalised(fires []autotrade.PaperFire) []autotrade.PaperFire {
+	out := make([]autotrade.PaperFire, len(fires))
+	for i, f := range fires {
+		if f.Strategy == "" {
+			if strings.HasPrefix(f.Why, "engine") {
+				f.Strategy = "engine"
+			} else {
+				f.Strategy = "range-edge"
+			}
+		}
+		out[len(fires)-1-i] = f
+	}
+	return out
 }

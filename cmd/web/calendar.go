@@ -30,6 +30,10 @@ type calEvent struct {
 	Impact   string // data releases only: High / Medium
 	Forecast string // data releases only
 	Previous string // data releases only
+	// Speaker promotes central-bank speech past the feed's own rating. The
+	// feed calls "FOMC Member Waller Speaks" LOW impact; rendering it as low
+	// priority is how it got overlooked on 2026-09-03.
+	Speaker bool
 }
 
 type calMonth struct {
@@ -123,16 +127,27 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 		if e.Country != "" && e.Country != "USD" {
 			name = e.Country + " · " + name
 		}
+		cat := "data"
+		if e.Speaker {
+			cat = "speech"
+		}
+		// A speech has no release instant to be "30 minutes past" — remarks and
+		// the Q&A that follows run long, and the tape keeps moving with them.
+		active := 30 * time.Minute
+		if e.Speaker {
+			active = 90 * time.Minute
+		}
 		ev := calEvent{
 			Name:     name,
-			Cat:      "data",
+			Cat:      cat,
 			WhenUTC:  e.DatetimeUTC.Format("Jan 02 15:04"),
 			WhenTPE:  e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
 			Window:   e.Impact,
-			Status:   statusOf(e.DatetimeUTC, e.DatetimeUTC.Add(30*time.Minute)),
+			Status:   statusOf(e.DatetimeUTC, e.DatetimeUTC.Add(active)),
 			Impact:   e.Impact,
 			Forecast: e.Forecast,
 			Previous: e.Previous,
+			Speaker:  e.Speaker,
 		}
 		if ev.Status == "upcoming" {
 			ev.Days = int(e.DatetimeUTC.Sub(now).Hours() / 24)

@@ -26,8 +26,10 @@
     {{if .Recorded}}<div class="cal-banner next">✓ <span class="i18n-en">Recorded setup</span><span class="i18n-zh">已記錄 setup</span> #{{.Recorded}} → <a href="/setups">/setups</a></div>{{end}}
     {{if .RecErr}}<div class="cal-banner active">⚠ <span class="i18n-en">record failed</span><span class="i18n-zh">記錄失敗</span></div>{{end}}
     <div class="at-state">
-      <span class="badge {{if .FiringN}}b-green{{else}}b-dim{{end}}">{{.FiringN}} <span class="i18n-en">firing now</span><span class="i18n-zh">正在觸發</span></span>
-      <span class="badge b-dim">{{.Watching}} <span class="i18n-en">rules watching</span><span class="i18n-zh">規則監控中</span></span>
+      <span class="badge {{if .FiringN}}b-green{{else}}b-dim{{end}}">{{.FiringN}} <span class="i18n-en">armed &amp; firing</span><span class="i18n-zh">上膛且觸發</span></span>
+      <span class="badge b-dim">{{.Watching}} <span class="i18n-en">rules armed</span><span class="i18n-zh">規則上膛中</span></span>
+      <span class="badge {{if .UnarmedFireN}}b-yellow{{else}}b-dim{{end}}">{{.UnarmedFireN}} <span class="i18n-en">firing but UNARMED</span><span class="i18n-zh">觸發但沒上膛</span></span>
+      <span class="badge b-dim">{{.GridN}} <span class="i18n-en">cells scanned</span><span class="i18n-zh">格子已掃</span></span>
     </div>
 
     {{if .Firing}}
@@ -69,27 +71,76 @@
     </table>
     </div>
     {{else}}
-    <p class="empty"><span class="i18n-en">Nothing setting up right now — all rules are watching but none triggered on the current closed bar. Check back after the next close.</span><span class="i18n-zh">現在沒有 setup —— 規則都在監控,但當前收 K 沒有觸發。下一根收盤後再看。</span></p>
+    <p class="empty"><span class="i18n-en">Nothing setting up right now — all rules are watching but none triggered on the current closed bar. Check back after the next close.</span><span class="i18n-zh">上膛的規則都沒有觸發（當前收 K）。下一根收盤後再看 —— 下面「未上膛」那區可能還有東西。</span></p>
     {{end}}
 
-    <h2 class="section-title" style="margin-top:1rem"><span class="i18n-en">All rules (watching)</span><span class="i18n-zh">全部規則(監控中)</span></h2>
+    {{if .UnarmedFiring}}
+    {{/* Kept in a SEPARATE table from the armed rows on purpose. Mixing them
+         would read as "the system will take these", when nothing is watching
+         half of them. This section is exactly the 30-of-44 grid the page used
+         to omit entirely. */}}
+    <h2 class="section-title" style="margin-top:1rem">🟡 <span class="i18n-en">Setting up, but auto is NOT armed here</span><span class="i18n-zh">有 setup,但 auto 沒有這條規則</span></h2>
+    <p class="glossary-hint" style="margin:-.2rem 0 .5rem">
+      <span class="i18n-en">These strategy/symbol combinations are not in autotrade.json, so <b>nothing will fire</b> — they are read-only ideas. Unarmed cells default to 1h and borrow the strategy's configured stop settings.</span>
+      <span class="i18n-zh">這些 策略/標的 組合<b>不在</b> autotrade.json 裡,所以<b>不會有任何單</b> —— 純讀的想法。未上膛的格子預設 1h,停損設定沿用該策略已設定的值。</span>
+    </p>
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>rule-side</th><th>status</th></tr></thead>
+      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>side</th><th title="validator /100">評分</th><th>entry</th><th>stop</th><th>tp</th><th>R:R</th><th>mode</th><th>記</th><th>why</th></tr></thead>
       <tbody>
-        {{range .Rows}}
-        <tr>
-          <td><strong>{{.Symbol}}</strong></td>
+        {{range .UnarmedFiring}}
+        <tr style="opacity:.82">
+          <td><strong>{{.Symbol}}</strong> <span class="badge b-dim" title="autotrade.json 沒有這條規則">未上膛</span></td>
           <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
           <td class="cs-dim">{{.TF}}</td>
-          <td class="cs-dim">{{.RuleSide}}</td>
-          <td>{{if .Fire}}<span class="badge b-green">🟢 {{.Side}} setup</span>{{else}}<span class="cs-dim">— 監控中</span>{{end}}</td>
+          <td class="dir-{{.Side}}">{{.Side}}</td>
+          <td class="num">{{if .Score}}<span style="color:{{if ge .Score 60.0}}var(--green){{else if lt .Score 40.0}}var(--red){{else}}var(--text){{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td class="num">{{printf "%.4f" .Entry}}</td>
+          <td class="num">{{printf "%.4f" .Stop}}</td>
+          <td class="num">{{printf "%.4f" .TP}}</td>
+          <td class="num">{{printf "%.1f" .RR}}</td>
+          <td>{{if .Market}}<span class="badge b-yellow">market</span>{{else}}<span class="badge b-blue">limit</span>{{end}}</td>
+          <td>
+            <form method="post" action="/scan/record" style="margin:0">
+              <input type="hidden" name="symbol" value="{{.Symbol}}">
+              <input type="hidden" name="tf" value="{{.TF}}">
+              <input type="hidden" name="strategy" value="{{.Strategy}}">
+              <input type="hidden" name="side" value="{{.Side}}">
+              <input type="hidden" name="entry" value="{{printf "%.4f" .Entry}}">
+              <input type="hidden" name="stop" value="{{printf "%.4f" .Stop}}">
+              <input type="hidden" name="tp" value="{{printf "%.4f" .TP}}">
+              <input type="hidden" name="score" value="{{printf "%.0f" .Score}}">
+              <input type="hidden" name="why" value="unarmed · {{.Why}}">
+              <button type="submit" class="setup-skip" title="記進 /setups forward-log">⚑ 記</button>
+            </form>
+          </td>
+          <td class="cs-dim">{{.Why}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
     </div>
-    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span class="i18n-en">cached 20s · read-only preview of what the auto rules would place · not the paper log (that's <a href="/ops/autotrade">/ops/autotrade</a>)</span><span class="i18n-zh">快取 20s · 這是 auto 規則「會下什麼」的唯讀預覽 · 不是已開單紀錄(那在 <a href="/ops/autotrade">/ops/autotrade</a>)</span></p>
+    {{end}}
+
+    <h2 class="section-title" style="margin-top:1rem"><span class="i18n-en">Whole grid</span><span class="i18n-zh">全部格子</span> <span class="section-meta">{{.Watching}} armed · {{.UnarmedN}} unarmed</span></h2>
+    <div class="dt-scroll">
+    <table class="dt">
+      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>auto</th><th>rule-side</th><th>status</th></tr></thead>
+      <tbody>
+        {{range .Rows}}
+        <tr{{if not .Armed}} style="opacity:.65"{{end}}>
+          <td><strong>{{.Symbol}}</strong></td>
+          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
+          <td class="cs-dim">{{.TF}}</td>
+          <td>{{if .Armed}}<span class="badge b-green" title="autotrade.json 有這條規則,會真的下單">上膛</span>{{else}}<span class="badge b-dim" title="沒有規則 — 純讀,不會下單">未上膛</span>{{end}}</td>
+          <td class="cs-dim">{{.RuleSide}}</td>
+          <td>{{if .Fire}}<span class="badge {{if .Armed}}b-green{{else}}b-yellow{{end}}">{{if .Armed}}🟢{{else}}🟡{{end}} {{.Side}} setup</span>{{else}}<span class="cs-dim">— 監控中</span>{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span class="i18n-en">cached 20s · read-only preview of what the auto rules would place · not the paper log (that's <a href="/ops/autotrade">/ops/autotrade</a>)</span><span class="i18n-zh">快取 20s · 唯讀預覽 · <b>上膛</b>=autotrade.json 有規則,會真的下單;<b>未上膛</b>=只是評估,不會有單 · 已開單紀錄在 <a href="/ops/autotrade">/ops/autotrade</a></span></p>
   </div>
 </main>
 </body>

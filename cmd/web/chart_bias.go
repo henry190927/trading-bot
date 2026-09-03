@@ -424,19 +424,33 @@ func symbolCategory(short string) string {
 }
 
 // handleTickers — GET /api/tickers
+//
+// Kept as the polling fallback for clients without EventSource, and as the
+// data source the SSE hub broadcasts (see stream.go). The build itself lives
+// in buildTickers so the two transports cannot serve different numbers.
 func (s *server) handleTickers(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	c.JSON(http.StatusOK, s.tickerSnapshot(ctx))
+}
+
+// tickerSnapshot returns the cached snapshot when it is still fresh, else
+// rebuilds it. The cache is what keeps N pollers from becoming N fan-outs.
+func (s *server) tickerSnapshot(ctx context.Context) gin.H {
 	tickerCacheMu.Lock()
 	if tickerCache.resp != nil && time.Since(tickerCache.at) < tickerCacheTTL {
 		resp := tickerCache.resp
 		tickerCacheMu.Unlock()
-		c.JSON(http.StatusOK, resp)
-		return
+		return resp
 	}
 	tickerCacheMu.Unlock()
+	return s.buildTickers(ctx)
+}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
-	defer cancel()
-
+// buildTickers fans out across the symbol set and assembles one snapshot,
+// then stores it in the shared cache. Always does the work — callers that
+// want the cache should go through tickerSnapshot.
+func (s *server) buildTickers(ctx context.Context) gin.H {
 	// Fan out across the (now larger) symbol set so the strip stays snappy —
 	// each symbol is 2 API calls (mark + klines); sequential over 11 symbols
 	// would crawl. Output order is preserved by index.
@@ -449,10 +463,12 @@ func (s *server) handleTickers(c *gin.Context) {
 			row := gin.H{"symbol": short, "cat": symbolCategory(short)}
 			sym, err := resolveWebSymbol(short)
 			if err == nil && s.client != nil {
-				// Price = live mark, SAME source as the chart header, so the
-				// ticker and the header never disagree. Klines are only for the
-				// 24h reference close (change %) + 24h range. Funding is free
-				// (same FundingRate call) — surfaced for the market-overview table.
+				// Price = live mark. The chart header now reads the same mark
+				// (it used to prefer the forming kline's close, which lags and
+				// sticks — measured 8-14 pts behind on BTC 2026-09-03, which is
+				// what made the strip and the header disagree). Klines are only
+				// for the 24h reference + range. Funding is free (same
+				// FundingRate call) — surfaced for the market-overview table.
 				price := 0.0
 				if fr, ferr := s.client.FundingRate(ctx, sym); ferr == nil && fr.MarkPrice > 0 {
 					price = fr.MarkPrice
@@ -463,9 +479,15 @@ func (s *server) handleTickers(c *gin.Context) {
 					if price == 0 {
 						price = ks[len(ks)-1].Close // mark fetch failed — fall back to last close
 					}
-					ref := ks[0].Close
+					// Reference = the OPEN of the bar 24h back, not its close.
+					// On a 1h series that bar's open IS the price 24h ago,
+					// while its close is the price 23h ago — and the header
+					// tile computes its change % from that same open, so
+					// using Close here made the two show different percentages
+					// next to each other.
+					ref := ks[0].Open
 					if j := len(ks) - 1 - 24; j >= 0 {
-						ref = ks[j].Close
+						ref = ks[j].Open
 					}
 					if ref > 0 && price > 0 {
 						row["changePct"] = (price - ref) / ref * 100
@@ -499,5 +521,5 @@ func (s *server) handleTickers(c *gin.Context) {
 	tickerCacheMu.Lock()
 	tickerCache = tickerCacheT{at: time.Now(), resp: resp}
 	tickerCacheMu.Unlock()
-	c.JSON(http.StatusOK, resp)
+	return resp
 }

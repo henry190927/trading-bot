@@ -812,7 +812,60 @@
         upColor: '#26a69a', downColor: '#ef5350',
         borderUpColor: '#26a69a', borderDownColor: '#ef5350',
         wickUpColor: '#26a69a',   wickDownColor: '#ef5350',
+        // LWC's built-in price line and last-value axis badge are drawn from
+        // the last BAR'S CLOSE. BingX aggregates the forming bar, so that
+        // value lags the mark by up to ~14 pts and visibly sticks — the same
+        // defect fixed in applyHeader. Leaving them on would put the canvas
+        // line and the header tile on two different numbers. Both are off;
+        // livePriceLine below replaces them, driven by markPrice.
+        priceLineVisible: false,
+        lastValueVisible: false,
     });
+
+    // The live price line + axis badge, driven by the SAME markPrice the
+    // header tile and the top ticker show. Updated in place via
+    // applyOptions rather than removed/recreated each 2s poll, so the label
+    // doesn't flicker and no line objects leak. Colour follows the forming
+    // bar's direction, matching what LWC's native line did.
+    // The FORMING candle comes from BingX's kline aggregate — the same slow,
+    // sticky source the price line was moved off of. Once the line tracks the
+    // mark, the candle tip visibly trails it (reported 2026-09-03). Patch the
+    // forming bar's close, stretching its high/low to contain the mark, so
+    // the wick tip and the line stay together — what an exchange UI does when
+    // it updates the live candle from its trade stream.
+    //
+    // Only ever touches the LAST bar, and only while that bar's own window
+    // still contains now, so a CLOSED bar is never rewritten. Display only:
+    // the engine evaluates closed bars server-side, so backtest parity is
+    // untouched (feedback-engine-closed-bar-only).
+    function patchFormingBar(candles, mark) {
+        if (!mark || isNaN(mark) || mark <= 0) return candles;
+        if (!candles || candles.length < 2) return candles;
+        var n = candles.length, last = candles[n - 1];
+        var barDur = last.time - candles[n - 2].time;
+        if (!(barDur > 0)) return candles;
+        if (Date.now() / 1000 >= last.time + barDur) return candles; // already closed
+        last.close = mark;
+        if (mark > last.high) last.high = mark;
+        if (mark < last.low)  last.low  = mark;
+        return candles;
+    }
+
+    var livePriceLine = null;
+    function applyLivePriceLine(px, lastBar) {
+        if (px == null || isNaN(px) || px <= 0) return;
+        var up = !lastBar || px >= lastBar.open;
+        var opts = {
+            price: px,
+            color: up ? '#26a69a' : '#ef5350',
+            lineWidth: 1,
+            lineStyle: 2, // dashed, as LWC's native price line was
+            axisLabelVisible: true,
+            title: '',
+        };
+        if (livePriceLine) livePriceLine.applyOptions(opts);
+        else livePriceLine = candleSeries.createPriceLine(opts);
+    }
     var upperSeries = chart.addLineSeries({ color: '#4c6ef5', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
     var midSeries   = chart.addLineSeries({ color: '#adb5bd', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
     var lowerSeries = chart.addLineSeries({ color: '#4c6ef5', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
@@ -1860,12 +1913,25 @@
     var h24Low       = document.getElementById('chart-h24-low');
     var h24Vol       = document.getElementById('chart-h24-vol');
 
+    // The ONE price formatter for the whole chart page — header tile and the
+    // top ticker strip both call it. They used to format independently
+    // (header toFixed(2) → "77293.50", ticker toLocaleString(1dp) →
+    // "77,307.9"), so the same price looked like two different numbers
+    // sitting inches apart. Digit grouping is applied to the integer part
+    // only; the decimal tiers keep sub-$1 symbols readable.
     function fmtPrice(v) {
         if (v == null || isNaN(v)) return '—';
-        if (v >= 1000)  return v.toFixed(2);
-        if (v >= 10)    return v.toFixed(3);
-        if (v >= 1)     return v.toFixed(4);
-        return v.toFixed(6);
+        // Tier off the MAGNITUDE. The old signed comparison sent every
+        // negative value to the 6-decimal branch, so a down day rendered
+        // the 24h change as "-1234.560000" in the header tile.
+        var neg = v < 0, a = Math.abs(v);
+        var dp = a >= 1000 ? 2 : (a >= 10 ? 3 : (a >= 1 ? 4 : 6));
+        var s = a.toFixed(dp);
+        var dot = s.indexOf('.');
+        var ip = dot < 0 ? s : s.slice(0, dot);
+        var fp = dot < 0 ? '' : s.slice(dot);
+        ip = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return (neg ? '-' : '') + ip + fp;
     }
     function fmtVolAbs(v) {
         if (!v) return '—';
@@ -1923,13 +1989,20 @@
         headerSym.textContent = (data.symbol || '?') + '-USDT';
         headerTf.textContent = data.tf || '?';
         var lastCandle = (data.candles && data.candles.length) ? data.candles[data.candles.length - 1] : null;
-        // Prefer the last candle's close so the big header price matches
-        // what the user sees on the chart itself. data.markPrice is the
-        // perp mark from /premiumIndex — related but not identical to
-        // the last trade tick (index ± basis). Falls back to markPrice
-        // only if candles are missing.
-        var currentPrice = (lastCandle ? lastCandle.close : null) || data.markPrice || null;
+        // markPrice FIRST. The old order preferred lastCandle.close so the
+        // number matched the drawn candle tip, but BingX aggregates the
+        // forming bar's close, so it both LAGS and STICKS: measured on BTC
+        // 2026-09-03, close sat at 77,300.00 across two polls while the mark
+        // moved 77,307.9 → 77,309.4 → 77,308.3, i.e. 8–14 points behind. The
+        // top ticker reads the mark, so the header also disagreed with the
+        // strip right next to it. markPrice tracks the ticker to <2 points.
+        // The candle close is kept only as a fallback for a missing mark.
+        var currentPrice = data.markPrice || (lastCandle ? lastCandle.close : null) || null;
         headerPrice.textContent = fmtPrice(currentPrice);
+        // Canvas price line reads the SAME variable as the header text, so
+        // the two cannot drift apart — the previous split was one reading
+        // markPrice and the other the series' last close.
+        applyLivePriceLine(currentPrice, lastCandle);
         apply24hStats(currentPrice, data.candles);
 
         sideEl.className = 'side-badge ' + sideClass(sig.side);
@@ -2186,7 +2259,7 @@
     }
 
     function applyChart(data) {
-        allCandles = data.candles || [];
+        allCandles = patchFormingBar(data.candles || [], data.markPrice);
         var bb = data.bollinger || {};
         allUpper = bb.upper || [];
         allMid   = bb.mid   || [];
@@ -2399,32 +2472,117 @@
     }
 
     // Top ticker bar — all symbols' live price + 24h %, click to switch.
-    function loadTickers() {
+    //
+    // Fed by the server-owned SSE fan-out (/api/stream/tickers), not its own
+    // poll: one upstream refresh serves every open tab AND both pages, and a
+    // price lands as soon as the server has it. REST stays as the fallback.
+    //
+    // Rows are built once and then updated in place. The old version rebuilt
+    // innerHTML on every tick, which at the stream's 3s cadence would rewrite
+    // the is-active button out from under a click and restart any animation.
+    var tkEls = {}, tkBuiltKey = null, tkPrev = {};
+
+    function tkChg(t) {
+        var chg = (typeof t.changePct === 'number') ? t.changePct : null;
+        return {
+            txt: chg == null ? '·' : (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%',
+            cls: 'tk-chg ' + (chg == null ? '' : (chg >= 0 ? 'tk-up' : 'tk-down'))
+        };
+    }
+
+    function buildTicker(el, rows) {
+        tkEls = {};
+        el.innerHTML = rows.map(function (t) {
+            return '<button type="button" class="chart-ticker-item" data-sym="' + t.symbol + '">'
+                 + '<span class="tk-sym">' + t.symbol + '</span>'
+                 + '<span class="tk-px"></span>'
+                 + '<span class="tk-chg"></span></button>';
+        }).join('');
+        rows.forEach(function (t) {
+            var btn = el.querySelector('.chart-ticker-item[data-sym="' + t.symbol + '"]');
+            if (btn) tkEls[t.symbol] = { btn: btn, px: btn.querySelector('.tk-px'), chg: btn.querySelector('.tk-chg') };
+        });
+    }
+
+    function paintTicker(rows, silent) {
+        var cur = currentSym();
+        rows.forEach(function (t) {
+            var e = tkEls[t.symbol];
+            if (!e) return;
+            var px = (typeof t.price === 'number') ? fmtPrice(t.price) : '—';
+            if (e.px.textContent !== px) {
+                e.px.textContent = px;
+                var was = tkPrev[t.symbol];
+                if (!silent && was != null && typeof t.price === 'number' && t.price !== was) {
+                    e.px.classList.remove('tk-up-flash', 'tk-down-flash');
+                    void e.px.offsetWidth; // force reflow so the animation re-runs
+                    e.px.classList.add(t.price > was ? 'tk-up-flash' : 'tk-down-flash');
+                }
+            }
+            if (typeof t.price === 'number') tkPrev[t.symbol] = t.price;
+            var c = tkChg(t);
+            if (e.chg.textContent !== c.txt) e.chg.textContent = c.txt;
+            e.chg.className = c.cls;
+            e.btn.classList.toggle('is-active', t.symbol === cur);
+        });
+    }
+
+    var tkRows = null;
+    // Re-mark the active button immediately on a symbol switch. Without this
+    // the highlight would lag until the next stream event (up to 3s), which
+    // on a click feels broken.
+    function tkMarkActive() {
+        var cur = currentSym();
+        Object.keys(tkEls).forEach(function (sym) {
+            tkEls[sym].btn.classList.toggle('is-active', sym === cur);
+        });
+    }
+
+    function applyTickers(rows, silent) {
         var el = document.getElementById('chart-ticker');
-        if (!el) return;
+        if (!el || !rows) return;
+        tkRows = rows;
+        var key = rows.map(function (t) { return t.symbol; }).join(',');
+        var rebuilt = false;
+        if (key !== tkBuiltKey) { buildTicker(el, rows); tkBuiltKey = key; rebuilt = true; }
+        paintTicker(rows, silent || rebuilt);
+    }
+
+    function loadTickers() {
         fetch('/api/tickers?_=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { return r.json(); })
-            .then(function (d) {
-                if (!d || !d.tickers) return;
-                var cur = currentSym();
-                var html = '';
-                d.tickers.forEach(function (t) {
-                    var chg = (typeof t.changePct === 'number') ? t.changePct : null;
-                    var cls = chg == null ? '' : (chg >= 0 ? 'tk-up' : 'tk-down');
-                    var chgTxt = chg == null ? '·' : (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
-                    var px = (typeof t.price === 'number')
-                        ? (t.price >= 1000 ? t.price.toLocaleString('en-US', { maximumFractionDigits: 1 })
-                                           : t.price.toLocaleString('en-US', { maximumFractionDigits: 3 }))
-                        : '—';
-                    var act = (t.symbol === cur) ? ' is-active' : '';
-                    html += '<button type="button" class="chart-ticker-item' + act + '" data-sym="' + t.symbol + '">'
-                          + '<span class="tk-sym">' + t.symbol + '</span>'
-                          + '<span class="tk-px">' + px + '</span>'
-                          + '<span class="tk-chg ' + cls + '">' + chgTxt + '</span></button>';
-                });
-                el.innerHTML = html;
-            })
+            .then(function (d) { if (d && d.tickers) applyTickers(d.tickers, false); })
             .catch(function () { /* best-effort */ });
+    }
+
+    // SSE transport, same contract as the home table: fall back to polling
+    // until the FIRST event proves the stream works end to end (an open but
+    // proxy-buffered stream would otherwise strand the strip), and treat
+    // onerror as "disconnected for now" rather than as a failure — the
+    // browser reconnects by itself.
+    var tkStream = null, tkAlive = false, tkPollTimer = null;
+    function tkStartPolling() {
+        if (tkPollTimer) return;
+        loadTickers();
+        tkPollTimer = setInterval(function () { if (!document.hidden) loadTickers(); }, 10000);
+    }
+    function tkStopPolling() {
+        if (!tkPollTimer) return;
+        clearInterval(tkPollTimer);
+        tkPollTimer = null;
+    }
+    function tkStartStream() {
+        if (typeof EventSource === 'undefined') { tkStartPolling(); return; }
+        try { tkStream = new EventSource('/api/stream/tickers'); }
+        catch (e) { tkStartPolling(); return; }
+        tkStream.addEventListener('tickers', function (ev) {
+            var d = null;
+            try { d = JSON.parse(ev.data); } catch (e) { return; }
+            if (!d || !d.tickers) return;
+            if (!tkAlive) { tkAlive = true; tkStopPolling(); }
+            applyTickers(d.tickers, false);
+        });
+        tkStream.onerror = function () { tkAlive = false; tkStartPolling(); };
     }
     (function () {
         var tk = document.getElementById('chart-ticker');
@@ -2485,6 +2643,7 @@
         history.replaceState({}, '', '/chart?symbol=' + currentSym() + '&tf=' + currentTF());
         aiPane.classList.add('hidden');
         aiPane.dataset.loaded = '';
+        tkMarkActive();
         load();
     });
     tfPills.forEach(function (p) {
@@ -2506,8 +2665,8 @@
     var pollTimer = null;
     var pollInFlight = false;
     function pollTick() {
-        // Ticker + bias refresh every tick (both cheap: server-cached).
-        loadTickers();
+        // Bias only — the ticker strip is pushed by SSE now (tkStartStream),
+        // so polling it here would duplicate the fan-out this change removed.
         loadBias();
         // If a previous poll is still resolving, skip this tick so we
         // don't stack requests during transient network slowness.
@@ -2524,7 +2683,7 @@
                 // Update last-known candles by time. LWC series.update()
                 // handles either a new bar or a replacement of the
                 // latest bar (matched by time key).
-                var candles = data.candles;
+                var candles = patchFormingBar(data.candles, data.markPrice);
                 // LWC's series.update() only accepts bars with time >=
                 // the series' current last time. The poll returns 60
                 // bars in ascending order, so calling update() on the
@@ -2656,6 +2815,10 @@
         // symbol/TF switch.
         pollTick();
         pollTimer = setInterval(pollTick, 2000);
+        // One EventSource for the page lifetime — load() runs again on every
+        // symbol/TF switch, so starting it there would leak a connection per
+        // switch.
+        if (!tkStream) tkStartStream();
     }
     function stopPoll() {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

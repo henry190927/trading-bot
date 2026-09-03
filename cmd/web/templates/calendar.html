@@ -39,7 +39,12 @@
         <span class="cal-cat cat-{{.Cat}}">{{.Cat}}</span>
         <span class="cal-when">{{.WhenUTC}}<br><span style="opacity:.7">{{.WhenTPE}} TPE</span></span>
         <span class="cal-name">{{.Name}}</span>
-        {{if eq .Cat "data"}}
+        {{if .Speaker}}
+        {{/* The feed rates these Low; we do not. Shown with its rating struck
+             through so the disagreement is visible rather than silently
+             overridden. */}}
+        <span class="cal-win"><span class="cal-speech-tag">🎙 央行發言</span> <span class="cal-feed-impact" title="ForexFactory 給的評級 — 對槓桿部位不適用">feed: {{.Impact}}</span></span>
+        {{else if eq .Cat "data"}}
         <span class="cal-win">{{.Impact}}{{if .Forecast}} · <b>fc</b> {{.Forecast}}{{end}}{{if .Previous}} · prev {{.Previous}}{{end}}</span>
         {{else}}
         <span class="cal-win">blackout {{.Window}}</span>

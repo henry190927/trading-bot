@@ -19,16 +19,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"myFirstGo/trading-bot/ai"
 	"myFirstGo/trading-bot/analyzer"
 	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/fundamental"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/journal"
 	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/fundamental"
 	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
-	"myFirstGo/trading-bot/ai"
 	"myFirstGo/trading-bot/onchain"
+	"myFirstGo/trading-bot/signal"
 	"myFirstGo/trading-bot/validator"
 )
 
@@ -48,6 +48,11 @@ type server struct {
 	// + dump-signal lookup. Constructed once in main.go so the
 	// CoinGecko cache + CEX registry persist across requests.
 	onchain *onchain.Service
+
+	// hub owns the single upstream price refresh and fans snapshots out to
+	// SSE subscribers. Constructed in main.go; starts polling only while at
+	// least one client is attached (see stream.go).
+	hub *tickerHub
 
 	// aiCache memoizes /ai/analyze responses by trade ID so repeat
 	// clicks (page refresh, accordion re-open) don't re-bill against
@@ -308,10 +313,10 @@ type openTradeCard struct {
 	// SignalCtx snapshot and we have a current Diagnose). Shows the
 	// trader how the validator picture has shifted since they committed,
 	// so they can distinguish "price drifted" from "thesis broke".
-	HasDiff     bool
-	ScoreDelta  float64 // current /10 minus entry /10
-	DiffCause   string  // one-line headline of the most actionable change
-	DiffClass   string  // "up" / "down" / "" — drives chip colour
+	HasDiff    bool
+	ScoreDelta float64 // current /10 minus entry /10
+	DiffCause  string  // one-line headline of the most actionable change
+	DiffClass  string  // "up" / "down" / "" — drives chip colour
 }
 
 func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView) []openTradeCard {
@@ -818,21 +823,21 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		analyzedAt = time.Now().Local().Format("2006-01-02T15:04")
 	}
 	c.HTML(http.StatusOK, "journal_new.html", gin.H{
-		"Symbol":        c.Query("symbol"),
-		"Side":          c.Query("side"),
-		"Entry":         c.Query("entry"),
-		"Stop":          c.Query("stop"),
-		"TP1":           c.Query("tp1"),
-		"TP2":           c.Query("tp2"),
-		"Anchor":        c.Query("anchor"),
-		"TF":            c.Query("tf"),
-		"Score":         c.Query("score"),
-		"Notes":         "",
-		"AnalyzedAt":    analyzedAt,
-		"SignalCtx":     c.Query("ctx"), // verbatim from recordHref / validateRecordHref
-		"Symbols":       uiSymbols,
-		"Anchors":       recommendedAnchors,
-		"Error":         "",
+		"Symbol":         c.Query("symbol"),
+		"Side":           c.Query("side"),
+		"Entry":          c.Query("entry"),
+		"Stop":           c.Query("stop"),
+		"TP1":            c.Query("tp1"),
+		"TP2":            c.Query("tp2"),
+		"Anchor":         c.Query("anchor"),
+		"TF":             c.Query("tf"),
+		"Score":          c.Query("score"),
+		"Notes":          "",
+		"AnalyzedAt":     analyzedAt,
+		"SignalCtx":      c.Query("ctx"), // verbatim from recordHref / validateRecordHref
+		"Symbols":        uiSymbols,
+		"Anchors":        recommendedAnchors,
+		"Error":          "",
 		"MarginUSDT":     "",
 		"TP1PartialPct":  "50",
 		"PlaceTP1":       true,
@@ -1067,15 +1072,15 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 	if pos == nil {
 		return "skip", fmt.Sprintf("no open %s position on BingX for %s — TP1 will be retried on next fill-detection sweep", t.Side, t.Symbol)
 	}
-	// Sanity: TP1 must be on the profitable side of entry for the position
-	// we're closing. The journal-form validation already enforced this for
-	// the *trade plan*, but the LIVE position might be different (e.g. user
-	// opened a different size/side). Re-check defensively.
-	if t.Side == "long" && t.TP1 <= pos.EntryPrice {
-		return "error", fmt.Sprintf("TP1 %.4f is not above live entry %.4f (long); refusing", t.TP1, pos.EntryPrice)
+	// Sanity against the live MARK — see stopPlacementFault's note on why
+	// entry is the wrong reference. The journal form already validated the
+	// trade PLAN; this re-checks the order about to be sent.
+	mark, err := s.markFor(ctx, sym)
+	if err != nil {
+		return "error", "read mark price: " + err.Error()
 	}
-	if t.Side == "short" && t.TP1 >= pos.EntryPrice {
-		return "error", fmt.Sprintf("TP1 %.4f is not below live entry %.4f (short); refusing", t.TP1, pos.EntryPrice)
+	if fault := tpPlacementFault(t.Side, t.TP1, mark); fault != "" {
+		return "error", fault
 	}
 
 	qty := pos.Quantity * pct / 100
@@ -1190,6 +1195,76 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 	return "ok", fmt.Sprintf("entry placed — orderId=%s qty=%g @ %.4f (margin %.2f × %dx)%s", res.OrderID, qty, t.Entry, t.MarginUSDT, t.Leverage, bundledMsg)
 }
 
+// Order-placement sanity guards, against the live MARK price.
+//
+// These replaced checks written against the position's ENTRY price, which
+// conflated two different questions. "Is this stop on the loss side of my
+// entry?" is a question about intent, and the answer is allowed to be no: a
+// stop above entry on a long is a profit lock, which is exactly what you place
+// when the trade is in profit. The old guard refused it outright, so trailing a
+// stop through the UI was impossible — hit on 2026-09-03 trailing BTC #61 to
+// 77,900 against an entry of 77,640.
+//
+// The question that actually protects the user is "would this order execute the
+// instant it lands?" — and that is answered by the mark, not the entry.
+//
+// Both return "" when the order is placeable, else the reason to refuse.
+
+// stopPlacementFault rejects a stop that the mark has already passed: a
+// STOP_MARKET trigger on the wrong side of the mark fires immediately and
+// closes the position at market, which is never what placing a stop meant.
+func stopPlacementFault(side string, stop, mark float64) string {
+	if stop <= 0 {
+		return "stop price must be > 0"
+	}
+	if mark <= 0 {
+		return "live mark price unavailable — refusing to place a stop without a reference price"
+	}
+	if side == "long" && stop >= mark {
+		return fmt.Sprintf("stop %.4f is at/above the live mark %.4f (long) — it would trigger immediately and close at market", stop, mark)
+	}
+	if side == "short" && stop <= mark {
+		return fmt.Sprintf("stop %.4f is at/below the live mark %.4f (short) — it would trigger immediately and close at market", stop, mark)
+	}
+	return ""
+}
+
+// tpPlacementFault rejects a take-profit the mark has already passed. Such an
+// order is not a loss (a reduce-only limit fills at the better of the two
+// prices) but it is an instant exit, and someone placing a TP wanted it to
+// rest. The old version compared against entry, which both permitted this and
+// forbade a deliberate scale-out below entry.
+func tpPlacementFault(side string, tp, mark float64) string {
+	if tp <= 0 {
+		return "tp price must be > 0"
+	}
+	if mark <= 0 {
+		return "live mark price unavailable — refusing to place a tp without a reference price"
+	}
+	if side == "long" && tp <= mark {
+		return fmt.Sprintf("tp %.4f is at/below the live mark %.4f (long) — it would fill immediately instead of resting", tp, mark)
+	}
+	if side == "short" && tp >= mark {
+		return fmt.Sprintf("tp %.4f is at/above the live mark %.4f (short) — it would fill immediately instead of resting", tp, mark)
+	}
+	return ""
+}
+
+// markFor reads the live mark used by the guards above. A failure is surfaced,
+// never defaulted: on an order-placing path, guessing the reference price is
+// worse than not placing. Placement is retried by the fill-detection sweep, so
+// a transient miss only delays it.
+func (s *server) markFor(ctx context.Context, sym market.Symbol) (float64, error) {
+	fr, err := s.client.FundingRate(ctx, sym)
+	if err != nil {
+		return 0, err
+	}
+	if fr.MarkPrice <= 0 {
+		return 0, fmt.Errorf("mark price unavailable for %s", sym)
+	}
+	return fr.MarkPrice, nil
+}
+
 // placeStopOnBingX submits a reduce-only STOP_MARKET sized to the full
 // live position (after TP1's partial is also placed, the stop still
 // covers everything reduce-only can touch — BingX won't over-close).
@@ -1211,11 +1286,12 @@ func (s *server) placeStopOnBingX(ctx context.Context, t *journal.Trade) (string
 	if pos == nil {
 		return "skip", fmt.Sprintf("no open %s position on BingX for %s — stop will be retried on next sweep", t.Side, t.Symbol)
 	}
-	if t.Side == "long" && t.Stop >= pos.EntryPrice {
-		return "error", fmt.Sprintf("stop %.4f is not below live entry %.4f (long); refusing", t.Stop, pos.EntryPrice)
+	mark, err := s.markFor(ctx, sym)
+	if err != nil {
+		return "error", "read mark price: " + err.Error()
 	}
-	if t.Side == "short" && t.Stop <= pos.EntryPrice {
-		return "error", fmt.Sprintf("stop %.4f is not above live entry %.4f (short); refusing", t.Stop, pos.EntryPrice)
+	if fault := stopPlacementFault(t.Side, t.Stop, mark); fault != "" {
+		return "error", fault
 	}
 	hedge := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
 	res, err := s.client.PlaceStopMarket(ctx, sym, t.Side, pos.Quantity, t.Stop, hedge)
@@ -1251,11 +1327,12 @@ func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1Parti
 	if pos == nil {
 		return "skip", fmt.Sprintf("no open %s position on BingX for %s — TP2 will be retried on next sweep", t.Side, t.Symbol)
 	}
-	if t.Side == "long" && t.TP2 <= pos.EntryPrice {
-		return "error", fmt.Sprintf("TP2 %.4f is not above live entry %.4f (long); refusing", t.TP2, pos.EntryPrice)
+	mark, err := s.markFor(ctx, sym)
+	if err != nil {
+		return "error", "read mark price: " + err.Error()
 	}
-	if t.Side == "short" && t.TP2 >= pos.EntryPrice {
-		return "error", fmt.Sprintf("TP2 %.4f is not below live entry %.4f (short); refusing", t.TP2, pos.EntryPrice)
+	if fault := tpPlacementFault(t.Side, t.TP2, mark); fault != "" {
+		return "error", fault
 	}
 	prec, ok := qtyPrecision[t.Symbol]
 	if !ok {
@@ -2025,10 +2102,13 @@ func (s *server) handleJournalList(c *gin.Context) {
 		avgR = totalR / float64(closedCount)
 	}
 
-	histogram := buildRHistogram(trades)
-	calendar := buildDailyCalendar(trades, 42) // 6 weeks
+	// One adapter call feeds all three portfolio views; /ops/autotrade runs
+	// the same builders over its deduped positions (see rstats.go).
+	rt := rTradesFromJournal(trades)
+	histogram := buildRHistogram(rt)
+	calendar := buildDailyCalendar(rt, 42) // 6 weeks
 	periods := buildPeriodStats(trades)
-	equity := buildEquityCurve(trades)
+	equity := buildEquityCurve(rt)
 
 	// Pagination — 10 per page, ?page=N (1-indexed). All stats above are
 	// computed over the FULL trade set; pagination only chunks the list
@@ -2095,40 +2175,34 @@ type equityPoint struct {
 // fill), key reference numbers (peak / current / drawdown), and trend color.
 // All viewBox math is done server-side so the template is dumb rendering.
 type equityCurve struct {
-	HasData      bool
-	Points       []equityPoint
-	LinePath     string  // SVG `d` for the line itself
-	AreaPath     string  // SVG `d` for the filled area below the line
-	ZeroY        float64 // Y coordinate of the 0R reference line in viewBox
-	PeakR        float64
-	PeakIdx      int
-	CurrentR     float64
-	Drawdown     float64 // distance from peak to current (positive number)
-	MinR, MaxR   float64
-	Trend        string // "up" | "down" | "flat" — controls line color
-	FirstClose   time.Time
-	LastClose    time.Time
-	ViewBoxW     int
-	ViewBoxH     int
+	HasData    bool
+	Points     []equityPoint
+	LinePath   string  // SVG `d` for the line itself
+	AreaPath   string  // SVG `d` for the filled area below the line
+	ZeroY      float64 // Y coordinate of the 0R reference line in viewBox
+	PeakR      float64
+	PeakIdx    int
+	CurrentR   float64
+	Drawdown   float64 // distance from peak to current (positive number)
+	MinR, MaxR float64
+	Trend      string // "up" | "down" | "flat" — controls line color
+	FirstClose time.Time
+	LastClose  time.Time
+	ViewBoxW   int
+	ViewBoxH   int
 }
 
 // buildEquityCurve builds the cumulative-R series sorted by close time,
 // then maps it into a 100×40 viewBox for SVG rendering. Origin (0, 0R) is
 // always the leftmost point so the line visually starts at the baseline.
-func buildEquityCurve(trades []journal.Trade) equityCurve {
-	// Closed trades sorted by ClosedAt ascending. No-fills don't move the
-	// equity curve so they're excluded — including them would emit flat
-	// points that misrepresent the R progression.
-	var closed []journal.Trade
-	for _, t := range trades {
-		if !t.IsOpen() && !t.ClosedAt.IsZero() && !t.IsNoFill() {
-			closed = append(closed, t)
-		}
-	}
+func buildEquityCurve(closed []rTrade) equityCurve {
+	// Sorted by close time ascending. Filtering (open / no-fill excluded —
+	// neither realizes R, and flat points would misrepresent the progression)
+	// now happens in the per-source adapters in rstats.go.
 	if len(closed) == 0 {
 		return equityCurve{}
 	}
-	sort.Slice(closed, func(i, j int) bool { return closed[i].ClosedAt.Before(closed[j].ClosedAt) })
+	sort.SliceStable(closed, func(i, j int) bool { return closed[i].Closed.Before(closed[j].Closed) })
 
 	// Build points: origin + one per trade.
 	pts := []equityPoint{{Index: 0, R: 0}}
@@ -2136,7 +2210,7 @@ func buildEquityCurve(trades []journal.Trade) equityCurve {
 	peak := 0.0
 	peakIdx := 0
 	for i, t := range closed {
-		cum += t.RRealized
+		cum += t.R
 		if cum > peak {
 			peak = cum
 			peakIdx = i + 1
@@ -2144,7 +2218,7 @@ func buildEquityCurve(trades []journal.Trade) equityCurve {
 		pts = append(pts, equityPoint{
 			Index: i + 1,
 			R:     cum,
-			Date:  t.ClosedAt.Local(),
+			Date:  t.Closed.Local(),
 		})
 	}
 
@@ -2219,8 +2293,8 @@ func buildEquityCurve(trades []journal.Trade) equityCurve {
 		MinR:       minR,
 		MaxR:       maxR,
 		Trend:      trend,
-		FirstClose: closed[0].ClosedAt.Local(),
-		LastClose:  closed[len(closed)-1].ClosedAt.Local(),
+		FirstClose: closed[0].Closed.Local(),
+		LastClose:  closed[len(closed)-1].Closed.Local(),
 		ViewBoxW:   int(vbW),
 		ViewBoxH:   int(vbH),
 	}
@@ -2230,14 +2304,14 @@ func buildEquityCurve(trades []journal.Trade) equityCurve {
 // portfolio hero. Mirrors the "today / week / month / all-time" rows that
 // every major exchange portfolio screen surfaces at the top.
 type periodStats struct {
-	TodayR     float64
-	TodayN     int
-	WeekR      float64 // since Monday 00:00 local
-	WeekN      int
-	MonthR     float64 // since 1st of this month 00:00 local
-	MonthN     int
-	AllTimeR   float64
-	AllTimeN   int
+	TodayR   float64
+	TodayN   int
+	WeekR    float64 // since Monday 00:00 local
+	WeekN    int
+	MonthR   float64 // since 1st of this month 00:00 local
+	MonthN   int
+	AllTimeR float64
+	AllTimeN int
 }
 
 func buildPeriodStats(trades []journal.Trade) periodStats {
@@ -2286,10 +2360,19 @@ type rBucket struct {
 // buildRHistogram bucks closed trades' realized R into fixed-width bins
 // from -3R to +3R in 0.5R steps. Anything beyond the edges is clamped
 // into the outermost bucket (rare; signal stop is -1R by design).
-func buildRHistogram(trades []journal.Trade) []rBucket {
+func buildRHistogram(trades []rTrade) []rBucket {
 	// Bucket boundaries: -3, -2.5, -2, ... +2.5, +3 → 12 buckets.
+	// Bucket i covers [bounds[i], bounds[i+1]). Labels are the LOWER bound
+	// throughout; the ends carry a comparison sign because they also absorb
+	// everything clamped from beyond the range.
+	//
+	// They were not consistent before: the negative half was labelled by its
+	// UPPER bound while the positive half used the lower one, so a -1.00R
+	// stop — the single most common outcome, since the design stop IS -1R —
+	// was displayed in a column labelled "-0.5", and the "-1" column showed
+	// [-1.5,-1) instead. Every negative bar was one bucket off.
 	bounds := []float64{-3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3}
-	labels := []string{"≤-2.5", "-2", "-1.5", "-1", "-0.5", "-0+", "0+", "+0.5", "+1", "+1.5", "+2", "+2.5+"}
+	labels := []string{"<-2.5", "-2.5", "-2", "-1.5", "-1", "-0.5", "0", "+0.5", "+1", "+1.5", "+2", ">+2.5"}
 	buckets := make([]rBucket, len(labels))
 	for i := range buckets {
 		buckets[i] = rBucket{
@@ -2301,10 +2384,7 @@ func buildRHistogram(trades []journal.Trade) []rBucket {
 	}
 	maxCount := 0
 	for _, t := range trades {
-		if t.IsOpen() || t.IsNoFill() {
-			continue
-		}
-		r := t.RRealized
+		r := t.R
 		// Find the bucket — clamp to ends if out of range.
 		idx := len(buckets) - 1
 		if r < bounds[0] {
@@ -2349,7 +2429,7 @@ type dailyCell struct {
 // (default 42 = 6 weeks). Each cell shows the day's net R from closed
 // trades. Renders Mon-Sun rows, with the most recent week at the bottom
 // (GitHub-style).
-func buildDailyCalendar(trades []journal.Trade, days int) [][]dailyCell {
+func buildDailyCalendar(trades []rTrade, days int) [][]dailyCell {
 	// Aggregate closed R by local date.
 	type agg struct {
 		count int
@@ -2357,17 +2437,14 @@ func buildDailyCalendar(trades []journal.Trade, days int) [][]dailyCell {
 	}
 	byDate := map[string]*agg{}
 	for _, t := range trades {
-		if t.IsOpen() || t.ClosedAt.IsZero() || t.IsNoFill() {
-			continue
-		}
-		key := t.ClosedAt.Local().Format("2006-01-02")
+		key := t.Closed.Local().Format("2006-01-02")
 		a, ok := byDate[key]
 		if !ok {
 			a = &agg{}
 			byDate[key] = a
 		}
 		a.count++
-		a.r += t.RRealized
+		a.r += t.R
 	}
 
 	// Find max absolute daily R for color scaling.
@@ -2621,7 +2698,7 @@ func templateFuncs() template.FuncMap {
 		"fmtPct": func(v float64) string {
 			return fmt.Sprintf("%+.4f%%", v*100)
 		},
-		"mulPct": func(v float64) float64 { return v * 100 },
+		"mulPct":   func(v float64) float64 { return v * 100 },
 		"score100": func(v float64) float64 { return v * 10 }, // validator /10 → unified /100
 		"fmtSigned1": func(v float64) string {
 			return fmt.Sprintf("%+.1f", v)
@@ -3283,8 +3360,8 @@ func defaultStr(v, fallback string) string {
 // lookup itself is triggered client-side via /api/onchain/lookup.
 func (s *server) handleOnchainPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "onchain.html", gin.H{
-		"Prefill":    strings.TrimSpace(c.Query("symbol")),
-		"Chains":     []string{"", "bsc", "eth", "base"},
+		"Prefill": strings.TrimSpace(c.Query("symbol")),
+		"Chains":  []string{"", "bsc", "eth", "base"},
 	})
 }
 
@@ -3423,11 +3500,11 @@ func (s *server) handleAIAnalyzeSymbol(c *gin.Context) {
 			InsideVA:     d.InsideVA,
 			OutsideVAUp:  d.OutsideVAUp,
 			OutsideVADn:  d.OutsideVADn,
-			POCTrend:    d.POCMig.Trend,
-			POCDriftPct: d.POCMig.DriftPct,
-			POCStacked:  d.POCMig.Stacked,
+			POCTrend:     d.POCMig.Trend,
+			POCDriftPct:  d.POCMig.DriftPct,
+			POCStacked:   d.POCMig.Stacked,
 			FallingKnife: d.RecentFlashBarBearish,
-			BlowOff:     d.RecentFlashBarBullish,
+			BlowOff:      d.RecentFlashBarBullish,
 		}
 		for _, f := range d.Factors {
 			sd.Factors = append(sd.Factors, ai.SymbolDiagnoseFactor{
@@ -3605,7 +3682,7 @@ func (s *server) handleAIAnalyzeValidate(c *gin.Context) {
 		Verdict: d.Verdict,
 		AtVAH:   d.AtVAH, AtVAL: d.AtVAL, InsideVA: d.InsideVA,
 		OutsideVAUp: d.OutsideVAUp, OutsideVADn: d.OutsideVADn,
-		POCTrend:    d.POCMig.Trend, POCDriftPct: d.POCMig.DriftPct, POCStacked: d.POCMig.Stacked,
+		POCTrend: d.POCMig.Trend, POCDriftPct: d.POCMig.DriftPct, POCStacked: d.POCMig.Stacked,
 		FallingKnife: d.RecentFlashBarBearish, BlowOff: d.RecentFlashBarBullish,
 	}
 	for _, f := range d.Factors {
@@ -3976,12 +4053,12 @@ func (s *server) handleChartData(c *gin.Context) {
 	if historicalOnly {
 		c.Header("Cache-Control", "no-store")
 		c.JSON(http.StatusOK, gin.H{
-			"symbol":        short,
-			"tf":            tfStr,
-			"candles":       ohlcArr,
-			"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
-			"markers":       chartMarkers,
-			"paginated":     true,
+			"symbol":    short,
+			"tf":        tfStr,
+			"candles":   ohlcArr,
+			"bollinger": gin.H{"upper": upper, "mid": mid, "lower": lower},
+			"markers":   chartMarkers,
+			"paginated": true,
 		})
 		return
 	}
@@ -4006,13 +4083,13 @@ func (s *server) handleChartData(c *gin.Context) {
 
 	// Compact Signal + Diagnose projection.
 	sig := map[string]any{
-		"side":       view.Signal.Side.String(),
-		"score":      view.Signal.Score,
-		"mrScore":    view.Signal.MRScore,
-		"momScore":   view.Signal.MomentumScore,
-		"reasons":    view.Signal.Reasons,
-		"notes":      view.Signal.Notes,
-		"warnings":   view.Signal.Warnings,
+		"side":     view.Signal.Side.String(),
+		"score":    view.Signal.Score,
+		"mrScore":  view.Signal.MRScore,
+		"momScore": view.Signal.MomentumScore,
+		"reasons":  view.Signal.Reasons,
+		"notes":    view.Signal.Notes,
+		"warnings": view.Signal.Warnings,
 	}
 	var diag map[string]any
 	if view.Diagnose != nil {
@@ -4078,16 +4155,16 @@ func (s *server) handleChartData(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"symbol":        short,
-		"tf":            tfStr,
-		"contract":      string(sym),
-		"candles":       ohlcArr,
-		"bollinger":     gin.H{"upper": upper, "mid": mid, "lower": lower},
-		"rsi":           rsiOut,
-		"macdLine":      macdLine,
-		"macdSignal":    macdSignal,
-		"macdHist":      macdHist,
-		"hvn":           topHVN,
+		"symbol":     short,
+		"tf":         tfStr,
+		"contract":   string(sym),
+		"candles":    ohlcArr,
+		"bollinger":  gin.H{"upper": upper, "mid": mid, "lower": lower},
+		"rsi":        rsiOut,
+		"macdLine":   macdLine,
+		"macdSignal": macdSignal,
+		"macdHist":   macdHist,
+		"hvn":        topHVN,
 		"pocMigration": gin.H{
 			"short":    view.Signal.POCMig.POCShort,
 			"med":      view.Signal.POCMig.POCMed,
@@ -4361,16 +4438,16 @@ func collectOpenPositionsForChart(short string, markPrice float64) []map[string]
 		}
 		filled := t.FilledAt.IsZero() == false
 		out = append(out, map[string]any{
-			"id":         t.ID,
-			"side":       strings.ToLower(t.Side),
-			"entry":      t.Entry,
-			"stop":       t.Stop,
-			"tp1":        t.TP1,
-			"tp2":        t.TP2,
-			"tf":         t.TF,
-			"filled":     filled,
-			"unrealR":    unrealR,
-			"openedAt":   t.OpenedAt.Unix(),
+			"id":       t.ID,
+			"side":     strings.ToLower(t.Side),
+			"entry":    t.Entry,
+			"stop":     t.Stop,
+			"tp1":      t.TP1,
+			"tp2":      t.TP2,
+			"tf":       t.TF,
+			"filled":   filled,
+			"unrealR":  unrealR,
+			"openedAt": t.OpenedAt.Unix(),
 		})
 	}
 	return out
@@ -4381,12 +4458,13 @@ func collectOpenPositionsForChart(short string, markPrice float64) []map[string]
 // tops/bottoms, RSI/CVD divergence pivots, range-expansion flash bars.
 //
 // Each returned map matches LWC's setMarkers([]) format:
-//   time     — unix seconds (matches candle time)
-//   position — "aboveBar" | "belowBar" | "inBar"
-//   color    — CSS color string
-//   shape    — "circle" | "arrowUp" | "arrowDown" | "square"
-//   text     — short label (e.g. "sweep", "2×top", "div")
-//   kind     — internal category so frontend can filter/style further
+//
+//	time     — unix seconds (matches candle time)
+//	position — "aboveBar" | "belowBar" | "inBar"
+//	color    — CSS color string
+//	shape    — "circle" | "arrowUp" | "arrowDown" | "square"
+//	text     — short label (e.g. "sweep", "2×top", "div")
+//	kind     — internal category so frontend can filter/style further
 //
 // All input candles must be in ascending time order (as returned by
 // bingx.Klines / KlinesWithForming). Marker times MUST also be sorted

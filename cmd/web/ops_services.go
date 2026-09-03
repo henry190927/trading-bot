@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/zone"
 
 	"github.com/gin-gonic/gin"
@@ -254,6 +255,14 @@ func (s *server) handleOpsServices(c *gin.Context) {
 		"zone_only":    zoneOnly,
 		"zone_channel": gin.H{"enabled": zoneCfg.Enabled, "auto": zoneCfg.Auto, "tfs": zoneCfg.TFs},
 		"loops":        monitorLoops(zoneOnly, on, zoneCfg.Enabled),
+		// Price fan-out. drop_pct is the backpressure signal: broadcast
+		// silently discards a stale pending snapshot for a slow client, which
+		// is correct behaviour but was previously unobservable.
+		"stream": s.hub.stats(),
+		// Runtime macro overlay. Surfaced because an ad-hoc blackout you
+		// cannot verify is indistinguishable from a typo in the file — and the
+		// failure is silent in the dangerous direction ("no blackout").
+		"macro_overlay": macro.OverlayStatus(),
 	})
 }
 

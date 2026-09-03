@@ -25,6 +25,7 @@ import (
 	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/econcal"
 	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/onchain"
 )
 
@@ -111,6 +112,9 @@ func main() {
 		aiSymbolCache:  make(map[string]aiCacheEntry),
 		onchain:        onchainSvc,
 	}
+	// The hub's only dependency is "give me a snapshot" — the same builder
+	// /api/tickers serves, so both transports carry identical numbers.
+	srv.hub = newTickerHub(func(ctx context.Context) any { return srv.buildTickers(ctx) })
 	r.GET("/", srv.handleTodayPage)      // home = Today (symbols overview)
 	r.GET("/today", srv.handleTodayPage) // kept for existing links/bookmarks
 	r.GET("/scan", srv.handleDashboard)  // Scan moved off "/"
@@ -155,6 +159,7 @@ func main() {
 	r.GET("/api/chart/data", srv.handleChartData)
 	r.GET("/api/chart/bias", srv.handleChartBias)
 	r.GET("/api/tickers", srv.handleTickers)
+	r.GET("/api/stream/tickers", srv.handleStreamTickers)
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/scan", srv.handleScanSetups)
 	r.POST("/scan/record", srv.handleScanRecord)
@@ -179,6 +184,11 @@ func main() {
 	// the daily cron-written earnings.json is picked up without a restart. A
 	// missing file just leaves the gate a no-op — never fatal.
 	earnings.LoadDefaultAndWatch(context.Background(), earnings.Path(), 10*time.Minute, log.Printf)
+	// Ad-hoc blackouts (a Fed speech announced days ahead) without a rebuild.
+	// 1 minute, not 10 like earnings: an earnings date is known weeks out, but
+	// the overlay exists precisely for something you are adding minutes before
+	// it matters.
+	macro.LoadOverlayAndWatch(context.Background(), macro.OverlayPath(), time.Minute, log.Printf)
 
 	// Economic-data-release calendar (ForexFactory feed) — display layer for
 	// /calendar, refreshed hourly. Never fatal: feed down = calendar minus this row.

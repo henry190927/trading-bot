@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
+<script src="/static/perf-tabs.js" defer></script>
 </head>
 <body>
 
@@ -77,6 +78,20 @@
     </div>
     <p class="glossary-hint" style="margin-top:.5rem"><b>pending</b> = 掛價還沒被觸及、6 根內仍在等成交;<b>no-fill</b> = 6 根過了還沒觸及(視為失效);<b>open</b> = 已成交未出場;outcome 先撞先算,同根撞到保守算 stop;<b>net R</b> = 已結算(tp/stop)。歷史 tp/stop 用收盤棒補抓 wick,<b>當前狀態疊加即時 mark 價</b>:現價已穿 tp/stop 即結算,否則 <b>浮動 R*</b> = open 單 mark-to-<b>即時價</b>(同 dashboard 開倉卡)。fill% 只算已定案的(pending 不計)。</p>
   </div>
+  {{end}}
+
+  {{if .Equity.HasData}}
+  {{/* Equity / Calendar / Distribution — the SAME partial and the same
+       builders /journal uses (perfPanels + rstats.go), over DEDUPED positions
+       rather than raw fires: a setup that re-fired every bar is one position,
+       and charting the raw log would draw trades that were never taken. */}}
+  {{template "perfPanels" .}}
+  <p class="glossary-hint" style="margin:-.4rem 0 1rem">
+    走勢圖用<b>一倉一單</b>後的部位、依<b>出場時間</b>排序（權益是在平倉時才動的）。
+    <b>Calendar 的日界是 UTC+8</b>（本機時區），而<b>斷路器的 todayR 用 UTC 日界</b> —— 兩者「今天」的數字可能不同,那是刻意的:斷路器要跟它自己重置的時點對齊。
+    {{if .StatOpenN}}曲線只含<b>已結算</b>;另有 {{.StatOpenN}} 筆未平倉,浮動 <b>{{printf "%+.2f" .StatOpenR}}R</b> 不在圖上。{{end}}
+    {{if .StatUnscoreable}}<b style="color:var(--red)">⚠ {{.StatUnscoreable}} 筆已結算部位無法回放</b>（K 線視窗已不及其進場時間）,未計入曲線。{{end}}
+  </p>
   {{end}}
 
   <div class="stats-card">

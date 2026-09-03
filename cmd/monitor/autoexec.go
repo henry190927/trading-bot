@@ -63,8 +63,19 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		// otherwise refetches the same candles per rule.
 		now := time.Now().UTC()
 		kc := newKlineCache(ctx, client)
-		book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), kc.forFire, now, maxCooldownBars(cfg))
+		fires := autotrade.ReadFires(500)
+		book, unscored, trace := autotrade.BuildBookTraced(fires, kc.forFire, now, maxCooldownBars(cfg))
 		logBook(book, cfg, unscored)
+		// AUTOEXEC_TRACE=1 explains the two numbers the book prints. Without
+		// it, todayR is a bare figure you cannot reconcile against the /ops
+		// row list — the panel shows EVERY fire's outcome while the breaker
+		// counts DEDUPED positions, so the two legitimately differ and there
+		// was no way to see which fires actually fed the breaker. The trace
+		// has existed in BuildBookTraced since it was written; nothing had
+		// ever consumed it.
+		if os.Getenv("AUTOEXEC_TRACE") == "1" {
+			logTrace(trace, maxCooldownBars(cfg))
+		}
 
 		// The daily-loss breaker is a whole-executor stop, not a per-rule one:
 		// evaluate it before touching any rule so a halted day does no work

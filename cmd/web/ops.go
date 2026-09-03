@@ -269,19 +269,36 @@ func (s *server) handleOpsZones(c *gin.Context) {
 	// "armed" must mean ARMED. runZoneAlerts skips any zone with an explicit
 	// enabled:false, so listing those here overstated the channel — 13 rows
 	// shown while 2 could fire. Retired zones are counted, not hidden.
-	var armed []zone.Zone
-	var retired int
+	// A zone the daemon would refuse to evaluate (bad `confirm`) must not be
+	// listed as plain ARMED either — zone.TriggerFault is the same check
+	// runZoneAlerts uses, so the row carries the daemon's own verdict.
+	type armedZone struct {
+		zone.Zone
+		Trigger string `json:"trigger"` // human label for the fire rule
+		Fault   string `json:"fault,omitempty"`
+	}
+	wrap := func(z zone.Zone) armedZone {
+		return armedZone{Zone: z, Trigger: zone.ConfirmWord(z.Confirm), Fault: zone.TriggerFault(z)}
+	}
+	armed := []armedZone{}
+	var retired, faulted int
 	for _, z := range zone.LoadManual() {
 		if z.Enabled != nil && !*z.Enabled {
 			retired++
 			continue
 		}
-		armed = append(armed, z)
+		a := wrap(z)
+		if a.Fault != "" {
+			faulted++
+		}
+		armed = append(armed, a)
 	}
 	if cfg.Enabled && cfg.Auto && s.client != nil {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
 		defer cancel()
-		armed = append(armed, zone.ComputeAuto(ctx, s.client, cfg.TFList())...)
+		for _, z := range zone.ComputeAuto(ctx, s.client, cfg.TFList()) {
+			armed = append(armed, wrap(z))
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"enabled": cfg.Enabled,
@@ -291,6 +308,7 @@ func (s *server) handleOpsZones(c *gin.Context) {
 		"poll":    "25s",
 		"armed":   armed,
 		"retired": retired,
+		"faulted": faulted,
 	})
 }
 

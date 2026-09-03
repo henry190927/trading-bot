@@ -38,6 +38,7 @@ import (
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/indicator"
+	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/notify"
 	sig "myFirstGo/trading-bot/signal"
@@ -126,6 +127,11 @@ func main() {
 	// looked armed while the auto-executor ran unprotected. A missing file is
 	// still fine (empty calendar = no-op by construction, not by omission).
 	earnings.LoadDefaultAndWatch(ctx, earnings.Path(), 10*time.Minute, log.Printf)
+	// Ad-hoc blackouts (a Fed speech announced days ahead) without a rebuild.
+	// 1 minute, not 10 like earnings: an earnings date is known weeks out, but
+	// the overlay exists precisely for something you are adding minutes before
+	// it matters.
+	macro.LoadOverlayAndWatch(ctx, macro.OverlayPath(), time.Minute, log.Printf)
 
 	// Zone-alert channel: fast live-price watcher for pivot-zone-fade
 	// entries (separate cadence from the confluence scan). No-op if

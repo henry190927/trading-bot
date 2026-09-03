@@ -43,6 +43,28 @@
     <div class="ops-loops-title">trading-monitor 子迴圈</div>
     <div class="ops-loops-grid" id="ops-health-loops"></div>
   </div>
+
+  <!-- Price pipeline, in two rows because there are two independent failures:
+       the exchange websocket can be dead while the SSE fan-out is perfectly
+       healthy (it would keep serving 30s-old REST prices), and vice versa.
+       One combined "stream OK" light would hide exactly that case. -->
+  <!-- Runtime macro overlay. The embedded calendar needs a redeploy; this
+       file does not, which is exactly why its state has to be visible: a
+       mistyped entry fails as "no blackout", which looks identical to a
+       working system right up until it isn't. -->
+  <div class="ops-health-loops">
+    <div class="ops-loops-title">Macro overlay <span class="ops-svc-tag">runtime blackout · 60s reload</span></div>
+    <div class="ops-stream-grid" id="ops-health-macro"><span class="hint">載入中…</span></div>
+  </div>
+
+  <div class="ops-health-loops">
+    <div class="ops-loops-title">價格上游 <span class="ops-svc-tag">BingX ws · @markPrice</span></div>
+    <div class="ops-stream-grid" id="ops-health-ws"><span class="hint">載入中…</span></div>
+  </div>
+  <div class="ops-health-loops">
+    <div class="ops-loops-title">價格推流 <span class="ops-svc-tag">SSE · /api/stream/tickers</span></div>
+    <div class="ops-stream-grid" id="ops-health-stream"><span class="hint">載入中…</span></div>
+  </div>
 </section>
 
 
@@ -416,10 +438,103 @@
                  + '</div>';
         }).join('');
     }
+    // Thresholds: any drop at all is worth a warning colour (it means a client
+    // fell behind a 3s interval), but only a sustained rate is actually bad.
+    function renderStream(st) {
+        var el = document.getElementById('ops-health-stream');
+        if (!el) return;
+        if (!st) { el.innerHTML = '<span class="hint">n/a</span>'; return; }
+        var dropCls = st.dropped === 0 ? 'ok' : (st.drop_pct >= 5 ? 'bad' : 'warn');
+        var ageTxt = st.last_age_sec < 0 ? '—' : st.last_age_sec + 's';
+        // Stale if we have subscribers but no broadcast in >3 intervals.
+        var ageCls = (st.subscribers > 0 && st.last_age_sec > st.interval_sec * 3) ? 'bad' : 'ok';
+        var cells = [
+            ['狀態', st.running ? '推流中' : '待機', st.running ? 'ok' : 'dim'],
+            ['訂閱者', st.subscribers + ' <span class="cs-dim">(峰值 ' + st.peak_subs + ')</span>', st.subscribers ? 'ok' : 'dim'],
+            ['丟棄', st.dropped + ' <span class="cs-dim">(' + st.drop_pct.toFixed(1) + '%)</span>', dropCls],
+            ['已送達', st.delivered, 'dim'],
+            ['上游刷新', st.refreshes + (st.refresh_errs ? ' <span class="ops-stream-bad">/' + st.refresh_errs + ' err</span>' : ''), st.refresh_errs ? 'bad' : 'dim'],
+            ['最後快照', ageTxt + ' <span class="cs-dim">前 · 間隔 ' + st.interval_sec + 's</span>', ageCls]
+        ];
+        el.innerHTML = cells.map(function (c) {
+            return '<div class="ops-stream-cell ' + c[2] + '">'
+                 + '<span class="lbl">' + c[0] + '</span>'
+                 + '<span class="val">' + c[1] + '</span></div>';
+        }).join('');
+    }
+    // Upstream websocket. Read separately from the fan-out below: "we are
+    // serving clients" and "we are receiving prices" are different questions,
+    // and the SSE side stays green while the feed is dead.
+    function renderWS(st) {
+        var el = document.getElementById('ops-health-ws');
+        if (!el) return;
+        if (!st) { el.innerHTML = '<span class="hint">n/a</span>'; return; }
+        // Connected is not the same as working: a dial can succeed and deliver
+        // nothing. Stale = up but no frame for >10s on a ~1Hz feed.
+        var stale = st.ws_up && st.ws_last_age_sec > 10;
+        var state = !st.running ? ['待機', 'dim']
+                  : !st.ws_up  ? ['斷線 · 走 REST 備援', 'bad']
+                  : stale      ? ['連線中但無資料', 'bad']
+                                : ['推流中', 'ok'];
+        var ageTxt = st.ws_last_age_sec < 0 ? '—' : st.ws_last_age_sec + 's';
+        var symCls = (st.ws_live_syms === st.ws_total_syms && st.ws_total_syms > 0) ? 'ok'
+                   : (st.ws_live_syms === 0 ? 'bad' : 'warn');
+        var cells = [
+            ['狀態', state[0], state[1]],
+            ['即時標的', st.ws_live_syms + ' / ' + st.ws_total_syms, symCls],
+            ['最後報價', ageTxt + ' <span class="cs-dim">前 · 約 1Hz</span>', stale ? 'bad' : 'ok'],
+            ['連線次數', st.ws_connects, 'dim'],
+            ['斷線次數', st.ws_drops, st.ws_drops > 0 ? 'warn' : 'ok']
+        ];
+        var html = cells.map(function (c) {
+            return '<div class="ops-stream-cell ' + c[2] + '">'
+                 + '<span class="lbl">' + c[0] + '</span>'
+                 + '<span class="val">' + c[1] + '</span></div>';
+        }).join('');
+        if (st.ws_last_err) {
+            html += '<div class="ops-stream-cell warn ops-stream-err">'
+                  + '<span class="lbl">最後斷線原因</span>'
+                  + '<span class="val">' + st.ws_last_err + '</span></div>';
+        }
+        el.innerHTML = html;
+    }
+    function renderMacro(st) {
+        var el = document.getElementById('ops-health-macro');
+        if (!el) return;
+        if (!st) { el.innerHTML = '<span class="hint">n/a</span>'; return; }
+        // Absent is normal, not a fault — the embedded calendar still gates.
+        var state = st.err ? ['讀取失敗 · 保留上一份', 'bad']
+                  : !st.present ? ['無檔案 · 只用內建行事曆', 'dim']
+                  : ['已載入', 'ok'];
+        var cells = [
+            ['狀態', state[0], state[1]],
+            ['新增封鎖', st.added || 0, (st.added > 0 ? 'ok' : 'dim')],
+            ['壓制內建', st.suppressed || 0, (st.suppressed > 0 ? 'warn' : 'dim')],
+            ['略過(有問題)', st.skipped || 0, (st.skipped > 0 ? 'bad' : 'ok')]
+        ];
+        var html = cells.map(function (c) {
+            return '<div class="ops-stream-cell ' + c[2] + '">'
+                 + '<span class="lbl">' + c[0] + '</span>'
+                 + '<span class="val">' + c[1] + '</span></div>';
+        }).join('');
+        // Problems are the point of `skipped` — a count with no reason is
+        // just a mystery.
+        (st.problems || []).forEach(function (p) {
+            html += '<div class="ops-stream-cell bad ops-stream-err">'
+                  + '<span class="lbl">問題</span><span class="val">' + p + '</span></div>';
+        });
+        if (st.err) {
+            html += '<div class="ops-stream-cell bad ops-stream-err">'
+                  + '<span class="lbl">錯誤</span><span class="val">' + st.err + '</span></div>';
+        }
+        html += '<div class="ops-stream-cell dim ops-stream-err">'
+              + '<span class="lbl">檔案</span><span class="val">' + (st.path || '—') + '</span></div>';
+        el.innerHTML = html;
+    }
     function fetchHealth() {
         fetch('/ops/services?_=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { return r.json(); })
-            .then(renderHealth)
+            .then(function (d) { renderHealth(d); renderWS(d && d.stream); renderStream(d && d.stream); renderMacro(d && d.macro_overlay); })
             .catch(function () { /* best-effort card */ });
     }
     document.getElementById('ops-ntfy-toggle').addEventListener('click', function () {
@@ -482,10 +597,18 @@
                 wrap.innerHTML = arr.map(function (a) {
                     var cls = a.dir === 'short' ? 'z-short' : (a.dir === 'long' ? 'z-long' : 'z-watch');
                     var tf = a.tf ? ' ' + a.tf : '';
-                    return '<div class="ops-zone-row ' + cls + '">'
+                    // Trigger rule is shown on every row: a touch band and a
+                    // close-confirmed band behave completely differently, and
+                    // a faulted one does not fire at all.
+                    var trig = a.fault
+                        ? '<span class="z-trig z-trig-bad">⚠ ' + a.fault + '</span>'
+                        : '<span class="z-trig' + (a.confirm ? ' z-trig-close' : '') + '">'
+                          + (a.trigger || '即時觸價') + '</span>';
+                    return '<div class="ops-zone-row ' + cls + (a.fault ? ' z-faulted' : '') + '">'
                         + '<span class="z-sym">' + a.symbol + tf + '</span>'
                         + '<span class="z-dir">' + a.dir + '</span>'
                         + '<span class="z-band">' + zFmt(a.lo) + '–' + zFmt(a.hi) + '</span>'
+                        + trig
                         + '<span class="z-note">' + (a.note || '') + '</span></div>';
                 }).join('');
             })

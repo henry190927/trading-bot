@@ -156,3 +156,150 @@
   })();
 </script>
 {{end}}
+
+{{/* ============================================================ */}}
+{{/* perfPanels — Equity / Calendar / Distribution.                */}}
+{{/*                                                               */}}
+{{/* Extracted from journal_list.html so /ops/autotrade renders the */}}
+{{/* SAME three views over the auto-executor's paper record. The    */}}
+{{/* builders behind it are shared too (rstats.go), so neither the  */}}
+{{/* markup nor the maths can drift between the two surfaces.       */}}
+{{/*                                                               */}}
+{{/* Context needs: .Equity .Calendar .Histogram .ClosedCount       */}}
+{{/* ============================================================ */}}
+{{define "perfPanels"}}
+<div class="pf-group">
+  <h2 class="pf-group-title">Performance</h2>
+  <div class="pf-tabs" role="tablist">
+    <button type="button" class="pf-tab active" data-tab="equity">Equity</button>
+    <button type="button" class="pf-tab" data-tab="calendar">Calendar</button>
+    <button type="button" class="pf-tab" data-tab="distribution">Distribution</button>
+  </div>
+
+{{/* --- TAB: Equity --- */}}
+{{if .Equity.HasData}}
+<section class="pf-section pf-equity pf-tab-panel active" data-panel="equity">
+  <h2 class="pf-section-title">
+    <span class="pf-section-dot equity"></span>
+    Equity curve
+    <span class="pf-section-meta">{{len .Equity.Points}}{{if gt (len .Equity.Points) 1}} points{{end}}</span>
+  </h2>
+
+  <div class="pf-equity-stats">
+    <div class="pf-equity-stat">
+      <span class="lbl">current</span>
+      <strong class="{{rClass .Equity.CurrentR}}">{{fmtR .Equity.CurrentR}}R</strong>
+    </div>
+    <div class="pf-equity-stat">
+      <span class="lbl">peak</span>
+      <strong class="r-pos">{{fmtR .Equity.PeakR}}R</strong>
+    </div>
+    <div class="pf-equity-stat">
+      <span class="lbl">drawdown</span>
+      {{/* Drawdown is a positive MAGNITUDE, so the sign is written here.
+           fmtR adds its own "+", which produced "−+1.00R". */}}
+      <strong class="{{if gt .Equity.Drawdown 0.0}}r-neg{{else}}r-zero{{end}}">{{if gt .Equity.Drawdown 0.0}}−{{end}}{{printf "%.2f" .Equity.Drawdown}}R</strong>
+    </div>
+  </div>
+
+  <div class="pf-equity-chart-wrap eq-{{.Equity.Trend}}">
+    <svg class="pf-equity-svg" viewBox="0 0 {{.Equity.ViewBoxW}} {{.Equity.ViewBoxH}}" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="eq-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="currentColor" stop-opacity="0.30"/>
+          <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- Zero reference line -->
+      <line x1="0" y1="{{printf "%.2f" .Equity.ZeroY}}" x2="{{.Equity.ViewBoxW}}" y2="{{printf "%.2f" .Equity.ZeroY}}"
+            stroke="rgba(139,148,158,0.4)" stroke-width="0.18" stroke-dasharray="0.8 0.8"/>
+      <!-- Filled area below the line -->
+      <path d="{{.Equity.AreaPath}}" fill="url(#eq-grad)" />
+      <!-- The line itself -->
+      <path d="{{.Equity.LinePath}}" fill="none" stroke="currentColor" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Trade dots -->
+      {{range .Equity.Points}}
+        {{if gt .Index 0}}
+          <circle cx="{{printf "%.2f" .X}}" cy="{{printf "%.2f" .Y}}" r="0.7" fill="currentColor"/>
+        {{end}}
+      {{end}}
+    </svg>
+    <div class="pf-equity-axis">
+      <span>{{.Equity.FirstClose.Format "Jan 2"}}</span>
+      <span>{{.Equity.LastClose.Format "Jan 2"}}</span>
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{/* --- TAB: Calendar --- */}}
+<section class="pf-section pf-tab-panel" data-panel="calendar">
+  <h2 class="pf-section-title">
+    <span class="pf-section-dot calendar"></span>
+    Daily R
+    <span class="pf-section-meta">last 6 weeks</span>
+  </h2>
+  <div class="cal2">
+    <div class="cal2-weekdays">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>
+    <div class="cal2-body">
+      {{range .Calendar}}
+        <div class="cal2-week">
+          {{range .}}
+            {{if .IsZero}}
+              <div class="cal2-cell empty {{if .IsToday}}today{{end}}" title="{{if .Day}}{{.Date.Format "Mon, Jan 2"}}{{end}} — no trades closed">
+                <div class="cal2-inner">
+                  <span class="cal2-day">{{if .Day}}{{.Day}}{{end}}</span>
+                </div>
+              </div>
+            {{else}}
+              <div class="cal2-cell {{if .IsPos}}pos{{else}}neg{{end}} {{if .IsToday}}today{{end}}"
+                   style="--intensity: {{printf "%.0f" .Intensity}}%"
+                   title="{{.Date.Format "Mon, Jan 2"}} — {{.Count}} trade{{if ne .Count 1}}s{{end}}, {{fmtR .TotalR}}R">
+                <div class="cal2-inner">
+                  <span class="cal2-day">{{.Day}}</span>
+                  <span class="cal2-r">{{fmtR .TotalR}}</span>
+                </div>
+              </div>
+            {{end}}
+          {{end}}
+        </div>
+      {{end}}
+    </div>
+    <div class="cal2-legend">
+      <span class="cal2-legend-end">−2R</span>
+      <span class="cal2-legend-swatch neg" style="--intensity: 100%"></span>
+      <span class="cal2-legend-swatch neg" style="--intensity: 60%"></span>
+      <span class="cal2-legend-swatch neg" style="--intensity: 30%"></span>
+      <span class="cal2-legend-swatch empty"></span>
+      <span class="cal2-legend-swatch pos" style="--intensity: 30%"></span>
+      <span class="cal2-legend-swatch pos" style="--intensity: 60%"></span>
+      <span class="cal2-legend-swatch pos" style="--intensity: 100%"></span>
+      <span class="cal2-legend-end">+2R</span>
+    </div>
+  </div>
+</section>
+
+{{/* --- TAB: Distribution --- */}}
+<section class="pf-section pf-tab-panel" data-panel="distribution">
+  <h2 class="pf-section-title">
+    <span class="pf-section-dot histo"></span>
+    R distribution
+    <span class="pf-section-meta">{{.ClosedCount}} closed</span>
+  </h2>
+  <div class="hist-grid">
+    {{range .Histogram}}
+      <div class="hist-col" title="{{.Label}}R: {{.Count}} trade{{if ne .Count 1}}s{{end}}">
+        <div class="hist-count">{{if .Count}}{{.Count}}{{end}}</div>
+        <div class="hist-bar-wrap">
+          <div class="hist-bar {{if .IsPos}}pos{{else}}neg{{end}}" style="height: {{printf "%.0f" .PctHeight}}%"></div>
+        </div>
+        <div class="hist-label">{{.Label}}</div>
+      </div>
+    {{end}}
+  </div>
+</section>
+</div>{{/* /pf-group performance */}}
+{{end}}
+

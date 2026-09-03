@@ -125,7 +125,7 @@
         <tbody id="mkt-body"><tr><td colspan="5" class="cs-dim">Loading…</td></tr></tbody>
       </table>
     </div>
-    <p class="glossary-hint"><span id="mkt-updated">—</span> · <span class="i18n-en">every 10s · live mark · funding as %</span><span class="i18n-zh">每 10s · 即時 mark 價 · funding 為當期 %</span></p>
+    <p class="glossary-hint"><span id="mkt-updated">—</span> · <span class="i18n-en">live mark · funding as %</span><span class="i18n-zh">即時 mark 價 · funding 為當期 %</span></p>
   </section>
 </main>
 
@@ -133,7 +133,16 @@
 (function () {
   var EMOJI = { BTC:'₿', ETH:'Ξ', SOL:'◎', LINK:'🔗', SUI:'🌊', HYPE:'🚀', NEAR:'Ⓝ', XAU:'🥇', XAG:'🥈', SNDK:'💾', NVDA:'🟩' };
   var cat = 'all', last = [];
-  function fmtPx(v){ if(v>=1000) return v.toLocaleString('en-US',{maximumFractionDigits:2}); if(v>=1) return v.toFixed(2); return v.toFixed(4); }
+  // Fixed decimal count, not just a maximum: maximumFractionDigits alone drops
+  // trailing zeros, so 77175.80 rendered "77,175.8" and 77175.75 rendered
+  // "77,175.75" — the cell width jittered on every tick, which defeats the
+  // tabular-nums that keeps the flashing cell still. Matches the chart page's
+  // fmtPrice output for the same value.
+  function fmtPx(v){
+    if(v>=1000) return v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(v>=1) return v.toFixed(2);
+    return v.toFixed(4);
+  }
   // verified-working logo CDNs: crypto → coincap (lower@2x); metals → coinglass
   // lowercase; stocks → coinglass UPPERCASE. onerror still falls back to emoji.
   function iconURL(sym){
@@ -144,44 +153,171 @@
   function icon(sym){
     return '<img class="mkt-logo" data-fb="'+(EMOJI[sym]||'•')+'" alt="" src="'+iconURL(sym)+'">';
   }
-  function render(){
+  // Rows are built ONCE per row-set and then updated CELL BY CELL.
+  //
+  // The old render() rebuilt body.innerHTML on every poll. That is what made a
+  // flash effect impossible: brand-new nodes have no previous state, so a CSS
+  // animation either never starts or restarts from scratch every 10s. Building
+  // in place also stops the 11 logo <img> elements from being recreated on
+  // every tick.
+  var rowEls = {};      // symbol -> {tr, px, chg, fund, rng}
+  var prevPx = {};      // symbol -> last price we displayed
+  var builtKey = null;  // which row set is currently in the DOM
+
+  function cellsFor(r){
+    var chg = (r.changePct==null) ? '' : (r.changePct>=0?'+':'') + r.changePct.toFixed(2) + '%';
+    return {
+      px:   (r.price==null) ? '—' : fmtPx(r.price),
+      chg:  chg,
+      chgc: (r.changePct==null) ? 'num cs-dim' : (r.changePct>=0 ? 'num up' : 'num down'),
+      fund: (r.funding==null) ? '—' : (r.funding>=0?'+':'') + r.funding.toFixed(4) + '%',
+      fundc:(r.funding==null) ? 'num cs-dim' : (r.funding>=0 ? 'num up' : 'num down'),
+      rng:  (r.low24==null||r.high24==null) ? '—' : fmtPx(r.low24)+' – '+fmtPx(r.high24)
+    };
+  }
+
+  function build(rows){
     var body = document.getElementById('mkt-body'); if(!body) return;
-    var rows = last.filter(function(r){ return cat==='all' || r.cat===cat; });
+    rowEls = {};
     if(!rows.length){ body.innerHTML = '<tr><td colspan="5" class="cs-dim">—</td></tr>'; return; }
     body.innerHTML = rows.map(function(r){
-      var chg = (r.changePct==null) ? '' : (r.changePct>=0?'+':'') + r.changePct.toFixed(2) + '%';
-      var chgc = (r.changePct==null) ? 'cs-dim' : (r.changePct>=0 ? 'up' : 'down');
-      var fund = (r.funding==null) ? '<span class="cs-dim">—</span>' : '<span style="color:'+(r.funding>=0?'var(--green)':'var(--red)')+'">'+(r.funding>=0?'+':'')+r.funding.toFixed(4)+'%</span>';
-      var rng = (r.low24==null||r.high24==null) ? '<span class="cs-dim">—</span>' : '<span class="cs-dim">'+fmtPx(r.low24)+' – '+fmtPx(r.high24)+'</span>';
-      var px = (r.price==null) ? '<span class="cs-dim">—</span>' : fmtPx(r.price);
-      return '<tr>'+
+      return '<tr data-sym="'+r.symbol+'">'+
         '<td><a href="/chart?symbol='+r.symbol+'" class="mkt-sym">'+icon(r.symbol)+' <b>'+r.symbol+'</b></a></td>'+
-        '<td class="num">'+px+'</td>'+
-        '<td class="num '+chgc+'">'+chg+'</td>'+
-        '<td class="num">'+fund+'</td>'+
-        '<td class="num">'+rng+'</td>'+
+        '<td class="num mkt-px"><span class="mkt-px-val"></span></td>'+
+        '<td class="num mkt-chg"></td>'+
+        '<td class="num mkt-fund"></td>'+
+        '<td class="num cs-dim mkt-rng"></td>'+
       '</tr>';
     }).join('');
+    rows.forEach(function(r){
+      var tr = body.querySelector('tr[data-sym="'+r.symbol+'"]');
+      if(!tr) return;
+      rowEls[r.symbol] = {
+        tr: tr,
+        px:   tr.querySelector('.mkt-px'),
+        pxv:  tr.querySelector('.mkt-px-val'),
+        chg:  tr.querySelector('.mkt-chg'),
+        fund: tr.querySelector('.mkt-fund'),
+        rng:  tr.querySelector('.mkt-rng')
+      };
+    });
     body.querySelectorAll('.mkt-logo').forEach(function(img){
-      img.onerror = function(){ var s=document.createElement('span'); s.className='mkt-ico'; s.textContent=img.getAttribute('data-fb'); img.replaceWith(s); };
+      img.onerror = function(){ var sp=document.createElement('span'); sp.className='mkt-ico'; sp.textContent=img.getAttribute('data-fb'); img.replaceWith(sp); };
     });
   }
+
+  // Re-triggering a CSS animation on an element that already carries the class
+  // needs the class removed AND a reflow forced before re-adding, otherwise the
+  // browser coalesces the two states and nothing plays. Reading offsetWidth is
+  // the reflow.
+  function flash(el, dir){
+    if(!el) return;
+    el.classList.remove('flash-up','flash-down');
+    void el.offsetWidth;
+    el.classList.add(dir > 0 ? 'flash-up' : 'flash-down');
+  }
+
+  function paint(rows, silent){
+    rows.forEach(function(r){
+      var el = rowEls[r.symbol]; if(!el) return;
+      var c = cellsFor(r);
+      if(el.pxv.textContent !== c.px){
+        el.pxv.textContent = c.px;
+        // Compare NUMBERS, not the formatted strings: a move too small to
+        // change the rounded text should not flash, and a move that does
+        // change it must flash in the direction the number actually went.
+        var was = prevPx[r.symbol];
+        if(!silent && was != null && r.price != null && r.price !== was){
+          flash(el.px, r.price > was ? 1 : -1);
+        }
+      }
+      if(r.price != null) prevPx[r.symbol] = r.price;
+      if(el.chg.textContent !== c.chg){ el.chg.textContent = c.chg; }
+      el.chg.className = c.chgc;
+      if(el.fund.textContent !== c.fund){ el.fund.textContent = c.fund; }
+      el.fund.className = c.fundc;
+      if(el.rng.textContent !== c.rng){ el.rng.textContent = c.rng; }
+    });
+  }
+
+  function render(silent){
+    var rows = last.filter(function(r){ return cat==='all' || r.cat===cat; });
+    var key = cat + '|' + rows.map(function(r){ return r.symbol; }).join(',');
+    var rebuilt = false;
+    if(key !== builtKey){ build(rows); builtKey = key; rebuilt = true; }
+    // A structural rebuild (first load, tab switch) fills the cells for the
+    // first time — flashing every row there would be noise, not information.
+    paint(rows, silent || rebuilt);
+  }
+
   function poll(){
     fetch('/api/tickers?_='+Date.now(), {cache:'no-store'})
       .then(function(r){ return r.json(); })
-      .then(function(d){ last = (d && d.tickers) || []; render();
-        var u=document.getElementById('mkt-updated'); if(u) u.textContent = new Date().toLocaleTimeString('en-GB',{hour12:false}); })
+      .then(function(d){ last = (d && d.tickers) || []; render(false); markUpdated(); })
       .catch(function(){});
   }
+  // ── Transport ────────────────────────────────────────────────────────
+  // SSE first: the server owns one upstream refresh and pushes to every tab,
+  // so a price change lands as soon as the server knows it instead of on the
+  // next local timer. Polling stays as the fallback for a browser without
+  // EventSource, or a proxy that mangles text/event-stream.
+  var es = null, pollTimer = null, sseAlive = false;
+
+  function markUpdated(){
+    var u = document.getElementById('mkt-updated');
+    if(u) u.textContent = new Date().toLocaleTimeString('en-GB',{hour12:false})
+                        + (sseAlive ? ' · live' : ' · poll');
+  }
+
+  function startPolling(){
+    if(pollTimer) return;
+    poll();
+    pollTimer = setInterval(function(){ if(!document.hidden) poll(); }, 5000);
+  }
+  function stopPolling(){
+    if(!pollTimer) return;
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  function startStream(){
+    if(typeof EventSource === 'undefined'){ startPolling(); return; }
+    try { es = new EventSource('/api/stream/tickers'); }
+    catch(e){ startPolling(); return; }
+
+    es.addEventListener('tickers', function(ev){
+      var d = null;
+      try { d = JSON.parse(ev.data); } catch(e){ return; }
+      if(!d || !d.tickers) return;
+      // First event proves the stream works end to end — only then is it safe
+      // to stop the fallback. Tearing the poller down on open() would strand
+      // the table if a proxy buffered the stream into silence.
+      if(!sseAlive){ sseAlive = true; stopPolling(); }
+      last = d.tickers;
+      render(false);
+      markUpdated();
+    });
+
+    // EventSource reconnects on its own, so onerror is not a failure path —
+    // it fires on every transient drop too. Fall back to polling only while
+    // disconnected, and let the stream take over again when it returns.
+    es.onerror = function(){
+      sseAlive = false;
+      startPolling();
+    };
+  }
+
   var tabs = document.getElementById('mkt-tabs');
   if(tabs) tabs.addEventListener('click', function(e){
     var b = e.target.closest('.mkt-tab'); if(!b) return;
     cat = b.getAttribute('data-cat');
     tabs.querySelectorAll('.mkt-tab').forEach(function(x){ x.classList.toggle('active', x===b); });
-    render();
+    render(true);
   });
+  // Paint from the REST snapshot immediately (no wait for the stream to
+  // establish), then hand over to SSE.
   poll();
-  setInterval(function(){ if(!document.hidden) poll(); }, 10000);
+  startStream();
 })();
 </script>
 </body>

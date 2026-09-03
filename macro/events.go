@@ -17,6 +17,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -91,12 +93,47 @@ func loadEvents() {
 				AfterMinutes:  after,
 			})
 		}
+		// All() documents sorted order; the file happens to be in order today,
+		// which is not the same as guaranteeing it.
+		sort.Slice(allEvts, func(i, j int) bool {
+			return allEvts[i].DatetimeUTC.Before(allEvts[j].DatetimeUTC)
+		})
 	})
 }
 
-// All returns the embedded event list (sorted by datetime).
-// Caller may freely iterate; the slice is not mutated after load.
+// All returns the effective event list: the embedded calendar merged with the
+// runtime overlay (see overlay.go), sorted by datetime.
+//
+// Merging HERE rather than at each call site is deliberate — there are ten
+// consumers across the engine, the monitor, /calendar, /today and the MCP
+// server, and an overlay that only some of them honoured would be worse than
+// no overlay at all.
+//
+// The returned slice is freshly built, so callers may not assume identity
+// across calls; nobody did, and pinning that down is cheaper than a copy-on-
+// write scheme for a list this small.
 func All() []Event {
+	loadEvents()
+	add, sup := overlaySnapshot()
+	if len(add) == 0 && len(sup) == 0 {
+		return allEvts
+	}
+	out := make([]Event, 0, len(allEvts)+len(add))
+	for _, e := range allEvts {
+		if sup[strings.ToLower(strings.TrimSpace(e.Name))] {
+			continue
+		}
+		out = append(out, e)
+	}
+	out = append(out, add...)
+	sort.Slice(out, func(i, j int) bool { return out[i].DatetimeUTC.Before(out[j].DatetimeUTC) })
+	return out
+}
+
+// Embedded returns ONLY the committed calendar, ignoring the overlay. Used by
+// /calendar to show which entries are permanent and which are ad-hoc, so an
+// overlay entry cannot be mistaken for a reviewed one.
+func Embedded() []Event {
 	loadEvents()
 	return allEvts
 }
@@ -114,10 +151,10 @@ func LoadError() error {
 // in file-order; since real-world blackouts shouldn't overlap, the
 // first match is fine.
 func ActiveAt(t time.Time) *Event {
-	loadEvents()
-	for i := range allEvts {
-		if allEvts[i].Contains(t) {
-			return &allEvts[i]
+	evts := All()
+	for i := range evts {
+		if evts[i].Contains(t) {
+			return &evts[i]
 		}
 	}
 	return nil
@@ -128,13 +165,13 @@ func ActiveAt(t time.Time) *Event {
 // heads-up before blackout begins (e.g. "CPI in 2h 14min — blackout
 // starts in 1h 14min"). Returns nil if nothing in lookahead.
 func NextUpcoming(t time.Time, lookahead time.Duration) *Event {
-	loadEvents()
+	evts := All()
 	var best *Event
-	for i := range allEvts {
-		start, _ := allEvts[i].Window()
+	for i := range evts {
+		start, _ := evts[i].Window()
 		if start.After(t) && start.Before(t.Add(lookahead)) {
 			if best == nil || start.Before(best.DatetimeUTC.Add(-time.Duration(best.BeforeMinutes)*time.Minute)) {
-				best = &allEvts[i]
+				best = &evts[i]
 			}
 		}
 	}

@@ -5553,7 +5553,7 @@ main { overflow-x: hidden; }
 .ops-zone-armed { margin-top: .5rem; display: flex; flex-direction: column; gap: 4px; }
 .ops-zone-hint { color: var(--text-dim); font-size: .82rem; font-style: italic; }
 .ops-zone-row {
-  display: grid; grid-template-columns: 6.5em 3.5em 9em 1fr; align-items: baseline;
+  display: grid; grid-template-columns: 6.5em 3.5em 9em 6.5em 1fr; align-items: baseline;
   gap: .5rem; padding: .3rem .5rem; border-radius: 6px; font-size: .82rem;
   background: rgba(255,255,255,0.03); border-left: 3px solid rgba(255,255,255,0.15);
 }
@@ -5566,6 +5566,25 @@ main { overflow-x: hidden; }
 .ops-zone-row.z-long  { border-left-color: #26a69a; }
 .ops-zone-row.z-long  .z-dir { color: #26a69a; }
 .ops-zone-row.z-watch { border-left-color: #d8a657; }
+/* Trigger rule per row — a touch band and a close-confirmed band are not the
+   same alert, so the list has to say which one is armed. */
+.ops-zone-row .z-trig {
+  font-size: .7rem; font-weight: 600; letter-spacing: .02em; text-align: center;
+  padding: .05rem .3rem; border-radius: 4px; color: var(--text-dim);
+  background: rgba(255,255,255,0.06);
+}
+.ops-zone-row .z-trig-close { color: #7fd6c2; background: rgba(38,166,154,0.16); }
+.ops-zone-row .z-trig-bad   { color: #ef9a9a; background: rgba(239,83,80,0.18); text-align: left; }
+.ops-zone-row.z-faulted { opacity: .7; border-left-color: #ef5350; }
+
+@media (max-width: 640px) {
+  /* 5 columns will not fit a phone — stack the metadata and let the note wrap
+     under it rather than truncating everything to nothing. */
+  .ops-zone-row { grid-template-columns: 6.5em 3.5em 1fr; }
+  .ops-zone-row .z-band { grid-column: 1 / -1; }
+  .ops-zone-row .z-trig { justify-self: start; }
+  .ops-zone-row .z-note { grid-column: 1 / -1; white-space: normal; }
+}
 
 /* ── Zone-fade alert: config + log (/ops) ───────────────────────────── */
 .ops-zone-autorow { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
@@ -6314,6 +6333,133 @@ html[data-density="compact"] .setups-table {
 .mkt-tabs { display: flex; gap: .3rem; flex-wrap: wrap; }
 .mkt-tab { padding: .25rem .7rem; border: 1px solid var(--chip-border); background: var(--chip); color: var(--text-dim); border-radius: 999px; cursor: pointer; font-size: .85rem; }
 .mkt-tab.active { color: var(--text); border-color: var(--blue); background: rgba(var(--blue-rgb), .12); }
+/* Ticker-strip tick flash. Lighter than the home table's (no travelling
+   edge, lower alpha): the strip is chrome sitting above the chart, so the
+   same intensity there would pull the eye off the price action. */
+@keyframes tk-flash-up   { 0% { background-color: rgba(var(--green-rgb), 0); } 10% { background-color: rgba(var(--green-rgb), .26); } 100% { background-color: rgba(var(--green-rgb), 0); } }
+@keyframes tk-flash-down { 0% { background-color: rgba(var(--red-rgb), 0);   } 10% { background-color: rgba(var(--red-rgb), .26);   } 100% { background-color: rgba(var(--red-rgb), 0); } }
+.chart-ticker-item .tk-px { border-radius: 4px; padding: 0 .18rem; font-variant-numeric: tabular-nums; }
+.chart-ticker-item .tk-px.tk-up-flash   { animation: tk-flash-up   .95s cubic-bezier(.22,.61,.36,1) both; }
+.chart-ticker-item .tk-px.tk-down-flash { animation: tk-flash-down .95s cubic-bezier(.22,.61,.36,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .chart-ticker-item .tk-px.tk-up-flash,
+  .chart-ticker-item .tk-px.tk-down-flash { animation-duration: .01ms; }
+  .chart-ticker-item .tk-px.tk-up-flash   { background-color: rgba(var(--green-rgb), .16); }
+  .chart-ticker-item .tk-px.tk-down-flash { background-color: rgba(var(--red-rgb), .16); }
+}
+
+/* Central-bank speech on /calendar. Promoted past the feed's own impact
+   rating, so it needs to LOOK promoted — and the rating we are overriding is
+   shown struck through rather than hidden. */
+.cal-cat.cat-speech { background: rgba(var(--red-rgb), 0.18); color: var(--red); border-color: var(--red); }
+.cal-speech-tag { color: var(--red); font-weight: 700; }
+.cal-feed-impact { color: var(--text-dim); text-decoration: line-through; font-size: .74rem; }
+
+/* ── Price fan-out stats (/ops health card) ──────────────────────────── */
+.ops-stream-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: .4rem; margin-top: .35rem;
+}
+.ops-stream-cell {
+  display: flex; flex-direction: column; gap: .1rem;
+  padding: .35rem .5rem; border-radius: 6px;
+  background: rgba(255,255,255,0.03); border-left: 3px solid var(--border);
+}
+.ops-stream-cell .lbl { font-size: .7rem; color: var(--text-dim); letter-spacing: .02em; }
+.ops-stream-cell .val { font-size: .9rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ops-stream-cell.ok   { border-left-color: var(--green); }
+.ops-stream-cell.warn { border-left-color: #d8a657; }
+.ops-stream-cell.warn .val { color: #d8a657; }
+.ops-stream-cell.bad  { border-left-color: var(--red); background: rgba(var(--red-rgb),0.08); }
+.ops-stream-cell.bad .val { color: var(--red); }
+.ops-stream-cell.dim  { border-left-color: var(--border); }
+.ops-stream-bad { color: var(--red); }
+/* The last-drop reason is a sentence, not a number — let it span and wrap
+   instead of being truncated inside a metric cell. */
+.ops-stream-cell.ops-stream-err { grid-column: 1 / -1; }
+.ops-stream-cell.ops-stream-err .val {
+  font-size: .78rem; font-weight: 500; white-space: normal;
+  word-break: break-word; font-variant-numeric: normal;
+}
+
+/* ── Price-tick flash (home market table) ────────────────────────────
+   Coinglass-style: the price cell washes with colour on a tick, then fades
+   out. Deliberately asymmetric — the tint arrives almost instantly (the
+   information) and leaves slowly (the grace). A symmetric ease looks like a
+   blink; a slow rise looks laggy.
+
+   Applied to the CELL, not the row: a whole-row flash across five columns
+   reads as an error state. The number itself takes the tick colour for the
+   same beat and settles back to normal text, which is what makes a fast
+   sequence of ticks legible instead of strobing.
+
+   Solid rgba only, no color-mix() — iOS Safari < 16.4 renders nothing for it
+   (feedback-css-color-mix). Tokens are per-theme, so this follows the theme. */
+.mkt-table td.mkt-px {
+  position: relative;
+  font-variant-numeric: tabular-nums; /* digits keep their column so a tick doesn't shift the cell */
+  border-radius: 5px;
+}
+.mkt-table td.mkt-px .mkt-px-val {
+  position: relative;
+  transition: color .5s cubic-bezier(.22,.61,.36,1);
+}
+
+@keyframes mkt-tick-up {
+   0%  { background-color: rgba(var(--green-rgb), 0); }
+   9%  { background-color: rgba(var(--green-rgb), .30); }
+  100% { background-color: rgba(var(--green-rgb), 0); }
+}
+@keyframes mkt-tick-down {
+   0%  { background-color: rgba(var(--red-rgb), 0); }
+   9%  { background-color: rgba(var(--red-rgb), .30); }
+  100% { background-color: rgba(var(--red-rgb), 0); }
+}
+@keyframes mkt-tick-text-up {
+   0%  { color: var(--green); }
+  18%  { color: var(--green); }
+  100% { color: var(--text); }
+}
+@keyframes mkt-tick-text-down {
+   0%  { color: var(--red); }
+  18%  { color: var(--red); }
+  100% { color: var(--text); }
+}
+
+.mkt-table td.mkt-px.flash-up   { animation: mkt-tick-up   1.15s cubic-bezier(.22,.61,.36,1) both; }
+.mkt-table td.mkt-px.flash-down { animation: mkt-tick-down 1.15s cubic-bezier(.22,.61,.36,1) both; }
+.mkt-table td.mkt-px.flash-up   .mkt-px-val { animation: mkt-tick-text-up   1.15s cubic-bezier(.22,.61,.36,1) both; }
+.mkt-table td.mkt-px.flash-down .mkt-px-val { animation: mkt-tick-text-down 1.15s cubic-bezier(.22,.61,.36,1) both; }
+
+/* A hairline on the leading edge gives the flash a direction to come from,
+   which is most of why the Coinglass version reads as motion rather than a
+   blink. Sits on a pseudo-element so it can't disturb the cell's layout. */
+.mkt-table td.mkt-px::before {
+  content: ""; position: absolute; left: 0; top: 12%; bottom: 12%; width: 2px;
+  border-radius: 2px; background: transparent; opacity: 0;
+}
+@keyframes mkt-tick-edge {
+   0%  { opacity: 0; transform: scaleY(.4); }
+  12%  { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
+}
+.mkt-table td.mkt-px.flash-up::before   { background: var(--green); animation: mkt-tick-edge 1.15s ease-out both; }
+.mkt-table td.mkt-px.flash-down::before { background: var(--red);   animation: mkt-tick-edge 1.15s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Keep the information, drop the movement: one short static tint, no
+     travelling edge, no colour ramp on the digits. */
+  .mkt-table td.mkt-px.flash-up,
+  .mkt-table td.mkt-px.flash-down { animation-duration: .01ms; }
+  .mkt-table td.mkt-px.flash-up   { background-color: rgba(var(--green-rgb), .18); }
+  .mkt-table td.mkt-px.flash-down { background-color: rgba(var(--red-rgb), .18); }
+  .mkt-table td.mkt-px.flash-up .mkt-px-val,
+  .mkt-table td.mkt-px.flash-down .mkt-px-val,
+  .mkt-table td.mkt-px.flash-up::before,
+  .mkt-table td.mkt-px.flash-down::before { animation: none; }
+  .mkt-table td.mkt-px::before { display: none; }
+}
+
 .mkt-table td.up, .mkt-table th.up { color: var(--green); }
 .mkt-table td.down { color: var(--red); }
 .mkt-sym { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); text-decoration: none; }

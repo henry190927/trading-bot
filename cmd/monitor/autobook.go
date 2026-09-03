@@ -118,3 +118,37 @@ func capStr(v float64) string {
 	}
 	return fmt.Sprintf("%g", v)
 }
+
+// logTrace prints one line per fire behind AUTOEXEC_TRACE=1, so the book's
+// open= and todayR= numbers can be reconciled against the /ops row list.
+//
+// The two views answer different questions and are SUPPOSED to differ: /ops
+// lists the outcome of every fire, while the breaker sums DEDUPED positions —
+// a re-fire inside a still-held (or cooling-down) rule is absorbed and books
+// no R of its own. Without this trace that difference is indistinguishable
+// from a miscount, which is exactly the confusion it was added to end.
+func logTrace(trace []autotrade.FireTrace, cooldownBars int) {
+	log.Printf("autoexec: trace — %d fire(s), cooldown=%d bars (newest first)", len(trace), cooldownBars)
+	for _, t := range trace {
+		flags := ""
+		if t.NewestForRule {
+			flags += " newest"
+		}
+		if t.CountedOpen {
+			flags += " OPEN-SLOT"
+		}
+		if t.CountedToday {
+			flags += " →todayR"
+		}
+		if t.Unscoreable {
+			flags += " UNSCOREABLE"
+		}
+		exit := "—"
+		if !t.ExitAt.IsZero() {
+			exit = t.ExitAt.UTC().Format("01-02 15:04")
+		}
+		log.Printf("autoexec:   %s %s/%s fired=%s bars=%d status=%s exit=%s netR=%+.2f%s",
+			t.Symbol, t.TF, t.Strategy, t.FireTime.UTC().Format("01-02 15:04"),
+			t.Bars, t.Status, exit, t.NetR, flags)
+	}
+}
