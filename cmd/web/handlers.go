@@ -3333,7 +3333,10 @@ func resolveWebSymbol(s string) (market.Symbol, error) {
 	case "NEAR":
 		return market.NEARUSDT, nil
 	}
-	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG / SNDK / NVDA / SOL / LINK / SUI / HYPE / NEAR)", s)
+	// Built from uiSymbols rather than hardcoded: the literal list here went
+	// stale the moment SPCX/MSTR/APP were added, so the error told the caller
+	// to use symbols that WERE valid and omitted three that also were.
+	return "", fmt.Errorf("unknown symbol %q (use %s)", s, strings.Join(uiSymbols, " / "))
 }
 
 // techSideStr renders an engine Side as the "long"/"short"/"flat" string the

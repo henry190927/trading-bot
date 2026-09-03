@@ -2592,7 +2592,23 @@
             if (!btn) return;
             var sym = btn.getAttribute('data-sym');
             if (!sym || sym === currentSym()) return;
+            // The strip is built from /api/tickers (live), the <select> from the
+            // page's server-rendered options (fixed at load). After a deploy
+            // that adds a symbol, a tab still holding the OLD page has a strip
+            // offering it and a dropdown that does not: `symSel.value = sym`
+            // then silently no-ops, currentSym() returns "", and every fetch
+            // 400s with `unknown symbol ""`. Reported 2026-09-04 clicking
+            // MSTR/SPCX right after they shipped.
+            //
+            // So don't trust the assignment — verify it took, and fall back to
+            // a real navigation, which reloads the page WITH the new symbol in
+            // its dropdown. A stale tab degrades to one extra page load
+            // instead of an error toast.
             symSel.value = sym;
+            if (symSel.value !== sym) {
+                location.href = '/chart?symbol=' + encodeURIComponent(sym) + '&tf=' + encodeURIComponent(currentTF());
+                return;
+            }
             symSel.dispatchEvent(new Event('change'));
         });
     })();
