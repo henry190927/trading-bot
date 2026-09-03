@@ -35,6 +35,7 @@ func main() {
 	structMomentum := flag.Bool("struct-momentum", false, "STRATEGY: replace the MR engine with the trend/structure-aligned StructMomentum strategy (BOS-continuation retrace into 樞紐區) for ALL symbols. A/B vs the MR baseline per symbol/TF before assigning it in strategyFor. See docs/struct_momentum_strategy_design.md.")
 	liqVote := flag.Float64("liq-vote", 0, "STRATEGY VARIANT: EQH/EQL pool proximity as an MR confluence vote — an EQH within this many percent ABOVE price votes bear, an EQL that close BELOW votes bull (polarity matches sweep-reject, the only pool use that passed an A/B). Default 0 = off; pools score nothing. Try 0.3/0.5/0.8 and check nearby params, not just one.")
 	liqVoteMagnet := flag.Bool("liq-vote-magnet", false, "invert --liq-vote's polarity to test the competing liquidity-MAGNET reading (EQH above = bullish pull, EQL below = bearish pull). Only meaningful with --liq-vote > 0.")
+	noStructMomentum := flag.Bool("no-struct-momentum", false, "A/B BASELINE: force the MR engine for every symbol, overriding the strategyFor allowlist. REQUIRED for an SM-vs-MR A/B on a symbol already assigned to StructMomentum (SOL/LINK 1h+2h, SUI/HYPE 1h) — without it BOTH arms run SM and the comparison is inert. Mutually exclusive with --struct-momentum.")
 	smStopBuffer := flag.Float64("sm-stop-buffer", 0, "STRATEGY VARIANT: push the StructMomentum stop this many ATR(14) beyond the leg-origin invalidate (sweep buffer). Only affects --struct-momentum. Default 0 = stop on the invalidate line. A/B on SOL/LINK before shipping.")
 	useDXY := flag.Bool("dxy", false, "enable DXY macro veto on XAU/XAG signals. Default OFF — 2026-05-27 backtest showed it hurt by ~46R (vetoed trades were the best ones; mean-reversion thrives on macro-divergent dips)")
 	bodyWeight := flag.Float64("body-weight", 0, "POC/HVN body-weighted distribution: fraction (0,1) of each candle's volume routed to its body range. Default 0 = legacy uniform-over-HL. Try 0.7 to damp wick-hunt distortion during whipsaw.")
@@ -49,6 +50,13 @@ func main() {
 	useFunding := flag.Bool("funding", true, "fetch per-symbol funding-rate history and pass to engine via Context. Activates applyContextFilters' crowd penalties + applyFundingContrarianVote's contrarian +1/+2 votes. Default ON (matches shipped engine behavior).")
 	noFundingVote := flag.Bool("no-funding-vote", false, "disable signal.FundingContrarianVoteEnabled — the contrarian +1/+2 vote stays off even when --funding is on. A/B switch for the pre-2026-06-08 baseline.")
 	flag.Parse()
+	if *structMomentum && *noStructMomentum {
+		fmt.Fprintln(os.Stderr, "--struct-momentum and --no-struct-momentum are mutually exclusive: one forces StructMomentum on, the other forces it off. Pick the arm you mean.")
+		os.Exit(2)
+	}
+	if *noStructMomentum {
+		signal.StructMomentumOff = true
+	}
 	if *noFundingVote {
 		signal.FundingContrarianVoteEnabled = false
 	}

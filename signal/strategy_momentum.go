@@ -40,29 +40,93 @@ var SMStopBufferATR = 0.0
 // existing symbols before any alt is added to strategyFor. Default false.
 var StructMomentumEnabled = false
 
+// StructMomentumOff forces the MR engine for EVERY symbol, overriding the
+// strategyFor allowlist.
+//
+// Without it, an SM-vs-MR A/B on an ALREADY-ASSIGNED symbol is inert: the
+// baseline arm runs `strategyFor(SOL,1h) == StrategyStructMomentum` and the
+// variant arm runs StructMomentumEnabled, so BOTH arms execute SM and the two
+// outputs are byte-identical. That is precisely the failure mode recorded for
+// cmd/flipbt, where an inert -window flag produced a flattering +10.00R that
+// turned into -4.00R once the parameter actually did something.
+//
+// So this is not a convenience switch — it is the only thing that makes the
+// baseline arm a real baseline for SOL/LINK/SUI/HYPE. Takes precedence over
+// StructMomentumEnabled; setting both is a caller error and cmd/backtest
+// refuses it rather than silently picking one.
+var StructMomentumOff = false
+
 // strategyFor returns the strategy a (symbol, timeframe) runs. Per-(symbol,TF)
 // allowlist — the A/B showed the StructMomentum edge is BOTH symbol- and
-// TF-specific (BTC likes it on 1h not 2h; ETH the reverse), so assignment must
-// be per-pair. Everything defaults to MR; a pair opts into StructMomentum ONLY
-// after clearing its A/B gate (Phase 3, 2026-08-22).
+// TF-specific, so assignment must be per-pair. Everything defaults to MR; a
+// pair opts into StructMomentum ONLY after clearing its A/B gate.
 //
-// Assignments (forward-log only — none of these are in market.All(), so this
-// changes NO daemon/live-core behavior; the core 4 stay MR on every TF):
-//   SOL 1h/2h, LINK 1h/2h — cleared strongly.  SUI 1h, HYPE 1h — marginal
-//   (avoid MR's bleed; forward-log to confirm).  NEAR — MR on all TFs (it
-//   A/B'd as a mean-reversion symbol).  BTC/ETH left on MR pending their own
-//   forward-log decision despite BTC-1h/ETH-2h showing promise.
+// Forward-log only: none of these are in market.All(), so this changes no
+// daemon/live-core behaviour. It DOES steer autotrade.json rules whose
+// strategy is "engine", which is how HYPE 1h ended up running a disproven
+// strategy in paper.
+//
+// ── Phase-2 validation, 2026-09-03 (SM vs MR, netR per window 60/90/120d) ───
+//
+// Re-run required building signal.StructMomentumOff first: once a pair is IN
+// this allowlist, the baseline arm runs SM too, so an SM-vs-MR A/B on an
+// assigned pair is INERT and both arms emit byte-identical output. The 2026-08
+// numbers below predate the assignment, when the baseline genuinely was MR.
+// Gate = SM must beat MR in EVERY window.
+//
+//	SOL  1h  MR -19.37/-21.17/-20.10  ->  SM  +3.65/+2.48/+8.47   PASS 3/3  KEPT
+//	SUI  1h  MR  -6.10/ -8.13/-18.05  ->  SM  -2.44/-2.44/-0.69   PASS 3/3  KEPT*
+//	LINK 1h  MR  -0.08/ +5.69/ -4.05  ->  SM  -3.66/+2.22/+0.71   1/3       REMOVED
+//	HYPE 1h  MR  +1.35/ +4.22/ -1.28  ->  SM  -0.61/-1.90/-1.94   0/3       REMOVED
+//
+// SOL 1h is the strongest result in the file, and it is really a finding about
+// MR: -19 to -21R across all three windows on 36-75 trades is not noise, it is
+// mean-reversion bleeding on that pair. SM fires ~1/3 as often (0.19-0.23
+// trades/day vs 0.60-0.62) for far better R/trade.
+//
+// *SUI 1h passes the gate while being NEGATIVE in every window. It wins only
+// because MR is catastrophic there. Better-than-a-disaster is not an edge — a
+// purely relative gate cannot express that, and the honest reading is that SUI
+// 1h should probably be traded by neither engine. Kept because removing it
+// would silently hand those bars back to the worse of the two; revisit with a
+// minimum-absolute-netR gate rather than by picking a winner.
+//
+// LINK's earlier note claimed it "cleared strongly" on 1h/2h. Not a
+// contradiction of that test: it ran on 2026-08-22 windows, before LINK was
+// assigned, so its baseline was real. The re-run uses windows ending
+// 2026-09-03. Two valid tests disagreeing across a two-week shift is itself
+// the finding — LINK 1h is regime-dependent, not a stable edge, which is
+// exactly what the every-window gate exists to reject.
+//
+// 2h assignments are UNDECIDED, not passing: SM fires 3-14 times per 2h window
+// (SOL 4/6/12, LINK 3/6/11), and calling n=3 a window loss is reading noise.
+// Left in place with the uncertainty stated rather than churned on thin data.
+// NEAR stays MR on all TFs (it A/B'd as a mean-reversion symbol). BTC/ETH stay
+// MR pending their own forward-log decision.
+//
+// The alt expansion (XRP/NEAR/…) remains BLOCKED: SM is validated on exactly
+// one pair out of six tested. One pass in six is not a strategy ready to grow.
 func strategyFor(sym market.Symbol, tf market.Timeframe) StrategyKind {
 	switch sym {
-	case market.SOLUSDT, market.LINKUSDT:
+	case market.SOLUSDT:
+		// 1h PASS 3/3. 2h undecided (n=4/6/12) — kept, not validated.
 		if tf == "1h" || tf == "2h" {
 			return StrategyStructMomentum
 		}
-	case market.SUIUSDT, market.HYPEUSDT:
+	case market.LINKUSDT:
+		// 1h REMOVED 2026-09-03 (1/3). 2h undecided (n=3/6/11) — kept.
+		if tf == "2h" {
+			return StrategyStructMomentum
+		}
+	case market.SUIUSDT:
+		// 1h PASS 3/3 but negative in every window; see the note above.
 		if tf == "1h" {
 			return StrategyStructMomentum
 		}
 	}
+	// HYPE removed entirely 2026-09-03: 1h was its only assignment and it
+	// FAILED 0/3 with adequate n (11/18/23). Its "engine" autotrade rule now
+	// falls back to MR, which beat SM in every window.
 	return StrategyMR
 }
 

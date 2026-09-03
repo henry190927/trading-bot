@@ -204,7 +204,9 @@ func Evaluate(in Inputs) Signal {
 	// trend/structure-aligned path INSTEAD of the MR body below. The MR body is
 	// unchanged — closed-bar parity preserved. Both share the macro + earnings
 	// blackout gates above. See docs/struct_momentum_strategy_design.md.
-	if StructMomentumEnabled || strategyFor(in.Symbol, in.Timeframe) == StrategyStructMomentum {
+	// StructMomentumOff wins over both the force-on flag and the allowlist —
+	// see its doc comment for why an SM-vs-MR A/B is inert without it.
+	if !StructMomentumOff && (StructMomentumEnabled || strategyFor(in.Symbol, in.Timeframe) == StrategyStructMomentum) {
 		return evaluateStructMomentum(in)
 	}
 
@@ -843,10 +845,10 @@ var StructureVetoEnabled = false
 // is OPPOSITE the crowded side — the side getting paid to hold a
 // position, with squeeze fuel building behind it.
 //
-//   LONG  + funding ≤ FundingExtremeShort (-0.10%/8h):  +2 (extreme squeeze setup)
-//   LONG  + funding ≤ FundingCrowdedShort (-0.05%/8h):  +1 (crowded shorts)
-//   SHORT + funding ≥ FundingExtremeLong  (+0.10%/8h):  +2 (extreme flush setup)
-//   SHORT + funding ≥ FundingCrowdedLong  (+0.05%/8h):  +1 (crowded longs)
+//	LONG  + funding ≤ FundingExtremeShort (-0.10%/8h):  +2 (extreme squeeze setup)
+//	LONG  + funding ≤ FundingCrowdedShort (-0.05%/8h):  +1 (crowded shorts)
+//	SHORT + funding ≥ FundingExtremeLong  (+0.10%/8h):  +2 (extreme flush setup)
+//	SHORT + funding ≥ FundingCrowdedLong  (+0.05%/8h):  +1 (crowded longs)
 //
 // Same-side crowding is handled by annotateContextWarnings as an
 // advisory warning (display-only; doesn't affect trade selection).

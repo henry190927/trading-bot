@@ -31,10 +31,18 @@ func TestStrategyForAltAssignments(t *testing.T) {
 		tf   market.Timeframe
 		want StrategyKind
 	}{
-		{market.SOLUSDT, "1h", sm}, {market.SOLUSDT, "2h", sm}, {market.SOLUSDT, "15m", StrategyMR},
-		{market.LINKUSDT, "1h", sm}, {market.LINKUSDT, "2h", sm}, {market.LINKUSDT, "4h", StrategyMR},
-		{market.SUIUSDT, "1h", sm}, {market.SUIUSDT, "2h", StrategyMR},
-		{market.HYPEUSDT, "1h", sm}, {market.HYPEUSDT, "2h", StrategyMR},
+		// Gate results from the 2026-09-03 Phase-2 validation are carried
+		// inline so an edit to the allowlist has to confront the number.
+		{market.SOLUSDT, "1h", sm}, // PASS 3/3
+		{market.SOLUSDT, "2h", sm}, // undecided (n=4/6/12), kept
+		{market.SOLUSDT, "15m", StrategyMR},
+		{market.LINKUSDT, "1h", StrategyMR}, // REMOVED — 1/3
+		{market.LINKUSDT, "2h", sm},         // undecided (n=3/6/11), kept
+		{market.LINKUSDT, "4h", StrategyMR},
+		{market.SUIUSDT, "1h", sm}, // PASS 3/3 (negative in absolute terms — see strategyFor)
+		{market.SUIUSDT, "2h", StrategyMR},
+		{market.HYPEUSDT, "1h", StrategyMR}, // REMOVED — FAIL 0/3
+		{market.HYPEUSDT, "2h", StrategyMR},
 	}
 	for _, c := range cases {
 		if got := strategyFor(c.sym, c.tf); got != c.want {
