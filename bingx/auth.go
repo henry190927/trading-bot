@@ -127,3 +127,23 @@ func rawCanonical(params url.Values) string {
 	}
 	return sb.String()
 }
+
+// SignedGetRaw performs a signed GET and returns the envelope's `data`
+// verbatim.
+//
+// Read-only diagnostics only — it exists because the typed structs in this
+// package capture just the fields the trading flow needs, and a cross-margin
+// account's liquidation price and equity live in fields nobody had modelled
+// yet. Guessing BingX's field names from documentation is how you end up with
+// a silently-zero number in a risk readout, so this lets a caller look at
+// exactly what the exchange sends before committing to a struct.
+//
+// Never use this on a mutating endpoint: the point of the typed wrappers is
+// that order placement goes through code that has been reviewed.
+func (c *Client) SignedGetRaw(ctx context.Context, path string, params url.Values) (json.RawMessage, error) {
+	var out json.RawMessage
+	if err := c.signedRequest(ctx, "GET", path, params, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

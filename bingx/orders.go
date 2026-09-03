@@ -401,7 +401,7 @@ func (c *Client) OpenOrders(ctx context.Context, sym market.Symbol) ([]OpenOrder
 			ReduceOnly   bool   `json:"reduceOnly"`
 		} `json:"orders"`
 	}
-	if err := c.signedRequest(ctx, "GET", "/openApi/swap/v2/trade/openOrders", q, &resp); err != nil {
+	if err := c.signedRequest(ctx, "GET", PathOpenOrders, q, &resp); err != nil {
 		return nil, err
 	}
 	out := make([]OpenOrder, 0, len(resp.Orders))

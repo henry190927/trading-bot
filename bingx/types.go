@@ -5,10 +5,10 @@ package bingx
 //   - Standard Futures (XAU-USDT, XAG-USDT): currently under open-api with
 //     a separate path. Confirm with current BingX docs before wiring.
 const (
-	HostSwap     = "https://open-api.bingx.com"
-	HostWSSwap   = "wss://open-api-swap.bingx.com/swap-market"
-	PathKlines   = "/openApi/swap/v3/quote/klines"
-	PathDepth    = "/openApi/swap/v2/quote/depth"
+	HostSwap           = "https://open-api.bingx.com"
+	HostWSSwap         = "wss://open-api-swap.bingx.com/swap-market"
+	PathKlines         = "/openApi/swap/v3/quote/klines"
+	PathDepth          = "/openApi/swap/v2/quote/depth"
 	PathFunding        = "/openApi/swap/v2/quote/premiumIndex"
 	PathFundingHistory = "/openApi/swap/v2/quote/fundingRate"
 	PathOpenInt        = "/openApi/swap/v2/quote/openInterest"
@@ -19,6 +19,8 @@ const (
 	PathOrder       = "/openApi/swap/v2/trade/order"
 	PathCancelOrder = "/openApi/swap/v2/trade/order" // DELETE on /trade/order cancels
 	PathLeverage    = "/openApi/swap/v2/trade/leverage"
+	PathBalance     = "/openApi/swap/v2/user/balance"
+	PathOpenOrders  = "/openApi/swap/v2/trade/openOrders"
 )
 
 type RawKline struct {
