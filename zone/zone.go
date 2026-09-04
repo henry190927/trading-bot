@@ -288,9 +288,50 @@ func Key(z Zone) string {
 		strings.ToLower(strings.TrimSpace(z.Confirm)))
 }
 
+// AutoZoneFrom turns one structural snapshot into an armable zone. Split out
+// of ComputeAuto so the arming RULES are testable without a live client —
+// ComputeAuto's own body is now just fetch-and-loop.
+//
+// ok=false means "nothing to arm here": no active 樞紐區 (the leg was
+// invalidated by a CHoCH), or a trend that is neither clean up nor clean down.
+// Fading a neutral tape is the counter-trend trade with none of the context
+// that justifies it.
+func AutoZoneFrom(short string, tf market.Timeframe, st signal.StructureState) (Zone, bool) {
+	if st.Zone == nil {
+		return Zone{}, false
+	}
+	var dir string
+	switch st.Trend {
+	case signal.StructDowntrend:
+		dir = "short"
+	case signal.StructUptrend:
+		dir = "long"
+	default:
+		return Zone{}, false
+	}
+	lo, hi := st.Zone.Lo, st.Zone.Hi
+	if hi < lo {
+		lo, hi = hi, lo
+	}
+	note := fmt.Sprintf("auto %s %s 樞紐區 fade｜stop %s target %s",
+		string(tf), TrendWord(st.Trend), FmtPrice(st.Zone.Invalidate), FmtPrice(st.Zone.Target))
+	return Zone{
+		Symbol: short, Lo: lo, Hi: hi, Dir: dir, Note: note, TF: string(tf),
+		// close-in, NOT the ConfirmTouch zero value. A 樞紐區 is a 0.5–0.705
+		// retrace BAND — on BTC 2h that is ~1,000 points wide — so touch
+		// semantics fire the moment the mark grazes the far edge, a full
+		// band-width before the level worth watching. cmd/confirmbt measured
+		// the same thing as R: touch -0.41R/trade vs close-in -0.12R/trade.
+		// The hand-armed zones already carry close-in; leaving the auto ones
+		// on the default meant the generated half of the channel ran on the
+		// mode our own A/B rejected.
+		Confirm: ConfirmCloseIn,
+	}, true
+}
+
 // ComputeAuto derives one zone per (symbol, TF) in a CONFIRMED trend with an
-// active pivot zone. Trade dir = trend dir (downtrend → fade short, uptrend
-// → fade long). Symbols not cleanly trending are skipped.
+// active pivot zone, over market.All() — the core universe only, NOT the alts
+// or the stock synthetics (those are forward-log symbols with no zone channel).
 func ComputeAuto(ctx context.Context, client *bingx.Client, tfs []market.Timeframe) []Zone {
 	var zs []Zone
 	for _, sym := range market.All() {
@@ -300,26 +341,11 @@ func ComputeAuto(ctx context.Context, client *bingx.Client, tfs []market.Timefra
 			if err != nil || len(candles) < 60 {
 				continue
 			}
-			st := signal.AnalyzeStructure(candles, 2)
-			if st.Zone == nil {
+			z, ok := AutoZoneFrom(short, tf, signal.AnalyzeStructure(candles, 2))
+			if !ok {
 				continue
 			}
-			var dir string
-			switch st.Trend {
-			case signal.StructDowntrend:
-				dir = "short"
-			case signal.StructUptrend:
-				dir = "long"
-			default:
-				continue
-			}
-			lo, hi := st.Zone.Lo, st.Zone.Hi
-			if hi < lo {
-				lo, hi = hi, lo
-			}
-			note := fmt.Sprintf("auto %s %s 樞紐區 fade｜stop %s target %s",
-				string(tf), TrendWord(st.Trend), FmtPrice(st.Zone.Invalidate), FmtPrice(st.Zone.Target))
-			zs = append(zs, Zone{Symbol: short, Lo: lo, Hi: hi, Dir: dir, Note: note, TF: string(tf)})
+			zs = append(zs, z)
 		}
 	}
 	return zs

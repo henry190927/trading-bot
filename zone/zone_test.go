@@ -3,6 +3,8 @@ package zone
 import (
 	"strings"
 	"testing"
+
+	"myFirstGo/trading-bot/signal"
 )
 
 // The band that caused this feature: BTC 77390–77476.3 (EQL 3x + 日開 77396.9
@@ -205,5 +207,87 @@ func TestSymbolMapsRoundTrip(t *testing.T) {
 	}
 	if len(SymToShort) != len(ShortToSym) {
 		t.Errorf("map sizes differ: %d vs %d", len(SymToShort), len(ShortToSym))
+	}
+}
+
+// ---------------------------------------------------------------------
+// AutoZoneFrom — the arming rules for the generated half of the channel.
+// ---------------------------------------------------------------------
+
+func upZone() *signal.PivotZone {
+	return &signal.PivotZone{
+		Dir: signal.StructUptrend, Lo: 78864.4, Hi: 79853.1,
+		Invalidate: 77441.6, Target: 87087.8, LegLow: 77441.6, LegHigh: 82264.7,
+	}
+}
+
+// The bug this asserts against: ComputeAuto built its Zone without setting
+// Confirm, so every generated zone inherited ConfirmTouch (""). On a band as
+// wide as BTC 2h (78,864.4–79,853.1 ≈ 1,000 points) touch fires at the far
+// edge, ~a full band-width early, and cmd/confirmbt priced that difference at
+// -0.41R/trade vs -0.12R/trade. Auto zones must match the hand-armed ones.
+func TestAutoZoneFromUsesCloseConfirmation(t *testing.T) {
+	z, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{
+		Trend: signal.StructUptrend, Zone: upZone(),
+	})
+	if !ok {
+		t.Fatal("a clean uptrend with an active pivot zone must arm")
+	}
+	if z.Confirm != ConfirmCloseIn {
+		t.Errorf("Confirm = %q, want %q — touch semantics fire a band-width early",
+			z.Confirm, ConfirmCloseIn)
+	}
+	if !z.NeedsClose() {
+		t.Error("NeedsClose() must be true, or zonealert takes the live-price path")
+	}
+}
+
+func TestAutoZoneFromDirectionFollowsTrend(t *testing.T) {
+	for _, tc := range []struct {
+		trend signal.TrendStructure
+		want  string
+	}{
+		{signal.StructUptrend, "long"},
+		{signal.StructDowntrend, "short"},
+	} {
+		z, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{Trend: tc.trend, Zone: upZone()})
+		if !ok {
+			t.Fatalf("%v should arm", tc.trend)
+		}
+		if z.Dir != tc.want {
+			t.Errorf("%v → dir %q, want %q (fade WITH the trend, never against)", tc.trend, z.Dir, tc.want)
+		}
+	}
+}
+
+// Two distinct skips, both of which would otherwise arm a counter-trend fade
+// with no structural backing.
+func TestAutoZoneFromSkips(t *testing.T) {
+	if _, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{
+		Trend: signal.StructUptrend, Zone: nil,
+	}); ok {
+		t.Error("no active 樞紐區 (leg invalidated by CHoCH) must not arm")
+	}
+	if _, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{
+		Trend: signal.StructNeutral, Zone: upZone(),
+	}); ok {
+		t.Error("a neutral trend must not arm — BTC 1h was exactly this case on 2026-09-04")
+	}
+}
+
+// Lo/Hi must come out ordered whichever way the pivot zone stored them: the
+// zonealert band test is `px >= Lo && px <= Hi`, which is empty if they swap.
+func TestAutoZoneFromNormalisesBandOrder(t *testing.T) {
+	inverted := upZone()
+	inverted.Lo, inverted.Hi = inverted.Hi, inverted.Lo
+	z, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{Trend: signal.StructUptrend, Zone: inverted})
+	if !ok {
+		t.Fatal("should arm")
+	}
+	if z.Lo > z.Hi {
+		t.Errorf("band not normalised: Lo %.1f > Hi %.1f", z.Lo, z.Hi)
+	}
+	if z.Lo != 78864.4 || z.Hi != 79853.1 {
+		t.Errorf("band = %.1f–%.1f, want 78864.4–79853.1", z.Lo, z.Hi)
 	}
 }
