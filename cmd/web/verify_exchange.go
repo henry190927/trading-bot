@@ -16,14 +16,21 @@ import (
 // the "don't trust local bookkeeping, look at BingX" tool. Flags when the
 // journal thinks there's a stop/position but the exchange disagrees.
 type verifyTrade struct {
-	ID                        int
-	Symbol, Side              string
-	Entry, Stop, TP1, TP2     float64
-	HasPosition               bool
-	PosQty, PosEntry          float64
-	Orders                    []bingx.OpenOrder
-	HasStop, HasTP            bool
-	Warn                      string
+	ID                    int
+	Symbol, Side          string
+	Entry, Stop, TP1, TP2 float64
+	HasPosition           bool
+	PosQty, PosEntry      float64
+	Orders                []bingx.OpenOrder
+	HasStop, HasTP        bool
+	Warn                  string
+
+	// SessionWarn is the cash-open-bar advisory for stock synthetics (see
+	// session_guard.go). Kept separate from Warn, and counted separately,
+	// because Warn means "the exchange disagrees with the journal" — fix it
+	// now — while this means "this stop sits inside one bar's ordinary
+	// noise", a sizing judgement the desk may have made on purpose.
+	SessionWarn string
 }
 
 // handleVerifyExchange lists every open journal trade with its ACTUAL BingX
@@ -31,7 +38,7 @@ type verifyTrade struct {
 // or a position with no protective stop). Runs on the VPS = whitelisted IP.
 func (s *server) handleVerifyExchange(c *gin.Context) {
 	rows := []verifyTrade{}
-	warnN := 0
+	warnN, sessionWarnN := 0, 0
 	if s.client != nil {
 		trades, _ := journal.ReadAll("")
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
@@ -70,13 +77,28 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 				vt.Warn = "⚠ journal 記為已成交,但交易所沒有部位(可能已平/已停損)"
 				warnN++
 			}
+			// Cash-open-bar advisory: only meaningful once there IS a stop to
+			// measure, and measured against the exchange's average fill when
+			// we have it — the distance that matters is the position's, not
+			// the journal's intended entry.
+			if vt.Stop > 0 {
+				ref := vt.PosEntry
+				if ref <= 0 {
+					ref = vt.Entry
+				}
+				if w := s.sessionStopWarning(ctx, sym, ref, vt.Stop, time.Now()); w != "" {
+					vt.SessionWarn = w
+					sessionWarnN++
+				}
+			}
 			rows = append(rows, vt)
 		}
 	}
 	c.HTML(http.StatusOK, "verify_exchange.html", gin.H{
-		"Rows":       rows,
-		"WarnN":      warnN,
-		"NoClient":   s.client == nil,
-		"UpdatedUTC": time.Now().In(time.FixedZone("Asia/Taipei", 8*3600)).Format("2006-01-02 15:04:05 UTC+8"),
+		"Rows":         rows,
+		"WarnN":        warnN,
+		"SessionWarnN": sessionWarnN,
+		"NoClient":     s.client == nil,
+		"UpdatedUTC":   time.Now().In(time.FixedZone("Asia/Taipei", 8*3600)).Format("2006-01-02 15:04:05 UTC+8"),
 	})
 }

@@ -61,6 +61,13 @@ type server struct {
 	aiCacheMu sync.Mutex
 	aiCache   map[int]aiCacheEntry
 
+	// openBar caches each stock synthetic's cash-open-bar median range
+	// (see session_guard.go). Keyed by symbol, TTL'd: the median shifts at
+	// most once a day, and /ops/verify would otherwise pull 400 candles
+	// per row on every render.
+	openBarMu sync.Mutex
+	openBar   map[market.Symbol]openBarEntry
+
 	// aiSymbolCache memoizes /ai/analyze/symbol responses keyed by
 	// "SHORT|TF|signalhash" — same signal hash skips re-billing on
 	// dashboard refreshes that didn't change the underlying setup.
@@ -1307,7 +1314,19 @@ func (s *server) placeStopOnBingX(ctx context.Context, t *journal.Trade) (string
 		return "error", "place stop: " + err.Error()
 	}
 	t.StopOrderID = res.OrderID
-	return "ok", fmt.Sprintf("stop placed — orderId=%s qty=%g @ %.4f", res.OrderID, pos.Quantity, t.Stop)
+	msg := fmt.Sprintf("stop placed — orderId=%s qty=%g @ %.4f", res.OrderID, pos.Quantity, t.Stop)
+	// Advisory, appended AFTER the order went in: for a stock synthetic, say
+	// so when the stop sits inside the cash-open bar's ordinary range. Measured
+	// against the exchange's own average fill rather than the journal's entry,
+	// because the distance that matters is the one the position actually has.
+	ref := pos.EntryPrice
+	if ref <= 0 {
+		ref = t.Entry
+	}
+	if w := s.sessionStopWarning(ctx, sym, ref, t.Stop, time.Now()); w != "" {
+		msg += " · ⚠ " + w
+	}
+	return "ok", msg
 }
 
 // placeTP2OnBingX submits a reduce-only LIMIT at t.TP2 for the

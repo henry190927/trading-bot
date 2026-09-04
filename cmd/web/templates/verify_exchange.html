@@ -28,6 +28,7 @@
     {{else}}
     <div class="at-state">
       {{if .WarnN}}<span class="badge b-red">⚠ {{.WarnN}} <span class="i18n-en">mismatch</span><span class="i18n-zh">筆有落差</span></span>{{else}}<span class="badge b-green">✓ <span class="i18n-en">all trades protected &amp; matched</span><span class="i18n-zh">全部對上、有防護</span></span>{{end}}
+      {{if .SessionWarnN}}<span class="badge b-yellow">⏰ {{.SessionWarnN}} <span class="i18n-en">stop inside the cash-open bar</span><span class="i18n-zh">筆停損在美股開盤根內</span></span>{{end}}
       <a href="/ops/verify" class="badge b-blue" style="text-decoration:none">↻ <span class="i18n-en">re-check</span><span class="i18n-zh">重新查證</span></a>
     </div>
 
@@ -37,6 +38,7 @@
         <span class="section-meta">journal: entry {{printf "%.2f" .Entry}} · stop {{printf "%.2f" .Stop}} · tp1 {{printf "%.2f" .TP1}} · tp2 {{printf "%.2f" .TP2}}</span>
       </h2>
       {{if .Warn}}<p class="glossary-hint" style="border-left:3px solid var(--red);padding-left:.6rem;color:var(--red)"><b>{{.Warn}}</b></p>{{end}}
+      {{if .SessionWarn}}<p class="glossary-hint" style="border-left:3px solid var(--yellow);padding-left:.6rem;color:var(--yellow)">⏰ {{.SessionWarn}}</p>{{end}}
       <div class="at-state">
         {{if .HasPosition}}<span class="badge b-green">✓ <span class="i18n-en">position</span><span class="i18n-zh">部位</span> {{printf "%.5f" .PosQty}} @ {{printf "%.2f" .PosEntry}}</span>{{else}}<span class="badge b-dim">— <span class="i18n-en">no position</span><span class="i18n-zh">無部位</span></span>{{end}}
         {{if .HasStop}}<span class="badge b-green">🛡️ <span class="i18n-en">stop live</span><span class="i18n-zh">有停損</span></span>{{else}}<span class="badge b-red">🚨 <span class="i18n-en">NO STOP</span><span class="i18n-zh">無停損</span></span>{{end}}
