@@ -139,19 +139,28 @@ func main() {
 	go runZoneAlerts(ctx, client)
 	go runAutoExecutor(ctx, client) // auto-order daemon (paper by default; triple-gated for live)
 
-	// MONITOR_ZONE_ONLY=1 keeps ONLY the zone-fade + breakout-tripwire channel
-	// (zonealert) and skips the multi-TF confluence scan / structalert /
-	// macrowarn — for when the user wants the zone alerts without the confluence
-	// noise. Block on ctx so the zonealert goroutine keeps polling; never reach
-	// the confluence loop below.
+	// macrowarn starts BEFORE the zone-only branch on purpose. It used to sit
+	// below it, so MONITOR_ZONE_ONLY=1 silently took the NFP/FOMC pre-blackout
+	// heads-up down with the confluence noise — two unrelated concerns on one
+	// switch. It fires at most once per calendar event (~monthly), which is
+	// not "noise" under any reading of that flag, and its absence is invisible
+	// until the morning an event arrives unannounced. Self-gating on
+	// NTFY_TOPIC, so starting it unconditionally costs nothing when push is
+	// muted.
+	go runMacroWarn(ctx)
+
+	// MONITOR_ZONE_ONLY=1 keeps the zone-fade + breakout-tripwire channel
+	// (zonealert), autoexec and macrowarn, and skips the multi-TF confluence
+	// scan / structalert — for when the user wants the zone alerts without the
+	// confluence noise. Block on ctx so those goroutines keep polling; never
+	// reach the confluence loop below.
 	if os.Getenv("MONITOR_ZONE_ONLY") == "1" {
-		log.Printf("MONITOR_ZONE_ONLY=1 — zonealert only (confluence / structalert / macrowarn disabled)")
+		log.Printf("MONITOR_ZONE_ONLY=1 — zonealert + autoexec + macrowarn only (confluence / structalert disabled)")
 		<-ctx.Done()
 		log.Printf("monitor shutting down")
 		return
 	}
 
-	go runMacroWarn(ctx)
 	go runStructureAlerts(ctx, client)
 
 	dedup := newDedupSet()

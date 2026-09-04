@@ -130,14 +130,36 @@ func TestMonitorLoops(t *testing.T) {
 		return monitorLoop{}
 	}
 
-	t.Run("zone-only with ntfy on: zonealert + autoexec", func(t *testing.T) {
+	t.Run("zone-only with ntfy on: zonealert + autoexec + macrowarn", func(t *testing.T) {
 		ls := monitorLoops(true, true, true)
-		if !get(ls, "autoexec").On || !get(ls, "zonealert").On {
-			t.Error("autoexec and zonealert should both be live")
+		for _, n := range []string{"autoexec", "zonealert", "macrowarn"} {
+			if !get(ls, n).On {
+				t.Errorf("%s should be live under MONITOR_ZONE_ONLY=1", n)
+			}
 		}
-		for _, n := range []string{"confluence", "structalert", "macrowarn"} {
+		for _, n := range []string{"confluence", "structalert"} {
 			if get(ls, n).On {
 				t.Errorf("%s must be off under MONITOR_ZONE_ONLY=1", n)
+			}
+		}
+	})
+
+	// The regression this whole change exists for: macrowarn used to be
+	// started below the zone-only early-return in cmd/monitor/main.go, so
+	// turning off confluence noise also turned off the NFP/FOMC pre-blackout
+	// heads-up — discovered the morning of an NFP with nothing scheduled to
+	// warn. Push is its ONLY gate now, in both modes.
+	t.Run("macrowarn is gated by push alone, never by zone-only", func(t *testing.T) {
+		for _, zo := range []bool{true, false} {
+			if !get(monitorLoops(zo, true, true), "macrowarn").On {
+				t.Errorf("macrowarn off at zoneOnly=%v with push on", zo)
+			}
+			mw := get(monitorLoops(zo, false, true), "macrowarn")
+			if mw.On {
+				t.Errorf("macrowarn on at zoneOnly=%v with push muted", zo)
+			}
+			if !strings.Contains(mw.Reason, "NTFY_TOPIC") {
+				t.Errorf("zoneOnly=%v: muted reason should name push, got %q", zo, mw.Reason)
 			}
 		}
 	})

@@ -111,8 +111,11 @@ type monitorLoop struct {
 //
 //	runZoneAlerts    — always started, but returns immediately if NTFY_TOPIC == ""
 //	runAutoExecutor  — always started, ntfy only decorates it
-//	macrowarn / structalert / confluence scan — skipped entirely when
-//	MONITOR_ZONE_ONLY=1, and ntfy-dependent otherwise
+//	runMacroWarn     — always started, ntfy-dependent only (NOT gated by
+//	                   MONITOR_ZONE_ONLY: a monthly pre-blackout heads-up is
+//	                   not confluence noise, and it used to vanish with it)
+//	structalert / confluence scan — skipped entirely when MONITOR_ZONE_ONLY=1,
+//	                   and ntfy-dependent otherwise
 func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn bool) []monitorLoop {
 	pushOff := "NTFY_TOPIC 空白 → 這個 loop 直接 return"
 	zoneOnlyOff := "MONITOR_ZONE_ONLY=1 → 沒啟動"
@@ -139,7 +142,6 @@ func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn bool) []monitorLoop {
 	for _, n := range []struct{ name, desc string }{
 		{"confluence", "多 TF 匯合掃描 · 收盤觸發"},
 		{"structalert", "結構事件(BOS/CHoCH)警報"},
-		{"macrowarn", "宏觀事件前置提醒"},
 	} {
 		l := monitorLoop{Name: n.name, On: !zoneOnly && ntfyOn, Reason: n.desc}
 		switch {
@@ -150,6 +152,15 @@ func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn bool) []monitorLoop {
 		}
 		loops = append(loops, l)
 	}
+
+	// macrowarn is deliberately NOT in the loop above: it runs in zone-only
+	// mode too (see cmd/monitor/main.go). Its only gate is push.
+	mw := monitorLoop{Name: "macrowarn", On: ntfyOn, Reason: "宏觀事件前置提醒 · blackout 前 45 分"}
+	if !ntfyOn {
+		mw.Reason = pushOff
+	}
+	loops = append(loops, mw)
+
 	return loops
 }
 
