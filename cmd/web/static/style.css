@@ -6342,10 +6342,10 @@ html[data-density="compact"] .setups-table {
 .chart-ticker-item .tk-px.tk-up-flash   { animation: tk-flash-up   .95s cubic-bezier(.22,.61,.36,1) both; }
 .chart-ticker-item .tk-px.tk-down-flash { animation: tk-flash-down .95s cubic-bezier(.22,.61,.36,1) both; }
 @media (prefers-reduced-motion: reduce) {
-  .chart-ticker-item .tk-px.tk-up-flash,
-  .chart-ticker-item .tk-px.tk-down-flash { animation-duration: .01ms; }
-  .chart-ticker-item .tk-px.tk-up-flash   { background-color: rgba(var(--green-rgb), .16); }
-  .chart-ticker-item .tk-px.tk-down-flash { background-color: rgba(var(--red-rgb), .16); }
+  /* The strip flash is background-only already — no transform anywhere — so
+     there is nothing to remove. The previous rule here had the same
+     instant-animation defect as the home table and made it invisible for no
+     benefit. Left deliberately empty of overrides. */
 }
 
 /* Central-bank speech on /calendar. Promoted past the feed's own impact
@@ -6447,17 +6447,23 @@ html[data-density="compact"] .setups-table {
 .mkt-table td.mkt-px.flash-down::before { background: var(--red);   animation: mkt-tick-edge 1.15s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Keep the information, drop the movement: one short static tint, no
-     travelling edge, no colour ramp on the digits. */
-  .mkt-table td.mkt-px.flash-up,
-  .mkt-table td.mkt-px.flash-down { animation-duration: .01ms; }
-  .mkt-table td.mkt-px.flash-up   { background-color: rgba(var(--green-rgb), .18); }
-  .mkt-table td.mkt-px.flash-down { background-color: rgba(var(--red-rgb), .18); }
-  .mkt-table td.mkt-px.flash-up .mkt-px-val,
-  .mkt-table td.mkt-px.flash-down .mkt-px-val,
+  /* Reduced motion means no MOVEMENT — it does not mean no colour change, and
+     the previous version got that wrong in a way that made the tick invisible.
+     It set `animation-duration: .01ms`, so the animation completed instantly
+     and, because the shorthand carries `both`, held its 100% keyframe:
+     `background-color: rgba(--green-rgb, 0)` — transparent. An animation's
+     applied value beats a normal declaration, so the static tint underneath it
+     never rendered. On any device with Reduce Motion on (common on iOS, and
+     implied by some battery-saver settings) the price flash simply did not
+     exist. Reported from mobile 2026-09-04.
+   
+     The only actual motion in this effect is the leading edge, which animates
+     transform: scaleY. So that is the one thing removed here; the background
+     fade and the digit colour ramp are kept, because a cross-fade is not
+     motion and it is the whole signal. */
+  .mkt-table td.mkt-px::before,
   .mkt-table td.mkt-px.flash-up::before,
-  .mkt-table td.mkt-px.flash-down::before { animation: none; }
-  .mkt-table td.mkt-px::before { display: none; }
+  .mkt-table td.mkt-px.flash-down::before { display: none; animation: none; }
 }
 
 .mkt-table td.up, .mkt-table th.up { color: var(--green); }
