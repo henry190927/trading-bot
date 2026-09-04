@@ -131,7 +131,10 @@
 
 <script>
 (function () {
-  var EMOJI = { BTC:'₿', ETH:'Ξ', SOL:'◎', LINK:'🔗', SUI:'🌊', HYPE:'🚀', NEAR:'Ⓝ', XAU:'🥇', XAG:'🥈', SNDK:'💾', NVDA:'🟩' };
+  // Fallbacks when the CDN image 404s or is blocked. 🚀 is already HYPE's, so
+  // SpaceX takes the satellite rather than duplicating it.
+  var EMOJI = { BTC:'₿', ETH:'Ξ', SOL:'◎', LINK:'🔗', SUI:'🌊', HYPE:'🚀', NEAR:'Ⓝ', XAU:'🥇', XAG:'🥈',
+                SNDK:'💾', NVDA:'🟩', SPCX:'🛰', MSTR:'Ⓜ', APP:'📲' };
   var cat = 'all', last = [];
   // Fixed decimal count, not just a maximum: maximumFractionDigits alone drops
   // trailing zeros, so 77175.80 rendered "77,175.8" and 77175.75 rendered
@@ -143,9 +146,31 @@
     if(v>=1) return v.toFixed(2);
     return v.toFixed(4);
   }
-  // verified-working logo CDNs: crypto → coincap (lower@2x); metals → coinglass
-  // lowercase; stocks → coinglass UPPERCASE. onerror still falls back to emoji.
+  // ICON_URL is an EXPLICIT per-symbol override, checked before the patterns.
+  //
+  // The patterns below (crypto → coincap lower@2x, metals → coinglass
+  // lowercase, stocks → coinglass UPPERCASE) held for the first eleven
+  // symbols and then broke on all three added 2026-09-04, each in a
+  // different way:
+  //
+  //   SPCX   /coins/spcx.png        lowercase, so the "stocks are UPPERCASE"
+  //                                 rule is wrong
+  //   MSTR   /coins/MSTR3.png       carries a "3" that is not derivable from
+  //                                 the ticker at all
+  //   APP    /stocks/logo/APP.svg   different PATH and different EXTENSION
+  //
+  // Three symbols, three shapes, none inferable — so the map is the structure
+  // and the patterns are just the fallback for symbols that happen to fit.
+  // Each URL here was verified to return 200 with an image content-type
+  // before being added; a wrong one degrades silently to the emoji via
+  // onerror, which is safe but also invisible.
+  var ICON_URL = {
+    SPCX: 'https://cdn.coinglasscdn.com/static/img/coins/spcx.png',
+    MSTR: 'https://cdn.coinglasscdn.com/static/img/coins/MSTR3.png',
+    APP:  'https://cdn.coinglasscdn.com/static/img/stocks/logo/APP.svg'
+  };
   function iconURL(sym){
+    if (ICON_URL[sym]) return ICON_URL[sym];
     if (sym==='XAU'||sym==='XAG') return 'https://cdn.coinglasscdn.com/static/img/coins/'+sym.toLowerCase()+'.png';
     if (sym==='SNDK'||sym==='NVDA') return 'https://cdn.coinglasscdn.com/static/img/coins/'+sym+'.png';
     return 'https://assets.coincap.io/assets/icons/'+sym.toLowerCase()+'@2x.png';
