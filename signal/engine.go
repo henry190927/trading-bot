@@ -272,9 +272,13 @@ func Evaluate(in Inputs) Signal {
 			avgVol += in.Candles[i].Volume
 		}
 		avgVol /= 19.0
+		trailing := 1.0
 		if avgVol > 0 {
-			relVol = in.Candles[last].Volume / avgVol
+			trailing = in.Candles[last].Volume / avgVol
 		}
+		// SessionVolBaseline off (default) → `trailing` passes through
+		// unchanged, including the 1.0 fallback when avgVol is zero.
+		relVol, _ = relVolFor(in.Candles, last, trailing)
 	}
 	// volumeConfirmed: when the gate is disabled for this symbol (crypto),
 	// always true so the vote runs unconditionally. When enabled (metals),
@@ -402,16 +406,22 @@ func Evaluate(in Inputs) Signal {
 			avgVol += in.Candles[i].Volume
 		}
 		avgVol /= 20.0
-		if a14 > 0 && avgVol > 0 && barRange > 1.5*a14 && bar.Volume > 1.5*avgVol {
+		// avgVol > 0 stays in the guard so a zero-volume window still skips
+		// the vote exactly as before, flag or no flag.
+		relVolRE, reBase := 0.0, ""
+		if avgVol > 0 {
+			relVolRE, reBase = relVolFor(in.Candles, last, bar.Volume/avgVol)
+		}
+		if a14 > 0 && avgVol > 0 && barRange > 1.5*a14 && relVolRE > 1.5 {
 			switch {
 			case bar.Close > bar.Open:
 				bullMR++
 				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("Range expansion + volume bullish bar (range %.4f, vol %.0f)", barRange, bar.Volume))
+					fmt.Sprintf("Range expansion + volume bullish bar (range %.4f, vol %.0f = %.1fx %s)", barRange, bar.Volume, relVolRE, reBase))
 			case bar.Close < bar.Open:
 				bearMR++
 				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("Range expansion + volume bearish bar (range %.4f, vol %.0f)", barRange, bar.Volume))
+					fmt.Sprintf("Range expansion + volume bearish bar (range %.4f, vol %.0f = %.1fx %s)", barRange, bar.Volume, relVolRE, reBase))
 			}
 		}
 	}
@@ -460,17 +470,19 @@ func Evaluate(in Inputs) Signal {
 			avgVol += in.Candles[i].Volume
 		}
 		avgVol /= 20.0
-		if avgVol > 0 && bar.Volume > 3.0*avgVol {
-			ratio := bar.Volume / avgVol
-			switch {
-			case bar.Close > bar.Open:
-				bullMOM++
-				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("[MOM] Volume anomaly + bullish bar (vol %.1fx 20-bar avg)", ratio))
-			case bar.Close < bar.Open:
-				bearMOM++
-				sig.Reasons = append(sig.Reasons,
-					fmt.Sprintf("[MOM] Volume anomaly + bearish bar (vol %.1fx 20-bar avg)", ratio))
+		if avgVol > 0 {
+			ratio, base := relVolFor(in.Candles, last, bar.Volume/avgVol)
+			if ratio > 3.0 {
+				switch {
+				case bar.Close > bar.Open:
+					bullMOM++
+					sig.Reasons = append(sig.Reasons,
+						fmt.Sprintf("[MOM] Volume anomaly + bullish bar (vol %.1fx %s)", ratio, base))
+				case bar.Close < bar.Open:
+					bearMOM++
+					sig.Reasons = append(sig.Reasons,
+						fmt.Sprintf("[MOM] Volume anomaly + bearish bar (vol %.1fx %s)", ratio, base))
+				}
 			}
 		}
 	}

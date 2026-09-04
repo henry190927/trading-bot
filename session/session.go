@@ -206,3 +206,69 @@ func humanDur(d time.Duration) string {
 	}
 	return fmt.Sprintf("%dh %dm", h, m)
 }
+
+// ---------------------------------------------------------------------
+// Session-relative volume baseline (Layer 1).
+//
+// The engine's three volume gates all divide by a trailing 19/20-bar mean
+// (signal/engine.go). On a 1h series that window is nearly a whole day, so it
+// always contains the cash-open bar — and which side of the contamination a
+// given bar falls on is decided purely by its hour:
+//
+//	SNDK relVol median   09:00 ET 6.32x  ...  02:00 ET 0.22x   (29x apart)
+//	SPCX relVol median   09:00 ET 4.94x  ...  09:00 ET 0.37x   (13x apart)
+//	BTC                                                        ( 7.2x apart)
+//
+// Measured at the VOTE, not just the formula: the cash-open bar is 4.1% of
+// bars but produces 24-36% of every range-expansion-plus-volume fire on the
+// stock synthetics, 17% on BTC, 21% on XAG.
+//
+// Whether normalising that IMPROVES anything is an open question, not a
+// given — the open bar genuinely is a range-expansion-on-volume bar, so the
+// contaminated denominator may be accidentally selecting the most informative
+// bar of the day. That is what the A/B is for; this function only makes the
+// alternative expressible.
+// ---------------------------------------------------------------------
+
+// TimeOfDayBucket keys a bar by its start offset within the exchange-local
+// day, in minutes. For a regular timeframe this yields exactly
+// 1440/tfMinutes buckets, and it tracks DST for free because the offset is
+// computed in exchange-local time.
+func TimeOfDayBucket(c market.Candle) int {
+	n := c.OpenTime.In(NY())
+	return n.Hour()*60 + n.Minute()
+}
+
+// SessionRelVol returns candles[i].Volume divided by the MEDIAN volume of
+// earlier bars in the same time-of-day bucket, and whether the bucket held
+// enough history to mean anything.
+//
+// ok=false is the important half of the contract: on a 5m series there are 288
+// buckets a day, so a 300-bar window leaves ~1 sample each and the honest
+// answer is "no baseline". Callers must fall back to the trailing mean rather
+// than treat a one-sample median as a measurement — which also makes the whole
+// change a no-op on short timeframes instead of a silent randomiser.
+//
+// Only bars strictly BEFORE i are used, so this stays usable inside a
+// backtest without leaking the future.
+func SessionRelVol(candles []market.Candle, i, minSamples int) (float64, bool) {
+	if i <= 0 || i >= len(candles) || minSamples < 1 {
+		return 0, false
+	}
+	want := TimeOfDayBucket(candles[i])
+	var xs []float64
+	for j := 0; j < i; j++ {
+		if TimeOfDayBucket(candles[j]) == want && candles[j].Volume > 0 {
+			xs = append(xs, candles[j].Volume)
+		}
+	}
+	if len(xs) < minSamples {
+		return 0, false
+	}
+	sort.Float64s(xs)
+	base := medianSorted(xs)
+	if base <= 0 {
+		return 0, false
+	}
+	return candles[i].Volume / base, true
+}

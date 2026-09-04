@@ -44,6 +44,7 @@ func main() {
 	stopHuntVerbose := flag.Bool("stop-hunt-v", false, "as --stop-hunt but also dump each individual swept-then-reverted trade")
 	stopBufferR := flag.Float64("stop-buffer-r", 0, "STRATEGY VARIANT 1: widen the stop by this fraction of R (e.g. 0.3 = stop 0.3R further from entry). Risk per trade grows; TPs re-derived from new R. Goal: survive stop hunts without changing entry.")
 	slideOffsetPct := flag.Float64("slide-offset-pct", 0, "STRATEGY VARIANT 2: slide BOTH entry and stop in the side's away direction by this fraction of entry (e.g. 0.002 = 0.2%). Risk distance unchanged. Goal: let the typical sweep play out, then fill past it with stop past the cluster.")
+	sessionVol := flag.Bool("session-vol", false, "ENGINE VARIANT (Layer 1): replace the volume gates' trailing 19/20-bar MEAN baseline with a median over the same exchange-local time-of-day bucket. The trailing window spans nearly a whole 1h day, so it always contains the US cash-open bar and \"vol > 1.5x baseline\" becomes substantially a function of the hour: the open bar is 4.1% of bars but supplies 24-36% of every range-expansion fire on the stock synthetics (17% BTC, 21% XAG). Falls back to the mean wherever a bucket has under 5 samples, so it is a deliberate no-op below 1h. NOT presumed an improvement — the open bar really is a range-expansion-on-volume bar, so the biased denominator may be selecting the day's most informative candle. A/B per symbol and window.")
 	symFlag := flag.String("symbol", "", "override market.All() with a single BingX contract code, e.g. NCCO1OILBRENT2USD-USDT — for pre-flighting new symbols without polluting the live daemon universe.")
 	disablePerSym := flag.Bool("no-per-symbol-buffer", false, "clear signal.PerSymbolStopBuffer for this run — A/B comparison against the pre-2026-06-03 baseline before per-symbol stop buffers shipped.")
 	replayValidator := flag.Bool("replay-validator", false, "diagnostic: run validator.Validate on each emitted signal; bucket realized R by validator verdict (STRONG/TAKE/NEUTRAL/WEAK/AVOID). Used to A/B whether validator weight changes improve predictive correlation.")
@@ -81,6 +82,9 @@ func main() {
 	}
 	if *structMomentum {
 		signal.StructMomentumEnabled = true
+	}
+	if *sessionVol {
+		signal.SessionVolBaseline = true
 	}
 	signal.SMStopBufferATR = *smStopBuffer
 	signal.LiqVoteProxPct = *liqVote

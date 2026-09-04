@@ -273,3 +273,106 @@ func TestMaxLeverageForOpenBar(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------
+// SessionRelVol / TimeOfDayBucket
+// ---------------------------------------------------------------------
+
+// volBar is a candle that only carries a start time and a volume, which is all
+// the baseline cares about.
+func volBar(startUTC time.Time, vol float64) market.Candle {
+	return market.Candle{
+		OpenTime: startUTC, CloseTime: startUTC.Add(time.Hour),
+		Open: 100, High: 100, Low: 100, Close: 100, Volume: vol,
+	}
+}
+
+// The bucket is exchange-local, so the SAME UTC hour lands in different
+// buckets either side of DST — which is the correct answer, because the
+// session itself moved. Bucketing on UTC would merge 09:00 ET summer bars with
+// 08:00 ET winter bars and average the open into its neighbour.
+func TestTimeOfDayBucketTracksDST(t *testing.T) {
+	edt := TimeOfDayBucket(volBar(time.Date(2026, 9, 4, 13, 0, 0, 0, time.UTC), 1))
+	est := TimeOfDayBucket(volBar(time.Date(2026, 11, 2, 13, 0, 0, 0, time.UTC), 1))
+	if edt != 9*60 {
+		t.Errorf("EDT 13:00 UTC → bucket %d, want %d (09:00 ET)", edt, 9*60)
+	}
+	if est != 8*60 {
+		t.Errorf("EST 13:00 UTC → bucket %d, want %d (08:00 ET)", est, 8*60)
+	}
+	if edt == est {
+		t.Error("the same UTC hour must bucket differently across DST")
+	}
+}
+
+func TestSessionRelVolUsesSameBucketMedian(t *testing.T) {
+	var cs []market.Candle
+	// Five prior days at 13:00 UTC with volumes 10..50, each padded with a
+	// same-day 20:00 UTC bar carrying an absurd volume that must not leak in.
+	for i, v := range []float64{10, 20, 30, 40, 50} {
+		day := time.Date(2026, 9, 7+i, 13, 0, 0, 0, time.UTC)
+		cs = append(cs, volBar(day, v))
+		cs = append(cs, volBar(day.Add(7*time.Hour), 9999))
+	}
+	// The bar under test: same bucket, volume 60. median(10..50) = 30 → 2.0x.
+	cs = append(cs, volBar(time.Date(2026, 9, 12, 13, 0, 0, 0, time.UTC), 60))
+
+	rv, ok := SessionRelVol(cs, len(cs)-1, 5)
+	if !ok {
+		t.Fatal("five same-bucket samples must be enough")
+	}
+	if math.Abs(rv-2.0) > 1e-9 {
+		t.Errorf("relVol = %.6f, want 2.0 (60 / median(10,20,30,40,50)=30) — a 9999 bar leaking in would show here", rv)
+	}
+}
+
+// ok=false is the load-bearing half of the contract: it is what makes the flag
+// a no-op on short timeframes rather than a randomiser driven by one sample.
+func TestSessionRelVolRefusesThinBucket(t *testing.T) {
+	var cs []market.Candle
+	for i, v := range []float64{10, 20, 30, 40} { // one short of 5
+		cs = append(cs, volBar(time.Date(2026, 9, 7+i, 13, 0, 0, 0, time.UTC), v))
+	}
+	cs = append(cs, volBar(time.Date(2026, 9, 11, 13, 0, 0, 0, time.UTC), 60))
+	if rv, ok := SessionRelVol(cs, len(cs)-1, 5); ok {
+		t.Errorf("four samples must refuse, got %v", rv)
+	}
+}
+
+// No look-ahead: a later bar in the same bucket must not enter the baseline,
+// or the flag would be unusable inside a backtest.
+func TestSessionRelVolIgnoresFutureBars(t *testing.T) {
+	var cs []market.Candle
+	for i, v := range []float64{10, 20, 30, 40, 50} {
+		cs = append(cs, volBar(time.Date(2026, 9, 7+i, 13, 0, 0, 0, time.UTC), v))
+	}
+	target := len(cs)
+	cs = append(cs, volBar(time.Date(2026, 9, 12, 13, 0, 0, 0, time.UTC), 60))
+	// A future same-bucket bar big enough to move the median if it counted.
+	cs = append(cs, volBar(time.Date(2026, 9, 13, 13, 0, 0, 0, time.UTC), 100000))
+
+	rv, ok := SessionRelVol(cs, target, 5)
+	if !ok {
+		t.Fatal("should have a baseline")
+	}
+	if math.Abs(rv-2.0) > 1e-9 {
+		t.Errorf("relVol = %.6f, want 2.0 — a future bar entered the baseline", rv)
+	}
+}
+
+func TestSessionRelVolGuardsBadIndexes(t *testing.T) {
+	cs := []market.Candle{volBar(time.Date(2026, 9, 7, 13, 0, 0, 0, time.UTC), 10)}
+	for _, tc := range []struct {
+		name string
+		i, m int
+	}{
+		{"i=0 has no history", 0, 1},
+		{"i past the end", 5, 1},
+		{"negative i", -1, 1},
+		{"minSamples < 1", 0, 0},
+	} {
+		if _, ok := SessionRelVol(cs, tc.i, tc.m); ok {
+			t.Errorf("%s: want ok=false", tc.name)
+		}
+	}
+}
