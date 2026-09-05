@@ -1858,6 +1858,31 @@ footer {
     border-top: 1px solid rgba(240, 173, 78, 0.35);
     border-bottom: 1px solid rgba(240, 173, 78, 0.35);
 }
+/* Swing shelves (A2) — bands touched by BOTH swing highs and lows.
+   Deliberately a different hue from .chart-zone-band's red/green/amber:
+   those are directional (EQH above / EQL below), a shelf is neither. Sits
+   one z-index below the zone host so the same-side pools stay the louder
+   layer when both are on. Literal rgba, not tokens — matching the zone
+   bands, and so it renders identically in every theme. */
+.chart-shelf-host { z-index: 2; }
+.chart-shelf-band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    min-height: 2px;
+    background: rgba(124, 152, 214, 0.10);
+    border-top: 1px dashed rgba(124, 152, 214, 0.38);
+    border-bottom: 1px dashed rgba(124, 152, 214, 0.38);
+}
+/* min(highs, lows) >= 3: pivoted around from both sides repeatedly. */
+.chart-shelf-band.shelf-strong {
+    background: rgba(124, 152, 214, 0.18);
+    border-top-style: solid;
+    border-bottom-style: solid;
+    border-top-color: rgba(124, 152, 214, 0.60);
+    border-bottom-color: rgba(124, 152, 214, 0.60);
+}
+
 .chart-poc-label {
     position: absolute;
     left: 0;
@@ -5275,6 +5300,27 @@ main { overflow-x: hidden; }
     position: relative;
 }
 .chart-struct-panel.hidden { display: none; }
+
+/* A3 HVN target strip. Same chrome as .chart-struct-panel so the two read as
+   one family, with the violet accent that marks the "clean" target on the
+   chart, so panel and price line are recognisably the same thing. */
+.chart-hvn-panel {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.8rem;
+    padding: 0.4rem 0.7rem;
+    margin-bottom: 0.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid #7048e8;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.8rem;
+}
+.chart-hvn-panel.hidden { display: none; }
+.chart-hvn-panel .cs-kv em { color: var(--text-dim); font-style: normal; margin-right: 0.35rem; }
+.chart-hvn-panel b { color: #7048e8; }
+.chart-hvn-panel i { color: var(--text-dim); font-style: normal; }
 .chart-struct-panel .cs-lean {
     font-weight: 700;
     padding: 2px 10px;

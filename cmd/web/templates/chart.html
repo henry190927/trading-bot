@@ -63,6 +63,7 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="opens">開盤線 <span class="layer-count" data-layer-count="opens">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="liquidity">流動性 EQH/EQL <span class="layer-count" data-layer-count="liquidity">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="zones">支撐帶 <span class="layer-count" data-layer-count="zones">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="shelves">樞紐帶 S/R <span class="layer-count" data-layer-count="shelves">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">POC migration</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="struct">N字 struct <span class="layer-count" data-layer-count="struct">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="tf-bias">TF bias 表</button>
@@ -206,6 +207,7 @@
              edge of the plot. Kept off the right axis so the VP
              histogram there stays uncluttered. -->
         <div id="chart-zone-bands" class="chart-zone-bands" aria-hidden="true"></div>
+        <div id="chart-shelf-bands" class="chart-zone-bands chart-shelf-host" aria-hidden="true"></div>
         <div id="chart-poc-labels" class="chart-poc-labels" aria-hidden="true"></div>
         <div id="chart-open-labels" class="chart-poc-labels" aria-hidden="true"></div>
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
@@ -256,6 +258,10 @@
   <div class="chart-one-liner" id="chart-oneliner">
     <span id="chart-oneliner-text">Loading…</span>
     <button type="button" class="cs-record-btn" id="cs-record-btn" title="記錄目前 setup 到 forward-log(/setups),不管有沒有開單 — 獨立於 N字圖層">⚑ 記 setup</button>
+  </div>
+  <div class="chart-hvn-panel hidden" id="chart-hvn-panel"
+       title="量能節點目標(A3) — R 後面的數字是路上還有幾個節點擋著。四個節點外的 +10R 比淨空的 +4.7R 更難到">
+    <span class="cs-kv"><em>HVN 目標</em><span id="chart-hvn-body">—</span></span>
   </div>
   <div class="chart-struct-panel hidden" id="chart-struct-panel">
     <span class="cs-lean" id="cs-lean">—</span>
@@ -1033,7 +1039,7 @@
         boll: false, vol: false, vp: false, plan: false, positions: true,
         sweep: false, double: false, div: false, volx: false,
         'bb-events': false, macd: false, flags: false,
-        rsi: false, 'macd-pane': false, hvn: false, opens: true, liquidity: true, zones: false, 'poc-mig': false,
+        rsi: false, 'macd-pane': false, hvn: false, opens: true, liquidity: true, zones: false, shelves: false, 'poc-mig': false,
         'delta-div': false, struct: true, 'tf-bias': true,
     };
     var ALL_LAYER_KEYS = Object.keys(DEFAULT_LAYERS);
@@ -1168,6 +1174,7 @@
         counts['opens']     = (lastOpens || []).length;
         counts['liquidity'] = (lastLiq || []).length;
         counts['zones']     = (lastBands || []).length;
+        counts['shelves']   = (lastShelves || []).length;
         counts['struct']    = (lastStructure && lastStructure.swings) ? lastStructure.swings.length : 0;
         document.querySelectorAll('[data-layer-count]').forEach(function (span) {
             var k = span.dataset.layerCount;
@@ -1179,7 +1186,7 @@
     // Each category toggle button shows "how many of my layers are
     // currently ON". Recomputed on every layers-state change.
     var MENU_MEMBERS = {
-        overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn', 'opens', 'liquidity', 'zones', 'struct'],
+        overlays: ['boll', 'vol', 'vp', 'plan', 'positions', 'hvn', 'opens', 'liquidity', 'zones', 'shelves', 'struct'],
         osc:      ['rsi', 'macd-pane'],
         events:   ['sweep', 'double', 'div', 'delta-div', 'volx', 'bb-events', 'macd', 'flags'],
     };
@@ -1213,6 +1220,7 @@
         applyOpenLinesVisibility();
         applyLiqLinesVisibility();
         drawZoneBands();
+        drawShelfBands();
         applyPOCMigLinesVisibility();
         applyStructureVisibility();
         var tbEl = document.getElementById('tf-bias');
@@ -1442,6 +1450,45 @@
         addPlanLine(lastPlan.stop,  '#e03131', 'stop');
         addPlanLine(lastPlan.tp1,   '#2f9e44', 'TP1');
         addPlanLine(lastPlan.tp2,   '#0ca678', 'TP2');
+        // A3: volume-node candidates, dashed so they never read as the
+        // plan's own levels. The label carries the obstacle count because
+        // R alone is misleading — a node four levels out showing +10R is a
+        // worse trade than one at +4.7R with clear air.
+        var h = lastPlan.hvnTargets;
+        if (h && Array.isArray(h.targets)) {
+            h.targets.forEach(function (t) {
+                if (!t || !t.price) return;
+                var tag = 'HVN ' + t.r.toFixed(1) + 'R';
+                if (t.obstacles > 0) tag += ' /' + t.obstacles;
+                if (t.isPOC) tag += ' POC';
+                planLines.push(candleSeries.createPriceLine({
+                    price: t.price,
+                    color: t.clean ? '#7048e8' : '#868e96',
+                    lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: tag,
+                }));
+            });
+        }
+    }
+
+    // Side-panel text for A3. Renders the NOTE too, because an empty target
+    // list has two very different causes: "clear air ahead" is a read, and a
+    // blank panel would bury it.
+    function renderHVNPanel() {
+        var wrap = document.getElementById('chart-hvn-panel');
+        var body = document.getElementById('chart-hvn-body');
+        if (!wrap || !body) return;
+        var h = lastPlan && lastPlan.hvnTargets;
+        if (!h) { wrap.classList.add('hidden'); return; }
+        wrap.classList.remove('hidden');
+        var parts = [];
+        (h.targets || []).forEach(function (t) {
+            var one = fmtPrice(t.price) + ' ' + t.r.toFixed(2) + 'R';
+            one += t.obstacles > 0 ? ' (擋' + t.obstacles + ')' : ' (淨空)';
+            if (t.isPOC) one += ' ★POC';
+            parts.push(t.clean ? '<b>' + one + '</b>' : one);
+        });
+        if (h.note) parts.push('<i>' + h.note + '</i>');
+        body.innerHTML = parts.join(' · ') || '—';
     }
 
     // ── Open positions overlay ─────────────────────────────────────
@@ -1591,6 +1638,44 @@
             el.style.height = h + 'px';
             el.title = (b.role || 'zone') + ' ' + b.lo.toFixed(0) + '–' + b.hi.toFixed(0)
                 + ' (' + (b.touches || 0) + 'x' + (b.count > 1 ? ', ' + b.count + ' 池合併' : '') + ')';
+            host.appendChild(el);
+        });
+    }
+
+    // ── Swing shelves (A2) ───────────────────────────────────────
+    // Bands that swing HIGHS and swing LOWS both fall into — a price the
+    // market has pivoted around in both directions. Distinct from the
+    // 支撐帶 layer above, which is same-side EQH/EQL liquidity: a pool of
+    // five highs and a genuinely two-sided level look identical to a
+    // same-side clusterer and behave differently.
+    //
+    // The server already ranked and capped these (six per symbol, within
+    // 5% of price) because raw detection returns ~15 including bands 20%
+    // away — so this draws what it is given and does not re-filter.
+    var lastShelves = [];
+    function drawShelfBands() {
+        var host = document.getElementById('chart-shelf-bands');
+        if (!host) return;
+        while (host.firstChild) host.removeChild(host.firstChild);
+        if (!layerOn('shelves') || !lastShelves.length) return;
+        var plotH = host.clientHeight || 600;
+        lastShelves.forEach(function (b) {
+            if (!b || !b.lo || !b.hi) return;
+            var yHi = candleSeries.priceToCoordinate(b.hi);
+            var yLo = candleSeries.priceToCoordinate(b.lo);
+            if (yHi == null || yLo == null) return;
+            var top = Math.min(yHi, yLo), h = Math.abs(yLo - yHi);
+            if (top > plotH || top + h < 0) return;
+            if (h < 2) h = 2;   // hairline — a tight shelf is the strongest kind
+            var el = document.createElement('div');
+            // Weight by two-sidedness, the property that makes it a shelf at
+            // all: min(highs, lows) >= 3 reads as the strong tier.
+            var bal = Math.min(b.highs || 0, b.lows || 0);
+            el.className = 'chart-shelf-band' + (bal >= 3 ? ' shelf-strong' : '');
+            el.style.top = top + 'px';
+            el.style.height = h + 'px';
+            el.title = '樞紐帶 ' + fmtPrice(b.lo) + '–' + fmtPrice(b.hi)
+                + '  ' + (b.label || '') + '  (' + (b.touches || 0) + ' 觸)';
             host.appendChild(el);
         });
     }
@@ -2228,6 +2313,7 @@
             if (typeof drawPOCMigLabels === 'function') drawPOCMigLabels();
             if (typeof drawOpenLabels === 'function') drawOpenLabels();
             if (typeof drawZoneBands === 'function') drawZoneBands();
+            if (typeof drawShelfBands === 'function') drawShelfBands();
         });
     }
 
@@ -2288,6 +2374,7 @@
         }, 0);
 
         lastPlan = data.plan || null;
+        renderHVNPanel();
         applyPlanLinesVisibility();
         lastPositions = data.openPositions || [];
         applyPositionLinesVisibility();
@@ -2298,7 +2385,9 @@
         lastLiq = data.liquidity || [];
         applyLiqLinesVisibility();
         lastBands = data.bands || [];
+        lastShelves = data.shelves || [];
         drawZoneBands();
+        drawShelfBands();
         lastPOCMig = data.pocMigration || null;
         applyPOCMigLinesVisibility();
         lastRecordCtx = {
@@ -2778,7 +2867,10 @@
                 }
                 if (Array.isArray(data.bands)) {
                     lastBands = data.bands;
+                    lastShelves = data.shelves || [];
                     drawZoneBands();
+                    drawShelfBands();
+        drawShelfBands();
                     updateLayerCounts();
                 }
                 if (data.pocMigration) {
