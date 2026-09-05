@@ -4125,6 +4125,11 @@ func (s *server) handleChartData(c *gin.Context) {
 		if len(p.TakeProfit) >= 2 {
 			plan["tp2"] = p.TakeProfit[1]
 		}
+		// A3: candidate take-profits at the volume nodes ahead, each with
+		// how many nodes stand in front of it. Display only — BuildPlan's
+		// own TPs are untouched (the liquidity-TP A/B of 2026-08-27 was
+		// rejected, so "aim at the obvious level" is not a free win here).
+		plan["hvnTargets"] = hvnTargetPayload(view.Signal, p.Entry, p.StopLoss)
 	}
 
 	// Compact Signal + Diagnose projection.
@@ -4192,12 +4197,15 @@ func (s *server) handleChartData(c *gin.Context) {
 
 	// Session opens + liquidity pools change slowly and each costs a dedicated
 	// Klines fetch — compute them only on full loads, not the frequent light poll.
-	var opens, liquidity, bands []map[string]any
+	var opens, liquidity, bands, shelves []map[string]any
 	if !light {
 		opens = s.computeChartOpens(ctx, sym)
 		pools, px := s.chartLiquidityPools(ctx, sym, tf)
 		liquidity = liquidityLines(pools)
 		bands = mergeBands(pools, px)
+		// A2's second half: bands touched from BOTH sides. Distinct from the
+		// EQH/EQL pools above, which are same-side liquidity. Display only.
+		shelves = shelfBands(candles, px)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -4232,6 +4240,7 @@ func (s *server) handleChartData(c *gin.Context) {
 		"opens":         opens,
 		"liquidity":     liquidity,
 		"bands":         bands,
+		"shelves":       shelves,
 	})
 }
 
