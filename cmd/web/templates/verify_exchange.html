@@ -47,8 +47,8 @@
       {{if .HasPosition}}
       <form class="pr-form" data-symbol="{{.Symbol}}" data-side="{{.Side}}" onsubmit="return false">
         <div class="pr-row">
-          <label>stop <input type="number" step="any" name="stop" value="{{if .Stop}}{{printf "%g" .Stop}}{{end}}" placeholder="{{printf "%g" .Stop}}"></label>
-          <label>tp <input type="number" step="any" name="tp" placeholder="{{if .TP1}}{{printf "%g" .TP1}}{{else}}—{{end}}"></label>
+          <label>stop <input type="number" step="any" inputmode="decimal" name="stop" value="{{if .Stop}}{{printf "%g" .Stop}}{{end}}" placeholder="{{printf "%g" .Stop}}"></label>
+          <label>tp <input type="number" step="any" inputmode="decimal" name="tp" placeholder="{{if .TP1}}{{printf "%g" .TP1}}{{else}}—{{end}}"></label>
           <button type="button" class="badge b-blue pr-preview">
             <span class="i18n-en">preview</span><span class="i18n-zh">預覽</span>
           </button>
@@ -88,10 +88,17 @@
 <style>
 .pr-form{margin:.5rem 0 .2rem;padding:.5rem .6rem;border-radius:6px;background:var(--wash-dim)}
 .pr-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end}
-.pr-row label{display:flex;flex-direction:column;font-size:.72rem;color:var(--text-dim);gap:.15rem}
-.pr-row input{width:9rem;padding:.3rem .4rem;font:inherit;font-size:.82rem;
+/* Flexible, not fixed: this form's whole reason to exist is being usable
+   from a phone when a limit fills while nobody is at a desk. A fixed 9rem
+   input cannot shrink, so a larger accessibility font size pushed it into a
+   cramped four-row stack. flex + min-width:0 lets the pair share whatever
+   width there is. */
+.pr-row label{display:flex;flex-direction:column;font-size:.72rem;color:var(--text-dim);gap:.15rem;
+  flex:1 1 7rem;min-width:0}
+.pr-row input{width:100%;min-width:0;padding:.4rem .45rem;font:inherit;font-size:.9rem;
   background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px}
-.pr-row button{cursor:pointer;border:0;padding:.35rem .7rem;font:inherit;font-size:.78rem}
+.pr-row button{flex:0 0 auto;min-height:2.1rem;cursor:pointer;border:0;
+  padding:.4rem .8rem;font:inherit;font-size:.8rem}
 .pr-out{margin:.45rem 0 0;white-space:pre-wrap;font-size:.76rem}
 </style>
 
