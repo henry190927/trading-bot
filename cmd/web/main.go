@@ -164,6 +164,9 @@ func main() {
 	r.GET("/ops/scan", srv.handleScanSetups)
 	r.POST("/scan/record", srv.handleScanRecord)
 	r.GET("/ops/verify", srv.handleVerifyExchange)
+	// B2: attach a reduce-only stop/tp to a live position without SSH.
+	// POST-only and two-step (preview unless confirm=1) — see protect_handler.go.
+	r.POST("/ops/protect", srv.handleOpsProtect)
 	r.GET("/ops/autotrade", srv.handleOpsAutotrade)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/services", srv.handleOpsServices)

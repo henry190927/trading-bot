@@ -8,8 +8,10 @@
 // stop trailed to 77,900 — and forcing both into one field would either
 // destroy the R baseline or place the wrong order.
 //
-// Size always comes from the live position, never from a flag: a reduce-only
-// order sized by hand is how you end up with a partially-protected position.
+// The rules (size from the live position; sanity against the MARK, not the
+// entry) live in package protect, shared with POST /ops/protect. This binary
+// is now just a CLI front-end: it exists for the cases where a browser is not
+// to hand, and it cannot drift from the button.
 //
 // Dry by default. --confirm is required to send anything.
 package main
@@ -24,20 +26,27 @@ import (
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/protect"
+	"myFirstGo/trading-bot/zone"
 )
 
 func main() {
-	symShort := flag.String("symbol", "", "short symbol, e.g. BTC / SNDK")
+	symShort := flag.String("symbol", "", "short symbol, e.g. BTC / ETH / SNDK / MSTR")
+	side := flag.String("side", "", "position side to protect: long | short (blank = whichever is open)")
 	stop := flag.Float64("stop", 0, "reduce-only STOP_MARKET trigger price (0 = skip)")
 	tp := flag.Float64("tp", 0, "reduce-only LIMIT take-profit price (0 = skip)")
 	confirm := flag.Bool("confirm", false, "actually send the orders")
 	flag.Parse()
 
 	if *symShort == "" || (*stop == 0 && *tp == 0) {
-		fmt.Fprintln(os.Stderr, "usage: protect -symbol BTC -stop 77900 -tp 78900 [-confirm]")
+		fmt.Fprintln(os.Stderr, "usage: protect -symbol BTC -stop 77900 -tp 78900 [-side short] [-confirm]")
 		os.Exit(2)
 	}
-	sym, ok := shortToSym(*symShort)
+	// Single source of truth for the symbol table. The old local map had gone
+	// stale — it never learned SPCX/MSTR/APP, so protecting one of those
+	// positions from the CLI was impossible and the failure was "unknown
+	// symbol", which reads like a typo rather than a missing entry.
+	sym, ok := zone.ShortToSym[*symShort]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown symbol %q\n", *symShort)
 		os.Exit(2)
@@ -48,20 +57,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	poss, err := c.OpenPositions(ctx, sym)
+	pos, err := findPosition(ctx, c, sym, *side)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read positions: %v\n", err)
-		os.Exit(1)
-	}
-	var pos *bingx.Position
-	for i := range poss {
-		if poss[i].Quantity > 0 {
-			pos = &poss[i]
-			break
-		}
-	}
-	if pos == nil {
-		fmt.Fprintf(os.Stderr, "no open position for %s — nothing to protect\n", *symShort)
 		os.Exit(1)
 	}
 
@@ -70,49 +68,27 @@ func main() {
 		fmt.Fprintf(os.Stderr, "read mark price: %v\n", err)
 		os.Exit(1)
 	}
-	mark := fr.MarkPrice
-	hedge := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
 
-	fmt.Printf("position  %s %s qty %g entry %.4f | mark %.4f | lev %dx | posSide %s (hedge=%v)\n",
-		*symShort, pos.Side, pos.Quantity, pos.EntryPrice, mark, pos.Leverage, pos.PositionSide, hedge)
-
-	// Sanity is checked against the MARK, not the entry. A stop above entry on
-	// a long is a legitimate profit-lock; a stop above the MARK is an order
-	// that fires the instant it lands and closes at market. Those are entirely
-	// different mistakes and only the second one is a mistake.
-	if *stop > 0 {
-		if pos.Side == "long" && *stop >= mark {
-			fmt.Fprintf(os.Stderr, "REFUSED stop %.4f >= mark %.4f on a long — would trigger immediately\n", *stop, mark)
-			os.Exit(1)
+	plan := protect.BuildPlan(pos, fr.MarkPrice, *stop, *tp)
+	if !plan.OK() {
+		for _, f := range plan.Faults {
+			fmt.Fprintf(os.Stderr, "REFUSED %s\n", f)
 		}
-		if pos.Side == "short" && *stop <= mark {
-			fmt.Fprintf(os.Stderr, "REFUSED stop %.4f <= mark %.4f on a short — would trigger immediately\n", *stop, mark)
-			os.Exit(1)
-		}
-		lock := ""
-		if (pos.Side == "long" && *stop > pos.EntryPrice) || (pos.Side == "short" && *stop < pos.EntryPrice) {
-			locked := (*stop - pos.EntryPrice) * pos.Quantity
-			if pos.Side == "short" {
-				locked = -locked
-			}
-			lock = fmt.Sprintf("  [locks in ~%+.2f USDT]", locked)
-		}
-		fmt.Printf("  STOP_MARKET reduce-only  qty %g  trigger %.4f%s\n", pos.Quantity, *stop, lock)
+		os.Exit(1)
 	}
-	if *tp > 0 {
-		if pos.Side == "long" && *tp <= mark {
-			fmt.Fprintf(os.Stderr, "REFUSED tp %.4f <= mark %.4f on a long — would fill immediately at market-ish\n", *tp, mark)
-			os.Exit(1)
+
+	fmt.Printf("position  %s %s qty %g entry %.4f | mark %.4f | lev %dx | hedge=%v\n",
+		*symShort, plan.Side, plan.Qty, plan.Entry, plan.Mark, plan.Leverage, plan.Hedge)
+	if plan.Stop > 0 {
+		lock := ""
+		if plan.StopLocksUSDT != 0 {
+			lock = fmt.Sprintf("  [locks in ~%+.2f USDT]", plan.StopLocksUSDT)
 		}
-		if pos.Side == "short" && *tp >= mark {
-			fmt.Fprintf(os.Stderr, "REFUSED tp %.4f >= mark %.4f on a short — would fill immediately\n", *tp, mark)
-			os.Exit(1)
-		}
-		gain := (*tp - pos.EntryPrice) * pos.Quantity
-		if pos.Side == "short" {
-			gain = -gain
-		}
-		fmt.Printf("  LIMIT reduce-only        qty %g  price   %.4f  [~%+.2f USDT if filled]\n", pos.Quantity, *tp, gain)
+		fmt.Printf("  STOP_MARKET reduce-only  qty %g  trigger %.4f%s\n", plan.Qty, plan.Stop, lock)
+	}
+	if plan.TP > 0 {
+		fmt.Printf("  LIMIT reduce-only        qty %g  price   %.4f  [~%+.2f USDT if filled]\n",
+			plan.Qty, plan.TP, plan.TPGainUSDT)
 	}
 
 	if !*confirm {
@@ -120,30 +96,39 @@ func main() {
 		return
 	}
 
-	if *stop > 0 {
-		res, err := c.PlaceStopMarket(ctx, sym, pos.Side, pos.Quantity, *stop, hedge)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "place stop: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("SENT stop  orderId=%s\n", res.OrderID)
+	res := protect.Apply(ctx, c, plan)
+	if res.StopOrderID != "" {
+		fmt.Printf("SENT stop  orderId=%s\n", res.StopOrderID)
 	}
-	if *tp > 0 {
-		res, err := c.PlaceReduceOnlyLimit(ctx, sym, pos.Side, pos.Quantity, *tp, hedge)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "place tp: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("SENT tp    orderId=%s\n", res.OrderID)
+	if res.TPOrderID != "" {
+		fmt.Printf("SENT tp    orderId=%s\n", res.TPOrderID)
 	}
+	for _, e := range res.Errors {
+		fmt.Fprintf(os.Stderr, "%s\n", e)
+	}
+	if len(res.Errors) > 0 {
+		// Exit non-zero even on a partial send, so a script cannot read
+		// "stop landed, tp failed" as success.
+		os.Exit(1)
+	}
+	fmt.Println("\nnow re-check /ops/verify — an orderId is not proof the exchange is holding it (see #60)")
 }
 
-func shortToSym(short string) (market.Symbol, bool) {
-	m := map[string]market.Symbol{
-		"BTC": market.BTCUSDT, "ETH": market.ETHUSDT,
-		"XAU": market.XAUUSDT, "XAG": market.XAGUSDT,
-		"SNDK": market.SNDKUSDT, "NVDA": market.NVDAUSDT,
+// findPosition returns the open position to protect. With -side given it asks
+// for that leg (hedge accounts can hold both); without, it takes whichever
+// non-zero position exists.
+func findPosition(ctx context.Context, c *bingx.Client, sym market.Symbol, side string) (*bingx.Position, error) {
+	if side != "" {
+		return c.FindOpenPosition(ctx, sym, side)
 	}
-	s, ok := m[short]
-	return s, ok
+	poss, err := c.OpenPositions(ctx, sym)
+	if err != nil {
+		return nil, err
+	}
+	for i := range poss {
+		if poss[i].Quantity > 0 {
+			return &poss[i], nil
+		}
+	}
+	return nil, nil // BuildPlan turns this into a readable fault
 }

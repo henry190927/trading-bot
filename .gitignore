@@ -69,6 +69,12 @@ go.work.sum
 /wsprobe
 /acct
 /protect
+# ...but NOT the package of the same name. The entries above exist for the
+# BINARIES `go build` drops at the repo root, and a bare `/protect` pattern
+# matches a DIRECTORY too — which silently excluded the whole protect/ package
+# on 2026-09-05. Caught before committing; it would have built fine locally
+# (deploy uploads a binary) and broken every fresh clone.
+!/protect/
 /shadowbt
 /confirmbt
 /breakbt

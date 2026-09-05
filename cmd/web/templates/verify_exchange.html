@@ -44,6 +44,19 @@
         {{if .HasStop}}<span class="badge b-green">🛡️ <span class="i18n-en">stop live</span><span class="i18n-zh">有停損</span></span>{{else}}<span class="badge b-red">🚨 <span class="i18n-en">NO STOP</span><span class="i18n-zh">無停損</span></span>{{end}}
         {{if .HasTP}}<span class="badge b-blue">🎯 <span class="i18n-en">tp live</span><span class="i18n-zh">有 TP</span></span>{{end}}
       </div>
+      {{if .HasPosition}}
+      <form class="pr-form" data-symbol="{{.Symbol}}" data-side="{{.Side}}" onsubmit="return false">
+        <div class="pr-row">
+          <label>stop <input type="number" step="any" name="stop" value="{{if .Stop}}{{printf "%g" .Stop}}{{end}}" placeholder="{{printf "%g" .Stop}}"></label>
+          <label>tp <input type="number" step="any" name="tp" placeholder="{{if .TP1}}{{printf "%g" .TP1}}{{else}}—{{end}}"></label>
+          <button type="button" class="badge b-blue pr-preview">
+            <span class="i18n-en">preview</span><span class="i18n-zh">預覽</span>
+          </button>
+        </div>
+        <p class="pr-out glossary-hint" hidden></p>
+      </form>
+      {{end}}
+
       {{if .Orders}}
       <div class="dt-scroll">
       <table class="dt">
@@ -71,5 +84,90 @@
     {{end}}
   </div>
 </main>
+
+<style>
+.pr-form{margin:.5rem 0 .2rem;padding:.5rem .6rem;border-radius:6px;background:var(--wash-dim)}
+.pr-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end}
+.pr-row label{display:flex;flex-direction:column;font-size:.72rem;color:var(--text-dim);gap:.15rem}
+.pr-row input{width:9rem;padding:.3rem .4rem;font:inherit;font-size:.82rem;
+  background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px}
+.pr-row button{cursor:pointer;border:0;padding:.35rem .7rem;font:inherit;font-size:.78rem}
+.pr-out{margin:.45rem 0 0;white-space:pre-wrap;font-size:.76rem}
+</style>
+
+<script>
+// Two-step by design: `preview` calls /ops/protect WITHOUT confirm and shows
+// exactly what would be sent (size read from the live position, not this
+// form). Only the second click, on a button that appears after the preview,
+// carries confirm=1. Nothing here computes an order size — that comes back
+// from the server, so a stale tab cannot place a mis-sized order.
+(function () {
+  function post(form, confirm) {
+    const body = new URLSearchParams();
+    body.set('symbol', form.dataset.symbol);
+    body.set('side', form.dataset.side);
+    body.set('stop', form.querySelector('[name=stop]').value.trim());
+    body.set('tp', form.querySelector('[name=tp]').value.trim());
+    if (confirm) body.set('confirm', '1');
+    return fetch('/ops/protect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }).then(r => r.json().then(j => ({ status: r.status, j })));
+  }
+
+  function money(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + 'u'; }
+
+  function render(form, out, status, j) {
+    out.hidden = false;
+    if (j.error) { out.style.color = 'var(--red)'; out.textContent = '✗ ' + j.error; return; }
+    if (j.stage === 'refused') {
+      out.style.color = 'var(--red)';
+      out.textContent = '✗ ' + (j.faults || []).join('\n✗ ');
+      return;
+    }
+    if (j.stage === 'preview') {
+      out.style.color = 'var(--text-dim)';
+      const L = [`position ${j.side} qty ${j.qty} @ ${j.entry}  ·  mark ${j.mark}`];
+      if (j.stop) L.push(`STOP_MARKET reduce-only  qty ${j.qty}  trigger ${j.stop}` +
+        (j.stop_locks_usdt ? `   [locks ${money(j.stop_locks_usdt)}]` : ''));
+      if (j.tp) L.push(`LIMIT reduce-only        qty ${j.qty}  price   ${j.tp}   [${money(j.tp_gain_usdt)} if filled]`);
+      out.textContent = L.join('\n');
+      let go = form.querySelector('.pr-send');
+      if (!go) {
+        go = document.createElement('button');
+        go.type = 'button';
+        go.className = 'badge b-red pr-send';
+        go.textContent = '⚠ SEND';
+        go.addEventListener('click', () => {
+          go.disabled = true;
+          post(form, true).then(({ status, j }) => render(form, out, status, j));
+        });
+        form.querySelector('.pr-row').appendChild(go);
+      }
+      go.disabled = false;
+      return;
+    }
+    // stage === 'sent'
+    const errs = j.errors || [];
+    out.style.color = errs.length ? 'var(--yellow)' : 'var(--green)';
+    const L = [];
+    if (j.stop_order_id) L.push('✓ stop orderId=' + j.stop_order_id);
+    if (j.tp_order_id) L.push('✓ tp   orderId=' + j.tp_order_id);
+    errs.forEach(e => L.push('✗ ' + e));
+    L.push('↻ ' + j.next);
+    out.textContent = L.join('\n');
+    const go = form.querySelector('.pr-send');
+    if (go) go.remove();
+  }
+
+  document.querySelectorAll('.pr-form').forEach(form => {
+    const out = form.querySelector('.pr-out');
+    form.querySelector('.pr-preview').addEventListener('click', () => {
+      post(form, false).then(({ status, j }) => render(form, out, status, j));
+    });
+  });
+})();
+</script>
 </body>
 </html>
