@@ -2844,12 +2844,22 @@ func templateFuncs() template.FuncMap {
 			}
 			return "side-flat"
 		},
-		"or": func(a, b string) string {
-			if a == "" {
-				return b
-			}
-			return a
-		},
+		// NO "or" HERE. A custom `or func(a, b string) string` used to live
+		// at this spot to supply string defaults (`{{or .TF "—"}}`) — but it
+		// SHADOWED the builtin, so any template using `or` for boolean logic
+		// died at render time. `{{if or (eq .Type "STOP_MARKET") (eq .Type
+		// "STOP")}}` in verify_exchange.html handed two bools to a function
+		// wanting strings, and because Gin has already written the 200 header
+		// by then, the page silently TRUNCATED mid-row: the first open trade
+		// rendered halfway and the second never appeared at all. Found
+		// 2026-09-05 with two live resting orders on the exchange and no way
+		// to confirm them.
+		//
+		// The builtin was never needed: text/template's `or` returns the
+		// first non-empty argument or the last one, which is exactly the
+		// string-default behaviour, and it handles bools correctly. Deleting
+		// the override fixed every call site without touching a template.
+		// Don't re-add a helper whose name collides with a builtin.
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
 		"fmtElapsed": func(d time.Duration) string {

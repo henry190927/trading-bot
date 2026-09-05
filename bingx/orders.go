@@ -375,6 +375,7 @@ func (c *Client) SetLeverage(ctx context.Context, sym market.Symbol, side string
 // OpenOrder is a resting (unfilled) order — used to verify a stop/TP is actually
 // live on the exchange (don't trust local bookkeeping).
 type OpenOrder struct {
+	Symbol       string // as reported by the exchange; "" when absent from the response
 	OrderID      string
 	Type         string // LIMIT / STOP_MARKET / TAKE_PROFIT_MARKET / ...
 	Side         string // BUY / SELL
@@ -391,14 +392,20 @@ func (c *Client) OpenOrders(ctx context.Context, sym market.Symbol) ([]OpenOrder
 	q.Set("symbol", string(sym))
 	var resp struct {
 		Orders []struct {
+			Symbol       string `json:"symbol"`
 			OrderID      int64  `json:"orderId"`
 			Type         string `json:"type"`
 			Side         string `json:"side"`
 			PositionSide string `json:"positionSide"`
 			Price        string `json:"price"`
 			StopPrice    string `json:"stopPrice"`
-			Quantity     string `json:"quantity"`
-			ReduceOnly   bool   `json:"reduceOnly"`
+			// BingX names the order size origQty on this endpoint. Reading
+			// only "quantity" made every row render qty 0.00000 — a real
+			// order looked like a zero-size one on /ops/verify. Both are
+			// captured so a future rename degrades instead of zeroing.
+			OrigQty    string `json:"origQty"`
+			Quantity   string `json:"quantity"`
+			ReduceOnly bool   `json:"reduceOnly"`
 		} `json:"orders"`
 	}
 	if err := c.signedRequest(ctx, "GET", PathOpenOrders, q, &resp); err != nil {
@@ -406,10 +413,25 @@ func (c *Client) OpenOrders(ctx context.Context, sym market.Symbol) ([]OpenOrder
 	}
 	out := make([]OpenOrder, 0, len(resp.Orders))
 	for _, o := range resp.Orders {
+		// Filter client-side. The endpoint is sent symbol= and IGNORES it:
+		// with one resting BTC limit and one resting ETH limit, both came
+		// back on both calls, so /ops/verify showed ETH's order under the
+		// BTC trade and vice versa. On a surface whose whole purpose is
+		// "trust the exchange, not local bookkeeping", cross-attributing
+		// orders is worse than showing none. Rows without a symbol field
+		// are kept — a response that stops reporting it should degrade to
+		// the old over-inclusive behaviour, not silently drop everything.
+		if o.Symbol != "" && o.Symbol != string(sym) {
+			continue
+		}
 		price, _ := strconv.ParseFloat(o.Price, 64)
 		stopPrice, _ := strconv.ParseFloat(o.StopPrice, 64)
-		qty, _ := strconv.ParseFloat(o.Quantity, 64)
+		qty, _ := strconv.ParseFloat(o.OrigQty, 64)
+		if qty == 0 {
+			qty, _ = strconv.ParseFloat(o.Quantity, 64)
+		}
 		out = append(out, OpenOrder{
+			Symbol:  o.Symbol,
 			OrderID: strconv.FormatInt(o.OrderID, 10), Type: o.Type, Side: o.Side, PositionSide: o.PositionSide,
 			Price: price, StopPrice: stopPrice, Quantity: qty, ReduceOnly: o.ReduceOnly,
 		})

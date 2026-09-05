@@ -63,7 +63,12 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 					if strings.Contains(up, "STOP") {
 						vt.HasStop = true
 					}
-					if strings.Contains(up, "TAKE_PROFIT") || up == "LIMIT" {
+					// A TP either says so in its type, or is a reduce-only
+					// LIMIT. reduceOnly is the discriminator that matters:
+					// without it a plain LIMIT matched the ENTRY order, so
+					// every resting pending trade reported "🎯 tp live" on
+					// the strength of its own unfilled entry.
+					if strings.Contains(up, "TAKE_PROFIT") || (up == "LIMIT" && o.ReduceOnly) {
 						vt.HasTP = true
 					}
 				}
