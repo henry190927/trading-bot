@@ -12,6 +12,48 @@
 //	V2 +vol      — skip range-edge when ATR% > threshold (MR only in calm ranges)
 //	V3 both
 //
+//	 V4 long-only / V5 short-only / V6 event-filter (added 2026-09-07)
+//
+// ---------------------------------------------------------------------------
+// SIDE + EVENT-FILTER ARMS RUN AND REJECTED 2026-09-07. Ship nothing; V0 wins.
+//
+//	arm              60d      90d     120d   all>0   beat V0
+//	V0-baseline    +3.04   +20.27   +20.96     yes      0/3
+//	V1-mom        -24.42   -29.20   -12.59      no      0/3
+//	V2-vol        -10.23    -0.17    -9.88      no      0/3
+//	V3-both       -24.42   -28.90   -14.05      no      0/3
+//	V4-long-only  +12.32   +20.64   -26.95      no      2/3
+//	V5-short-only -14.67   -17.85   +10.47      no      0/3
+//	V6-event-filt -11.16   -25.02   -19.34      no      0/3
+//
+// cmd/gate: V0 AS SHIPPED **PASSES** the absolute floor (medR/t +0.084,
+// min-n 122). long-only FAILS on 120d. event-filter FAILS all three windows.
+//
+// WHAT PROMPTED THE RUN, AND WHY IT WAS A MISREAD. The forward paper log
+// showed range-edge at -0.384 R/trade over 13 trades, with all 5 shorts
+// losing -1.00R each. That looked like "A/B passed, forward failing". It was
+// not: against the 120d backtest's +0.084 R/trade, a 13-trade sample has a
+// standard error of ~0.333, so -0.384 is 1.41 SE away — squarely inside
+// noise. It would take ~25 trades for that gap to mean anything. Five losing
+// shorts in a row is unremarkable in a +/-1R system.
+//
+// The 120d window says the opposite of the forward log outright: short-only
+// is +10.47 and long-only is -26.95. The sides swap sign between windows,
+// which is what a 13-trade read cannot see.
+//
+// AND THE PROPOSED FIX WAS WORSE. Diagnosis of the mechanism was correct —
+// the shipped guard tests `Trend != StructDowntrend`, and Trend reads
+// `neutral` on 77-87% of bars (all 13 live fires had neutral), so it has
+// never blocked anything, while Event fires on 25-37% and two losing shorts
+// were taken on a CHoCH-up. Adding the Event check (V6) still lost in all
+// three windows. That is the THIRD directional filter to fail on this
+// mean-reversion box-fade, after the momentum filter and vol gate of
+// 2026-08-27. The standing conclusion from that day holds: MR box-fade and a
+// directional filter are contradictory, because MR wants to buy the drop.
+//
+// A true observation about the code does not imply the change it suggests.
+// ---------------------------------------------------------------------------
+//
 // Usage: go run ./cmd/rangebt --days 60   (also run 90, 120)
 package main
 
@@ -32,9 +74,29 @@ import (
 )
 
 type variant struct {
-	name             string
-	momFilter        bool
-	volGate          bool
+	name      string
+	momFilter bool
+	volGate   bool
+
+	// noLong / noShort disable a SIDE entirely. Added 2026-09-07 after the
+	// forward log showed range-edge's loss is all on the short side: 5 shorts,
+	// 5 x -1.00R, against 8 longs netting +0.01R.
+	//
+	// short-only is included on purpose rather than inferred. Under
+	// one-position-per-rule dedup, removing shorts FREES slots for longs, so
+	// long-only is NOT baseline minus short-only — the arms interact and each
+	// has to be run.
+	noLong  bool
+	noShort bool
+
+	// eventFilter also blocks a side when the latest structural EVENT points
+	// against it (CHoCH-up / BOS-up kills a short, and the mirror for longs).
+	//
+	// The shipped filter tests Trend only, and Trend reads `neutral` on 77-87%
+	// of bars — all 13 live range-edge fires had Trend == neutral, so it has
+	// never blocked anything. Event fires on 25-37% of bars, and two of the
+	// five losing shorts were taken on a CHoCH-up.
+	eventFilter bool
 }
 
 func main() {
@@ -57,10 +119,13 @@ func main() {
 	}{{"BTC", market.BTCUSDT}, {"ETH", market.ETHUSDT}, {"SOL", market.SOLUSDT}}
 
 	variants := []variant{
-		{"V0-baseline", false, false},
-		{"V1-mom", true, false},
-		{"V2-vol", false, true},
-		{"V3-both", true, true},
+		{name: "V0-baseline"},
+		{name: "V1-mom", momFilter: true},
+		{name: "V2-vol", volGate: true},
+		{name: "V3-both", momFilter: true, volGate: true},
+		{name: "V4-long-only", noShort: true},
+		{name: "V5-short-only", noLong: true},
+		{name: "V6-event-filt", eventFilter: true},
 	}
 
 	fmt.Printf("=== range-edge A/B · %dd · %s · stop %.2f%% · vol-gate ATR%%>%.1f ===\n", *days, *tfStr, *stopPct, *volThresh)
@@ -84,7 +149,7 @@ func main() {
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
 
 		if *concTest {
-			base := genFires(cs, ema, atr, variant{"V0", false, false}, *stopPct/100.0, *volThresh/100.0, s.short)
+			base := genFires(cs, ema, atr, variant{name: "V0"}, *stopPct/100.0, *volThresh/100.0, s.short)
 			for _, n := range []int{1, 2, 3} {
 				sum := summarize(scoreConcurrent(base, n, cs))
 				fmt.Printf("%-5s conc=%-2d %6d %5.0f%% %5d %5d %6.0f%% %+7.2f\n",
@@ -152,7 +217,8 @@ func genFires(cs []market.Candle, ema, atr []float64, v variant, stopBuf, volThr
 		emaUp := i >= 3 && ema[i] >= ema[i-3]
 		emaDown := i >= 3 && ema[i] <= ema[i-3]
 
-		if pos <= 0.34 && st.Trend != signal.StructDowntrend {
+		if pos <= 0.34 && st.Trend != signal.StructDowntrend &&
+			!v.noLong && !(v.eventFilter && bearishEvent(st.Event)) {
 			if !v.momFilter || emaUp {
 				out = append(out, autotrade.PaperFire{
 					Time: cs[i].CloseTime, Symbol: short, TF: "1h", Strategy: "range-edge", Side: "long",
@@ -161,7 +227,8 @@ func genFires(cs []market.Candle, ema, atr []float64, v variant, stopBuf, volThr
 				continue
 			}
 		}
-		if pos >= 0.66 && st.Trend != signal.StructUptrend {
+		if pos >= 0.66 && st.Trend != signal.StructUptrend &&
+			!v.noShort && !(v.eventFilter && bullishEvent(st.Event)) {
 			if !v.momFilter || emaDown {
 				out = append(out, autotrade.PaperFire{
 					Time: cs[i].CloseTime, Symbol: short, TF: "1h", Strategy: "range-edge", Side: "short",
@@ -257,4 +324,16 @@ func alignRight(arr []float64, n int) []float64 {
 		}
 	}
 	return out
+}
+
+// bullishEvent / bearishEvent name the structural shifts that argue against
+// fading an edge. Kept as functions rather than inlined so the two sides
+// cannot drift apart — an asymmetric filter would be indistinguishable from a
+// directional bias in the results.
+func bullishEvent(e signal.StructEventKind) bool {
+	return e == signal.EvCHoCHUp || e == signal.EvBOSUp
+}
+
+func bearishEvent(e signal.StructEventKind) bool {
+	return e == signal.EvCHoCHDown || e == signal.EvBOSDown
 }
