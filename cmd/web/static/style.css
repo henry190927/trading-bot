@@ -1903,10 +1903,22 @@ footer {
    the EDGES — a stop goes beyond the band, and "beyond" needs the exact edge,
    not the mid. Same violet family as the bands so tag and band read as one
    object. Literal rgba like the bands themselves, so it is theme-independent. */
-.chart-shelf-labels { left: 0; right: 4px; }
+/* Sides, swapped 2026-09-07. The RIGHT edge already carries every
+   lightweight-charts axis pill (plan entry/stop/TP, struct, HVN targets,
+   open lines all set axisLabelVisible), so putting up to twelve shelf edge
+   tags there too was unreadable. Shelves take the left, which has no native
+   axis competing; POC migration is three labels and fits on the right.
+   NOTE: the open-line labels also live on the left (#chart-open-labels), so
+   a shelf edge at the same price as an open can sit under it. Occasional, not
+   systematic — if it bites, the fix is a cross-layer vertical de-dup, not a
+   magic-number indent. */
+.chart-labels-right { left: 0; right: 4px; }
+.chart-labels-right .chart-poc-label { left: auto; right: 0; }
+
+.chart-shelf-labels { left: 4px; right: 0; }
 .chart-shelf-label {
-    left: auto;
-    right: 0;
+    left: 0;
+    right: auto;
     background: rgba(124, 152, 214, 0.55);
     font-size: 0.66rem;
     padding: 1px 5px;
