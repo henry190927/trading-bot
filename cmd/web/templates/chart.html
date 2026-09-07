@@ -1261,7 +1261,7 @@
         applyOpenLinesVisibility();
         applyLiqLinesVisibility();
         drawZoneBands();
-        drawShelfBands();
+        drawShelves();
         applyPOCMigLinesVisibility();
         applyStructureVisibility();
         var tbEl = document.getElementById('tf-bias');
@@ -1719,6 +1719,20 @@
                 + '  ' + (b.label || '') + '  (' + (b.touches || 0) + ' 觸)';
             host.appendChild(el);
         });
+    }
+
+    // Single entry point for the shelf layer — always call THIS, never the
+    // two passes directly.
+    //
+    // Bands and labels live in separate DOM hosts, and each pass clears its
+    // own host before its early return. The first wiring called the label
+    // pass from the END of the band pass, which put it AFTER
+    // `if (!layerOn || !lastShelves.length) return` — so switching to a
+    // symbol with no shelves cleared the bands and left the previous
+    // symbol's price tags on screen. Keeping both calls here means neither
+    // pass depends on the other's control flow.
+    function drawShelves() {
+        drawShelfBands();
         drawShelfLabels();
     }
 
@@ -2393,7 +2407,7 @@
             if (typeof drawPOCMigLabels === 'function') drawPOCMigLabels();
             if (typeof drawOpenLabels === 'function') drawOpenLabels();
             if (typeof drawZoneBands === 'function') drawZoneBands();
-            if (typeof drawShelfBands === 'function') drawShelfBands();
+            if (typeof drawShelves === 'function') drawShelves();
         });
     }
 
@@ -2467,7 +2481,7 @@
         lastBands = data.bands || [];
         lastShelves = data.shelves || [];
         drawZoneBands();
-        drawShelfBands();
+        drawShelves();
         lastPOCMig = data.pocMigration || null;
         applyPOCMigLinesVisibility();
         lastRecordCtx = {
@@ -2949,8 +2963,7 @@
                     lastBands = data.bands;
                     lastShelves = data.shelves || [];
                     drawZoneBands();
-                    drawShelfBands();
-        drawShelfBands();
+                    drawShelves();
                     updateLayerCounts();
                 }
                 if (data.pocMigration) {
