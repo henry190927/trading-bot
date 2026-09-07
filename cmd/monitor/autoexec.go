@@ -25,6 +25,11 @@ var autoSymbols = map[string]market.Symbol{
 
 type autoState struct {
 	lastFireBar time.Time // dedup: one placement per rule per bar
+	// lastBlockBar dedups the C7 blocked-candidate record. Separate from
+	// lastFireBar on purpose: the block path places nothing, so it must NOT
+	// consume the fire dedup — a candidate blocked at 20:01 has to stay
+	// eligible to fire at 20:02 if a slot frees up.
+	lastBlockBar time.Time
 }
 
 // runAutoExecutor is the deterministic auto-order daemon (docs/auto_executor_design.md).
@@ -145,6 +150,32 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			// taken the last slot.
 			if v := autotrade.CheckCaps(cfg, book, r.MarginUSDT); v.Blocked {
 				log.Printf("autoexec: %s %s/%s BLOCKED by caps — %s", r.Symbol, r.TF, r.Strategy, v.Reason)
+				// Record WHAT was denied, not just that something was (C7).
+				// The one-line log above cannot answer "would best-first have
+				// beaten first-come", because entry/stop/target/score are all
+				// absent — and the accepted fires cannot answer it either,
+				// since they are exactly what first-come already chose.
+				//
+				// Deduped per rule per BAR, not per tick. The block path does
+				// not set st.lastFireBar (nothing was placed), so it re-runs
+				// every minute — on 2026-09-04 that produced eleven identical
+				// lines for one candidate. Without this the log would be
+				// ~60x the real candidate count and useless for ranking.
+				if !st.lastBlockBar.Equal(barTime) {
+					st.lastBlockBar = barTime
+					qty := r.MarginUSDT * float64(r.Leverage) / trig.Entry
+					autotrade.AppendBlocked(autotrade.BlockedCandidate{
+						Fire: autotrade.PaperFire{
+							Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF,
+							Strategy: r.Strategy, Side: trig.Side, Market: trig.Market,
+							Entry: trig.Entry, Stop: trig.Stop, TP: trig.TP, Qty: qty,
+							Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.Why,
+							Score: autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry),
+						},
+						Reason: v.Reason, BarTime: barTime,
+						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
+					})
+				}
 				continue
 			}
 
