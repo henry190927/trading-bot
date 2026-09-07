@@ -1899,6 +1899,20 @@ footer {
        Kept literal #fff (not a token): the pill bg is the data-viz
        POC purple in BOTH themes, so white is always correct here. */
 }
+/* Shelf edge tags (A2). Right-aligned because the numbers that get used are
+   the EDGES — a stop goes beyond the band, and "beyond" needs the exact edge,
+   not the mid. Same violet family as the bands so tag and band read as one
+   object. Literal rgba like the bands themselves, so it is theme-independent. */
+.chart-shelf-labels { left: 0; right: 4px; }
+.chart-shelf-label {
+    left: auto;
+    right: 0;
+    background: rgba(124, 152, 214, 0.55);
+    font-size: 0.66rem;
+    padding: 1px 5px;
+}
+.chart-shelf-label.shelf-label-strong { background: rgba(124, 152, 214, 0.85); }
+
 .chart-poc-label-sub {
     font-size: 0.65rem;
     opacity: 0.9;

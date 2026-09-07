@@ -210,6 +210,7 @@
         <div id="chart-shelf-bands" class="chart-zone-bands chart-shelf-host" aria-hidden="true"></div>
         <div id="chart-poc-labels" class="chart-poc-labels" aria-hidden="true"></div>
         <div id="chart-open-labels" class="chart-poc-labels" aria-hidden="true"></div>
+        <div id="chart-shelf-labels" class="chart-poc-labels chart-shelf-labels" aria-hidden="true"></div>
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
         <div class="chart-price-marker" id="chart-price-marker" hidden>
           <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
@@ -556,6 +557,9 @@
               <p class="glossary-how"><b>How this differs from EQH/EQL above — the whole point:</b> a liquidity pool is <b>same-side</b> (N highs = resting stops above = a sweep TARGET). A shelf is <b>two-sided</b> = price has flipped across it from support to resistance and back = genuine S/R. Five highs at one price and a genuinely two-sided level are indistinguishable to a same-side clusterer, and they behave differently. If both layers light up at the same price, that is the strongest configuration on the chart.</p>
               <p class="glossary-how"><b>Reading the strength:</b> the band is drawn <b>solid and denser</b> when <code>min(highs, lows) &ge; 3</code> — pivoted around from both sides repeatedly. Dashed = ordinary. Judge by <b>two-sidedness, not total touches</b>: <code>H2/L2</code> is a truer shelf than <code>H5/L1</code>, which is mostly a pool wearing one low — treat that one closer to an EQH. <b>Span</b> separates a level that has mattered across 300 bars from five touches inside one stretch of chop; it is counted in bars of the LOADED window, so it changes with timeframe.</p>
               <p class="glossary-how"><b>Direction:</b> unlike EQH/EQL a shelf has <b>no inherent side</b> — its role is decided by where price is NOW. Above it = support; below it = resistance. <b>Stops:</b> a shelf is something a stop belongs <b>beyond</b>, never inside — the band IS the noise range by definition, so a stop within it is a stop that ordinary movement reaches. <b>Targets:</b> a shelf in the profit direction is a place the move can stall, which makes it a take-profit candidate and, simultaneously, an obstacle to anything past it.</p>
+              <p class="glossary-how"><b>Reading SEVERAL bands together — the part that changes decisions:</b> look at the GAPS, not the bands. Bands 20–70 points apart are one thick <b>value area</b>, where the market actually spent its time; if the level you are on fails, that is the magnet. A gap of &gt;0.5% with no band in it is a <b>vacuum</b> — price crossed it fast and left no structure, so nothing is there to catch a fall. BTC 1h on 2026-09-07 showed both at once: five bands packed into 854 points (77,349–78,204), then a <b>1,443-point vacuum</b>, then one lone band at 79,647–79,739. <b>An isolated band above a vacuum and a band inside a cluster carry completely different risk</b> — break the first and the next structure is 1,443 points away; break the second and the next is 20 points away. Same label, same touch count, not the same trade.</p>
+              <p class="glossary-how"><b>Where the pools sit relative to the band is the other half.</b> Four configurations, three of them visible on BTC simultaneously that morning: <b>(a) pool top == band bottom</b> (EQL 4x topping out at exactly 79,647.0, the band floor) — the lows that BUILT the floor ARE the pool, so a break down instantly triggers resting stops: <b>a break down has fuel</b>. <b>(b) pool bottom inside the band</b> (EQH 6x starting at 79,722.7, in a band topping at 79,739) — the ceiling is not a wall, it is the FLOOR of a pool above. <b>(c) a pool entirely inside the band</b> (EQL 2x at 79,676.9–79,708.3) — <b>weaker than its touch count says</b>, because the band existing proves price already crossed that level from both sides. <b>(d) no pool at either edge</b> = pure structure, no liquidity trigger: quieter, likelier to hold. Note what each layer gives you: the pool layer merged that whole area into one 670-point contested zone, the shelf named the 92-point pivot inside it. <b>Range from one, price from the other.</b></p>
+              <p class="glossary-how">⚠️ <b>"The next turn will happen in the band" is NOT what this shows.</b> A shelf is where turns HAVE happened — that is its definition, so it is true by construction and predicts nothing. It is why a stop belongs beyond the band (the band is the observed turn-scatter, so a stop inside sits where price is known to travel), and that argument needs no forecast. The forecast itself is untested: on 2026-09-07 at 10:14 BTC turned at 79,756.1 — <b>17 points ABOVE the band top</b>, inside a 6-touch EQH pool the band had nothing to do with. Place stops and read context with it; as an entry signal it has to clear cmd/gate first.</p>
               <p class="glossary-how">⚠️ <b>You are seeing a selection.</b> At most 6 bands within 5% of price, ranked. Raw detection finds ~15, including bands 20% away with a 16-bar span, and drawing all of them loses the two that matter. ⚠️ <b>Descriptive, not predictive.</b> This layer has never been A/B'd as a signal — it draws and votes nothing, unlike sweep-reject. Use it to place stops and read context, not as a reason to take a trade.</p>
             </div>
             <div class="lang-zh">
@@ -563,6 +567,9 @@
               <p class="glossary-how"><b>跟上面 EQH/EQL 的差別 —— 這是重點：</b>流動性池是<b>單側</b>的（N 個高點 = 上方囤積止損 = 掃單「目標」）。樞紐帶是<b>雙側</b>的 = 價格在它身上從支撐翻成壓力又翻回來 = 真正的支撐壓力。同一個價位的 5 個高點、跟一個真雙側的樞紐，對「只看同側」的偵測器來說長得一樣，但行為不同。<b>兩個圖層在同一個價位同時亮起 = 圖上最強的組合。</b></p>
               <p class="glossary-how"><b>強度怎麼看：</b><code>min(高點, 低點) &ge; 3</code> 時畫成<b>實線、底色較濃</b> —— 代表兩邊都反覆轉過。虛線 = 一般。判斷要看<b>兩面性，不是總觸數</b>：<code>H2/L2</code> 比 <code>H5/L1</code> 更像真樞紐，後者其實是「一個池子配一個低點」，該當 EQH 看。<b>span</b> 用來區分「跨 300 根都在管事」和「一段盤整裡連續碰五次」；它是<b>目前載入視窗內的 K 根數</b>，換 TF 會變。</p>
               <p class="glossary-how"><b>方向解讀：</b>跟 EQH/EQL 不同，樞紐帶<b>沒有天生的方向</b> —— 角色由現價在它上面還下面決定。在它上方 = <span class="dir-long">支撐</span>；在它下方 = <span class="dir-short">壓力</span>。<b>停損：</b>停損要放在樞紐帶<b>外面</b>，絕不放帶內 —— 那個帶「就是」雜訊範圍的定義，停損放裡面等於放在正常波動摸得到的地方。<b>目標：</b>獲利方向上的樞紐帶是行情可能停下來的位置，所以它同時是<b>停利候選</b>和<b>它後面任何目標的障礙</b>。</p>
+              <p class="glossary-how"><b>好幾條帶一起看 —— 這是真正會改變決策的部分：</b>看<b>間距</b>，不要一條一條看。帶跟帶差 20–70 點的，那其實是<b>一整塊價值區</b>，市場真正待過的地方；現在這一層失守，那裡就是磁鐵。間距超過 0.5% 而中間沒有帶的，是<b>真空</b> —— 價格穿過去太快、沒留下結構，所以掉下去沒東西接。BTC 1h 在 2026-09-07 同時出現兩者：五條帶擠在 854 點內（77,349–78,204），然後<b>1,443 點的真空</b>，然後一條孤立帶在 79,647–79,739。<b>「真空上方的孤立帶」和「密集群裡的帶」風險完全不同</b> —— 前者破了，下一個結構在 1,443 點外；後者破了，下一個在 20 點外。標籤一樣、觸數一樣，不是同一筆交易。</p>
+              <p class="glossary-how"><b>池子相對於帶的位置是另外一半。</b>四種配置，那天早上 BTC 同時展示了三種：<b>(a) 池頂 == 帶底</b>（EQL 4觸 的頂剛好是 79,647.0，也就是帶底）—— 築成帶底的那些低點<b>就是</b>那個池，所以跌破的瞬間就啟動止損：<b>往下破有燃料</b>。<b>(b) 池底在帶內</b>（EQH 6觸 從 79,722.7 起，而帶頂是 79,739）—— 帶頂不是牆，它是<b>上方一個池子的地板</b>。<b>(c) 池子完全在帶內</b>（EQL 2觸 79,676.9–79,708.3）—— <b>那個池比它的觸數看起來更弱</b>，因為帶的存在本身就證明價格已經從兩邊穿過那裡了。<b>(d) 兩邊都沒有池</b> = 純結構、沒有流動性觸發器：比較安靜、比較容易守住。另外注意兩層各給你什麼：池子那層把整片合併成一條 670 點的爭奪區，樞紐帶在裡面指出 92 點的轉軸。<b>一個給範圍，一個給價位。</b></p>
+              <p class="glossary-how">⚠️ <b>「下一個拐點會發生在帶裡面」不是這個圖層在講的事。</b>樞紐帶是「拐點<b>曾經</b>發生在這裡」—— 那是它的定義，所以一定成立、也因此什麼都沒預測。它的用處是<b>停損該放帶外</b>（帶就是已觀測到的轉折散布範圍，停損放裡面等於放在價格已知會來回的地方），而這個論證不需要任何預測。預測本身沒被驗證：2026-09-07 10:14 BTC 在 <b>79,756.1</b> 轉向 —— <b>比帶頂高 17 點</b>，在一個跟這條帶無關的 6 觸 EQH 池裡面。拿它擺停損和讀盤面；想當進場訊號用，得先過 cmd/gate。</p>
               <p class="glossary-how">⚠️ <b>你看到的是「篩選後」的結果。</b>最多 6 條、且在現價 5% 內，已排序。原始偵測會找出約 15 條，包含離現價 20%、span 只有 16 根的垃圾 —— 全畫上去會蓋掉真正重要的兩條。⚠️ <b>它是描述性的,不是預測性的。</b>這個圖層<b>從未被 A/B 驗證過</b>當訊號用 —— 它只畫圖、不投票，跟 sweep-reject 不同。拿它擺停損和讀盤面，不要拿它當進場理由。</p>
             </div>
           </dd>
@@ -1711,6 +1718,45 @@
             el.title = '樞紐帶 ' + fmtPrice(b.lo) + '–' + fmtPrice(b.hi)
                 + '  ' + (b.label || '') + '  (' + (b.touches || 0) + ' 觸)';
             host.appendChild(el);
+        });
+        drawShelfLabels();
+    }
+
+    // Price tags on both EDGES of each shelf, right-aligned.
+    //
+    // The edges are the numbers that get used — a stop belongs beyond the
+    // band, and "beyond" needs the exact edge, not the midpoint. Right side
+    // by default so they sit next to the price axis where the eye already is;
+    // the host is a separate layer from the bands so a label is never clipped
+    // by its own band's height.
+    function drawShelfLabels() {
+        var host = document.getElementById('chart-shelf-labels');
+        if (!host) return;
+        while (host.firstChild) host.removeChild(host.firstChild);
+        if (!layerOn('shelves') || !lastShelves.length) return;
+        var plotH = host.clientHeight || 600;
+        var used = [];   // keep tags from stacking on top of each other
+        lastShelves.forEach(function (b) {
+            if (!b || !b.lo || !b.hi) return;
+            var bal = Math.min(b.highs || 0, b.lows || 0);
+            [[b.hi, 'hi'], [b.lo, 'lo']].forEach(function (pair) {
+                var y = candleSeries.priceToCoordinate(pair[0]);
+                if (y == null || y < 0 || y > plotH) return;
+                // A shelf can be thinner than a label is tall; drop the
+                // second tag rather than print two overlapping numbers.
+                for (var i = 0; i < used.length; i++) {
+                    if (Math.abs(used[i] - y) < 11) return;
+                }
+                used.push(y);
+                var el = document.createElement('div');
+                el.className = 'chart-poc-label chart-shelf-label'
+                    + (bal >= 3 ? ' shelf-label-strong' : '');
+                el.style.top = y + 'px';
+                el.textContent = fmtPrice(pair[0]);
+                el.title = '樞紐帶' + (pair[1] === 'hi' ? '上緣' : '下緣')
+                    + ' ' + fmtPrice(pair[0]) + '  ' + (b.label || '');
+                host.appendChild(el);
+            });
         });
     }
 
