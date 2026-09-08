@@ -116,6 +116,12 @@
         <span class="tf">{{or .TF "—"}}</span>
         {{if .Score}}<span class="score-tag">score {{.Score}}</span>{{end}}
         {{if .Leverage}}<span class="lev-tag">{{.Leverage}}×</span>{{end}}
+        {{with .AccountLeverage}}<span class="acct-lev-tag {{acctLevClass .}}"
+          title="帳戶槓桿 = 名目/進場時權益。這跟合約槓桿是兩件事:125× 是合約倍數,這個是「押了帳戶的幾倍」。歸零距離是它的倒數。">
+          帳戶 {{printf "%.0f" .}}×</span>{{end}}
+        {{with .KillDistancePct}}<span class="kill-tag {{killClass .}}"
+          title="歸零距離 — 反向走多少 % 權益歸零。0.85% 在 BTC 1h 有 19% 的棒子會超過,ETH 是 34%。">
+          歸零 {{printf "%.2f" .}}%</span>{{end}}
         <span class="trade-status">{{outcomeText .}}</span>
         {{if not .IsOpen}}
           <span class="trade-r {{rClass .RRealized}}">{{fmtR .RRealized}}R</span>

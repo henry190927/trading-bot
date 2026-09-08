@@ -25,7 +25,23 @@ import (
 //	v5 = 20 cols (adds filled_at at end)
 //	v6 = 21 cols (adds signal_ctx — analyst snapshot at signal time)
 //	v7 = 23 cols (adds tp1_auto + tp1_order_id — auto-TP1 placement state)
-//	v8 = 29 cols (adds margin_usdt + entry/stop/tp2 auto-placement state) — current
+//	v8 = 29 cols (adds margin_usdt + entry/stop/tp2 auto-placement state)
+//	v9 = 30 cols (adds equity_usdt — account equity at entry) — current
+//
+// equity_usdt is the one column that makes the row say anything about RISK
+// rather than about the read. R is leverage-independent by definition, so the
+// R series is structurally incapable of showing an account going to zero: on
+// 2026-09-08 this file read 66 settled / gross +19.04R while the balance read
+// 0.00000000, and both numbers were correct. Bucketing the 50 filled trades by
+// leverage confirms it is definitional and not a data gap — 100x+ averaged
+// +0.435R and leverage-not-recorded averaged +0.450R, identical, because the
+// position size cancels out of R.
+//
+// margin_usdt x leverage already gave NOTIONAL on 48% of filled rows, but
+// notional alone answers nothing: 16,463u is a rounding error on a large
+// account and a liquidation on a small one. Only notional/equity — account
+// leverage — is comparable across time, and the fatal pair of 2026-09-08 sat
+// at 117.9x with a 0.848% kill distance that nothing in the system computed.
 var Header = []string{
 	"id", "opened_at", "analyzed_at", "closed_at", "symbol", "side", "tf", "score",
 	"entry", "stop", "tp1", "tp2",
@@ -42,6 +58,7 @@ var Header = []string{
 	"stop_order_id",
 	"tp2_auto",
 	"tp2_order_id",
+	"equity_usdt",
 }
 
 // Trade is one journal row.
@@ -119,6 +136,52 @@ type Trade struct {
 	// TP2OrderID is the BingX orderId of the placed TP2 limit, or "" if
 	// not yet placed.
 	TP2OrderID string
+	// EquityUSDT is total account equity AT ENTRY, read from BingX when the
+	// trade was opened. 0 = not recorded (every row before 2026-09-08, and
+	// any row whose balance read failed).
+	//
+	// It is here so the row can answer "what fraction of the account was at
+	// risk", which neither R nor notional can. See the Header comment.
+	EquityUSDT float64
+}
+
+// Notional is the position's face value in USDT — margin x leverage. Zero when
+// either input is unrecorded, which is 52% of filled rows historically.
+func (t Trade) Notional() float64 {
+	if t.MarginUSDT <= 0 || t.Leverage <= 0 {
+		return 0
+	}
+	return t.MarginUSDT * float64(t.Leverage)
+}
+
+// AccountLeverage is notional / equity-at-entry: how many times the whole
+// account this single position represented. Zero when either is unrecorded.
+//
+// This is the number that separates a survivable trade from a fatal one, and
+// it is invisible to R. For scale, from the 2026-09-08 post-mortem: the pair
+// that took the account to zero sat at 117.9x combined, while the trades that
+// produced the journal's best results ran at 30-40x.
+func (t Trade) AccountLeverage() float64 {
+	n := t.Notional()
+	if n <= 0 || t.EquityUSDT <= 0 {
+		return 0
+	}
+	return n / t.EquityUSDT
+}
+
+// KillDistancePct is the adverse move, in percent, that would take equity to
+// zero if this position were the account's only exposure. The reciprocal of
+// AccountLeverage. Zero when not computable.
+//
+// Reported as a percentage because that is the unit a chart is read in: 0.85%
+// is inside a single 1h bar on BTC 19% of the time and on ETH 34% of the time,
+// which is what made 117.9x fatal rather than merely aggressive.
+func (t Trade) KillDistancePct() float64 {
+	al := t.AccountLeverage()
+	if al <= 0 {
+		return 0
+	}
+	return 100 / al
 }
 
 // IsOpen reports whether the trade is still open (no close time set).
@@ -416,8 +479,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV7(row), nil
 	case 29:
 		return parseRowV8(row), nil
+	case 30:
+		return parseRowV9(row), nil
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23/29 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23/29/30 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -563,6 +628,14 @@ func parseRowV8(row []string) Trade {
 	return t
 }
 
+func parseRowV9(row []string) Trade {
+	t := parseRowV8(row[:29])
+	if row[29] != "" {
+		t.EquityUSDT, _ = strconv.ParseFloat(row[29], 64)
+	}
+	return t
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -590,6 +663,14 @@ func rowFromTrade(t Trade) []string {
 	filledAt := ""
 	if !t.FilledAt.IsZero() {
 		filledAt = t.FilledAt.Local().Format(time.RFC3339)
+	}
+	// Blank rather than "0" when unknown, so a row that predates the column
+	// (or one opened while the balance read failed) is distinguishable from a
+	// genuinely zero account. AccountLeverage returns 0 for both, but the CSV
+	// keeps the difference for anyone reading it later.
+	equityStr := ""
+	if t.EquityUSDT > 0 {
+		equityStr = strconv.FormatFloat(t.EquityUSDT, 'f', -1, 64)
 	}
 	return []string{
 		strconv.Itoa(t.ID),
@@ -621,6 +702,7 @@ func rowFromTrade(t Trade) []string {
 		t.StopOrderID,
 		boolStr(t.TP2Auto),
 		t.TP2OrderID,
+		equityStr,
 	}
 }
 

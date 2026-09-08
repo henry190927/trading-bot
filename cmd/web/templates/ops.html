@@ -39,6 +39,17 @@
   </div>
   <div class="hint ops-ntfy-note" id="ops-ntfy-note"></div>
 
+  <!-- Account exposure. Equity alone cannot say whether a book is
+       survivable: the pair that closed the account on 2026-09-08 was 16,463u
+       of notional, unremarkable next to a large balance and fatal next to
+       139.66u. 帳戶槓桿 = 名目/權益, and 歸零距離 is its reciprocal — the
+       adverse move that takes equity to zero, in the same unit a chart is
+       read in. Neither figure existed anywhere in the system before. -->
+  <div class="ops-health-loops">
+    <div class="ops-loops-title">帳戶曝險 <span class="ops-svc-tag">名目/權益 · 唯讀 · 兩個 signed GET</span></div>
+    <div class="ops-stream-grid" id="ops-health-exposure"><span class="hint">載入中…</span></div>
+  </div>
+
   <div class="ops-health-loops">
     <div class="ops-loops-title">trading-monitor 子迴圈</div>
     <div class="ops-loops-grid" id="ops-health-loops"></div>
@@ -498,6 +509,56 @@
         }
         el.innerHTML = html;
     }
+    // Exposure comes from /ops/balance, not /ops/services — it is two signed
+    // exchange calls and does not belong on the 10s services poll.
+    function fmtU(v) {
+        if (v === null || v === undefined) return '—';
+        return Math.round(v).toLocaleString('en-US') + 'u';
+    }
+    function renderExposure(d) {
+        var el = document.getElementById('ops-health-exposure');
+        if (!d || d.error) {
+            el.innerHTML = '<span class="hint">讀不到:' + ((d && d.error) || 'no data') + '</span>';
+            return;
+        }
+        var e = d.exposure || {}, lim = d.limits || {};
+        var eq = (d.equity !== null && d.equity !== undefined) ? d.equity : d.balance;
+        var lev = e.accountLeverage || 0, kill = e.killDistancePct || 0;
+        // Colour on the kill distance, not the leverage: 0.85% is inside one
+        // ordinary 1h candle (19% of BTC bars, 34% of ETH bars exceed it),
+        // 2% is a bad day, 5% is room.
+        var cls = 'on';
+        if (lev > 0) cls = kill < 1 ? 'fail' : (kill < 2.5 ? 'off' : 'on');
+        var cells = [
+            ['權益', eq === null || eq === undefined ? '—' : (eq.toFixed(2) + 'u')],
+            ['已用保證金', fmtU(d.usedMargin)],
+            ['部位數', String(e.openCount || 0)],
+            ['總名目', fmtU(e.openNotionalU)],
+            ['帳戶槓桿', lev > 0 ? lev.toFixed(1) + 'x' : '—'],
+            ['歸零距離', kill > 0 ? kill.toFixed(3) + '%' : '—']
+        ];
+        var html = cells.map(function (c) {
+            var extra = (c[0] === '歸零距離' || c[0] === '帳戶槓桿') ? ' ' + cls : '';
+            return '<div class="ops-hsvc"><span class="ops-hsvc-name">' + c[0] + '</span>'
+                 + '<span class="ops-hsvc-state' + extra + '">' + c[1] + '</span></div>';
+        }).join('');
+        if ((e.legs || []).length) {
+            html += '<div class="hint" style="grid-column:1/-1">開倉:' + e.legs.join(' · ') + '</div>';
+        }
+        var capTxt = lim.anySet
+            ? ('上限 ' + (lim.maxAccountLev > 0 ? lim.maxAccountLev.toFixed(1) + 'x' : '無')
+               + ' · 警告 ' + (lim.warnAccountLev > 0 ? lim.warnAccountLev.toFixed(1) + 'x' : '無')
+               + ' · 名目 ' + (lim.maxNotionalUSDT > 0 ? fmtU(lim.maxNotionalUSDT) : '無')
+               + ' · 倉數 ' + (lim.maxConcurrent > 0 ? lim.maxConcurrent : '無'))
+            : '未設任何上限(RISK_MAX_ACCOUNT_LEV / RISK_WARN_ACCOUNT_LEV / RISK_MAX_NOTIONAL_USDT / RISK_MAX_CONCURRENT)—— 手動下單不會被擋';
+        html += '<div class="hint" style="grid-column:1/-1">' + capTxt + '</div>';
+        (e.warnings || []).forEach(function (w) {
+            html += '<div class="hint" style="grid-column:1/-1;color:var(--yellow)">⚠ ' + w + '</div>';
+        });
+        html += '<div class="hint" style="grid-column:1/-1">' + (d.atTPE || '') + ' · 每 60s</div>';
+        el.innerHTML = html;
+    }
+
     function renderMacro(st) {
         var el = document.getElementById('ops-health-macro');
         if (!el) return;
@@ -530,6 +591,15 @@
         html += '<div class="ops-stream-cell dim ops-stream-err">'
               + '<span class="lbl">檔案</span><span class="val">' + (st.path || '—') + '</span></div>';
         el.innerHTML = html;
+    }
+    // Its own timer, deliberately. fetchHealth is local (systemctl + .env) and
+    // polls every 30s; this is TWO SIGNED EXCHANGE CALLS and does not belong on
+    // that cadence. Equity does not move meaningfully in 30s when flat.
+    function fetchExposure() {
+        fetch('/ops/balance?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(renderExposure)
+            .catch(function (e) { renderExposure({ error: String(e) }); });
     }
     function fetchHealth() {
         fetch('/ops/services?_=' + Date.now(), { cache: 'no-store' })
@@ -567,6 +637,8 @@
     });
     fetchHealth();
     setInterval(fetchHealth, 30000);
+    fetchExposure();
+    setInterval(fetchExposure, 60000);
 
     // ─── Zone-fade alert status (recomputes structure, so slower cadence) ──
     function zFmt(v) {

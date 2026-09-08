@@ -4797,6 +4797,45 @@ footer {
     font-weight: 600;
 }
 
+/* Account-leverage and kill-distance tags on journal trade cards.
+   Sits next to .lev-tag on purpose and must NOT look like it: .lev-tag is the
+   contract multiplier (125x), these are what fraction of the account the
+   position was (40x) and the adverse move that would zero it (2.48%). Only the
+   second pair can end an account, so they get the traffic-light treatment and
+   the contract multiplier stays neutral blue.
+
+   Colours come from --*-rgb triples via rgba(), never color-mix(): iOS Safari
+   below 16.4 renders no background at all for color-mix, and these tags are
+   read on a phone more often than on a desk. */
+.acct-lev-tag,
+.kill-tag {
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: help;
+}
+.acct-lev-tag.kill-ok,
+.kill-tag.kill-ok {
+    background: rgba(var(--green-rgb), 0.12);
+    color: var(--green);
+    border: 1px solid rgba(var(--green-rgb), 0.45);
+}
+.acct-lev-tag.kill-warn,
+.kill-tag.kill-warn {
+    background: rgba(var(--yellow-rgb), 0.14);
+    color: var(--yellow);
+    border: 1px solid rgba(var(--yellow-rgb), 0.5);
+}
+.acct-lev-tag.kill-fatal,
+.kill-tag.kill-fatal {
+    background: rgba(var(--red-rgb), 0.16);
+    color: var(--red);
+    border: 1px solid rgba(var(--red-rgb), 0.6);
+}
+
 /* --- Ops control panel (Phase 2C) --- */
 
 /* Per-service block: groups title + status card + action buttons so
@@ -5266,7 +5305,7 @@ footer {
 /* Status capsules: never let "falling knife" / "blow-off risk" / lev /
    side / score wrap mid-word. They flow inline and the parent's natural
    wrap moves the whole capsule to the next line as one unit. */
-.ot-flag, .diag-flag, .lev-tag, .side-badge, .score,
+.ot-flag, .diag-flag, .lev-tag, .acct-lev-tag, .kill-tag, .side-badge, .score,
 .ot-tf, .ot-id, .ot-elapsed, .ot-r {
     white-space: nowrap;
     overflow-wrap: normal;

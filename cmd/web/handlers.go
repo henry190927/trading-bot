@@ -1004,6 +1004,12 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		TP1Auto:    autoTP1,
 		StopAuto:   autoStop,
 		TP2Auto:    autoTP2,
+		// Equity at entry, captured whether or not this trade auto-opens.
+		// Without it the row can state notional but not what fraction of the
+		// account was at risk, which is the gap that let a +19.04R journal
+		// coexist with a zero balance. 0 when the balance read fails, and
+		// journal.AccountLeverage degrades to 0 rather than guessing.
+		EquityUSDT: s.equityAtEntry(c.Request.Context()),
 	}
 	trades = append(trades, t)
 	idx := len(trades) - 1
@@ -1193,6 +1199,25 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 	if t.TP2Auto && t.TP2 > 0 {
 		bundledTP = t.TP2
 	}
+	// Account-exposure gate. Priced on the FLOORED qty, because that is the
+	// notional the exchange will actually carry, and against the live account
+	// rather than journal.csv — a position opened by hand in the app counts.
+	//
+	// Equity is recorded on the trade either way. A blocked order still leaves
+	// the row carrying the number that blocked it, which is the only way the
+	// decision stays auditable later.
+	notional := qty * t.Entry
+	verdict, _ := s.checkNewPosition(ctx, notional)
+	if t.EquityUSDT == 0 {
+		// Normally already captured at trade creation; this covers a re-place
+		// on an older row.
+		t.EquityUSDT = s.equityAtEntry(ctx)
+	}
+	if verdict.Blocked {
+		return "error", "risk gate refused this order — " + verdict.Reason +
+			". Adjust margin/leverage, close something, or raise the cap in .env (RISK_MAX_ACCOUNT_LEV)."
+	}
+
 	res, err := s.client.PlaceLimit(ctx, sym, t.Side, qty, t.Entry, bundledStop, bundledTP, hedge)
 	if err != nil {
 		return "error", "place entry: " + err.Error()
@@ -1207,7 +1232,12 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 		t.TP2OrderID = "ATTACHED:" + res.OrderID
 		bundledMsg += fmt.Sprintf(" + TP2 bundled @ %.4f", t.TP2)
 	}
-	return "ok", fmt.Sprintf("entry placed — orderId=%s qty=%g @ %.4f (margin %.2f × %dx)%s", res.OrderID, qty, t.Entry, t.MarginUSDT, t.Leverage, bundledMsg)
+	msg := fmt.Sprintf("entry placed — orderId=%s qty=%g @ %.4f (margin %.2f × %dx = %s notional)%s",
+		res.OrderID, qty, t.Entry, t.MarginUSDT, t.Leverage, usdt(notional), bundledMsg)
+	if note := riskNote(verdict); note != "" {
+		msg += " · " + note
+	}
+	return "ok", msg
 }
 
 // Order-placement sanity guards, against the live MARK price.
@@ -2792,6 +2822,37 @@ func templateFuncs() template.FuncMap {
 		"fmtR": func(r float64) string {
 			return fmt.Sprintf("%+.2f", r)
 		},
+		// Both of these colour on the KILL DISTANCE, not on the leverage
+		// multiple, because the distance is the figure that is comparable to
+		// a chart. Thresholds come from the 1h range distribution over the
+		// last 500 bars: BTC's median range is 0.518% and its p90 is 1.096%,
+		// ETH's are 0.662% and 1.494%. So under 1% means an ordinary hour can
+		// end the account (19% of BTC bars and 34% of ETH bars exceed 0.85%),
+		// under 2.5% means a busy session can, and above that there is room.
+		// The 2026-09-08 liquidation ran at 0.848%.
+		"killClass": func(pct float64) string {
+			switch {
+			case pct <= 0:
+				return ""
+			case pct < 1:
+				return "kill-fatal"
+			case pct < 2.5:
+				return "kill-warn"
+			}
+			return "kill-ok"
+		},
+		"acctLevClass": func(lev float64) string {
+			if lev <= 0 {
+				return ""
+			}
+			switch {
+			case lev > 100:
+				return "kill-fatal"
+			case lev > 40:
+				return "kill-warn"
+			}
+			return "kill-ok"
+		},
 		"rClass": func(r float64) string {
 			switch {
 			case r > 0:
@@ -3269,6 +3330,7 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		OpenNotes:  notes,
 		MarginUSDT: margin,
 		Leverage:   leverage,
+		EquityUSDT: s.equityAtEntry(c.Request.Context()),
 	}
 	trades = append(trades, t)
 	if err := journal.WriteAll("", trades); err != nil {

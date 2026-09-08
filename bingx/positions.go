@@ -11,7 +11,7 @@ import (
 // Position is a (much) trimmed-down view of one BingX open position.
 // We capture only what the journal/TP-placement flow needs.
 type Position struct {
-	Symbol     market.Symbol
+	Symbol       market.Symbol
 	PositionSide string  // "LONG" | "SHORT" (hedge mode) | "BOTH" (one-way)
 	Side         string  // "long" | "short" — normalized from PositionSide / quantity sign
 	Quantity     float64 // signed in one-way mode; we always return abs here
@@ -19,6 +19,12 @@ type Position struct {
 	Leverage     int
 	MarginMode   string // "isolated" | "cross"
 }
+
+// Notional is the position's face value in USDT at its average entry. This is
+// the exposure number — margin x leverage — and the one that has to be
+// compared against equity, because margin alone is blind to leverage: 131.71u
+// of margin at 125x is 16,463u of exposure.
+func (p Position) Notional() float64 { return p.Quantity * p.EntryPrice }
 
 // rawPosition mirrors the BingX position payload. Fields are stringly-typed.
 type rawPosition struct {
@@ -46,7 +52,26 @@ type rawPosition struct {
 func (c *Client) OpenPositions(ctx context.Context, sym market.Symbol) ([]Position, error) {
 	q := url.Values{}
 	q.Set("symbol", string(sym))
+	return c.positions(ctx, q)
+}
 
+// AllPositions lists every open position across all symbols, in ONE signed
+// call, by omitting the symbol parameter.
+//
+// Used to price total account exposure before opening something new; the
+// per-symbol alternative is fourteen calls. The endpoint accepts the
+// parameterless form (verified live 2026-09-08), but it was verified against a
+// FLAT account, so "returns every symbol" is not distinguishable from "returns
+// nothing" on that evidence alone. Callers that make a safety decision from
+// this must cross-check the count against Balance.UsedMargin, which is an
+// independent witness that positions exist — see risk.Exposure. Note also
+// that OpenOrders is documented to IGNORE its symbol parameter, so this family
+// of endpoints has form.
+func (c *Client) AllPositions(ctx context.Context) ([]Position, error) {
+	return c.positions(ctx, url.Values{})
+}
+
+func (c *Client) positions(ctx context.Context, q url.Values) ([]Position, error) {
 	var raws []rawPosition
 	if err := c.signedRequest(ctx, "GET", PathPositions, q, &raws); err != nil {
 		return nil, err
