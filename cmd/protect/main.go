@@ -27,7 +27,6 @@ import (
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/protect"
-	"myFirstGo/trading-bot/zone"
 )
 
 func main() {
@@ -42,13 +41,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: protect -symbol BTC -stop 77900 -tp 78900 [-side short] [-confirm]")
 		os.Exit(2)
 	}
-	// Single source of truth for the symbol table. The old local map had gone
-	// stale — it never learned SPCX/MSTR/APP, so protecting one of those
-	// positions from the CLI was impossible and the failure was "unknown
-	// symbol", which reads like a typo rather than a missing entry.
-	sym, ok := zone.ShortToSym[*symShort]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown symbol %q\n", *symShort)
+	// Single source of truth for the symbol table, now market.Resolve rather
+	// than zone.ShortToSym. The local map had gone stale first (it never
+	// learned SPCX/MSTR/APP), and zone.ShortToSym then went stale the same way
+	// against the five crypto alts — so protecting a SOL/LINK/SUI/HYPE/NEAR
+	// position from the CLI was impossible while the web could do it. Two
+	// tables, two chances to be missing the symbol you need at the moment you
+	// need it. zone.ShortToSym stays where it is: it gates what a MANUAL zone
+	// may name, which is a different question from what a position may be.
+	sym, err := market.ResolveErr(*symShort)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 

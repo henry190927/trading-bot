@@ -116,7 +116,11 @@ type monitorLoop struct {
 //	                   not confluence noise, and it used to vanish with it)
 //	structalert / confluence scan — skipped entirely when MONITOR_ZONE_ONLY=1,
 //	                   and ntfy-dependent otherwise
-func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn bool) []monitorLoop {
+//	runBracketGuard  — always started, off only on MONITOR_BRACKET=0 or a
+//	                   missing API key. NOT gated by MONITOR_ZONE_ONLY and NOT
+//	                   gated by ntfy: without push it still logs and still
+//	                   places, which is degraded but not off.
+func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn, bracketOn, apiKeyOn bool, bracketMode string) []monitorLoop {
 	pushOff := "NTFY_TOPIC 空白 → 這個 loop 直接 return"
 	zoneOnlyOff := "MONITOR_ZONE_ONLY=1 → 沒啟動"
 
@@ -160,6 +164,27 @@ func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn bool) []monitorLoop {
 		mw.Reason = pushOff
 	}
 	loops = append(loops, mw)
+
+	// bracket, like macrowarn, is not gated by MONITOR_ZONE_ONLY. Unlike
+	// every other loop here it is not gated by ntfy either: with push muted
+	// it still logs, and in place mode it still attaches the stop. So "on"
+	// here means the goroutine is doing its job, and a muted-push caveat
+	// rides in the reason instead of flipping the badge.
+	bg := monitorLoop{Name: "bracket", On: bracketOn && apiKeyOn}
+	switch {
+	case !bracketOn:
+		bg.Reason = "MONITOR_BRACKET=0 → 沒啟動"
+	case !apiKeyOn:
+		bg.Reason = "BINGX_API_KEY/SECRET 未設 → 直接 return"
+	case bracketMode == "place":
+		bg.Reason = "裸倉守衛 · 30s · mode=place(自動掛 journal 停損)"
+	default:
+		bg.Reason = "裸倉守衛 · 30s · mode=alert(只推播,StopAuto 單才自動掛)"
+	}
+	if bg.On && !ntfyOn {
+		bg.Reason += " · NTFY 靜音 → 只有 log"
+	}
+	loops = append(loops, bg)
 
 	return loops
 }
@@ -252,20 +277,31 @@ func (s *server) handleOpsServices(c *gin.Context) {
 	}
 	on, muted := ntfyState()
 	zoneCfg := zone.ReadConfig()
-	zoneOnly := false
+	// Read from .env, not os.Getenv: this panel reports what the MONITOR
+	// process will do on its next start, and that process reads the file.
+	// The web process's own environment can differ.
+	zoneOnly, bracketOn, bracketMode := false, true, "alert"
 	if data, err := os.ReadFile(envPath()); err == nil {
 		for _, line := range strings.Split(string(data), "\n") {
-			if strings.HasPrefix(line, "MONITOR_ZONE_ONLY=") {
+			switch {
+			case strings.HasPrefix(line, "MONITOR_ZONE_ONLY="):
 				zoneOnly = strings.TrimSpace(strings.TrimPrefix(line, "MONITOR_ZONE_ONLY=")) == "1"
+			case strings.HasPrefix(line, "MONITOR_BRACKET="):
+				bracketOn = strings.TrimSpace(strings.TrimPrefix(line, "MONITOR_BRACKET=")) != "0"
+			case strings.HasPrefix(line, "MONITOR_BRACKET_MODE="):
+				if strings.EqualFold(strings.TrimSpace(strings.TrimPrefix(line, "MONITOR_BRACKET_MODE=")), "place") {
+					bracketMode = "place"
+				}
 			}
 		}
 	}
+	apiKeyOn := s.client != nil && s.client.APIKey != "" && s.client.APISecret != ""
 	c.JSON(http.StatusOK, gin.H{
 		"services":     svcs,
 		"ntfy":         gin.H{"on": on, "muted": muted},
 		"zone_only":    zoneOnly,
 		"zone_channel": gin.H{"enabled": zoneCfg.Enabled, "auto": zoneCfg.Auto, "tfs": zoneCfg.TFs},
-		"loops":        monitorLoops(zoneOnly, on, zoneCfg.Enabled),
+		"loops":        monitorLoops(zoneOnly, on, zoneCfg.Enabled, bracketOn, apiKeyOn, bracketMode),
 		// Price fan-out. drop_pct is the backpressure signal: broadcast
 		// silently discards a stale pending snapshot for a slow client, which
 		// is correct behaviour but was previously unobservable.

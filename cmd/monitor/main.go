@@ -149,13 +149,21 @@ func main() {
 	// muted.
 	go runMacroWarn(ctx)
 
+	// Bracket guard: watches every OPEN journal trade against the exchange
+	// and reports (or, opted in, fixes) a live position with no reduce-only
+	// stop resting on it. Starts here, above the zone-only branch, for the
+	// same reason macrowarn does — MONITOR_ZONE_ONLY exists to silence
+	// confluence noise, and a naked-position alarm is not that. See
+	// cmd/monitor/bracket.go for why this cannot live in cmd/web.
+	go runBracketGuard(ctx, client)
+
 	// MONITOR_ZONE_ONLY=1 keeps the zone-fade + breakout-tripwire channel
 	// (zonealert), autoexec and macrowarn, and skips the multi-TF confluence
 	// scan / structalert — for when the user wants the zone alerts without the
 	// confluence noise. Block on ctx so those goroutines keep polling; never
 	// reach the confluence loop below.
 	if os.Getenv("MONITOR_ZONE_ONLY") == "1" {
-		log.Printf("MONITOR_ZONE_ONLY=1 — zonealert + autoexec + macrowarn only (confluence / structalert disabled)")
+		log.Printf("MONITOR_ZONE_ONLY=1 — zonealert + autoexec + macrowarn + bracket only (confluence / structalert disabled)")
 		<-ctx.Done()
 		log.Printf("monitor shutting down")
 		return

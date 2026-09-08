@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"myFirstGo/trading-bot/bingx"
+	"myFirstGo/trading-bot/bracket"
 	"myFirstGo/trading-bot/journal"
 
 	"github.com/gin-gonic/gin"
@@ -52,34 +53,33 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 				continue
 			}
 			vt := verifyTrade{ID: t.ID, Symbol: t.Symbol, Side: t.Side, Entry: t.Entry, Stop: t.Stop, TP1: t.TP1, TP2: t.TP2}
-			if pos, perr := s.client.FindOpenPosition(ctx, sym, t.Side); perr == nil && pos != nil {
+			pos, perr := s.client.FindOpenPosition(ctx, sym, t.Side)
+			if perr != nil {
+				pos = nil
+			}
+			if pos != nil {
 				vt.HasPosition = true
 				vt.PosQty, vt.PosEntry = pos.Quantity, pos.EntryPrice
 			}
-			if ords, oerr := s.client.OpenOrders(ctx, sym); oerr == nil {
-				vt.Orders = ords
-				for _, o := range ords {
-					up := strings.ToUpper(o.Type)
-					if strings.Contains(up, "STOP") {
-						vt.HasStop = true
-					}
+			var ords []bingx.OpenOrder
+			if got, oerr := s.client.OpenOrders(ctx, sym); oerr == nil {
+				ords = got
+				vt.Orders = got
+				for _, o := range got {
 					// A TP either says so in its type, or is a reduce-only
 					// LIMIT. reduceOnly is the discriminator that matters:
 					// without it a plain LIMIT matched the ENTRY order, so
 					// every resting pending trade reported "🎯 tp live" on
 					// the strength of its own unfilled entry.
+					up := strings.ToUpper(o.Type)
 					if strings.Contains(up, "TAKE_PROFIT") || (up == "LIMIT" && o.ReduceOnly) {
 						vt.HasTP = true
 					}
 				}
 			}
-			// The danger case: a filled/active trade with a position but NO stop
-			// on the exchange (exactly what left #60 naked).
-			if vt.HasPosition && !vt.HasStop {
-				vt.Warn = "⚠ 有部位但交易所沒有停損單 — 裸單!"
-				warnN++
-			} else if t.FilledAt.IsZero() == false && !vt.HasPosition {
-				vt.Warn = "⚠ journal 記為已成交,但交易所沒有部位(可能已平/已停損)"
+
+			vt.HasStop, vt.Warn = classifyVerify(t, pos, ords)
+			if vt.Warn != "" {
 				warnN++
 			}
 			// Cash-open-bar advisory: only meaningful once there IS a stop to
@@ -106,4 +106,45 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 		"NoClient":     s.client == nil,
 		"UpdatedUTC":   time.Now().In(time.FixedZone("Asia/Taipei", 8*3600)).Format("2006-01-02 15:04:05 UTC+8"),
 	})
+}
+
+// classifyVerify decides the stop badge and the warning banner for one row.
+//
+// Extracted so the handler and its tests run the SAME code. The account is
+// usually flat or holding one position, so the interesting rows — a
+// non-reduce-only STOP, a hedge-mode stop, a journal naming an order the
+// exchange no longer has — cannot be produced on demand against the live API.
+// A test that reimplemented this switch would drift from it silently, which is
+// how /ops/verify shipped four defects that only appeared once a real row
+// existed.
+//
+// "Protected" comes from package bracket, shared with the monitor daemon's
+// naked-position guard, so this page and the alarm that wakes you up cannot
+// disagree about what counts as a stop. The check here used to be
+// strings.Contains(type, "STOP") alone — wrong in the dangerous direction,
+// because a STOP that is not reduce-only (and so could OPEN a position) and
+// one belonging to the opposite book in hedge mode both rendered as
+// "🛡️ stop live" on the one surface meant to be trusted over the journal.
+func classifyVerify(t journal.Trade, pos *bingx.Position, ords []bingx.OpenOrder) (hasStop bool, warn string) {
+	d := bracket.Decide(t, pos, ords, bracket.ModeAlert)
+	hasStop = d.State == bracket.StateProtected
+	switch {
+	case d.State == bracket.StateNaked:
+		if d.GhostStopID != "" {
+			return hasStop, "⚠ journal 記有停損單 " + d.GhostStopID + ",但交易所沒有這張掛單 — 裸單!"
+		}
+		return hasStop, "⚠ 有部位但交易所沒有停損單 — 裸單!"
+	case d.State == bracket.StateStale:
+		return hasStop, "⚠ journal 記為已成交,但交易所沒有部位(可能已平/已停損)"
+	case pos != nil && !hasStop:
+		// Decide returns skip for a trade with no journal stop, and a naked
+		// position on such a trade would otherwise render clean. #62 was
+		// exactly this row: 100x, no stop recorded, none on the exchange, and
+		// it gave back 97% of the position's margin.
+		return hasStop, "⚠ 有部位但交易所沒有停損單 — 裸單!(journal 也沒記停損價)"
+	case pos == nil && !t.FilledAt.IsZero():
+		// The stale-journal warning has to survive the skip states too.
+		return hasStop, "⚠ journal 記為已成交,但交易所沒有部位(可能已平/已停損)"
+	}
+	return hasStop, ""
 }

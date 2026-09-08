@@ -3329,42 +3329,21 @@ func (s *server) handleAPIChartStatePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// resolveWebSymbol maps the short symbol the form posts (BTC/ETH/XAU/XAG)
-// to the full BingX market symbol the engine needs.
+// resolveWebSymbol turns a journal/UI short name into a contract symbol.
+//
+// The table lives in market.Resolve, shared with package bracket and cmd/protect.
+// It used to be a switch here, which is how zone.ShortToSym came to be missing
+// the five crypto alts while this one had them — cmd/protect could not protect
+// a SOL/SUI/HYPE/NEAR/LINK position that the web could. A journal row naming
+// "BTC" must mean the same contract in every process that reads it.
+//
+// The error message still comes from uiSymbols rather than market.Shorts(), so
+// it lists the names in the order the dropdown offers them. TestUISymbolsMatchMarketResolve
+// keeps the two sets from drifting.
 func resolveWebSymbol(s string) (market.Symbol, error) {
-	switch s {
-	case "BTC":
-		return market.BTCUSDT, nil
-	case "ETH":
-		return market.ETHUSDT, nil
-	case "XAU":
-		return market.XAUUSDT, nil
-	case "XAG":
-		return market.XAGUSDT, nil
-	case "SNDK":
-		return market.SNDKUSDT, nil
-	case "SPCX":
-		return market.SPCXUSDT, nil
-	case "MSTR":
-		return market.MSTRUSDT, nil
-	case "APP":
-		return market.APPUSDT, nil
-	case "NVDA":
-		return market.NVDAUSDT, nil
-	case "SOL":
-		return market.SOLUSDT, nil
-	case "LINK":
-		return market.LINKUSDT, nil
-	case "SUI":
-		return market.SUIUSDT, nil
-	case "HYPE":
-		return market.HYPEUSDT, nil
-	case "NEAR":
-		return market.NEARUSDT, nil
+	if sym, ok := market.Resolve(s); ok {
+		return sym, nil
 	}
-	// Built from uiSymbols rather than hardcoded: the literal list here went
-	// stale the moment SPCX/MSTR/APP were added, so the error told the caller
-	// to use symbols that WERE valid and omitted three that also were.
 	return "", fmt.Errorf("unknown symbol %q (use %s)", s, strings.Join(uiSymbols, " / "))
 }
 

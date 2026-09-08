@@ -131,7 +131,7 @@ func TestMonitorLoops(t *testing.T) {
 	}
 
 	t.Run("zone-only with ntfy on: zonealert + autoexec + macrowarn", func(t *testing.T) {
-		ls := monitorLoops(true, true, true)
+		ls := monitorLoops(true, true, true, true, true, "alert")
 		for _, n := range []string{"autoexec", "zonealert", "macrowarn"} {
 			if !get(ls, n).On {
 				t.Errorf("%s should be live under MONITOR_ZONE_ONLY=1", n)
@@ -151,10 +151,10 @@ func TestMonitorLoops(t *testing.T) {
 	// warn. Push is its ONLY gate now, in both modes.
 	t.Run("macrowarn is gated by push alone, never by zone-only", func(t *testing.T) {
 		for _, zo := range []bool{true, false} {
-			if !get(monitorLoops(zo, true, true), "macrowarn").On {
+			if !get(monitorLoops(zo, true, true, true, true, "alert"), "macrowarn").On {
 				t.Errorf("macrowarn off at zoneOnly=%v with push on", zo)
 			}
-			mw := get(monitorLoops(zo, false, true), "macrowarn")
+			mw := get(monitorLoops(zo, false, true, true, true, "alert"), "macrowarn")
 			if mw.On {
 				t.Errorf("macrowarn on at zoneOnly=%v with push muted", zo)
 			}
@@ -164,19 +164,26 @@ func TestMonitorLoops(t *testing.T) {
 		}
 	})
 
-	t.Run("muted under zone-only: autoexec alone", func(t *testing.T) {
-		ls := monitorLoops(true, false, true)
-		on := 0
+	t.Run("muted under zone-only: autoexec and bracket", func(t *testing.T) {
+		ls := monitorLoops(true, false, true, true, true, "alert")
+		// These two are the loops that do NOT need push to be useful:
+		// autoexec places paper orders, and bracket logs naked positions and
+		// still attaches a stop for a StopAuto trade. Every other loop's only
+		// output IS a push, so muting takes them down.
+		wantOn := map[string]bool{"autoexec": true, "bracket": true}
+		on := map[string]bool{}
 		for _, l := range ls {
 			if l.On {
-				on++
-				if l.Name != "autoexec" {
+				on[l.Name] = true
+				if !wantOn[l.Name] {
 					t.Errorf("%s should not be live when muted", l.Name)
 				}
 			}
 		}
-		if on != 1 {
-			t.Errorf("live loops = %d, want exactly 1 (autoexec)", on)
+		for name := range wantOn {
+			if !on[name] {
+				t.Errorf("%s should stay live when muted (reason %q)", name, get(ls, name).Reason)
+			}
 		}
 		if r := get(ls, "zonealert").Reason; !strings.Contains(r, "NTFY_TOPIC") {
 			t.Errorf("zonealert reason should name the cause, got %q", r)
@@ -184,7 +191,7 @@ func TestMonitorLoops(t *testing.T) {
 	})
 
 	t.Run("full mode with ntfy on: everything live", func(t *testing.T) {
-		for _, l := range monitorLoops(false, true, true) {
+		for _, l := range monitorLoops(false, true, true, true, true, "alert") {
 			if !l.On {
 				t.Errorf("%s should be live", l.Name)
 			}
@@ -194,7 +201,7 @@ func TestMonitorLoops(t *testing.T) {
 	t.Run("autoexec survives muting in every mode", func(t *testing.T) {
 		for _, zo := range []bool{true, false} {
 			for _, nt := range []bool{true, false} {
-				if !get(monitorLoops(zo, nt, true), "autoexec").On {
+				if !get(monitorLoops(zo, nt, true, true, true, "alert"), "autoexec").On {
 					t.Errorf("autoexec off at zoneOnly=%v ntfy=%v — it has no ntfy dependency", zo, nt)
 				}
 			}
@@ -214,17 +221,17 @@ func TestMonitorLoopsZoneChannelGate(t *testing.T) {
 		t.Fatalf("loop %q missing", name)
 		return monitorLoop{}
 	}
-	za := find(monitorLoops(true, true, false), "zonealert")
+	za := find(monitorLoops(true, true, false, true, true, "alert"), "zonealert")
 	if za.On {
 		t.Error("zonealert must read OFF when the zone channel master is disabled")
 	}
 	if !strings.Contains(za.Reason, "enabled=false") {
 		t.Errorf("reason should name the zone-config gate, got %q", za.Reason)
 	}
-	if !find(monitorLoops(true, true, false), "autoexec").On {
+	if !find(monitorLoops(true, true, false, true, true, "alert"), "autoexec").On {
 		t.Error("autoexec is independent of the zone channel and must stay ON")
 	}
-	if !find(monitorLoops(true, true, true), "zonealert").On {
+	if !find(monitorLoops(true, true, true, true, true, "alert"), "zonealert").On {
 		t.Error("both gates open → zonealert ON")
 	}
 }
@@ -282,4 +289,76 @@ func TestZoneOnlyActive(t *testing.T) {
 	if zoneOnlyActive() {
 		t.Error("missing .env should read false, not true")
 	}
+}
+
+// The bracket guard's gating differs from every other loop on this card, and
+// the card's whole value is not lying about what is running. It is NOT gated
+// by MONITOR_ZONE_ONLY (same reasoning as macrowarn) and NOT gated by ntfy —
+// with push muted it still logs, and in place mode it still attaches the stop,
+// which is degraded, not off.
+func TestMonitorLoopsBracketGating(t *testing.T) {
+	get := func(loops []monitorLoop, name string) monitorLoop {
+		for _, l := range loops {
+			if l.Name == name {
+				return l
+			}
+		}
+		t.Fatalf("loop %q missing from the card — an unlisted loop is a card that lies by omission", name)
+		return monitorLoop{}
+	}
+
+	t.Run("on regardless of zone-only and ntfy", func(t *testing.T) {
+		for _, zo := range []bool{true, false} {
+			for _, nt := range []bool{true, false} {
+				bg := get(monitorLoops(zo, nt, true, true, true, "alert"), "bracket")
+				if !bg.On {
+					t.Errorf("zoneOnly=%v ntfy=%v: bracket reported off (%s)", zo, nt, bg.Reason)
+				}
+			}
+		}
+	})
+
+	t.Run("muted push is a caveat, not an off switch", func(t *testing.T) {
+		bg := get(monitorLoops(true, false, true, true, true, "alert"), "bracket")
+		if !bg.On {
+			t.Fatal("bracket off with ntfy muted; want on with a caveat")
+		}
+		if !strings.Contains(bg.Reason, "NTFY") {
+			t.Errorf("reason %q does not mention the muted push", bg.Reason)
+		}
+	})
+
+	t.Run("MONITOR_BRACKET=0 is off", func(t *testing.T) {
+		bg := get(monitorLoops(false, true, true, false, true, "alert"), "bracket")
+		if bg.On {
+			t.Error("bracket reported on with MONITOR_BRACKET=0")
+		}
+		if !strings.Contains(bg.Reason, "MONITOR_BRACKET") {
+			t.Errorf("reason %q does not name the flag that disabled it", bg.Reason)
+		}
+	})
+
+	t.Run("a missing API key is off, and says so", func(t *testing.T) {
+		bg := get(monitorLoops(false, true, true, true, false, "alert"), "bracket")
+		if bg.On {
+			t.Error("bracket reported on with no API key")
+		}
+		if !strings.Contains(bg.Reason, "BINGX_API_KEY") {
+			t.Errorf("reason %q does not name the missing credential", bg.Reason)
+		}
+	})
+
+	t.Run("mode is visible, because alert and place do different things", func(t *testing.T) {
+		alert := get(monitorLoops(false, true, true, true, true, "alert"), "bracket")
+		place := get(monitorLoops(false, true, true, true, true, "place"), "bracket")
+		if !strings.Contains(alert.Reason, "alert") {
+			t.Errorf("alert-mode reason %q does not say so", alert.Reason)
+		}
+		if !strings.Contains(place.Reason, "place") {
+			t.Errorf("place-mode reason %q does not say so", place.Reason)
+		}
+		if alert.Reason == place.Reason {
+			t.Error("alert and place render identically — the card cannot show which one is live")
+		}
+	})
 }
