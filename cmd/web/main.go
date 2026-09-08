@@ -170,6 +170,8 @@ func main() {
 	// Read-only fill history for reconciling the journal against the
 	// exchange after a hand-closed trade. GET-only, signed GETs underneath.
 	r.GET("/ops/fills", srv.handleOpsFills)
+	// Read-only account equity. One signed GET; nothing mutable.
+	r.GET("/ops/balance", srv.handleOpsBalance)
 	r.GET("/ops/autotrade", srv.handleOpsAutotrade)
 	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/services", srv.handleOpsServices)
