@@ -18,38 +18,51 @@ A personal portfolio project built to deepen Go expertise and showcase productio
 flowchart TB
     subgraph Edge["📱 Edge (iPhone / Mac)"]
         ntfy["ntfy push<br/>(iOS app)"]
-        terminal["Terminal# SSH<br/>(on-demand CLIs)"]
-        safari["Safari → /dashboard<br/>(Tailscale only)"]
+        safari["Safari → web UI<br/>(Tailscale-only, no auth)"]
+        terminal["Terminal / SSH<br/>(26 CLIs)"]
+        claude["Claude Desktop<br/>→ cmd/mcp"]
     end
 
     subgraph VPS["☁️ Oracle Cloud Always Free VM ($0/mo)"]
-        daemon["serve daemon<br/>(systemd unit)"]
-        web["web UI daemon<br/>(Gin, html/template)"]
-        analyze["analyze · validate ·<br/>backtest · journal CLIs"]
-        csv[("journal.csv<br/>(18-col schema, v1→v3 auto-migrated)")]
+        web["trading-web<br/>Gin + html/template"]
+        monitor["trading-monitor<br/>zone alerts · autoexec<br/>bracket guard · macro warn"]
+        engine["trading-bot<br/>engine daemon (1h)"]
+        store[("flat files, env-overridable paths<br/>journal.csv (v9, 30 col)<br/>zones · autotrade · setups")]
     end
 
-    subgraph Core["🧠 Engine Core (importable Go packages)"]
-        signal["signal/<br/>confluence voting"]
-        analyzer["analyzer/<br/>sweep · divergence · CVD"]
-        indicator["indicator/<br/>RSI · BOLL · MACD · ATR · HVN"]
-        bingx_pkg["bingx/<br/>REST client + paginated klines"]
+    subgraph Core["🧠 Importable packages — 27 pkg / 42k lines / 51 test files"]
+        datain["DATA IN<br/>bingx (REST+WS) · market · twse · onchain<br/>econcal · earnings · fundamental · macro · dxy"]
+        math["PURE MATH<br/>indicator — RSI · BOLL · MACD · ATR · HVN/POC"]
+        detect["DETECTION<br/>signal — confluence votes · N字 BOS/CHoCH · EQH/EQL pools<br/>analyzer · zone · session (cash-open bar)"]
+        decide["DECISION + RISK<br/>validator (/10 score) · risk (notional/equity)<br/>shipgate · bracket · protect"]
+        exec["EXECUTION<br/>autostrat · autotrade — paper-first, capped"]
+    end
+
+    subgraph Research["🔬 Research — 10 A/B harnesses + a gate that is code"]
+        ab["sweepbt · rangebt · breakbt · confirmbt · flipbt<br/>openbt · opensab · basebt · shadowbt · shelfbt"]
+        gate["cmd/gate → shipgate<br/>PASS / FAIL / UNDECIDED, per-window"]
     end
 
     subgraph External["🌐 External"]
-        bingx[(BingX public REST<br/>klines · funding · OI)]
-        ntfysh[ntfy.sh push gateway]
+        bx[(BingX REST + WebSocket)]
+        ntfysh[ntfy.sh gateway]
+        others[(TWSE open data · Finnhub<br/>Moralis · Etherscan · Gemini)]
     end
 
-    terminal -->|SSH/22| daemon
-    safari -->|HTTPS via Tailscale 100.x.x.x| web
-    daemon --> signal & analyzer & indicator
-    web --> signal & analyzer & indicator & csv
-    analyze --> signal & csv
-    signal --> bingx_pkg
-    bingx_pkg --> bingx
-    daemon -->|"score≥threshold + sweep-anchored"| ntfysh
+    bx --> datain
+    others --> datain
+    datain --> math --> detect --> decide --> exec
+    exec --> store
+    detect --> engine & monitor
+    decide --> web
+    web <--> store
+    monitor -->|"zone fade · naked position · macro blackout"| ntfysh
     ntfysh --> ntfy
+    safari -->|"HTTPS over Tailscale 100.x"| web
+    terminal -->|SSH/22| engine
+    claude -.->|scp'd journal copy| store
+    detect --> ab
+    ab --> gate
 ```
 
 ### Engineering decisions & tradeoffs
@@ -63,7 +76,7 @@ These are the choices that came out of building, breaking, and fixing the system
 | **MTF bias filter behind an opt-in flag (`-bias`)** | Same story: backtest showed enforcing higher-TF MACD direction hurt ETH mean-reversion edge (+6.5R → −2.4R). Made it opt-in for experimentation rather than removing it entirely — preserves the ability to A/B with future data. |
 | **Stop refinement (push past HVN clusters) opt-in via `-stop-refine`** | Backtest showed wider stops shrink R-multiples within the 24-bar hold (more timeouts at small loss, fewer 2R winners). BUT the simulator can't model real stop-hunt slippage. Opt-in flag preserves both schools of thought; live data via journal will decide. |
 | **Confluence VOTE model, not weighted sum** | Each factor casts ≤1 vote per direction per bar, score = max(bull, bear). Simpler than weighted-sum (fewer hyperparameters to tune, less curve-fitting risk on small samples), and the vote count is interpretable (`LONG(3)` = three independent factors agreed). |
-| **CSV journal, not SQLite/Postgres** | One process writing append-mostly rows, the operator hand-edits via `jupdate` aliases. SQLite would force schema migrations as a tool; with CSV I version the schema (v1→v3) and auto-migrate on first read. Tradeoff: no concurrent writers, no complex queries — but those don't apply here. |
+| **CSV journal, not SQLite/Postgres** | One process writing append-mostly rows, the operator hand-edits via `jupdate` aliases. SQLite would force schema migrations as a tool; with CSV I version the schema by column count (v1→v9, currently 30 cols) and auto-migrate on first read. Tradeoff: no concurrent writers, no complex queries — but those don't apply here. |
 | **Web UI binds to Tailscale IP, NOT 0.0.0.0** | Three-layer defense (Tailscale CGNAT + ufw + bind-address) — any single breach still leaves two layers intact. No app-level auth needed because the network layer already enforces identity via Wireguard. Senior platform engineering: trust the network primitive when it's strong, don't bolt on weak auth as security theater. |
 | **Range expansion bars: voted, demoted, re-promoted** | Originally a vote; demoted to display-only after symbol-regime dependence showed up in one backtest; **re-promoted after an XAG case** where the engine gave a 9.0/10 LONG while a 3-ATR bearish range-expansion bar was being detected but ignored. Subsequent 60-day backtest validated: XAG flipped −8.65R → +0.66R. Lesson: a single backtest window is noisy; revisit decisions when new evidence shows up. |
 
@@ -91,7 +104,7 @@ These are the choices that came out of building, breaking, and fixing the system
 |---|---|
 | Language | **Go 1.22** (single binary deploy, easy cross-compile to ARM/AMD64) |
 | Web framework | Gin + `html/template` (server-side render, no JS framework) |
-| Persistence | CSV (auto-migrated v1→v3) |
+| Persistence | CSV (auto-migrated v1→v9, 30 cols) |
 | Push | ntfy.sh (free) |
 | Notifier | Pluggable `Notifier` interface (stdout / macOS Notification Center / ntfy) with `Multi` fan-out |
 | Network | Tailscale (Wireguard mesh, free tier) |
@@ -215,7 +228,19 @@ Positional args are read in order — no flags needed for common cases. For raw 
 
 ### `cmd/analyze` — one-shot snapshot
 
-Fetches the latest closed candle of `-tf` for all 4 symbols, runs the engine, prints per-symbol detail plus a summary table with the verdict. Use this when you want to know "what's actionable right now?".
+Fetches the latest closed candle of `-tf`, runs the engine, prints per-symbol
+detail (side, score, N字 structure, HVN/POC, session opens, reasons, warnings,
+plan) plus a summary table with the verdict. Use this when you want to know
+"what's actionable right now?".
+
+Defaults to `market.All()` — the four-symbol DAEMON universe (BTC/ETH/XAU/XAG).
+`-symbols` addresses anything `market.Resolve` knows, including the stock
+synthetics and the crypto alts that are deliberately kept out of the daemon
+universe:
+
+```bash
+go run ./trading-bot/cmd/analyze -symbols BTC,ETH,SUI,SNDK -tf 1h
+```
 
 ```bash
 go run ./trading-bot/cmd/analyze                  # default 1h
@@ -435,16 +460,32 @@ jupdate 1 closed_at=2026-05-24T19:45:00Z
 make jupdate ID=1 SET='opened_at=2026-05-24T15:30:00Z closed_at=2026-05-24T19:45:00Z'
 ```
 
-#### CSV schema (18 columns — current v3)
+#### CSV schema (30 columns — current v9)
+
+Versioned by COLUMN COUNT and auto-migrated on read, so an old file keeps
+working: v1=16, v2=17 (+analyzed_at), v3=18 (+score), v4=19 (+leverage),
+v5=20 (+filled_at), v6=21 (+signal_ctx), v7=23 (+tp1 auto-placement state),
+v8=29 (+margin_usdt and entry/stop/tp2 placement state), v9=30 (+equity_usdt).
 
 ```
 id, opened_at, analyzed_at, closed_at, symbol, side, tf, score,
 entry, stop, tp1, tp2,
 anchor, open_notes,
-exit_price, outcome, r_realized, close_notes
+exit_price, outcome, r_realized, close_notes,
+leverage, filled_at, signal_ctx,
+tp1_auto, tp1_order_id, margin_usdt,
+entry_order_id, stop_auto, stop_order_id, tp2_auto, tp2_order_id,
+equity_usdt
 ```
 
-Four columns deserve a callout:
+`equity_usdt` is the column that makes a row say anything about RISK rather
+than about the read. R is leverage-independent by definition, so an R series
+is structurally incapable of showing an account going to zero — on 2026-09-08
+this file read 66 settled / gross +19.04R while the balance read 0.00000000,
+and both were correct. Without equity-at-entry no row and no sum of rows can
+say what fraction of the account was on the table.
+
+Four more columns deserve a callout:
 
 | Column | What it captures |
 |---|---|
@@ -855,7 +896,7 @@ The loader reads `./.env` and `./trading/.env` (in that order). Existing env var
 | macOS Notification Center | none on macOS — banner + sound. Use `-no-mac` to disable. First run, macOS asks permission for Script Editor (osascript) — grant once. | ✅ on darwin |
 | ntfy.sh push (iPhone / Android) | set `NTFY_TOPIC` in `.env` to a hard-to-guess string; subscribe to the same topic in the ntfy mobile app | off until topic set |
 
-Other local alternatives if you want louder alerts on Mac (wrap them in a shell script or add a custom Notifier sink — see `trading/notify/mac.go` as a template):
+Other local alternatives if you want louder alerts on Mac (wrap them in a shell script or add a custom Notifier sink — see `notify/mac.go` as a template):
 
 ```bash
 afplay /System/Library/Sounds/Hero.aiff   # audible blip
@@ -1368,57 +1409,85 @@ For a single trading bot, you'll use about 1% of that budget.
 
 ## Architecture
 
-```
-trading/
-├── Makefile            positional-style task runner
-├── cmd/
-│   ├── analyze/        one-shot snapshot CLI
-│   ├── serve/          long-running monitor + Mac/ntfy notifier
-│   ├── backtest/       historical replay CLI
-│   ├── validate/       score a proposed trade
-│   ├── journal/        live trade log (open / close / list / stats)
-│   └── web/            Gin web UI (dashboard, click-to-copy, Tailscale-only)
-├── market/
-│   ├── symbol.go       Symbol consts (BTC/ETH/XAU/XAG); XAU/XAG map to BingX NCCO* contracts
-│   └── candle.go       Candle, Trade, Depth types
-├── bingx/
-│   ├── client.go       REST: Klines, Depth, FundingRate, OpenInterest
-│   ├── klines_range.go paginated historical fetch (>1440 bars)
-│   ├── types.go        endpoint constants + raw JSON shapes
-│   └── ws.go           WebSocket stubs (not yet implemented)
-├── indicator/          pure, stateless math
-│   ├── rsi.go
-│   ├── boll.go
-│   ├── macd.go
-│   ├── fib.go
-│   ├── atr.go
-│   └── volume_profile.go   HVN / POC (籌碼密集區), display-only
-├── analyzer/           stateful / pattern detection
-│   ├── double_pattern.go  double top / double bottom (display-only)
-│   ├── cvd.go          cumulative volume delta
-│   ├── liquidity.go    equal-highs/lows + sweep + reclaim
-│   ├── divergence.go   regular/hidden bull/bear divergence
-│   └── liq_heatmap.go  Provider interface + clustering (Coinglass TODO)
-├── signal/
-│   ├── engine.go       confluence voting → Side, Score, Reasons, Warnings, Notes
-│   ├── plan.go         Plan: OrderType, Entry, StopLoss, TakeProfit[]
-│   ├── stop_refine.go  opt-in stop widening past HVN / equal-level clusters
-│   └── opens.go        daily / weekly / monthly open prices (display-only)
-├── backtest/
-│   └── backtest.go     simulator with fee model + sweep-only filter
-├── notify/
-│   ├── notifier.go     interface + Multi (fan-out)
-│   ├── stdout.go       colored stdout
-│   ├── mac.go          macOS Notification Center via osascript
-│   └── ntfy.go         ntfy.sh push (iPhone / Android / web)
-├── ansi/
-│   └── ansi.go         shared ANSI color helpers (TTY/NO_COLOR-aware)
-├── config/
-│   └── env.go          .env loader
-└── .env.example
-```
+27 importable packages, 26 command binaries, ~42k lines of Go, 51 test files.
+A flat tree of that is noise, so this is grouped by what each layer is FOR.
+Data flows down; nothing below reaches back up.
 
----
+### Layers
+
+| Layer | Packages | Responsibility |
+|---|---|---|
+| **Data in** | `bingx` (REST + WebSocket + paginated klines), `market` (Symbol/Candle types, 14 contracts incl. NCCO* metals and NCSK* stock synthetics), `twse`, `onchain`, `econcal`, `earnings`, `fundamental`, `macro`, `dxy` | Every external read. `market.Resolve` is the single symbol map — the canonical one, after three stale copies caused outages. |
+| **Pure math** | `indicator` | Stateless: RSI, BOLL, MACD, ATR, Fibonacci, volume profile (HVN/POC). No I/O, no clock. |
+| **Detection** | `signal` (confluence voting, N字 BOS/CHoCH structure, EQH/EQL liquidity pools, session opens, shelves), `analyzer` (sweep + reclaim, divergence, CVD, double patterns), `zone` (pivot-zone bands, manual + auto-derived), `session` (US cash-open bar modelling) | Turns candles into named events. **Closed bars only** — the forming bar is never read, which is what keeps live and backtest identical. |
+| **Decision + risk** | `validator` (/10 discretionary score), `risk` (notional/equity, kill distance), `shipgate` (PASS/FAIL/UNDECIDED), `bracket` (naked-position guard), `protect` (stop management) | Scores a proposal and refuses bad ones. `shipgate` is the notable one: the ship criteria are CODE, not a habit — see below. |
+| **Execution** | `autostrat` (rule → trigger), `autotrade` (paper fires, dedup into one-position-per-rule, global caps) | Paper-first and non-negotiably so. Live requires config master ON, paper OFF, **and** an env kill-switch. |
+| **Record** | `journal` | 30-column CSV, versioned by column count, auto-migrating v1→v9 on read. |
+| **Output** | `notify` (stdout / macOS / ntfy fan-out), `ansi`, `ai` (Gemini/Anthropic, dry-run aware) | |
+| **Config** | `config` | `.env` loader. Every data path is env-overridable, which is what makes a fixture-backed demo instance cheap. |
+
+### cmd/ — 26 binaries
+
+| Group | Binaries |
+|---|---|
+| **Daemons** (systemd on the VPS) | `web` (Gin UI), `monitor` (zone alerts · autoexec · bracket guard · macro warn), `serve` (engine scan loop) |
+| **Read / analyse** | `analyze` (multi-symbol snapshot, `-symbols` for anything `market.Resolve` knows), `validate` (score a proposed entry), `price`, `contracts` |
+| **Account / exchange** | `acct`, `protect` (stop management), `wsprobe` |
+| **Data fetchers** (cron) | `earnings-fetch`, `fundamental-scan` |
+| **Record** | `journal` (open/close/list/stats/update/delete) |
+| **Integration** | `mcp` (MCP server — reads a synced journal copy so Claude Desktop can query trade history) |
+| **Simulator** | `backtest` |
+| **Research** | 10 A/B harnesses + `gate` — see below |
+
+### Research harnesses, and why there are ten of them
+
+Every strategy change goes through a 60/90/120-day A/B before it ships, and
+each harness exists because a *specific* question could not be answered by the
+one before it:
+
+| Harness | The question |
+|---|---|
+| `sweepbt` | sweep-reject parameter surface (the shipped edge) |
+| `rangebt` | range-edge arms, incl. side and event filters |
+| `breakbt` | break-and-retest |
+| `confirmbt` | touch entry vs close confirmation (answer: close, −0.12R/trade vs −0.41R) |
+| `flipbt` | polarity flip after a level breaks |
+| `openbt` | does session-open alignment predict outcome (bucket split) |
+| `opensab` | the same question done properly — filter at fire-generation, then `shipgate` |
+| `basebt` | baseline, so an arm always has something to beat |
+| `shadowbt` | EQH/EQL/open levels as shadow signals |
+| `shelfbt` | shelf-retest (run and REJECTED — the surface has no peak) |
+
+`cmd/gate` feeds windows into `shipgate.Evaluate`, which returns PASS, FAIL or
+**UNDECIDED** and lists *every* failed criterion rather than the first. The
+absolute floor (median R/trade must clear zero regardless of how the baseline
+did) exists because a purely relative gate cannot say "neither of these should
+be traded". Rejected results are kept in the docs on purpose so the same idea
+does not get relitigated.
+
+### Design docs
+
+Point-in-time records of a decision, not living documents — read them for the
+reasoning, check the code for current behaviour.
+
+| Doc | Subject |
+|---|---|
+| `docs/auto_executor_design.md` | Auto-executor: explicit IN/OUT scope, safety gates, phased rollout, open decisions |
+| `docs/price_stream_design.md` (+ `.zh-TW`) | WebSocket price stream |
+| `docs/AI_ARCHITECTURE.md` | AI advisor layering |
+| `docs/ai_analyze_upgrade_spec.md` | Symbol-analyze prompt/context ordering |
+| `docs/ai_fanout_design.md` | Multi-agent synthesis lattice |
+| `docs/struct_momentum_strategy_design.md` | StructMomentum, the second strategy |
+| `docs/fundamental_f3_earnings_spec.md` | Earnings/fundamental board |
+| `docs/ui_overhaul_plan.md` | UI phases |
+| `docs/MCP_SETUP.md` | MCP server wiring |
+
+Several packages carry the reasoning in their package doc rather than in
+`docs/` — `session/session.go` (why the 9:30 ET bar gets its own package, with
+the measurements), `autotrade/caps.go` (why zero means unlimited),
+`autotrade/blocked.go` (why the blocked log is a separate file) are the ones
+worth reading first.
+
 
 ## Recommended daily workflow
 
@@ -1441,58 +1510,62 @@ trading/
 - **TP1 isn't simulated.** Backtest exits at TP2 or stop — partial TP1 fills could improve real-world R but aren't modeled.
 - **Gold (XAU) is CFD-style** on BingX. Weekend gaps, thinner book, different liquidity profile than crypto perps. Backtest shows it's unprofitable; current recommendation is to exclude.
 - **Coinglass-style liquidation heatmap is not wired.** The interface exists in `analyzer/liq_heatmap.go` but no Provider implementation. This is the biggest data gap if you want to trade liquidation zones.
-- **No live position tracking.** The bot never places orders, never tracks fills, never closes positions. It only emits signals.
+- **It DOES place orders now — this used to say it never did.** `bingx/orders.go`
+  places entries, stops and take-profits; `protect/` manages stops on live
+  positions; the journal records `entry_order_id` / `stop_order_id` /
+  `tp1_order_id` / `tp2_order_id`; `/ops/fills` reconciles against the
+  exchange. Three consequences worth stating plainly rather than leaving in
+  the code: (a) the auto-executor is **paper-first** and going live needs the
+  config master ON, paper OFF *and* an env kill-switch — any one of the three
+  off means no real order; (b) a bundled stop can silently fail to attach, so
+  every entry must be re-checked against the exchange (`/ops/verify`) rather
+  than trusted from the journal; (c) `bracket/` runs a server-side
+  naked-position guard because (b) actually happened.
 - **Backtest sample size is small** (~27–38 trades per symbol at 1h over 60 days). Edge confidence intervals are wide.
 
 ---
 
 ## Roadmap
 
-### Done
+The hand-maintained changelog that used to live here had drifted about three
+months: of the nine items listed as "Open", **seven had already shipped**
+(R histogram, daily-R calendar, equity curve, WebSocket streams, position-size
+math, uPlot mini-charts, JSON poll endpoint). Maintaining a second history
+next to git guarantees exactly that outcome, so this section no longer tries.
 
-| Phase | Scope |
+**For what shipped, `git log` is authoritative** — commit messages here carry
+the reasoning and the A/B numbers, not just the diff. This section keeps only
+what git cannot tell you: what is deliberately NOT done, and why.
+
+### Genuinely open
+
+| Item | Status |
 |---|---|
-| 2A | VPS security pass — Tailscale-only access, ufw, fail2ban, unattended-upgrades, SSH key + Keychain |
-| 2A | ntfy push notifications to iPhone (replaces Slack) |
-| 2B.1 | Journal extracted to package + web list view with WR / avgR / totalR / best / worst |
-| 2B.2 | `/journal/new` open form with anchor autocomplete + validation |
-| 2B.3 | `/journal/:id/close` form with outcome → exit auto-fill |
-| 2B.4 | `/journal/:id/edit` (full edit, open↔closed transitions) + delete |
-| 2B.5 | `/validate` form + scored result page, validator package shared with CLI |
-| 2C | Live logs SSE stream on web + ops panel (start/stop/tconfig buttons in `/ops`) — mobile daemon control without SSH |
-| — | Partials calculator widget (multi-leg exits with weighted-avg, restored on re-open) |
-| — | Sweep close-confirmed invalidation (engine) |
-| — | Range-expansion + volume bar promoted to votes (engine), RSI-neutral gated |
-| — | OI delta sign correction (engine) |
-| — | Drop-forming-candle helper (live/backtest consistency) |
-| — | Falling-knife + entry-chase penalties in validator |
-| — | Engine plan-validity suppression when live mark is wrong-side of plan entry |
-| — | Diagnose-now badges on dashboard + side-specific diagnose on open-trade card |
-| — | Open-trades section on dashboard with live R, time elapsed, progress bar, engine drift signal |
-| — | Journal schema v4 — leverage column (with per-symbol defaults on new-trade form) |
-| — | 30m + 2h timeframes added (CLIs, daemon cadence, dashboard, bias filter, backtest) |
-| — | Trade-card border color follows realized R (not outcome label) |
-| — | Backtest A/B validated 1h: netR +10.91R → +19.97R (+83%) with sweep + range-expansion fixes |
-| — | Cross-TF backtest matrix (15m/30m/1h/2h/4h × 60/90/120d) documented |
+| Per-symbol score thresholds | Backtested — XAG=3 helps (+11-15R/window across 60/90/120d). Held pending live confirmation. |
+| Liquidation heatmap provider | `analyzer/liq_heatmap.go` has the Provider interface and `Cluster()`; no live implementation. The biggest remaining data gap for stop placement. |
+| Per-symbol concurrent cap (auto-executor) | The global cap is symbol-blind and ETH has four rules to every other symbol's one, so ETH alone can occupy half the book. Raising or lowering the global number is wrong in both directions. |
+| Pre-trade cash-open stop check | `session.StopWarning` already measures it; both call sites fire AFTER the order exists, which is useless for a trade that lasts 24 seconds. |
+| Read-only demo build | Every data path is already env-overridable and the account endpoints already 503 without an API key, so a fixture-backed public instance is a route allowlist plus fixtures — not an auth system. |
+| Fixture identifier test | Fail CI when a captured API response in a `*_test.go` still carries `userId`/`shortUid`-style keys. |
 
-### Open
+### Rejected, and kept rejected
 
-| Phase | Scope | Value |
-|---|---|---|
-| 2D | uPlot price mini-charts on dashboard symbol cards (last ~50 bars + sweeps/fib annotations) | Visual structure at a glance |
-| 2D | R-distribution histogram + daily-R calendar on `/journal` | Visual edge tracking + day-pattern recognition |
-| 2D | Equity curve on `/journal` (cumulative R over time) | Visual P&L trajectory |
-| 2D | Per-trade chart on close/edit form with entry/stop/TP lines | Trade-by-trade post-mortem |
-| Open | Per-symbol score thresholds | Backtested; XAG=3 helps (+11-15R/window across 60/90/120d); held pending live confirmation |
-| Open | Per-symbol notification routing | Quiet hours / per-symbol topics |
-| Open | Backtest report in web UI | View the A/B numbers without leaving the phone |
-| Open | Position-size tracker | Leverage column shipped; full sizer math `position_size = account_risk / risk_price` not yet |
-| Open | Coinglass / external liquidation heatmap provider | Stop refinement uses real liq clusters instead of just HVN |
-| Open | WebSocket streams | Sub-second reaction vs. TF-boundary polling |
-| Open | JSON poll endpoint for sub-30s price refresh | Lighter bandwidth alternative to full meta-refresh |
+Recorded so the same idea does not get relitigated. Several cost real work to
+disprove, which is the point of writing them down.
 
-### Earlier strategy ideas still on the table
+| Idea | Verdict |
+|---|---|
+| Higher-TF bias filter | Hurt the mean-reversion edge (ETH +6.5R → −2.4R). Revisited after sweep-invalidation and range-expansion voting shipped; still no. |
+| Engine reading the forming bar | Breaks live/backtest parity. The closed-bar rule is load-bearing — fix fill problems at the execution layer, never in the engine. |
+| Shelf-retest strategy (`shelfbt`) | Run and rejected: the parameter surface has no peak. |
+| Session-open alignment as a scoring factor | Measured 2026-09-09 with `opensab` at fire-generation: `mixed`, `dw-aligned` and `mo-aligned` all FAIL `shipgate` in every window, losing to the unfiltered baseline. One per-symbol PASS (BTC) out of 18 gate runs — about what noise produces. |
+| Proximity votes (distance to HVN, to EQH/EQL, to an open) | Distance dilutes a count threshold. Only EVENTS score. Rejected three separate times, once per level type. |
+| New trading pairs beyond the disciplined roster | Scope discipline; the roster is deliberately small. |
+| BingX chart drawing | No API for it. |
 
-1. **Multi-timeframe bias filter** — backtest previously hurt mean-reversion edge (ETH +6.5R → −2.4R). Worth revisiting now that sweep invalidation + range-expansion voting are in.
-2. **Minimum fee-budget filter** — skip any setup where `fee_R > 0.3R`.
-3. **MTF veto for breakdown only** — narrower form of MTF bias: don't suppress all counter-trend, just suppress longs into a clean 4h breakdown.
+### Still on the table
+
+1. **Minimum fee-budget filter** — skip any setup where `fee_R > 0.3R`. Cheap, untested.
+2. **MTF veto for breakdown only** — the narrow form of the rejected MTF bias: do not suppress all counter-trend entries, only longs into a clean 4h breakdown.
+3. **Extending the N字 structure veto past 1h** — it is validated and enabled on 1h only, so every 2h/4h signal is currently un-vetoed. Several counter-structure entries this month came through that gap.
+
