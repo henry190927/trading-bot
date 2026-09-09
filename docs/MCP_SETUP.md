@@ -70,7 +70,7 @@ Auto-refresh every 5 minutes via cron:
 ```bash
 crontab -e
 # Add the line below:
-*/5 * * * * scp -i ~/.ssh/oracle-trading.key ubuntu@your.vps.ip:/opt/trading/journal.csv ~/trading-bot-data/journal.csv >/dev/null 2>&1
+*/5 * * * * scp -i ~/.ssh/oracle-trading.key ubuntu@<your-vps-ip>:/opt/trading/journal.csv ~/trading-bot-data/journal.csv >/dev/null 2>&1
 ```
 
 (Live BingX position / candle / mark price calls don't need this

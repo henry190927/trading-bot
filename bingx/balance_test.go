@@ -6,10 +6,15 @@ import "testing"
 // the balance was genuinely zero. A parser that cannot tell this from a failed
 // read is worse than no parser: the post-mortem turned on being able to say
 // "this is a real zero".
-const realZeroPayload = `{"balance":{"userId":"1546329573031075840","asset":"USDT",` +
+//
+// userId / shortUid are SCRUBBED placeholders — the real ones were committed
+// here by accident on 2026-09-08 and removed on 2026-09-09. Nothing asserts on
+// them; what this fixture has to preserve is the payload SHAPE (equity present
+// and equal to "0.00000000"), not the account it came from. Keep them fake.
+const realZeroPayload = `{"balance":{"userId":"1000000000000000000","asset":"USDT",` +
 	`"balance":"0.00000000","equity":"0.00000000","unrealizedProfit":"0",` +
 	`"realisedProfit":"0.00000000","availableMargin":"0.00000000",` +
-	`"usedMargin":"0","freezedMargin":"0","shortUid":"35883679"}}`
+	`"usedMargin":"0","freezedMargin":"0","shortUid":"10000001"}}`
 
 func TestParseBalanceRealZero(t *testing.T) {
 	b, err := parseBalance([]byte(realZeroPayload))

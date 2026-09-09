@@ -247,7 +247,7 @@ mcp-install: mcp-build
 	@echo ""
 	@echo "Next steps (one-time):"
 	@echo "  1. mkdir -p ~/trading-bot-data && scp -i ~/.ssh/oracle-trading.key \\"
-	@echo "       ubuntu@your.vps.ip:/opt/trading/journal.csv \\"
+	@echo "       ubuntu@<your-vps-ip>:/opt/trading/journal.csv \\"
 	@echo "       ~/trading-bot-data/journal.csv"
 	@echo "  2. Register the server in your Claude Code config — see docs/MCP_SETUP.md"
 	@echo "  3. Restart 'claude' to pick up the new tools"

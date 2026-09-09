@@ -53,6 +53,11 @@ trading-web
 !/journal/
 !/backtest/
 
+# Python helper scripts under scripts/ leave bytecode caches behind; a bare
+# `git add .` would otherwise sweep them in.
+__pycache__/
+*.pyc
+
 # IDE
 .idea/
 .vscode/
