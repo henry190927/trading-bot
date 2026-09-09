@@ -1,6 +1,13 @@
 # trading-bot — multi-strategy crypto signal engine in Go
 
-A confluence-based signal generator, backtester, and live-monitoring daemon for **BTCUSDT, ETHUSDT, XAUUSDT, XAGUSDT** on BingX perpetuals.
+A confluence-based signal generator, backtester, and live-monitoring daemon on
+BingX perpetuals. The daemon universe is **BTC, ETH, XAU, XAG**; the CLIs and
+the web UI address any of the 14 contracts `market.Resolve` knows, including
+the NCSK* US-stock synthetics and the crypto alts that are deliberately kept
+out of the daemon.
+
+> 🇹🇼 **繁體中文架構導覽 → [`README.zh-TW.md`](README.zh-TW.md)** — 架構分層、
+> 工程決策與取捨、研究工具與 ship gate。安裝與 CLI 細節仍在本檔。
 
 The engine scans for setups where multiple independent technical signals agree (Fibonacci retracement, Bollinger bands, RSI, MACD, liquidity sweeps, RSI/CVD divergence) and emits an executable trade plan: limit entry, stop loss, and two take-profit targets. Runs 24/7 on a $0/month Oracle Cloud VM, alerts to iPhone via ntfy push, exposes a mobile-first web dashboard on Tailscale.
 
