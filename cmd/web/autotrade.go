@@ -17,13 +17,28 @@ import (
 // outcome (filled? → hit tp / stop / no-fill, and netR). The live-arm switches
 // (paper=false + AUTOTRADE_ENABLED) stay env/config-side by design — no toggle here
 // (real-money arming shouldn't be a fumble-able UI button).
+// autotradeLogDepth is how far back every number on /ops/autotrade reads —
+// the same depth cmd/monitor's executor uses. autotradeDisplayRows caps the
+// fires TABLE only; it must never bound the arithmetic.
+const (
+	autotradeLogDepth    = 500
+	autotradeDisplayRows = 60
+)
+
 func (s *server) handleOpsAutotrade(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	ctx := c.Request.Context()
 	cfg := autotrade.Load()
 	tpe := time.FixedZone("Asia/Taipei", 8*3600)
 
-	fires := autotrade.ReadFires(60)
+	// ONE read, at the depth the executor uses. This was ReadFires(60) — the
+	// display table's row cap — and `sum` was derived from it while the equity
+	// curve, the R histogram, the calendar and BuildBook all read 500. Same page,
+	// same second, two different answers: measured 2026-09-09 the summary said
+	// +4.58R over 50 closed trades while the portfolio views said +13.01R over
+	// 79, because the log had grown to 92 fires. The row cap is a UI choice and
+	// belongs at render time, not in the arithmetic.
+	fires := autotrade.ReadFires(autotradeLogDepth)
 
 	// Resolve each fire's timeframe: prefer the stored TF, else the matching
 	// rule for that symbol, else 1h. Then fetch one kline set per (symbol,TF)
@@ -122,26 +137,23 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 			cooldown = r.CooldownBars
 		}
 	}
-	// Read the SAME depth the executor does (it uses 500) — the display list
-	// above is capped at 60, and computing the book off that shorter slice
-	// could truncate today's realized R and disagree with what gates a trade.
-	book, unscored := autotrade.BuildBook(autotrade.ReadFires(500), candlesFor, time.Now().UTC(), cooldown)
+	// Same slice the summary and the portfolio views use — the executor's depth.
+	// Computing the book off a shorter slice could truncate today's realized R
+	// and disagree with what actually gates a trade.
+	book, unscored := autotrade.BuildBook(fires, candlesFor, time.Now().UTC(), cooldown)
 
 	resolve := func(f autotrade.PaperFire) autotrade.Outcome {
 		tf := tfFor(f)
 		return autotrade.EvaluateFireLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
 	}
+	// ONE dedup pass feeds every number on the page. There used to be two — a
+	// 60-fire pass for the table and summary and a 500-fire pass for the
+	// portfolio views — and dedup is history-dependent (a dropped fire frees
+	// the slot and resets the cooldown), so the two passes disagreed about the
+	// same recent fires, not just about how many they covered.
 	positions := autotrade.DedupFires(oldest, 6, cooldown, time.Hour, resolve)
-
-	// Portfolio views (equity / calendar / distribution) run over the FULL log
-	// depth the executor reads, not the 60-row display slice — a curve built
-	// from the visible page would silently restart every time the log grew.
-	// Same three builders the journal uses (rstats.go), so the two surfaces
-	// cannot render "cumulative R" two different ways.
-	statPositions := autotrade.DedupFires(
-		reverseNormalised(autotrade.ReadFires(500)), 6, cooldown, time.Hour, resolve)
-	statTrades, statUnscoreable := rTradesFromPositions(statPositions)
-	statOpenR, statOpenN := openUnrealR(statPositions)
+	statTrades, statUnscoreable := rTradesFromPositions(positions)
+	statOpenR, statOpenN := openUnrealR(positions)
 
 	var rows []fireRow
 	var outs []autotrade.Outcome
@@ -153,7 +165,12 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	for i := len(positions) - 1; i >= 0; i-- { // newest-first for display
 		p := positions[i]
 		f, out := p.Fire, p.Outcome
+		// Every position counts toward the summary; only the newest
+		// autotradeDisplayRows of them become table rows.
 		outs = append(outs, out)
+		if len(rows) >= autotradeDisplayRows {
+			continue
+		}
 		cur := liveFor(f.Symbol, tfFor(f))
 		curUp := (f.Side == "long" && cur >= f.Entry) || (f.Side == "short" && cur <= f.Entry)
 		rows = append(rows, fireRow{

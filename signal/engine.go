@@ -755,17 +755,29 @@ func Evaluate(in Inputs) Signal {
 	// allowlist is baked in.
 	if (StructureVetoEnabled || (isStructureVetoSymbol(in.Symbol) && isStructureTF(in.Timeframe))) && sig.Side != Flat {
 		st := AnalyzeStructure(in.Candles, 2)
-		var veto bool
+		// Track trend and event separately. The label used to be "event if
+		// any, else trend", which misreported every veto where the trend
+		// fired while an event pointed the other way — a short killed by an
+		// HH-HL uptrend was announced as "against CHoCH-down", i.e. against
+		// a structure that agreed with it. Name the condition that fired.
+		var trendVeto, eventVeto bool
 		switch sig.Side {
 		case Long:
-			veto = st.Trend == StructDowntrend || st.Event == EvCHoCHDown || st.Event == EvBOSDown
+			trendVeto = st.Trend == StructDowntrend
+			eventVeto = st.Event == EvCHoCHDown || st.Event == EvBOSDown
 		case Short:
-			veto = st.Trend == StructUptrend || st.Event == EvCHoCHUp || st.Event == EvBOSUp
+			trendVeto = st.Trend == StructUptrend
+			eventVeto = st.Event == EvCHoCHUp || st.Event == EvBOSUp
 		}
-		if veto {
-			label := st.Trend.String()
-			if st.Event != EvNone {
+		if veto := trendVeto || eventVeto; veto {
+			var label string
+			switch {
+			case trendVeto && eventVeto:
+				label = st.Trend.String() + " + " + st.Event.String()
+			case eventVeto:
 				label = st.Event.String()
+			default:
+				label = st.Trend.String()
 			}
 			sig.Warnings = append(sig.Warnings,
 				fmt.Sprintf("Structure veto — %s entry against %s", sig.Side, label))
