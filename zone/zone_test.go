@@ -210,6 +210,24 @@ func TestSymbolMapsRoundTrip(t *testing.T) {
 	}
 }
 
+// Every symbol on the traded roster must be armable as a MANUAL zone.
+//
+// This map has now gone stale against the roster twice: SNDK/NVDA bands sat in
+// zones.json unresolvable until 2026-09-02, and SUI's band sat the same way
+// until 2026-09-08. Both times the zone channel — the only thing that pages a
+// manual setup — was dead for a symbol being actively watched, and nothing
+// failed until someone armed the row by hand. Keep this list in step with the
+// roster and the next omission fails here instead.
+func TestRosterSymbolsArmable(t *testing.T) {
+	roster := []string{"BTC", "ETH", "XAG", "SUI", "SNDK"}
+	for _, short := range roster {
+		z := Zone{Symbol: short, Lo: 1, Hi: 2, Dir: "watch", TF: "1h", Confirm: ConfirmCloseIn}
+		if f := TriggerFault(z); f != "" {
+			t.Errorf("roster symbol %s is not armable: %s", short, f)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------
 // AutoZoneFrom — the arming rules for the generated half of the channel.
 // ---------------------------------------------------------------------

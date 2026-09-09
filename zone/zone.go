@@ -151,11 +151,23 @@ func ConfirmWord(mode string) string {
 // on the four majors), while this map gates what a MANUAL zone may name.
 // Before 2026-09-02 the two were conflated, so a hand-written SNDK/NVDA band
 // was skipped by the daemon while /ops still listed it as ARMED.
+//
+// SUI added 2026-09-08 for discretionary ("discussed") entries. zones.json has
+// carried a hand-written SUI band since the alt expansion, but with no entry
+// here TriggerFault rejected it as "未知 symbol: SUI" — so the one channel that
+// would actually page a manual SUI setup could never be armed. Deliberately
+// NOT added to market.All(): that would enrol SUI in the engine daemon
+// universe and in ComputeAuto's auto pivot zones, which is a wiring decision
+// an n=8 forward record does not support. Manual zone only.
+//
+// SOL / LINK / HYPE / NEAR stay absent on purpose. They have bands in
+// zones.json too, but they are outside the current traded roster.
 var ShortToSym = map[string]market.Symbol{
 	"BTC": market.BTCUSDT, "ETH": market.ETHUSDT,
 	"XAU": market.XAUUSDT, "XAG": market.XAGUSDT,
 	"SNDK": market.SNDKUSDT, "NVDA": market.NVDAUSDT,
 	"SPCX": market.SPCXUSDT, "MSTR": market.MSTRUSDT, "APP": market.APPUSDT,
+	"SUI": market.SUIUSDT,
 }
 
 var SymToShort = map[market.Symbol]string{
@@ -163,6 +175,7 @@ var SymToShort = map[market.Symbol]string{
 	market.XAUUSDT: "XAU", market.XAGUSDT: "XAG",
 	market.SNDKUSDT: "SNDK", market.NVDAUSDT: "NVDA",
 	market.SPCXUSDT: "SPCX", market.MSTRUSDT: "MSTR", market.APPUSDT: "APP",
+	market.SUIUSDT: "SUI",
 }
 
 // Path — zones.json location (ZONES_PATH env override).

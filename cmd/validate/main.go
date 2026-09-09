@@ -247,19 +247,44 @@ func colorFee(feeR float64) string {
 	return ansi.Wrap(str, ansi.BoldR)
 }
 
+// resolveSymbol delegates to market.ResolveErr rather than keeping a local
+// switch.
+//
+// It WAS a local switch over BTC/ETH/XAU/XAG only — the fourth copy of this
+// map, and the one market/resolve.go's own comment did not know about. The
+// consequence was not cosmetic: the pre-trade validator REFUSED every stock
+// synthetic and every alt, so the one surface that scores a proposed entry
+// could not be pointed at SNDK/NVDA/SPCX/MSTR/APP/SOL/SUI/LINK/HYPE/NEAR at
+// all. A SNDK short was placed on 2026-09-08 with a stop 1/7.4 of that
+// symbol's median cash-open-bar range; `validate -symbol SNDK` would have
+// answered "unknown symbol" rather than scoring it.
+//
+// The aliases the switch carried beyond the short names (GOLD, SILVER,
+// BTCUSDT, …) are kept: market.Resolve already accepts the short names, and
+// the "-USDT" passthrough still lets a raw contract code through for a symbol
+// with no short name (BRENT).
 func resolveSymbol(s string) (market.Symbol, error) {
-	switch strings.ToUpper(s) {
-	case "BTC", "BTCUSDT", "BTC-USDT":
-		return market.BTCUSDT, nil
-	case "ETH", "ETHUSDT", "ETH-USDT":
-		return market.ETHUSDT, nil
-	case "XAU", "GOLD", "XAUUSDT", "XAU-USDT":
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "GOLD":
 		return market.XAUUSDT, nil
-	case "XAG", "SILVER", "XAGUSDT", "XAG-USDT":
+	case "SILVER":
 		return market.XAGUSDT, nil
 	}
-	if strings.Contains(s, "-USDT") {
+	if sym, ok := market.Resolve(s); ok {
+		return sym, nil
+	}
+	u := strings.ToUpper(strings.TrimSpace(s))
+	if strings.Contains(u, "-USDT") {
 		return market.Symbol(s), nil
 	}
-	return "", fmt.Errorf("unknown symbol %q (use BTC / ETH / XAU / XAG)", s)
+	// "BTCUSDT" style: no dash, so it is not a contract code — strip the quote
+	// asset and try the short name. The old switch spelled these out per
+	// symbol; deriving it keeps the alias working for every short name
+	// market.Resolve knows, not just the four that were hardcoded.
+	if short := strings.TrimSuffix(u, "USDT"); short != u && short != "" {
+		if sym, ok := market.Resolve(short); ok {
+			return sym, nil
+		}
+	}
+	return market.ResolveErr(s)
 }

@@ -22,7 +22,38 @@ func main() {
 	biasTfFlag := flag.String("bias-tf", "", "higher timeframe for MTF bias filter (empty = auto)")
 	useBias := flag.Bool("bias", false, "enable MTF bias filter (disabled by default — backtest shows it hurts this mean-reversion strategy)")
 	minScore := flag.Int("min-score", 3, "score considered tradeable in the summary")
+	// market.All() is the DAEMON universe (BTC/ETH/XAU/XAG) and deliberately
+	// excludes the alts and stock synthetics. That makes the roster
+	// unscannable from here the moment it stops matching All() — SUI and SNDK
+	// joined the discretionary roster on 2026-09-08 and there was no way to
+	// get an engine read on either. Same escape hatch cmd/backtest already
+	// has, and for the same stated reason: pre-flight symbols without
+	// enrolling them in the live daemon universe. Short names or full BingX
+	// contract codes both work.
+	symbolsFlag := flag.String("symbols", "", "comma-separated symbols to scan instead of the daemon universe, e.g. BTC,ETH,SUI,SNDK")
 	flag.Parse()
+
+	symbols := market.All()
+	if strings.TrimSpace(*symbolsFlag) != "" {
+		var picked []market.Symbol
+		for s := range strings.SplitSeq(*symbolsFlag, ",") {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
+			// ResolveErr rather than Resolve: a typo then reports what WOULD
+			// have worked instead of just failing.
+			sym, err := market.ResolveErr(s)
+			if err != nil {
+				log.Fatal(err)
+			}
+			picked = append(picked, sym)
+		}
+		if len(picked) == 0 {
+			log.Fatal("-symbols was given but resolved to nothing")
+		}
+		symbols = picked
+	}
 
 	timeframe := market.Timeframe(*tf)
 	biasTF := signal.DefaultBiasTF(timeframe)
@@ -30,18 +61,23 @@ func main() {
 		biasTF = market.Timeframe(*biasTfFlag)
 	}
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
-	defer cancel()
 
 	if *useBias {
 		log.Printf("MTF bias filter enabled: %s base, %s bias", timeframe, biasTF)
 	}
 
 	var results []symbolResult
-	for _, sym := range market.All() {
+	for _, sym := range symbols {
+		// Per-symbol deadline, not one budget for the whole run. A single
+		// 25s context shared across every symbol was spent by the first two
+		// (klines + funding + OI each), so the symbols at the end of
+		// market.All() — the metals — timed out on every invocation and
+		// never appeared in the snapshot at all.
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 		candles, err := client.Klines(ctx, sym, timeframe, 300)
 		if err != nil {
 			log.Printf("%s: klines failed: %v", sym, err)
+			cancel()
 			continue
 		}
 		bias := signal.Flat
@@ -67,7 +103,12 @@ func main() {
 			LiveMarkPrice: markPrice,
 		})
 		results = append(results, symbolResult{s, sigCtx, bias})
-		printDetails(s, sigCtx, bias)
+		// Structure is printed explicitly, not left to be inferred from a veto
+		// warning. The veto only fires when it kills a signal, so on a FLAT
+		// symbol — which is most of them, most of the time — the trend/event
+		// state was invisible here even though the engine had just computed it.
+		printDetails(s, sigCtx, bias, signal.AnalyzeStructure(candles, 2))
+		cancel()
 	}
 	printSummary(results, *minScore)
 }
@@ -78,12 +119,14 @@ type symbolResult struct {
 	Bias   signal.Side
 }
 
-func printDetails(s signal.Signal, ctx signal.Context, bias signal.Side) {
+func printDetails(s signal.Signal, ctx signal.Context, bias signal.Side, st signal.StructureState) {
 	header := fmt.Sprintf("=== %s %s @ %.4f ===", s.Symbol, s.Timeframe, s.Price)
 	fmt.Printf("\n%s\n", ansi.Wrap(header, ansi.BoldC))
 	fmt.Printf("Side: %s   Score: %s   Bias: %s   Funding: %.4f%%   OI: %.0f\n",
 		colorSide(s.Side), colorScore(s.Score, 3), colorSide(bias),
 		ctx.FundingRate*100, ctx.OpenInterest)
+	fmt.Printf("Structure (N 字): trend=%s   event=%s\n",
+		ansi.Wrap(st.Trend.String(), ansi.BoldC), ansi.Wrap(st.Event.String(), ansi.BoldC))
 	if s.VP.POC != 0 {
 		hvnStr := make([]string, 0, len(s.VP.HVN))
 		for _, h := range s.VP.HVN {
