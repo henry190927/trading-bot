@@ -85,3 +85,27 @@ func TestVerifyExchangeOrderTypeCellRenders(t *testing.T) {
 		t.Errorf("got %q, want %q", sb.String(), "BRBR")
 	}
 }
+
+// Every template must PARSE with the real func map, exactly as main() does it.
+//
+// main() wraps this in template.Must, so a template that references an
+// undefined function or has an unbalanced {{if}}/{{end}} does not fail a
+// build and does not fail a test — it panics the service on startup, i.e.
+// during `make deploy-web`, after the binary is already in place. There was no
+// coverage for that until 2026-09-10, when adding a {{if .SessionWarn}} block
+// to validate_result.html meant the only way to find out was to deploy.
+func TestTemplatesParse(t *testing.T) {
+	tpl, err := template.New("").Funcs(templateFuncs()).ParseFS(assets, "templates/*.html")
+	if err != nil {
+		t.Fatalf("templates do not parse — this would panic main() on startup: %v", err)
+	}
+	// Guard against the glob silently matching nothing, which would make the
+	// check above pass while proving nothing.
+	for _, name := range []string{
+		"validate_result.html", "autotrade.html", "journal_new.html",
+	} {
+		if tpl.Lookup(name) == nil {
+			t.Errorf("%s not parsed — did the embed glob or the filename change?", name)
+		}
+	}
+}

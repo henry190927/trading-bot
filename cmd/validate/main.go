@@ -19,7 +19,9 @@ import (
 	"myFirstGo/trading-bot/ansi"
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
+	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/session"
 	"myFirstGo/trading-bot/signal"
 	"myFirstGo/trading-bot/validator"
 )
@@ -73,10 +75,31 @@ func main() {
 	}
 
 	res := validator.Validate(sym, tf, side, *entryFlag, *feeFlag, candles, markPrice)
-	print(res)
+
+	// Cash-open-bar check, PRE-TRADE. The same advisory exists in the web app,
+	// where BOTH call sites are post-hoc (the place-stop response and
+	// /ops/verify). Journal #67 is why that is not enough: a SNDK short with a
+	// stop 1/7.4 of that symbol's median cash-open-bar range, filled 7 seconds
+	// into the open and stopped 24 seconds later. A warning that arrives after
+	// the fill cannot be acted on.
+	//
+	// Checked against SuggStop because this command takes no stop of its own.
+	// session.OpenBarLookbackBars rather than a local 400 so this and the web
+	// guard cannot report different medians for the same symbol.
+	sessWarn := ""
+	if earnings.IsStockSymbol(string(sym)) {
+		if cs1h, err := client.Klines(ctx, sym, market.TF1h, session.OpenBarLookbackBars); err == nil {
+			if pct, n := session.MedianOpenBarRangePct(cs1h); pct > 0 {
+				now := time.Now()
+				sessWarn = session.StopWarning(*entryFlag, res.SuggStop, pct, n,
+					session.NextCashOpen(now).Sub(now))
+			}
+		}
+	}
+	print(res, sessWarn)
 }
 
-func print(r validator.Result) {
+func print(r validator.Result, sessWarn string) {
 	bar := strings.Repeat("=", 70)
 	fmt.Printf("\n%s\n", ansi.Wrap(bar, ansi.BoldC))
 	header := fmt.Sprintf("Validation: %s %s @ %.4f (%s)", r.Symbol, colorSide(r.Side), r.Entry, r.Timeframe)
@@ -157,6 +180,9 @@ func print(r validator.Result) {
 	fmt.Printf("  TP1:   %s   (1R)\n", ansi.Wrap(fmt.Sprintf("%.4f", r.SuggTP1), ansi.Green))
 	fmt.Printf("  TP2:   %s   (2R)\n", ansi.Wrap(fmt.Sprintf("%.4f", r.SuggTP2), ansi.Green))
 	fmt.Printf("  Fee:   %s per trade (round-trip)\n", colorFee(r.FeeR))
+	if sessWarn != "" {
+		fmt.Printf("  %s\n", ansi.Wrap("⚠ "+sessWarn, ansi.Yellow))
+	}
 
 	fmt.Println("\n" + ansi.Wrap("Factors:", ansi.Bold))
 	for _, f := range r.Factors {

@@ -102,6 +102,12 @@
     <div><span class="lbl">risk</span> <span class="mono">{{printf "%.4f" $r.Risk}}</span></div>
     <div><span class="lbl">fee_R</span> <span class="mono">{{printf "%.2fR" $r.FeeR}}</span></div>
   </div>
+  {{/* Cash-open-bar advisory, shown BEFORE the trade rather than after the
+       fill. Empty for anything that is not a US-stock synthetic, or whose
+       suggested stop already clears the open bar's median range. */}}
+  {{if .SessionWarn}}
+  <p class="modal-warn">⚠ {{.SessionWarn}}</p>
+  {{end}}
 </section>
 
 <section class="validate-block">

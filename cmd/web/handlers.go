@@ -3161,10 +3161,20 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 	}
 
 	res := validator.Validate(sym, tf, side, entry, feeBps, candles, markPrice)
+	// Cash-open-bar check, PRE-TRADE. This warning already existed on two
+	// surfaces and both were post-hoc: the place-stop response (below) and
+	// /ops/verify. Journal #67 is why that is not enough — a SNDK short with a
+	// stop 1/7.4 of the symbol's median cash-open-bar range, filled 7 seconds
+	// into the open and stopped 24 seconds later. An advisory that arrives
+	// after the fill cannot be acted on. Checked against SuggStop because
+	// /validate takes no stop of its own: the question it can answer is
+	// "would an ATR-appropriate stop survive the open bar on this symbol".
+	sessWarn := s.sessionStopWarning(ctx, sym, entry, res.SuggStop, time.Now())
 	c.HTML(http.StatusOK, "validate_result.html", gin.H{
-		"R":     res,
-		"TF":    tfStr,
-		"Short": shortSymbol(sym),
+		"R":           res,
+		"TF":          tfStr,
+		"Short":       shortSymbol(sym),
+		"SessionWarn": sessWarn,
 	})
 }
 
@@ -3220,26 +3230,36 @@ func (s *server) handleAPIChartValidate(c *gin.Context) {
 		markPrice = fr.MarkPrice
 	}
 	res := validator.Validate(sym, tf, side, entry, feeBps, candles, markPrice)
+	// Cash-open-bar check, PRE-TRADE. This warning already existed on two
+	// surfaces and both were post-hoc: the place-stop response (below) and
+	// /ops/verify. Journal #67 is why that is not enough — a SNDK short with a
+	// stop 1/7.4 of the symbol's median cash-open-bar range, filled 7 seconds
+	// into the open and stopped 24 seconds later. An advisory that arrives
+	// after the fill cannot be acted on. Checked against SuggStop because
+	// /validate takes no stop of its own: the question it can answer is
+	// "would an ATR-appropriate stop survive the open bar on this symbol".
+	sessWarn := s.sessionStopWarning(ctx, sym, entry, res.SuggStop, time.Now())
 
 	// Slim payload — only the fields the modal actually renders.
 	// Full result (reasons/notes/factor breakdown) can be surfaced
 	// via /validate?...&auto=1 for the deep-dive view.
 	c.JSON(http.StatusOK, gin.H{
-		"symbol":   shortSymbol(sym),
-		"side":     sideStr,
-		"entry":    res.Entry,
-		"price":    res.Price,
-		"total":    res.Total,
-		"totalMR":  res.TotalMR,
-		"totalMOM": res.TotalMOM,
-		"verdict":  res.Verdict,
-		"suggStop": res.SuggStop,
-		"suggTP1":  res.SuggTP1,
-		"suggTP2":  res.SuggTP2,
-		"risk":     res.Risk,
-		"feeR":     res.FeeR,
-		"reasons":  res.Reasons,
-		"notes":    res.Notes,
+		"symbol":      shortSymbol(sym),
+		"side":        sideStr,
+		"entry":       res.Entry,
+		"price":       res.Price,
+		"total":       res.Total,
+		"totalMR":     res.TotalMR,
+		"totalMOM":    res.TotalMOM,
+		"verdict":     res.Verdict,
+		"suggStop":    res.SuggStop,
+		"suggTP1":     res.SuggTP1,
+		"suggTP2":     res.SuggTP2,
+		"risk":        res.Risk,
+		"feeR":        res.FeeR,
+		"sessionWarn": sessWarn,
+		"reasons":     res.Reasons,
+		"notes":       res.Notes,
 	})
 }
 

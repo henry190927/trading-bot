@@ -23,17 +23,9 @@ import (
 	"myFirstGo/trading-bot/session"
 )
 
-const (
-	// 1h bars to sample. ~400 bars is ~17 calendar days, which after
-	// weekends leaves ~12 cash-open bars — comfortably above
-	// session.MinSamples without asking the exchange for a long history on
-	// every render.
-	openBarLookbackBars = 400
-
-	// The median moves at most once a day, so an hour of staleness is free
-	// and keeps /ops/verify from re-fetching 400 candles per row.
-	openBarCacheTTL = time.Hour
-)
+// The median moves at most once a day, so an hour of staleness is free and
+// keeps /ops/verify from re-fetching 400 candles per row.
+const openBarCacheTTL = time.Hour
 
 type openBarEntry struct {
 	pct float64
@@ -70,7 +62,7 @@ func (s *server) openBarBaseline(ctx context.Context, sym market.Symbol) (float6
 	}
 	s.openBarMu.Unlock()
 
-	cs, err := s.client.Klines(ctx, sym, market.TF1h, openBarLookbackBars)
+	cs, err := s.client.Klines(ctx, sym, market.TF1h, session.OpenBarLookbackBars)
 	if err != nil || len(cs) == 0 {
 		return 0, 0
 	}

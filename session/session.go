@@ -41,6 +41,18 @@ const (
 	cashOpenMin  = 30
 )
 
+// OpenBarLookbackBars is how many 1h bars a caller should fetch before asking
+// for MedianOpenBarRangePct. ~400 bars is ~17 calendar days, which after
+// weekends leaves ~12 cash-open bars — comfortably above MinSamples without
+// asking the exchange for a long history on every render.
+//
+// Exported so every surface that shows this warning samples the SAME window.
+// The web guard and cmd/validate both compute their own baseline; if they
+// disagreed on the lookback they would report different medians for the same
+// symbol at the same moment, which is the display-vs-reality shape this
+// package's warning exists to remove.
+const OpenBarLookbackBars = 400
+
 // MinSamples is the smallest cash-open-bar sample a median is reported for.
 // Below this the median is one or two prints and warning on it would be
 // noise dressed as a measurement.
