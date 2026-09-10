@@ -51,6 +51,12 @@
   </div>
 
   <div class="ops-health-loops">
+    <div class="ops-loops-title">OI Δ / funding <span class="ops-svc-tag">持倉量 1h 變化 · 讀本地快照 · 零 API 呼叫</span></div>
+    <div id="ops-oi-note" class="hint">載入中…</div>
+    <div id="ops-oi" class="ops-oi-wrap"></div>
+  </div>
+
+  <div class="ops-health-loops">
     <div class="ops-loops-title">trading-monitor 子迴圈</div>
     <div class="ops-loops-grid" id="ops-health-loops"></div>
   </div>
@@ -639,6 +645,73 @@
     setInterval(fetchHealth, 30000);
     fetchExposure();
     setInterval(fetchExposure, 60000);
+
+    // ─── OI Δ / funding ───────────────────────────────────────────────
+    // The engine turns a prior OI reading into a warning, but only as an
+    // annotation on a Long/Short signal — when everything scores FLAT the
+    // measurement exists and nothing displays it. This is that readout.
+    // Local file only, so the cadence just has to match the sampler (5m);
+    // polling faster would re-render identical numbers.
+    function oiFmtNotional(v) {
+        if (typeof v !== 'number' || !v) return '—';
+        if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+        if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+        if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+        return v.toFixed(0);
+    }
+    function renderOI(d) {
+        var note = document.getElementById('ops-oi-note');
+        var host = document.getElementById('ops-oi');
+        if (!d || d.error) {
+            note.textContent = '讀不到:' + ((d && d.error) || 'no data');
+            host.innerHTML = '';
+            return;
+        }
+        var thr = ((d.deltaThreshold || 0.02) * 100).toFixed(0);
+        note.textContent = d.samples + ' 筆快照 · 跨距 ' + d.spanMin + ' 分鐘 · 門檻 ±' + thr + '%'
+            + (d.hasHourOfDepth ? '' : ' — 尚未累積滿 1 小時,Δ 欄會是空的')
+            + ' · ' + d.atTPE;
+        var rows = (d.rows || []).map(function (r) {
+            if (r.state !== 'ok') {
+                return '<tr><td>' + r.short + '</td><td class="note" colspan="4">尚無快照</td></tr>';
+            }
+            var dTxt = '—', dCls = 'dim';
+            if (r.oiStatic) {
+                dTxt = 'n/a';
+            } else if (typeof r.delta === 'number') {
+                dTxt = (r.delta >= 0 ? '+' : '') + (r.delta * 100).toFixed(2) + '%';
+                if (r.arms) dCls = 'armed';
+            }
+            var fTxt = '—', fCls = 'dim';
+            if (typeof r.funding === 'number' && r.funding !== 0) {
+                fTxt = (r.funding >= 0 ? '+' : '') + (r.funding * 100).toFixed(4) + '%';
+                if (r.fundingSide) fCls = 'crowded';
+            }
+            // The arms label names which engine warning this delta would
+            // produce, and on which side — the sign alone does not say it.
+            var armTxt = r.oiStatic ? '交易所不公布此合約 OI(固定值)'
+                       : r.arms === 'long-unwind' ? '多單解除（空單確認）'
+                       : r.arms === 'shorts-crowding' ? '空單堆積（擠壓風險）'
+                       : (r.fundingSide === 'shorts-crowded' ? '空方付錢'
+                       : (r.fundingSide === 'longs-crowded' ? '多方付錢' : ''));
+            return '<tr><td>' + r.short + '</td>'
+                 + '<td class="dim">' + oiFmtNotional(r.oi) + '</td>'
+                 + '<td class="' + dCls + '">' + dTxt + '</td>'
+                 + '<td class="' + fCls + '">' + fTxt + '</td>'
+                 + '<td class="note">' + armTxt + '</td></tr>';
+        }).join('');
+        host.innerHTML = '<table class="ops-oi"><thead><tr>'
+            + '<th>標的</th><th>OI</th><th>1h Δ</th><th>funding</th><th style="text-align:left">判讀</th>'
+            + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    function fetchOI() {
+        fetch('/ops/oi?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(renderOI)
+            .catch(function (e) { renderOI({ error: String(e) }); });
+    }
+    fetchOI();
+    setInterval(fetchOI, 300000);
 
     // ─── Zone-fade alert status (recomputes structure, so slower cadence) ──
     function zFmt(v) {

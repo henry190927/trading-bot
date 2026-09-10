@@ -129,7 +129,15 @@ func sampleOICycle(ctx context.Context, client *bingx.Client, shorts []string) (
 			failed++
 			continue
 		}
-		oi.Append(oi.Snapshot{Time: time.Now().UTC(), Symbol: string(sym), OI: v})
+		// Funding is best-effort on top of a successful OI read: a row with
+		// OI and no funding is still useful, whereas dropping the whole
+		// sample because the funding endpoint hiccuped would put a hole in
+		// the series that PriorTo has to work around later.
+		var funding float64
+		if fr, ferr := readFunding(ctx, client, sym); ferr == nil {
+			funding = fr
+		}
+		oi.Append(oi.Snapshot{Time: time.Now().UTC(), Symbol: string(sym), OI: v, Funding: funding})
 		ok++
 		time.Sleep(oiSymbolStagger)
 	}
@@ -140,4 +148,14 @@ func readOI(ctx context.Context, client *bingx.Client, sym market.Symbol) (float
 	c, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	return client.OpenInterest(c, sym)
+}
+
+func readFunding(ctx context.Context, client *bingx.Client, sym market.Symbol) (float64, error) {
+	c, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	fr, err := client.FundingRate(c, sym)
+	if err != nil {
+		return 0, err
+	}
+	return fr.Rate, nil
 }

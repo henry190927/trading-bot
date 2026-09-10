@@ -3,6 +3,7 @@ package oi
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -152,5 +153,53 @@ func TestPrevFor(t *testing.T) {
 	}
 	if got := PrevFor(nil, "BTC-USDT", time.Hour, base); got != 0 {
 		t.Errorf("PrevFor(empty store) = %.0f, want 0", got)
+	}
+}
+
+func TestLatest(t *testing.T) {
+	snaps := seed(t)
+	// BTC's newest fixture row is the one at base (OI 1200); 11:05 is later
+	// in file order than 10:50 but base is later still.
+	got, ok := Latest(snaps, "BTC-USDT")
+	if !ok || got.OI != 1200 || !got.Time.Equal(base) {
+		t.Errorf("Latest(BTC) = %+v ok=%v, want the base row (OI 1200)", got, ok)
+	}
+	if got, ok := Latest(snaps, "ETH-USDT"); !ok || got.OI != 500 {
+		t.Errorf("Latest(ETH) = %+v ok=%v, want OI 500", got, ok)
+	}
+	if _, ok := Latest(snaps, "SOL-USDT"); ok {
+		t.Error("Latest(unknown symbol) reported ok=true")
+	}
+	if _, ok := Latest(nil, "BTC-USDT"); ok {
+		t.Error("Latest(empty store) reported ok=true")
+	}
+}
+
+func TestFundingRoundTripsAndStaysOptional(t *testing.T) {
+	t.Setenv("OI_LOG", filepath.Join(t.TempDir(), "oi.jsonl"))
+	Append(Snapshot{Time: base, Symbol: "BTC-USDT", OI: 1000, Funding: -0.00035})
+	Append(Snapshot{Time: base.Add(time.Minute), Symbol: "ETH-USDT", OI: 500}) // no funding
+
+	snaps := Load()
+	if len(snaps) != 2 {
+		t.Fatalf("Load() = %d, want 2", len(snaps))
+	}
+	b, _ := Latest(snaps, "BTC-USDT")
+	if b.Funding != -0.00035 {
+		t.Errorf("BTC funding = %v, want -0.00035", b.Funding)
+	}
+	e, _ := Latest(snaps, "ETH-USDT")
+	if e.Funding != 0 {
+		t.Errorf("ETH funding = %v, want 0 (absent)", e.Funding)
+	}
+	// omitempty: an absent funding must not be written as "funding":0, so a
+	// failed fetch stays distinguishable from a real zero on the wire.
+	raw, err := os.ReadFile(Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lines := strings.Split(strings.TrimSpace(string(raw)), "\n"); len(lines) == 2 &&
+		strings.Contains(lines[1], "funding") {
+		t.Errorf("ETH row wrote a funding key despite omitempty: %s", lines[1])
 	}
 }

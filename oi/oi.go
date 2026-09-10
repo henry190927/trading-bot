@@ -34,11 +34,26 @@ import (
 	"time"
 )
 
-// Snapshot is one open-interest reading.
+// Snapshot is one open-interest reading, with the funding rate observed at
+// the same instant.
+//
+// Funding rides along because the two only mean something together. OI says
+// how many positions exist, funding says which side is paying to hold them:
+// OI falling on a down-move is a long unwind, but OI RISING while funding
+// goes negative is shorts piling in — the "everyone is short the floor" setup
+// — and neither number alone separates those. It also costs one extra public
+// GET on a loop that is already making one, and a series beats the snapshot
+// the venue hands out (funding sliding for three hours is the signal; a
+// single print is not).
+//
+// omitempty on Funding so rows written before this field existed, and rows
+// where the funding fetch failed while the OI one succeeded, stay
+// distinguishable from a genuine zero.
 type Snapshot struct {
-	Time   time.Time `json:"time"`
-	Symbol string    `json:"symbol"` // exchange symbol, e.g. "BTC-USDT"
-	OI     float64   `json:"oi"`     // quote-currency (USDT) notional
+	Time    time.Time `json:"time"`
+	Symbol  string    `json:"symbol"`            // exchange symbol, e.g. "BTC-USDT"
+	OI      float64   `json:"oi"`                // quote-currency (USDT) notional
+	Funding float64   `json:"funding,omitempty"` // fraction per interval; >0 = longs pay shorts
 }
 
 // Retain is how much history Prune keeps. Seven days covers every timeframe
@@ -208,4 +223,25 @@ func PrevFor(snaps []Snapshot, sym string, bar time.Duration, now time.Time) flo
 		return 0
 	}
 	return v
+}
+
+// Latest returns the most recent snapshot held for sym.
+//
+// Used as "now" by readers that must not make network calls — the /ops card
+// renders the whole roster from this, so a page load costs zero requests and
+// cannot be rate-limited. The tradeoff is that "now" is as old as the last
+// sample, which is why callers show the timestamp rather than implying the
+// reading is live.
+func Latest(snaps []Snapshot, sym string) (Snapshot, bool) {
+	var best Snapshot
+	found := false
+	for _, s := range snaps {
+		if s.Symbol != sym {
+			continue
+		}
+		if !found || s.Time.After(best.Time) {
+			best, found = s, true
+		}
+	}
+	return best, found
 }
