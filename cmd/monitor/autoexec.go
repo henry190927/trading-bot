@@ -184,6 +184,32 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				continue
 			}
 
+			// Cash-open stop guard (see session_guard.go). LAST gate before
+			// the fire: it needs the resolved entry/stop, and a candidate the
+			// caps already denied should not spend a history fetch.
+			if why := autoSessionBlock(ctx, client, sym, r.TF, trig, time.Now().UTC()); why != "" {
+				log.Printf("autoexec: %s %s/%s BLOCKED by session guard — %s",
+					r.Symbol, r.TF, r.Strategy, why)
+				// Recorded like a caps block so the same replay can rank what
+				// was refused. Uses lastBlockBar, not lastFireBar: nothing was
+				// placed, so the rule stays eligible on the next bar.
+				if !st.lastBlockBar.Equal(barTime) {
+					st.lastBlockBar = barTime
+					q := r.MarginUSDT * float64(r.Leverage) / trig.Entry
+					autotrade.AppendBlocked(autotrade.BlockedCandidate{
+						Fire: autotrade.PaperFire{
+							Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF,
+							Strategy: r.Strategy, Side: trig.Side, Market: trig.Market,
+							Entry: trig.Entry, Stop: trig.Stop, TP: trig.TP, Qty: q,
+							Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.Why,
+						},
+						Reason: "session-guard: " + why, BarTime: barTime,
+						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
+					})
+				}
+				continue
+			}
+
 			qty := r.MarginUSDT * float64(r.Leverage) / trig.Entry
 			st.lastFireBar = barTime
 			// Account for it immediately: buildBook only runs once per tick, so

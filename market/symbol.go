@@ -1,5 +1,7 @@
 package market
 
+import "strings"
+
 type Symbol string
 
 // Note on metals: BingX swap doesn't list XAU-USDT / XAG-USDT directly.
@@ -47,6 +49,19 @@ const (
 
 func (s Symbol) IsMetal() bool {
 	return s == XAUUSDT || s == XAGUSDT
+}
+
+// IsUSStock reports whether s is one of BingX's CFD-style US-equity
+// synthetics. Their contract codes are NCSK<TICKER>2USD-USDT, where the
+// metals use NCCO instead.
+//
+// Prefix rather than an enumerated list, on purpose: cmd/contracts resolves
+// any ticker to its NCSK code and the roster has grown four times, so a list
+// would silently stop covering new additions — and the thing that consults
+// this (the cash-open stop guard) failing open on a NEW ticker is the exact
+// case it exists for.
+func (s Symbol) IsUSStock() bool {
+	return strings.HasPrefix(string(s), "NCSK")
 }
 
 func All() []Symbol {
