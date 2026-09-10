@@ -157,6 +157,15 @@ func main() {
 	// cmd/monitor/bracket.go for why this cannot live in cmd/web.
 	go runBracketGuard(ctx, client)
 
+	// OI sampler: the producer for signal.Context.PrevOpenInterest, which had
+	// no producer at all until now, so the engine's two OI crowding warnings
+	// were unreachable code. Above the zone-only branch for the same reason
+	// as the two guards — MONITOR_ZONE_ONLY exists to silence confluence
+	// noise, and this writes a data file rather than pushing anything. It is
+	// also the only process that CAN sample: cmd/analyze and the web handlers
+	// are too short-lived to remember an hour ago.
+	go runOISampler(ctx, client)
+
 	// MONITOR_ZONE_ONLY=1 keeps the zone-fade + breakout-tripwire channel
 	// (zonealert), autoexec and macrowarn, and skips the multi-TF confluence
 	// scan / structalert — for when the user wants the zone alerts without the

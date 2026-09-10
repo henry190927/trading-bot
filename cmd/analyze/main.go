@@ -13,6 +13,7 @@ import (
 	"myFirstGo/trading-bot/bingx"
 	"myFirstGo/trading-bot/config"
 	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/oi"
 	"myFirstGo/trading-bot/signal"
 )
 
@@ -95,8 +96,12 @@ func main() {
 			sigCtx.FundingRate = fr.Rate
 			markPrice = fr.MarkPrice
 		}
-		if oi, err := client.OpenInterest(ctx, sym); err == nil {
-			sigCtx.OpenInterest = oi
+		if v, err := client.OpenInterest(ctx, sym); err == nil {
+			sigCtx.OpenInterest = v
+			// Prior reading from the monitor's sampler (package oi). Zero
+			// when the store cannot answer, which leaves the engine's OI
+			// crowding warnings silent — their state before this was wired.
+			sigCtx.PrevOpenInterest = oi.PrevFor(oi.Load(), string(sym), market.BarDuration(timeframe), time.Now().UTC())
 		}
 		s := signal.Evaluate(signal.Inputs{
 			Symbol: sym, Timeframe: timeframe, Candles: candles, Ctx: sigCtx, Bias: bias,
@@ -141,6 +146,24 @@ func printDetails(s signal.Signal, ctx signal.Context, bias signal.Side, st sign
 			fmtOpen(s.Opens.Daily), pctDiff(s.Price, s.Opens.Daily),
 			fmtOpen(s.Opens.Weekly), pctDiff(s.Price, s.Opens.Weekly),
 			fmtOpen(s.Opens.Monthly), pctDiff(s.Price, s.Opens.Monthly))
+	}
+	// Day / week high-low. The opens alone say where a period started; the
+	// extremes say where its buyers and sellers actually were, and desks
+	// quote both. Month is left off deliberately — at 300 bars of 1h the
+	// month rarely has full coverage, and aggregateFrom reports zero rather
+	// than a partial period, so printing it would mostly print blanks.
+	for _, pr := range []struct {
+		label string
+		p     signal.Period
+	}{{"Day ", s.Periods.Day}, {"Week", s.Periods.Week}} {
+		if pr.p.High == 0 || pr.p.Low == 0 {
+			continue
+		}
+		fmt.Printf("%s  O %s   H %s (%+.2f%%)   L %s (%+.2f%%)\n",
+			pr.label,
+			fmtOpen(pr.p.Open),
+			ansi.Wrap(fmtOpen(pr.p.High), ansi.BoldC), pctDiff(s.Price, pr.p.High),
+			ansi.Wrap(fmtOpen(pr.p.Low), ansi.BoldC), pctDiff(s.Price, pr.p.Low))
 	}
 	for _, r := range s.Reasons {
 		fmt.Printf("  %s %s\n", ansi.Wrap("+", ansi.Green), ansi.Wrap(r, ansi.Green))

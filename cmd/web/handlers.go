@@ -27,6 +27,7 @@ import (
 	"myFirstGo/trading-bot/journal"
 	"myFirstGo/trading-bot/macro"
 	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/oi"
 	"myFirstGo/trading-bot/onchain"
 	"myFirstGo/trading-bot/signal"
 	"myFirstGo/trading-bot/validator"
@@ -730,8 +731,13 @@ func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timef
 		sigCtx.FundingRate = fr.Rate
 		markPrice = fr.MarkPrice
 	}
-	if oi, err := s.client.OpenInterest(ctx, sym); err == nil {
-		sigCtx.OpenInterest = oi
+	if v, err := s.client.OpenInterest(ctx, sym); err == nil {
+		sigCtx.OpenInterest = v
+		// Prior reading from the monitor's sampler. Until this was wired,
+		// PrevOpenInterest had no producer anywhere, so the engine's two OI
+		// crowding warnings were unreachable. Zero when the store cannot
+		// answer, which leaves them silent exactly as before.
+		sigCtx.PrevOpenInterest = oi.PrevFor(oi.Load(), string(sym), market.BarDuration(tf), time.Now().UTC())
 	}
 	v.Signal = signal.Evaluate(signal.Inputs{
 		Symbol: sym, Timeframe: tf, Candles: candles, Ctx: sigCtx,
