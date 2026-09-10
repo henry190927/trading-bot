@@ -60,7 +60,7 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="plan">plan</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="opens">開盤線 <span class="layer-count" data-layer-count="opens">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="opens">開盤/高低 <span class="layer-count" data-layer-count="opens">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="liquidity">流動性 EQH/EQL <span class="layer-count" data-layer-count="liquidity">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="zones">支撐帶 <span class="layer-count" data-layer-count="zones">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="shelves">樞紐帶 S/R <span class="layer-count" data-layer-count="shelves">0</span></button>
@@ -595,10 +595,12 @@
             <div class="lang-en">
               <b>Session opens</b> — daily (00:00 UTC, = Asia open), weekly (Mon 00:00 UTC), London (07:00 UTC), NY (13:00 UTC). Institutional anchors.
               <p class="glossary-how"><b>Direction:</b> price above BOTH daily &amp; weekly open = <span class="dir-long">long</span> bias; below both = <span class="dir-short">short</span>. Opens act as <b>S/R</b> (trade the bounce/reject) and as <b>mean-reversion magnets</b> (price far from an open tends to revert to it). A close reclaiming an open = character shift. Several opens clustered at one price = a stronger wall.</p>
+              <p class="glossary-how"><b>Period high/low</b> (日高/日低/週高/週低, dotted) — the same UTC periods' extremes, drawn beside their opens. The open says where the period <em>started</em>; the extreme says where its buyers and sellers actually <em>were</em>. Highs are red, lows green (same above/below convention as EQH/EQL). <b>Not</b> the exchange's rolling 24h high/low — that window slides with the clock, these snap to the calendar, so they move only when a period turns over. Early in a period the day high and day low sit close together and mean little; they firm up as the session fills out. A day low that equals the week low is one label, not two — that price is the more defended of the pair.</p>
             </div>
             <div class="lang-zh">
               <b>開盤價</b> — 日開（00:00 UTC，= 亞洲開）、週開（週一 00:00 UTC）、倫敦開（07:00 UTC）、紐約開（13:00 UTC）。機構錨點。
               <p class="glossary-how"><b>方向解讀：</b>站上日開<b>且</b>週開 =<span class="dir-long">做多</span>偏好；都在下 =<span class="dir-short">做空</span>。開盤價當<b>支撐/壓力</b>（做反彈/拒絕）+ <b>回歸磁鐵</b>（離太遠常回測）。收盤收復開盤價 = 性格轉變。多條開盤價擠一起 = 更強的牆。</p>
+              <p class="glossary-how"><b>期間高低</b>（日高/日低/週高/週低，點線）— 同樣的 UTC 期間的極值，畫在各自的開盤價旁邊。開盤價說這個期間從哪裡<em>開始</em>，極值說它的買方賣方實際<em>在哪裡</em>。高點紅、低點綠（沿用 EQH/EQL 上紅下綠的慣例）。<b>不是</b>交易所的滾動 24 小時高低 —— 那個窗口跟著時鐘滑動，這些是對齊日曆邊界的，所以只在換期間時才會變。期間剛開始時日高日低會擠在一起、參考價值低，隨著盤走完才成形。日低剛好等於週低時會合併成一個標籤而不是兩個 —— 那個價位是這一對裡防守更重的。</p>
             </div>
           </dd>
 
@@ -1569,7 +1571,17 @@
     // group references. Backend ships exact levels from a 1h fetch.
     var openLines = [];
     var lastOpens = [];
-    var OPEN_COLORS = { daily: '#22b8cf', weekly: '#f59f00', london: '#7048e8', ny: '#e64980', monthly: '#ffd43b' };
+    // Opens are cool/neutral anchors; period extremes reuse the chart's
+    // existing above-is-red / below-is-green convention (same as EQH/EQL) so
+    // a glance tells you which side of price a level sits on.
+    var OPEN_COLORS = {
+        daily: '#22b8cf', weekly: '#f59f00', london: '#7048e8', ny: '#e64980', monthly: '#ffd43b',
+        dayHigh: '#ff6b6b', dayLow: '#51cf66', weekHigh: '#c92a2a', weekLow: '#2f9e44',
+    };
+    // Period extremes are dotted, opens dashed, HVN sparsely dotted, plan
+    // solid — four price layers can be on at once and the line has to say
+    // which one it belongs to without reading the label.
+    var EXTREME_KINDS = { dayHigh: 1, dayLow: 1, weekHigh: 1, weekLow: 1 };
     function clearOpenLines() {
         openLines.forEach(function (l) { candleSeries.removePriceLine(l); });
         openLines = [];
@@ -1583,7 +1595,7 @@
                 price: o.price,
                 color: OPEN_COLORS[o.kind] || '#adb5bd',
                 lineWidth: 1,
-                lineStyle: 2,      // dashed — distinct from HVN dotted
+                lineStyle: EXTREME_KINDS[o.kind] || 2, // extremes dotted, opens dashed
                 axisLabelVisible: false, // label drawn on the LEFT (like POC), keeps right axis clean
                 title: o.label,
             }));

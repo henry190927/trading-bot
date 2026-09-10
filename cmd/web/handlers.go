@@ -4464,7 +4464,13 @@ func (s *server) computeChartOpens(ctx context.Context, sym market.Symbol) []map
 		return nil
 	}
 	// ~9 days of 1h bars — enough to reach this week's Monday 00:00.
-	cs, err := s.client.Klines(ctx, sym, market.Timeframe("1h"), 220)
+	//
+	// WithForming because the period high/low added below must include the
+	// hour still in progress: today's high is frequently made in it, and a
+	// "day high" that silently excludes the last hour is wrong on a chart.
+	// The opens are unaffected — they match on exact OpenTime, so a trailing
+	// partial bar is simply never the boundary bar.
+	cs, err := s.client.KlinesWithForming(ctx, sym, market.Timeframe("1h"), 220)
 	if err != nil || len(cs) == 0 {
 		return nil
 	}
@@ -4505,6 +4511,33 @@ func (s *server) computeChartOpens(ctx context.Context, sym market.Symbol) []map
 			out = append(out, map[string]any{"label": d.label, "kind": d.kind, "price": p})
 		}
 	}
+	// Period high/low. The opens above say where each period STARTED; these
+	// say where its buyers and sellers actually were, which is the other half
+	// of the set the group quotes. Same UTC boundaries as the opens, so they
+	// sit in the same layer and drawOpenLabels' same-price merge collapses the
+	// common case where the week low IS the day low.
+	//
+	// Zero means the fetch did not reach that boundary (ComputePeriodLevels
+	// refuses partial periods), so skip rather than draw a level that never
+	// existed. The month is expected to be zero here — 220 hourly bars is ~9
+	// days — and is deliberately not resolved from the daily series the way
+	// the monthly OPEN is: a month's extreme derived from daily bars would be
+	// a different measurement from the day/week ones beside it.
+	pl := signal.ComputePeriodLevels(cs, now)
+	for _, e := range []struct {
+		label, kind string
+		price       float64
+	}{
+		{"日高", "dayHigh", pl.Day.High},
+		{"日低", "dayLow", pl.Day.Low},
+		{"週高", "weekHigh", pl.Week.High},
+		{"週低", "weekLow", pl.Week.Low},
+	} {
+		if e.price > 0 {
+			out = append(out, map[string]any{"label": e.label, "kind": e.kind, "price": e.price})
+		}
+	}
+
 	// Monthly open (1st 00:00 UTC) — a major institutional level for the month.
 	// The 1h window can't reach the 1st past day ~9, so resolve it from daily
 	// candles (the 1st-of-month bar's open).
