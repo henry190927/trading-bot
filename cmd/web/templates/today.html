@@ -17,6 +17,17 @@
   .today-hero .th-status{font-size:var(--fs-xl);font-weight:800;letter-spacing:-.02em}
   .today-hero.live .th-status{color:var(--green)} .today-hero.blackout .th-status{color:var(--red)}
   .today-hero .th-sub{color:var(--text-dim);margin-top:var(--sp-2);font-size:var(--fs-md)}
+  /* Coverage gap: the curated table is hand-maintained and went stale
+     silently on 2026-09-10. Amber, not red — nothing is broken, the gate
+     just does not cover these. */
+  .today-gap{background:var(--wash-yellow);border:1px solid var(--yellow);border-radius:var(--r-lg);padding:var(--sp-4);margin-bottom:var(--sp-4)}
+  .today-gap .tg-title{font-weight:700;color:var(--yellow);font-size:var(--fs-md)}
+  .today-gap .tg-note{color:var(--text-dim);font-size:var(--fs-sm);margin-top:var(--sp-1)}
+  .today-gap ul{margin:var(--sp-3) 0 0;padding-left:0;list-style:none}
+  .today-gap li{display:flex;gap:var(--sp-2);align-items:baseline;padding:var(--sp-1) 0;font-size:var(--fs-sm);border-top:1px solid var(--border)}
+  .today-gap li .tg-when{font-variant-numeric:tabular-nums;color:var(--text-dim);white-space:nowrap}
+  .today-gap li .tg-cty{font-weight:700;font-size:var(--fs-xs);opacity:.85;white-space:nowrap}
+  .today-gap li .tg-name{flex:1;min-width:0}
   .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--sp-4);align-items:start}
   .today-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-4);box-shadow:var(--shadow-card)}
   .today-card h2{font-size:var(--fs-lg);font-weight:800;margin-bottom:var(--sp-3);display:flex;align-items:center;gap:var(--sp-2)}
@@ -55,6 +66,23 @@
   <div class="today-hero live">
     <div class="th-status">✅ <span class="i18n-en">Engine live</span><span class="i18n-zh">引擎運作中</span></div>
     <div class="th-sub">{{if .BONext}}<span class="i18n-en">Next event</span><span class="i18n-zh">下一個事件</span>: <strong>{{.BONext.name}}</strong> — {{.BONext.when}} · {{.BONext.hours}}h{{else}}<span class="i18n-en">no macro events on the calendar</span><span class="i18n-zh">日曆上無總經事件</span>{{end}}</div>
+  </div>
+  {{end}}
+
+  {{if .MacroGaps}}
+  <div class="today-gap">
+    <div class="tg-title">⚠️ <span class="i18n-en">Not covered by the blackout gate ({{len .MacroGaps}}, next 48h)</span><span class="i18n-zh">停訊窗沒有涵蓋的事件（{{len .MacroGaps}} 筆,未來 48 小時）</span></div>
+    <div class="tg-note"><span class="i18n-en">High-impact events on the live feed with no curated blackout window. The engine will keep firing straight through these.</span><span class="i18n-zh">live feed 上的高影響事件,但 curated 表沒有對應的停訊窗 —— 引擎會照常在這些事件裡出訊號。</span></div>
+    <ul>
+      {{range .MacroGaps}}
+      <li>
+        <span class="tg-when">{{.when}}</span>
+        <span class="tg-cty">{{.country}}</span>
+        <span class="tg-name">{{.name}}</span>
+        <span class="tg-when">{{.hours}}h</span>
+      </li>
+      {{end}}
+    </ul>
   </div>
   {{end}}
 

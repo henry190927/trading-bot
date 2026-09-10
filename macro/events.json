@@ -43,7 +43,7 @@
       "blackout_after_min": 90
     },
     {
-      "name": "Jackson Hole — Warsh keynote",
+      "name": "Jackson Hole \u2014 Warsh keynote",
       "datetime_utc": "2026-08-28T14:00:00Z",
       "blackout_before_min": 180,
       "blackout_after_min": 300
@@ -51,6 +51,12 @@
     {
       "name": "US NFP (August)",
       "datetime_utc": "2026-09-04T12:30:00Z",
+      "blackout_before_min": 60,
+      "blackout_after_min": 90
+    },
+    {
+      "name": "US CPI (August)",
+      "datetime_utc": "2026-09-11T12:30:00Z",
       "blackout_before_min": 60,
       "blackout_after_min": 90
     },

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"myFirstGo/trading-bot/econcal"
 	"myFirstGo/trading-bot/macro"
 )
 
@@ -33,6 +34,36 @@ func (s *server) handleTodayPage(c *gin.Context) {
 			"when":  upcoming.DatetimeUTC.In(tpe).Format("01/02 15:04"),
 			"hours": fmt.Sprintf("%.1f", upcoming.DatetimeUTC.Sub(now).Hours()),
 		}
+	}
+
+	// What the curated table does NOT cover. On 2026-09-10 this hero read
+	// "no macro events on the calendar" on a day an ECB rate hike and a US
+	// PPI print landed 15 minutes apart — truthfully, because the table had
+	// gone stale. An empty calendar is indistinguishable from a quiet day
+	// unless the page says which is which, so name the gap here.
+	//
+	// Over-inclusive by choice (every High plus central-bank speakers, any
+	// country): this is a heads-up list, not a gate, and for a warning the
+	// safe failure direction is one row too many rather than one too few.
+	var macroGaps []gin.H
+	var liveCands []macro.Candidate
+	for _, e := range econcal.All() {
+		if e.Impact != "High" && !e.Speaker {
+			continue
+		}
+		liveCands = append(liveCands, macro.Candidate{
+			Name:        e.Title,
+			Country:     e.Country,
+			DatetimeUTC: e.DatetimeUTC,
+		})
+	}
+	for _, g := range macro.Uncovered(liveCands, now, 48*time.Hour) {
+		macroGaps = append(macroGaps, gin.H{
+			"name":    g.Name,
+			"country": g.Country,
+			"when":    g.DatetimeUTC.In(tpe).Format("01/02 15:04"),
+			"hours":   fmt.Sprintf("%.1f", g.DatetimeUTC.Sub(now).Hours()),
+		})
 	}
 
 	// Open trades + live R (light: nil views → fetches only open symbols).
@@ -62,6 +93,7 @@ func (s *server) handleTodayPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "today.html", gin.H{
 		"MacroActive": activeBO,
 		"BONext":      boNext,
+		"MacroGaps":   macroGaps,
 		"OpenTrades":  openTrades,
 		"Daemons":     daemons,
 		"Pending":     pending,
