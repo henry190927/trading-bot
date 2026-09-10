@@ -194,3 +194,69 @@ func TestBuildBookCountsGenuineSecondTrade(t *testing.T) {
 		t.Fatalf("realized = %+.2fR, want -2.00R — two real trades must both count", bk.RealizedRToday)
 	}
 }
+
+// OpenLegs is what makes MaxSameSymbolSide able to fire at all. If BuildBook
+// counted a slot without recording the leg, the cap would read as configured
+// and do nothing — the inert-knob failure this codebase has already deleted
+// two fields for (see autotrade.go's REMOVED block).
+func TestBuildBookRecordsOpenLegs(t *testing.T) {
+	openBar := bookFixed(bookBar(bkBar, 95, 105, 100))
+	stopBar := bookFixed(bookBar(bkBar, 85, 105, 100))
+
+	t.Run("an open position records its symbol and side", func(t *testing.T) {
+		bk, _ := BuildBook([]PaperFire{bookLongFire("ETH", "engine", bkFire, 35)}, openBar, bkNow, 6)
+		if len(bk.OpenLegs) != 1 {
+			t.Fatalf("legs = %+v, want exactly 1", bk.OpenLegs)
+		}
+		if bk.OpenLegs[0] != (Leg{Symbol: "ETH", Side: "long"}) {
+			t.Errorf("leg = %+v, want {ETH long}", bk.OpenLegs[0])
+		}
+	})
+
+	t.Run("a CLOSED position records no leg", func(t *testing.T) {
+		bk, _ := BuildBook([]PaperFire{bookLongFire("ETH", "engine", bkFire, 35)}, stopBar, bkNow, 6)
+		if bk.OpenCount != 0 {
+			t.Fatalf("open count = %d, want 0", bk.OpenCount)
+		}
+		if len(bk.OpenLegs) != 0 {
+			t.Errorf("a stopped position must leave no leg, got %+v", bk.OpenLegs)
+		}
+	})
+
+	t.Run("legs and count stay in step across several rules", func(t *testing.T) {
+		bk, _ := BuildBook([]PaperFire{
+			bookLongFire("ETH", "engine", bkFire, 35),
+			bookLongFire("ETH", "sweep-reject", bkFire, 35),
+			bookLongFire("BTC", "engine", bkFire, 35),
+		}, openBar, bkNow, 6)
+		if bk.OpenCount != 3 || len(bk.OpenLegs) != 3 {
+			t.Fatalf("open=%d legs=%d, want 3 and 3", bk.OpenCount, len(bk.OpenLegs))
+		}
+		eth := 0
+		for _, l := range bk.OpenLegs {
+			if l.Symbol == "ETH" && l.Side == "long" {
+				eth++
+			}
+		}
+		// Two ETH longs from two different RULES is exactly the shape
+		// MaxSameSymbolSide exists to refuse — one position per rule does not
+		// bound it, and here the book proves it can hold both.
+		if eth != 2 {
+			t.Errorf("ETH long legs = %d, want 2", eth)
+		}
+	})
+
+	t.Run("an unscoreable fire holds a slot but records no side", func(t *testing.T) {
+		none := func(string, string) []market.Candle { return nil }
+		bk, un := BuildBook([]PaperFire{bookLongFire("ETH", "engine", bkFire, 35)}, none, bkNow, 6)
+		if bk.OpenCount != 1 || un != 1 {
+			t.Fatalf("open=%d unscored=%d, want 1 and 1", bk.OpenCount, un)
+		}
+		if len(bk.OpenLegs) != 1 {
+			t.Fatalf("legs = %+v, want 1", bk.OpenLegs)
+		}
+		if bk.OpenLegs[0].Side != "" {
+			t.Errorf("side = %q, want empty — an unscoreable direction must not refuse a candidate", bk.OpenLegs[0].Side)
+		}
+	})
+}

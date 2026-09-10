@@ -89,6 +89,10 @@ func BuildBookTraced(fires []PaperFire, candles CandleFn, now time.Time, cooldow
 				seen[key] = true
 				bk.OpenCount++
 				bk.OpenMargin += f.Margin
+				// No Side recorded: an unscoreable fire holds its slot but its
+				// direction is not trustworthy, so it must not match a
+				// same-symbol-side candidate. See Book.OpenLegs.
+				bk.OpenLegs = append(bk.OpenLegs, Leg{Symbol: f.Symbol})
 				unscored++
 				tr.CountedOpen = true
 			}
@@ -104,6 +108,7 @@ func BuildBookTraced(fires []PaperFire, candles CandleFn, now time.Time, cooldow
 			if oc.Status == OutOpen || oc.Status == OutPending {
 				bk.OpenCount++
 				bk.OpenMargin += f.Margin
+				bk.OpenLegs = append(bk.OpenLegs, Leg{Symbol: f.Symbol, Side: f.Side})
 				tr.CountedOpen = true
 			}
 		}

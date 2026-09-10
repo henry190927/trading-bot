@@ -86,7 +86,8 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		// The daily-loss breaker is a whole-executor stop, not a per-rule one:
 		// evaluate it before touching any rule so a halted day does no work
 		// and makes no API calls for triggers.
-		if v := autotrade.CheckCaps(cfg, book, 0); v.Halt {
+		// Zero Candidate = the halt probe; every candidate-specific cap skips it.
+		if v := autotrade.CheckCaps(cfg, book, autotrade.Candidate{}); v.Halt {
 			if halt.announce(now) {
 				log.Printf("autoexec: HALTED — %s", v.Reason)
 				if n != nil {
@@ -148,7 +149,11 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			// anyway doesn't consume a slot in the reasoning, and re-checked
 			// per rule because an earlier rule in this same tick may have just
 			// taken the last slot.
-			if v := autotrade.CheckCaps(cfg, book, r.MarginUSDT); v.Blocked {
+			// trig.Side (not r.Side) — a rule may be configured "auto", and the
+			// trigger has already resolved the concrete direction by here.
+			if v := autotrade.CheckCaps(cfg, book, autotrade.Candidate{
+				Symbol: r.Symbol, Side: trig.Side, Margin: r.MarginUSDT,
+			}); v.Blocked {
 				log.Printf("autoexec: %s %s/%s BLOCKED by caps — %s", r.Symbol, r.TF, r.Strategy, v.Reason)
 				// Record WHAT was denied, not just that something was (C7).
 				// The one-line log above cannot answer "would best-first have

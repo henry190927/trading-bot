@@ -4,6 +4,7 @@
 Run it on the VPS, or pipe it there from a workstation:
 
     ssh ... 'python3 - --halt=-6'            < scripts/set_autotrade_caps.py
+    ssh ... 'python3 - --same-side=1'        < scripts/set_autotrade_caps.py
     ssh ... 'python3 - --concurrent=8 --margin=280' < scripts/set_autotrade_caps.py
 
 Only the fields you pass are touched; the rest are left exactly as they are.
@@ -27,10 +28,18 @@ Cap semantics, from autotrade/caps.go
 Zero (or negative, for the two ceilings) means UNLIMITED, not "block
 everything" — an autotrade.json written before these fields existed unmarshals
 them to 0. daily_loss_halt_r is itself negative in normal use, so 0 is its
-disabled value. CheckCaps tests halt -> concurrent -> margin, and the FIRST
-one to bind is the one that reports, which is why concurrent and margin have
-to move together: 8 slots at 35u needs a 280u ceiling or margin binds at 4 and
-the concurrent value is inert.
+disabled value.
+
+CheckCaps tests halt -> same-symbol-side -> concurrent -> margin, and the FIRST
+one to bind is the one that reports. Two consequences:
+
+  concurrent and margin have to move TOGETHER — 8 slots at 35u needs a 280u
+  ceiling, or margin binds at 4 and the concurrent value is inert.
+
+  max_same_symbol_side is reported ahead of the global caps, deliberately:
+  "already short ETH" is more useful than "8 open >= cap 8". Setting it to 1
+  means the executor will never hold two positions in the same direction on
+  the same symbol; it still permits a hedge (long + short on one symbol).
 
 No restart needed: cmd/monitor/autoexec.go reloads the config each tick.
 """
@@ -41,7 +50,8 @@ import os
 import sys
 
 PATH = "/opt/trading/autotrade.json"
-FIELDS = ("max_concurrent_total", "max_margin_total_usdt", "daily_loss_halt_r")
+FIELDS = ("max_concurrent_total", "max_margin_total_usdt", "daily_loss_halt_r",
+          "max_same_symbol_side")
 
 
 def main() -> int:
@@ -49,6 +59,9 @@ def main() -> int:
     ap.add_argument("--concurrent", type=int, help="max_concurrent_total (0 = unlimited)")
     ap.add_argument("--margin", type=float, help="max_margin_total_usdt (0 = unlimited)")
     ap.add_argument("--halt", type=float, help="daily_loss_halt_r, e.g. -6 (0 = disabled)")
+    ap.add_argument("--same-side", type=int, dest="same_side",
+                    help="max_same_symbol_side: positions allowed per (symbol, direction). "
+                         "0 = unlimited (ships this way), 1 = never repeat an opinion already open")
     ap.add_argument("--path", default=PATH, help=f"config path (default {PATH})")
     args = ap.parse_args()
 
@@ -68,6 +81,8 @@ def main() -> int:
         changes["max_margin_total_usdt"] = args.margin
     if args.halt is not None:
         changes["daily_loss_halt_r"] = args.halt
+    if args.same_side is not None:
+        changes["max_same_symbol_side"] = args.same_side
 
     if not changes:
         print("no fields given — current caps, unchanged:")

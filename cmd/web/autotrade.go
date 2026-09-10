@@ -202,13 +202,18 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"MaxConc":         cfg.MaxConcurrentTotal,
 		"MaxMargin":       cfg.MaxMarginTotalUSDT,
 		"DailyHaltR":      cfg.DailyLossHaltR,
-		"Rules":           cfg.Rules,
-		"Fires":           rows,
-		"Sum":             sum,
-		"Equity":          buildEquityCurve(statTrades),
-		"Histogram":       buildRHistogram(statTrades),
-		"Calendar":        buildDailyCalendar(statTrades, 42),
-		"StatN":           len(statTrades),
+		// Shown even when 0 (= unlimited/off). A cap that gates real trades
+		// while being invisible on the panel that claims to show the caps is
+		// the display-vs-reality shape this file has already been fixed for
+		// once this week.
+		"MaxSameSide": cfg.MaxSameSymbolSide,
+		"Rules":       cfg.Rules,
+		"Fires":       rows,
+		"Sum":         sum,
+		"Equity":      buildEquityCurve(statTrades),
+		"Histogram":   buildRHistogram(statTrades),
+		"Calendar":    buildDailyCalendar(statTrades, 42),
+		"StatN":       len(statTrades),
 		// perfPanels labels its distribution panel with .ClosedCount.
 		"ClosedCount":     len(statTrades),
 		"StatUnscoreable": statUnscoreable,

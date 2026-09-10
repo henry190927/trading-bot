@@ -44,7 +44,11 @@ type Config struct {
 	MaxConcurrentTotal int     `json:"max_concurrent_total"`  // across all symbols
 	MaxMarginTotalUSDT float64 `json:"max_margin_total_usdt"` // total capital-at-risk cap
 	DailyLossHaltR     float64 `json:"daily_loss_halt_r"`     // kill-switch: halt all if today's R <= this
-	Rules              []Rule  `json:"rules"`
+	// MaxSameSymbolSide caps positions sharing a (symbol, direction). 0 =
+	// UNLIMITED, matching the other caps, so an existing file keeps today's
+	// behaviour. 1 = never repeat an opinion already on the book.
+	MaxSameSymbolSide int    `json:"max_same_symbol_side"`
+	Rules             []Rule `json:"rules"`
 }
 
 // Path is the on-disk config (env AUTOTRADE_PATH or the default).
