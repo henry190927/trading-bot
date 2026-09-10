@@ -168,6 +168,22 @@ func appendSetup(s Setup) (int, error) {
 // reversal setup. A close through the target = "win"; a close through
 // the stop = "loss"; >= expireBars with neither = "expired"; empty =
 // still open (or no target/stop and never stopped).
+// filledOn is the SINGLE definition of "the resting order got taken": a bar
+// whose range spans the entry. Shared by both classifiers on purpose.
+//
+// classifyOutcome had no fill test at all — it walked bars asking only whether
+// a CLOSE had passed stop or target. For a limit that never filled that
+// fabricates a verdict, and on 2026-09-10 three of 52 setups carried one:
+// id=40 SNDK read "win" on a long at 1512 that price left behind at 1545 and
+// never returned to, and id=20/id=27 read "loss" the same way. The page
+// invites the reader to treat the Hit-rate / Real-hit-rate GAP as execution
+// quality; 1.5 of the 9.2pp gap was instead one column counting trades that
+// never happened. With the gate shared the gap is purely close-vs-wick, which
+// is the only thing it ever claimed to measure.
+func filledOn(c market.Candle, entry float64) bool {
+	return entry > 0 && c.Low <= entry && entry <= c.High
+}
+
 func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float64, int) {
 	const expireBars = 20
 	const winR = 2.0 // R-based win when no explicit target: closed through +2R
@@ -175,12 +191,24 @@ func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float
 	if su.Entry > 0 && su.Stop > 0 {
 		risk = math.Abs(su.Entry - su.Stop)
 	}
+	if su.Entry <= 0 {
+		// Without an entry neither classifier can say anything; matching
+		// classifyRealOutcome's guard keeps the two populations identical.
+		return "", time.Time{}, 0, 0
+	}
 	n := 0
+	filled := false
 	for _, c := range closed {
 		if !c.CloseTime.After(su.RecordedAt) {
 			continue
 		}
 		n++
+		if !filled {
+			if !filledOn(c, su.Entry) {
+				continue
+			}
+			filled = true
+		}
 		if su.Dir == "short" {
 			if su.Stop > 0 && c.Close >= su.Stop {
 				return "loss", c.CloseTime, c.Close, n
@@ -202,6 +230,9 @@ func classifyOutcome(su Setup, closed []market.Candle) (string, time.Time, float
 				return "win", c.CloseTime, c.Close, n
 			}
 		}
+	}
+	if !filled && n >= expireBars {
+		return "no-fill", time.Time{}, 0, n
 	}
 	if n >= expireBars {
 		return "expired", time.Time{}, 0, n
@@ -228,11 +259,10 @@ func classifyRealOutcome(su Setup, closed []market.Candle) (string, time.Time, f
 		}
 		n++
 		if !filled {
-			if c.Low <= su.Entry && su.Entry <= c.High {
-				filled = true // price traded through the entry this bar
-			} else {
+			if !filledOn(c, su.Entry) {
 				continue
 			}
+			filled = true // price traded through the entry this bar
 		}
 		// First-touch after fill (incl. the fill bar). Check stop before
 		// target so a bar that spans both resolves to the stop.
