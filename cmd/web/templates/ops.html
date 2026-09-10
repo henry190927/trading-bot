@@ -673,7 +673,7 @@
             + ' · ' + d.atTPE;
         var rows = (d.rows || []).map(function (r) {
             if (r.state !== 'ok') {
-                return '<tr><td>' + r.short + '</td><td class="note" colspan="4">尚無快照</td></tr>';
+                return '<tr><td>' + r.short + '</td><td class="note" colspan="5">尚無快照</td></tr>';
             }
             var dTxt = '—', dCls = 'dim';
             if (r.oiStatic) {
@@ -687,21 +687,29 @@
                 fTxt = (r.funding >= 0 ? '+' : '') + (r.funding * 100).toFixed(4) + '%';
                 if (r.fundingSide) fCls = 'crowded';
             }
-            // The arms label names which engine warning this delta would
-            // produce, and on which side — the sign alone does not say it.
-            var armTxt = r.oiStatic ? '交易所不公布此合約 OI(固定值)'
-                       : r.arms === 'long-unwind' ? '多單解除（空單確認）'
-                       : r.arms === 'shorts-crowding' ? '空單堆積（擠壓風險）'
-                       : (r.fundingSide === 'shorts-crowded' ? '空方付錢'
-                       : (r.fundingSide === 'longs-crowded' ? '多方付錢' : ''));
+            // Price delta over the same window. Without it an OI change
+            // says contracts were opened but not by which side, which is
+            // what the first version of this card got wrong.
+            var pTxt = '—', pCls = 'dim';
+            if (typeof r.priceDelta === 'number') {
+                pTxt = (r.priceDelta >= 0 ? '+' : '') + (r.priceDelta * 100).toFixed(2) + '%';
+            }
+            // The verdict comes from the server (oiQuadrant) so the card
+            // cannot drift from the rule that produced it.
+            var readTxt = r.oiStatic ? '交易所不公布此合約 OI(固定值)'
+                        : (r.reading || (r.fundingSide === 'shorts-crowded' ? '空方付錢'
+                        : (r.fundingSide === 'longs-crowded' ? '多方付錢' : '')));
+            var readCls = 'note';
+            if (r.quadrant === 'shorts-building' || r.quadrant === 'longs-building') readCls = 'note armed';
             return '<tr><td>' + r.short + '</td>'
                  + '<td class="dim">' + oiFmtNotional(r.oi) + '</td>'
                  + '<td class="' + dCls + '">' + dTxt + '</td>'
+                 + '<td class="' + pCls + '">' + pTxt + '</td>'
                  + '<td class="' + fCls + '">' + fTxt + '</td>'
-                 + '<td class="note">' + armTxt + '</td></tr>';
+                 + '<td class="' + readCls + '">' + readTxt + '</td></tr>';
         }).join('');
         host.innerHTML = '<table class="ops-oi"><thead><tr>'
-            + '<th>標的</th><th>OI</th><th>1h Δ</th><th>funding</th><th style="text-align:left">判讀</th>'
+            + '<th>標的</th><th>OI</th><th>OI 1hΔ</th><th>價格 1hΔ</th><th>funding</th><th style="text-align:left">判讀</th>'
             + '</tr></thead><tbody>' + rows + '</tbody></table>';
     }
     function fetchOI() {

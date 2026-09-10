@@ -54,6 +54,12 @@ type Snapshot struct {
 	Symbol  string    `json:"symbol"`            // exchange symbol, e.g. "BTC-USDT"
 	OI      float64   `json:"oi"`                // quote-currency (USDT) notional
 	Funding float64   `json:"funding,omitempty"` // fraction per interval; >0 = longs pay shorts
+	// Price is the mark price at the same instant. Recorded because open
+	// interest alone cannot say which side the new positions are on: OI
+	// rising means contracts were opened, and only the PRICE direction over
+	// the same window says whether buyers or sellers opened them. Free to
+	// collect — the funding call already returns it.
+	Price float64 `json:"price,omitempty"`
 }
 
 // Retain is how much history Prune keeps. Seven days covers every timeframe
@@ -244,4 +250,59 @@ func Latest(snaps []Snapshot, sym string) (Snapshot, bool) {
 		}
 	}
 	return best, found
+}
+
+// PriceChangeOver returns the fractional mark-price change for sym across the
+// same window PrevFor compares OI over, and whether both endpoints existed.
+//
+// This is the half that makes an OI delta mean anything. OI rising says
+// contracts were opened; it does not say by whom. Price falling while OI
+// rises means the opening pressure was on the sell side (shorts building);
+// price rising while OI rises means the opposite. The engine gets away with
+// reading OI alone because its warnings only fire under an existing Long or
+// Short signal, which supplies the direction. A standalone readout has no
+// such signal and must measure it.
+func PriceChangeOver(snaps []Snapshot, sym string, bar time.Duration, now time.Time) (float64, bool) {
+	if bar <= 0 {
+		return 0, false
+	}
+	cur, ok := Latest(snaps, sym)
+	if !ok || cur.Price <= 0 {
+		return 0, false
+	}
+	prevSnap, ok := priorSnapshot(snaps, sym, now.Add(-bar), bar/4)
+	if !ok || prevSnap.Price <= 0 {
+		return 0, false
+	}
+	return (cur.Price - prevSnap.Price) / prevSnap.Price, true
+}
+
+// priorSnapshot is PriorTo's logic returning the whole row. PriorTo stays as
+// it is because signal.Context only ever wanted the one number.
+func priorSnapshot(snaps []Snapshot, sym string, at time.Time, tol time.Duration) (Snapshot, bool) {
+	if len(snaps) == 0 || sym == "" || tol <= 0 {
+		return Snapshot{}, false
+	}
+	at = at.UTC()
+	var best Snapshot
+	bestGap := time.Duration(-1)
+	for _, s := range snaps {
+		if s.Symbol != sym {
+			continue
+		}
+		gap := s.Time.UTC().Sub(at)
+		if gap < 0 {
+			gap = -gap
+		}
+		if gap > tol {
+			continue
+		}
+		if bestGap < 0 || gap < bestGap {
+			best, bestGap = s, gap
+		}
+	}
+	if bestGap < 0 {
+		return Snapshot{}, false
+	}
+	return best, true
 }

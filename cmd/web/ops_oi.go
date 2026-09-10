@@ -35,6 +35,48 @@ const oiDeltaThreshold = 0.02
 // the sampler's cadence.
 const oiStaticMinSamples = 6
 
+// oiPriceNoiseFloor is the smallest price move over the window that this will
+// treat as a direction. Below it the quadrant is reported as indeterminate
+// rather than guessed: a +1.9% OI change against a -0.06% drift is not
+// evidence about which side opened those contracts.
+//
+// A noise guard, not a measurement — deliberately loose, and the actual price
+// delta is returned alongside so the reader can judge it.
+const oiPriceNoiseFloor = 0.001 // 0.1%
+
+// oiQuadrant names what an OI change plus a price change over the same window
+// says about who opened or closed the contracts. This is the standard
+// four-way reading, and it is the correction to a first version of this card
+// that labelled OI-up as "shorts crowding" full stop.
+//
+// That label was wrong in a way the live data showed within two hours: ETH ran
+// OI +1.82% while price rose 0.5%, which is longs being added, not shorts.
+// signal.annotateContextWarnings gets away with reading OI alone because its
+// warnings only fire under an existing Long or Short signal — the signal
+// supplies the direction. Dropping that condition while keeping the conclusion
+// is how a readout ends up asserting the opposite of what happened.
+func oiQuadrant(oiDelta, priceDelta float64) (key, label string) {
+	if oiDelta >= oiDeltaThreshold {
+		switch {
+		case priceDelta <= -oiPriceNoiseFloor:
+			return "shorts-building", "跌勢中新倉 — 空單堆積"
+		case priceDelta >= oiPriceNoiseFloor:
+			return "longs-building", "漲勢中新倉 — 多單堆積"
+		}
+		return "new-positions", "新倉進場 — 價格無方向,分不出邊"
+	}
+	if oiDelta <= -oiDeltaThreshold {
+		switch {
+		case priceDelta <= -oiPriceNoiseFloor:
+			return "longs-unwinding", "跌勢中減倉 — 多單解除"
+		case priceDelta >= oiPriceNoiseFloor:
+			return "shorts-covering", "漲勢中減倉 — 空單回補"
+		}
+		return "closing", "倉位減少 — 價格無方向,分不出邊"
+	}
+	return "", ""
+}
+
 // oiIsStatic reports whether every stored reading for sym is the same number.
 //
 // BingX publishes a fixed open interest for its CFD-style synthetics — the
@@ -72,6 +114,7 @@ func (s *server) handleOpsOI(c *gin.Context) {
 	now := time.Now().UTC()
 	tpe := time.FixedZone("Asia/Taipei", 8*3600)
 
+	bar := market.BarDuration(market.TF1h)
 	rows := make([]gin.H, 0, len(uiSymbols))
 	for _, short := range uiSymbols {
 		sym, err := resolveWebSymbol(short)
@@ -106,19 +149,24 @@ func (s *server) handleOpsOI(c *gin.Context) {
 
 		if oiIsStatic(snaps, string(sym)) {
 			row["oiStatic"] = true
-		} else if prev := oi.PrevFor(snaps, string(sym), market.BarDuration(market.TF1h), now); prev > 0 {
+		} else if prev := oi.PrevFor(snaps, string(sym), bar, now); prev > 0 {
 			d := (cur.OI - prev) / prev
 			row["prev1h"] = prev
 			row["delta"] = d
-			// The label states which engine warning this delta would produce
-			// and on which side, because the delta's sign alone does not say
-			// it: the same -7% is a long unwind under a Long signal and
-			// nothing at all under a Short one.
-			switch {
-			case d <= -oiDeltaThreshold:
-				row["arms"] = "long-unwind"
-			case d >= oiDeltaThreshold:
-				row["arms"] = "shorts-crowding"
+
+			// The quadrant needs the price move over the SAME window. Without
+			// it there is no honest label — see oiQuadrant.
+			if pd, ok := oi.PriceChangeOver(snaps, string(sym), bar, now); ok {
+				row["priceDelta"] = pd
+				if key, label := oiQuadrant(d, pd); key != "" {
+					row["quadrant"] = key
+					row["reading"] = label
+				}
+			} else if d <= -oiDeltaThreshold || d >= oiDeltaThreshold {
+				// Past the threshold but no price history to interpret it —
+				// say so instead of falling back to an OI-only verdict.
+				row["quadrant"] = "no-price"
+				row["reading"] = "OI 已過門檻,但缺同窗價格,無法判邊"
 			}
 		}
 		rows = append(rows, row)

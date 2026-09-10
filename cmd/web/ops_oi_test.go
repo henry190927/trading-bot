@@ -93,3 +93,40 @@ func TestOIIsStaticIgnoresOtherSymbols(t *testing.T) {
 		t.Error("BTC should still read live beside a static XAG series")
 	}
 }
+
+func TestOIQuadrant(t *testing.T) {
+	cases := []struct {
+		name        string
+		oiD, priceD float64
+		wantKey     string
+	}{
+		// The bug this function exists to fix. The first version of the card
+		// called any OI rise "shorts crowding"; ETH ran OI up while price
+		// rose, which is longs being added.
+		{"OI up, price up = longs", 0.025, +0.005, "longs-building"},
+		{"OI up, price down = shorts", 0.050, -0.005, "shorts-building"},
+		// SUI and HYPE on 2026-09-11: OI +5.0% / +4.8% into three red bars.
+		{"OI up hard, price down hard", 0.0502, -0.013, "shorts-building"},
+		// A 1.9% OI move against a -0.06% drift is not evidence of a side.
+		{"OI up, price flat = indeterminate", 0.030, -0.0004, "new-positions"},
+		{"OI down, price down = long unwind", -0.046, -0.007, "longs-unwinding"},
+		{"OI down, price up = shorts covering", -0.046, +0.007, "shorts-covering"},
+		{"OI down, price flat", -0.046, 0.0, "closing"},
+		// Below the OI threshold nothing is claimed, however big the move.
+		{"OI inside threshold", 0.019, -0.05, ""},
+		{"OI inside threshold negative", -0.019, +0.05, ""},
+		// Boundaries are inclusive on the OI side and on the noise floor.
+		{"exactly at OI threshold", 0.02, -0.001, "shorts-building"},
+		{"exactly at noise floor up", 0.02, +0.001, "longs-building"},
+	}
+	for _, c := range cases {
+		key, label := oiQuadrant(c.oiD, c.priceD)
+		if key != c.wantKey {
+			t.Errorf("%s: oiQuadrant(%.4f, %.4f) = %q, want %q",
+				c.name, c.oiD, c.priceD, key, c.wantKey)
+		}
+		if (key == "") != (label == "") {
+			t.Errorf("%s: key %q and label %q must both be set or both empty", c.name, key, label)
+		}
+	}
+}

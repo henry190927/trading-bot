@@ -210,7 +210,6 @@
         <div id="chart-shelf-bands" class="chart-zone-bands chart-shelf-host" aria-hidden="true"></div>
         <div id="chart-poc-labels" class="chart-poc-labels chart-labels-right" aria-hidden="true"></div>
         <div id="chart-open-labels" class="chart-poc-labels" aria-hidden="true"></div>
-        <div id="chart-shelf-labels" class="chart-poc-labels chart-shelf-labels" aria-hidden="true"></div>
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
         <div class="chart-price-marker" id="chart-price-marker" hidden>
           <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
@@ -1733,57 +1732,23 @@
         });
     }
 
-    // Single entry point for the shelf layer — always call THIS, never the
-    // two passes directly.
+    // Single entry point for the shelf layer — always call THIS.
     //
-    // Bands and labels live in separate DOM hosts, and each pass clears its
-    // own host before its early return. The first wiring called the label
-    // pass from the END of the band pass, which put it AFTER
-    // `if (!layerOn || !lastShelves.length) return` — so switching to a
-    // symbol with no shelves cleared the bands and left the previous
-    // symbol's price tags on screen. Keeping both calls here means neither
-    // pass depends on the other's control flow.
+    // It used to also draw a price tag on both edges of every shelf. Six
+    // shelves x two edges is twelve loose numbers over the candles, on a
+    // chart that already carries opens, period high/low, EQH/EQL, HVN and
+    // the pivot-zone levels; the tags were the ones that pushed it past
+    // readable. The exact edges are still one hover away — drawShelfBands
+    // puts "樞紐帶 lo–hi  H2/L4  (N 觸)" on each band's title — so nothing
+    // is lost, it is just no longer competing for the same pixels.
+    //
+    // Kept as a wrapper rather than inlined: three call sites use it, and a
+    // second pass may come back (the removed one had a real hazard — each
+    // pass clears its own DOM host before its early return, so a label pass
+    // called from the END of the band pass left stale tags on screen when
+    // switching to a symbol with no shelves).
     function drawShelves() {
         drawShelfBands();
-        drawShelfLabels();
-    }
-
-    // Price tags on both EDGES of each shelf, right-aligned.
-    //
-    // The edges are the numbers that get used — a stop belongs beyond the
-    // band, and "beyond" needs the exact edge, not the midpoint. Right side
-    // by default so they sit next to the price axis where the eye already is;
-    // the host is a separate layer from the bands so a label is never clipped
-    // by its own band's height.
-    function drawShelfLabels() {
-        var host = document.getElementById('chart-shelf-labels');
-        if (!host) return;
-        while (host.firstChild) host.removeChild(host.firstChild);
-        if (!layerOn('shelves') || !lastShelves.length) return;
-        var plotH = host.clientHeight || 600;
-        var used = [];   // keep tags from stacking on top of each other
-        lastShelves.forEach(function (b) {
-            if (!b || !b.lo || !b.hi) return;
-            var bal = Math.min(b.highs || 0, b.lows || 0);
-            [[b.hi, 'hi'], [b.lo, 'lo']].forEach(function (pair) {
-                var y = candleSeries.priceToCoordinate(pair[0]);
-                if (y == null || y < 0 || y > plotH) return;
-                // A shelf can be thinner than a label is tall; drop the
-                // second tag rather than print two overlapping numbers.
-                for (var i = 0; i < used.length; i++) {
-                    if (Math.abs(used[i] - y) < 11) return;
-                }
-                used.push(y);
-                var el = document.createElement('div');
-                el.className = 'chart-poc-label chart-shelf-label'
-                    + (bal >= 3 ? ' shelf-label-strong' : '');
-                el.style.top = y + 'px';
-                el.textContent = fmtPrice(pair[0]);
-                el.title = '樞紐帶' + (pair[1] === 'hi' ? '上緣' : '下緣')
-                    + ' ' + fmtPrice(pair[0]) + '  ' + (b.label || '');
-                host.appendChild(el);
-            });
-        });
     }
 
     // ── POC migration ladder ─────────────────────────────────────

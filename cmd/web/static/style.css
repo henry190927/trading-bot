@@ -1915,16 +1915,6 @@ footer {
 .chart-labels-right { left: 0; right: 4px; }
 .chart-labels-right .chart-poc-label { left: auto; right: 0; }
 
-.chart-shelf-labels { left: 4px; right: 0; }
-.chart-shelf-label {
-    left: 0;
-    right: auto;
-    background: rgba(124, 152, 214, 0.55);
-    font-size: 0.66rem;
-    padding: 1px 5px;
-}
-.chart-shelf-label.shelf-label-strong { background: rgba(124, 152, 214, 0.85); }
-
 .chart-poc-label-sub {
     font-size: 0.65rem;
     opacity: 0.9;

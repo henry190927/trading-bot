@@ -133,11 +133,14 @@ func sampleOICycle(ctx context.Context, client *bingx.Client, shorts []string) (
 		// OI and no funding is still useful, whereas dropping the whole
 		// sample because the funding endpoint hiccuped would put a hole in
 		// the series that PriorTo has to work around later.
-		var funding float64
+		var funding, mark float64
 		if fr, ferr := readFunding(ctx, client, sym); ferr == nil {
-			funding = fr
+			funding, mark = fr.Rate, fr.MarkPrice
 		}
-		oi.Append(oi.Snapshot{Time: time.Now().UTC(), Symbol: string(sym), OI: v, Funding: funding})
+		oi.Append(oi.Snapshot{
+			Time: time.Now().UTC(), Symbol: string(sym),
+			OI: v, Funding: funding, Price: mark,
+		})
 		ok++
 		time.Sleep(oiSymbolStagger)
 	}
@@ -150,12 +153,11 @@ func readOI(ctx context.Context, client *bingx.Client, sym market.Symbol) (float
 	return client.OpenInterest(c, sym)
 }
 
-func readFunding(ctx context.Context, client *bingx.Client, sym market.Symbol) (float64, error) {
+// readFunding returns the whole FundingInfo, not just the rate: MarkPrice
+// rides in the same response, and the price at the sample instant is what
+// makes an OI change interpretable.
+func readFunding(ctx context.Context, client *bingx.Client, sym market.Symbol) (bingx.FundingInfo, error) {
 	c, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	fr, err := client.FundingRate(c, sym)
-	if err != nil {
-		return 0, err
-	}
-	return fr.Rate, nil
+	return client.FundingRate(c, sym)
 }

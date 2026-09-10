@@ -1,6 +1,7 @@
 package oi
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -201,5 +202,45 @@ func TestFundingRoundTripsAndStaysOptional(t *testing.T) {
 	if lines := strings.Split(strings.TrimSpace(string(raw)), "\n"); len(lines) == 2 &&
 		strings.Contains(lines[1], "funding") {
 		t.Errorf("ETH row wrote a funding key despite omitempty: %s", lines[1])
+	}
+}
+
+func TestPriceChangeOver(t *testing.T) {
+	t.Setenv("OI_LOG", filepath.Join(t.TempDir(), "oi.jsonl"))
+	// 11:05 is 5m from the 11:00 target and 10:50 is 10m, so 11:05 (102) is
+	// the prior endpoint; Latest is the 12:00 row (105).
+	for _, s := range []Snapshot{
+		{Time: base.Add(-2 * time.Hour), Symbol: "BTC-USDT", OI: 1000, Price: 90},
+		{Time: base.Add(-70 * time.Minute), Symbol: "BTC-USDT", OI: 1100, Price: 100},
+		{Time: base.Add(-55 * time.Minute), Symbol: "BTC-USDT", OI: 1150, Price: 102},
+		{Time: base, Symbol: "BTC-USDT", OI: 1200, Price: 105},
+		// Priced now, unpriced an hour ago: cannot be interpreted.
+		{Time: base.Add(-55 * time.Minute), Symbol: "ETH-USDT", OI: 500},
+		{Time: base, Symbol: "ETH-USDT", OI: 520, Price: 2400},
+	} {
+		Append(s)
+	}
+	snaps := Load()
+
+	got, ok := PriceChangeOver(snaps, "BTC-USDT", time.Hour, base)
+	want := (105.0 - 102.0) / 102.0
+	if !ok || math.Abs(got-want) > 1e-9 {
+		t.Errorf("PriceChangeOver(BTC) = (%.6f, %v), want (%.6f, true)", got, ok, want)
+	}
+
+	// A missing endpoint price must report not-ok, never 0 — a fabricated
+	// "price unchanged" would send oiQuadrant to the indeterminate branch
+	// when the truth is that it cannot be measured at all.
+	if got, ok := PriceChangeOver(snaps, "ETH-USDT", time.Hour, base); ok {
+		t.Errorf("PriceChangeOver(ETH, no prior price) = (%v, true), want ok=false", got)
+	}
+	if _, ok := PriceChangeOver(snaps, "SOL-USDT", time.Hour, base); ok {
+		t.Error("PriceChangeOver(unknown symbol) reported ok=true")
+	}
+	if _, ok := PriceChangeOver(snaps, "BTC-USDT", 0, base); ok {
+		t.Error("PriceChangeOver(bar=0) reported ok=true")
+	}
+	if _, ok := PriceChangeOver(nil, "BTC-USDT", time.Hour, base); ok {
+		t.Error("PriceChangeOver(empty store) reported ok=true")
 	}
 }
