@@ -27,7 +27,12 @@
     <p class="empty">BingX client not configured.</p>
     {{else}}
     <div class="at-state">
-      {{if .WarnN}}<span class="badge b-red">⚠ {{.WarnN}} <span class="i18n-en">mismatch</span><span class="i18n-zh">筆有落差</span></span>{{else}}<span class="badge b-green">✓ <span class="i18n-en">all trades protected &amp; matched</span><span class="i18n-zh">全部對上、有防護</span></span>{{end}}
+      {{if .WarnN}}<span class="badge b-red">⚠ {{.WarnN}} <span class="i18n-en">mismatch</span><span class="i18n-zh">筆有落差</span></span>{{end}}
+      {{if .OrphanNakedN}}<span class="badge b-red">🚨 {{.OrphanNakedN}} <span class="i18n-en">NAKED, not in journal</span><span class="i18n-zh">筆裸倉且不在 journal</span></span>{{end}}
+      {{/* The green badge requires BOTH counts to be zero. It used to depend on
+           WarnN alone, and WarnN is computed only over journal rows — so a
+           flat journal with a naked exchange position rendered green. */}}
+      {{if and (not .WarnN) (not .OrphanNakedN)}}<span class="badge b-green">✓ <span class="i18n-en">all trades protected &amp; matched</span><span class="i18n-zh">全部對上、有防護</span></span>{{end}}
       {{if .SessionWarnN}}<span class="badge b-yellow">⏰ {{.SessionWarnN}} <span class="i18n-en">stop inside the cash-open bar</span><span class="i18n-zh">筆停損在美股開盤根內</span></span>{{end}}
       <a href="/ops/verify" class="badge b-blue" style="text-decoration:none">↻ <span class="i18n-en">re-check</span><span class="i18n-zh">重新查證</span></a>
     </div>
@@ -78,7 +83,32 @@
       {{else}}<p class="empty" style="margin:.4rem 0"><span class="i18n-en">no resting orders on the exchange</span><span class="i18n-zh">交易所沒有掛單</span></p>{{end}}
     </div>
     {{else}}
-    <p class="empty"><span class="i18n-en">No open journal trades to verify.</span><span class="i18n-zh">沒有未平倉的 journal 單可查證。</span></p>
+    <p class="empty"><span class="i18n-en">No open journal trades to verify — see the exchange-side list below, which does not depend on the journal.</span><span class="i18n-zh">沒有未平倉的 journal 單可查證 —— 看下方交易所端的清單,那份不依賴 journal。</span></p>
+    {{end}}
+
+    {{/* Enumerated from the EXCHANGE, journal used only to exclude. This
+         section is why a flat journal can no longer render as all-clear. */}}
+    <h3 style="margin-top:1.2rem">
+      <span class="i18n-en">Exchange positions the journal does not know about</span><span class="i18n-zh">交易所有、journal 沒有的部位</span>
+    </h3>
+    {{if .Orphans}}
+    {{range .Orphans}}
+    <div class="verify-card{{if not .HasStop}} b-red{{end}}">
+      <div><strong>{{.Symbol}} {{.Side}}</strong> · qty {{printf "%g" .Qty}} @ {{fmtPrice .Entry}}
+        · <span class="i18n-en">notional</span><span class="i18n-zh">名目</span> {{printf "%.0f" .Notional}}u
+        · {{.Leverage}}x {{.MarginMode}}</div>
+      {{if .ReadErr}}
+        <p class="modal-warn">⚠ <span class="i18n-en">could not read resting orders — NOT proof of a stop</span><span class="i18n-zh">讀不到掛單 —— 這不等於有停損</span>: {{.ReadErr}}</p>
+      {{else if .HasStop}}
+        <p><span class="badge b-green">🛡️ <span class="i18n-en">protective stop live</span><span class="i18n-zh">有保護性停損</span></span>
+          <span class="i18n-en">but this position is not journaled — record it so the per-trade checks cover it.</span><span class="i18n-zh">但這張單沒有記在 journal,補記後逐筆檢查才會涵蓋它。</span></p>
+      {{else}}
+        <p class="modal-warn">🚨 <span class="i18n-en">NO protective stop on the exchange, and no journal row. Neither the per-trade check above nor the daemon's per-trade guard can see this.</span><span class="i18n-zh">交易所沒有任何保護性停損,journal 也沒有這筆。上方的逐筆檢查和 daemon 的逐筆守衛都看不到它。</span></p>
+      {{end}}
+    </div>
+    {{end}}
+    {{else}}
+    <p class="empty"><span class="i18n-en">None — every exchange position is accounted for in the journal.</span><span class="i18n-zh">沒有 —— 交易所的每個部位 journal 都有對應。</span></p>
     {{end}}
     <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span class="i18n-en">live query to BingX (VPS whitelisted IP) · reduceOnly ✗ = order could open a position, not just close</span><span class="i18n-zh">即時查 BingX(VPS 白名單 IP)· reduceOnly ✗ = 該單可能開倉,不只平倉</span></p>
     {{end}}

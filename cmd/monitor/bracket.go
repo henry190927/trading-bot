@@ -106,10 +106,14 @@ func runBracketGuard(ctx context.Context, client *bingx.Client) {
 		mode, bracketPollEvery, bracketRenagEvery)
 
 	state := map[int]*bracketState{}
+	// Keyed "SYMBOL|side" because an orphan has no journal id to key on —
+	// that is what makes it an orphan.
+	orphan := map[string]*bracketState{}
 	tick := time.NewTicker(bracketPollEvery)
 	defer tick.Stop()
 	for {
 		bracketCycle(ctx, client, n, mode, state)
+		orphanCycle(ctx, client, n, orphan)
 		select {
 		case <-ctx.Done():
 			return
@@ -340,4 +344,119 @@ func sideZH(side string) string {
 		return "空"
 	}
 	return "多"
+}
+
+// orphanCycle finds positions the EXCHANGE holds that no open journal trade
+// claims, and alerts when they carry no protective stop.
+//
+// WHY THIS EXISTS SEPARATELY FROM bracketCycle. That function enumerates from
+// the journal — `syms` is built from open trades and it returns early on
+// `len(open) == 0`, which the comment there defends as "a flat journal costs
+// zero API calls". On 2026-09-10 that cost real money instead: a BTC long,
+// 0.1202 @ 78,264.5, 125x cross, 9,407u notional on 258.52u of equity, was
+// placed outside the journal. With zero open journal rows the guard returned
+// before making a single exchange call, and /ops/verify — whose own subtitle
+// reads "trust the exchange, not local bookkeeping" — showed a GREEN "all
+// trades protected & matched" because it had zero rows to iterate. The
+// position was naked for five hours and both safety surfaces said fine.
+//
+// The inversion is the fix: the EXCHANGE enumerates what exists, the journal
+// only EXCLUDES what another path already covers. Read-only is not the same
+// as not-authoritative-for-what-exists, and that is the distinction both
+// surfaces got wrong.
+//
+// Deliberately additive rather than a rewrite of bracketCycle: this is a live
+// safety daemon and the per-trade path works for journaled trades. Cost is one
+// AllPositions call per poll — the thing the old early return was avoiding,
+// and worth it.
+func orphanCycle(ctx context.Context, client *bingx.Client, n *notify.Ntfy, state map[string]*bracketState) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("bracket/orphan: PANIC in cycle, loop continues: %v", r)
+		}
+	}()
+
+	poss, err := client.AllPositions(ctx)
+	if err != nil {
+		log.Printf("bracket/orphan: AllPositions failed, skipping cycle: %v", err)
+		return
+	}
+
+	// Journal used ONLY to exclude. A read failure must not silence the scan:
+	// with no exclusions every position looks like an orphan, which
+	// over-reports rather than under-reports — the safe direction here.
+	claimed := map[string]bool{}
+	if trades, jerr := journal.ReadAll(""); jerr == nil {
+		for _, t := range trades {
+			if t.IsOpen() && !t.IsNoFill() {
+				claimed[strings.ToUpper(t.Symbol)+"|"+strings.ToLower(t.Side)] = true
+			}
+		}
+	} else {
+		log.Printf("bracket/orphan: journal unreadable, treating every position as unclaimed: %v", jerr)
+	}
+
+	live := map[string]bool{}
+	for _, p := range poss {
+		if p.Notional() <= 0 {
+			continue
+		}
+		// market.Short returns "" for a contract with no short name (BRENT);
+		// fall back to the raw code so an unnamed symbol still gets reported
+		// rather than alerting about "".
+		short := market.Short(p.Symbol)
+		if short == "" {
+			short = string(p.Symbol)
+		}
+		key := strings.ToUpper(short) + "|" + strings.ToLower(p.Side)
+		if claimed[key] {
+			continue // bracketCycle owns this one
+		}
+		live[key] = true
+
+		ords, oerr := client.OpenOrders(ctx, p.Symbol)
+		if oerr != nil {
+			// Never treat a failed order read as "no orders": that would read
+			// as naked and cry wolf every 30s.
+			log.Printf("bracket/orphan: %s open orders failed, skipping: %v", short, oerr)
+			continue
+		}
+		protected := false
+		for _, o := range ords {
+			if bracket.Protects(o, &p) {
+				protected = true
+				break
+			}
+		}
+		st := state[key]
+		if st == nil {
+			st = &bracketState{}
+			state[key] = st
+		}
+		if protected {
+			if st.alerted {
+				log.Printf("bracket/orphan: %s %s — RESOLVED, a protective stop is now live", short, p.Side)
+				st.alerted = false
+			}
+			continue
+		}
+		if st.alerted && time.Since(st.lastNagged) < bracketRenagEvery {
+			continue
+		}
+		notional := p.Notional()
+		log.Printf("bracket/orphan: %s %s NAKED and NOT IN JOURNAL — qty %g @ %g (notional %.0fu, %dx %s)",
+			short, p.Side, p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode)
+		push(ctx, n, fmt.Sprintf("🚨 %s %s 裸倉(未記錄在 journal)", short, sideZH(p.Side)),
+			fmt.Sprintf("倉位 %g @ %g\n名目 %.0fu · %dx · %s\n交易所沒有任何保護性停損\n\n這張單不在 journal 裡,所以 /ops/verify 的逐筆檢查看不到它",
+				p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode), "rotating_light")
+		st.alerted, st.lastNagged = true, time.Now()
+	}
+
+	// Drop state for positions that no longer exist, so a reopened one cannot
+	// inherit a stale nag timer.
+	for k := range state {
+		if !live[k] {
+			delete(state, k)
+		}
+	}
 }

@@ -34,12 +34,83 @@ type verifyTrade struct {
 	SessionWarn string
 }
 
+// orphanPos is a position the EXCHANGE holds that no open journal trade claims.
+//
+// This page iterated the journal and nothing else, so a position placed
+// outside it produced zero rows — and zero rows rendered the GREEN
+// "all trades protected & matched" badge. On 2026-09-10 that badge was showing
+// while a BTC long (0.1202 @ 78,264.5, 125x cross, 9,407u notional against
+// 258.52u of equity) sat naked for five hours. The page's own subtitle says
+// "trust the exchange, not local bookkeeping"; the LIST of what to check came
+// from local bookkeeping.
+type orphanPos struct {
+	Symbol, Side string
+	Qty, Entry   float64
+	Notional     float64
+	Leverage     int
+	MarginMode   string
+	HasStop      bool
+	Orders       []bingx.OpenOrder
+	ReadErr      string
+}
+
+// exchangeOrphans enumerates from the EXCHANGE and uses the journal only to
+// EXCLUDE what the per-trade rows above already cover. That inversion is the
+// point: read-only is not the same as not-authoritative-for-what-exists.
+func (s *server) exchangeOrphans(ctx context.Context, trades []journal.Trade) (out []orphanPos, nakedN int) {
+	poss, err := s.client.AllPositions(ctx)
+	if err != nil {
+		return nil, 0
+	}
+	claimed := map[string]bool{}
+	for _, t := range trades {
+		if t.IsOpen() && !t.IsNoFill() {
+			claimed[strings.ToUpper(t.Symbol)+"|"+strings.ToLower(t.Side)] = true
+		}
+	}
+	for _, p := range poss {
+		n := p.Notional()
+		if n <= 0 {
+			continue
+		}
+		short := shortOrRaw(p.Symbol)
+		if claimed[strings.ToUpper(short)+"|"+strings.ToLower(p.Side)] {
+			continue
+		}
+		o := orphanPos{
+			Symbol: short, Side: p.Side, Qty: p.Quantity, Entry: p.EntryPrice,
+			Notional: n, Leverage: p.Leverage, MarginMode: p.MarginMode,
+		}
+		ords, oerr := s.client.OpenOrders(ctx, p.Symbol)
+		if oerr != nil {
+			// Not "no orders" — an unread order book must never render as
+			// naked, which is the direction that cries wolf.
+			o.ReadErr = oerr.Error()
+		} else {
+			o.Orders = ords
+			for _, ord := range ords {
+				if bracket.Protects(ord, &p) {
+					o.HasStop = true
+					break
+				}
+			}
+			if !o.HasStop {
+				nakedN++
+			}
+		}
+		out = append(out, o)
+	}
+	return out, nakedN
+}
+
 // handleVerifyExchange lists every open journal trade with its ACTUAL BingX
 // position + resting orders, flagging mismatches (open trade but no position,
-// or a position with no protective stop). Runs on the VPS = whitelisted IP.
+// or a position with no protective stop), THEN lists any exchange position the
+// journal does not know about. Runs on the VPS = whitelisted IP.
 func (s *server) handleVerifyExchange(c *gin.Context) {
 	rows := []verifyTrade{}
-	warnN, sessionWarnN := 0, 0
+	orphans := []orphanPos{}
+	warnN, sessionWarnN, orphanNakedN := 0, 0, 0
 	if s.client != nil {
 		trades, _ := journal.ReadAll("")
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
@@ -98,9 +169,12 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 			}
 			rows = append(rows, vt)
 		}
+		orphans, orphanNakedN = s.exchangeOrphans(ctx, trades)
 	}
 	c.HTML(http.StatusOK, "verify_exchange.html", gin.H{
 		"Rows":         rows,
+		"Orphans":      orphans,
+		"OrphanNakedN": orphanNakedN,
 		"WarnN":        warnN,
 		"SessionWarnN": sessionWarnN,
 		"NoClient":     s.client == nil,
