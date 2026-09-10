@@ -260,20 +260,89 @@ func TestAutoZoneFromUsesCloseConfirmation(t *testing.T) {
 	}
 }
 
+// downZone mirrors upZone through buildPivotZone's down-leg branch:
+// span 4823.1, Lo = legLow+0.5*span, Hi = legLow+0.705*span,
+// Invalidate = legHigh, Target = legLow-span.
+func downZone() *signal.PivotZone {
+	return &signal.PivotZone{
+		Dir: signal.StructDowntrend, Lo: 79853.15, Hi: 80841.8855,
+		Invalidate: 82264.7, Target: 72618.5, LegLow: 77441.6, LegHigh: 82264.7,
+	}
+}
+
 func TestAutoZoneFromDirectionFollowsTrend(t *testing.T) {
 	for _, tc := range []struct {
 		trend signal.TrendStructure
+		zone  *signal.PivotZone
 		want  string
 	}{
-		{signal.StructUptrend, "long"},
-		{signal.StructDowntrend, "short"},
+		{signal.StructUptrend, upZone(), "long"},
+		{signal.StructDowntrend, downZone(), "short"},
 	} {
-		z, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{Trend: tc.trend, Zone: upZone()})
+		z, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{Trend: tc.trend, Zone: tc.zone})
 		if !ok {
 			t.Fatalf("%v should arm", tc.trend)
 		}
 		if z.Dir != tc.want {
 			t.Errorf("%v → dir %q, want %q (fade WITH the trend, never against)", tc.trend, z.Dir, tc.want)
+		}
+	}
+}
+
+// The bug: Dir came from Trend (the 3-swing HH-HL/LH-LL context) while every
+// price in the note came from st.Zone (the CURRENT LEG). When the latest leg
+// has already turned against a still-unflipped classification those disagree,
+// and on 2026-09-10 XAG shipped two ARMED zones reading dir="long" with
+// stop 68.37 above the band and target 66.05 below it — a short's bracket
+// behind the 🟢 LONG push zonealert.go renders straight off Dir. All eight
+// (symbol, TF) combinations disagreed that morning.
+//
+// Refusing is deliberate: relabelling from Zone.Dir would keep emitting, but
+// it would turn a channel documented to "fade WITH the trend, never against"
+// into an auto-armed counter-trend fader — a strategy change wearing a
+// bug-fix's clothes.
+func TestAutoZoneFromRefusesTrendZoneDisagreement(t *testing.T) {
+	if _, ok := AutoZoneFrom("XAG", "2h", signal.StructureState{
+		Trend: signal.StructUptrend, Zone: downZone(),
+	}); ok {
+		t.Error("HH-HL uptrend with a down-leg pivot zone must not arm — that is the XAG 2026-09-10 case")
+	}
+	if _, ok := AutoZoneFrom("XAG", "2h", signal.StructureState{
+		Trend: signal.StructDowntrend, Zone: upZone(),
+	}); ok {
+		t.Error("LH-LL downtrend with an up-leg pivot zone must not arm")
+	}
+}
+
+// Whatever is emitted, the label and the bracket must describe the SAME trade:
+// a long stops below the band and targets above it, a short the reverse. This
+// is the invariant the direction bug violated, and it is checkable without
+// knowing anything about the market.
+func TestAutoZoneBracketMatchesDirection(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		trend signal.TrendStructure
+		zone  *signal.PivotZone
+	}{
+		{"long", signal.StructUptrend, upZone()},
+		{"short", signal.StructDowntrend, downZone()},
+	} {
+		z, ok := AutoZoneFrom("BTC", "2h", signal.StructureState{Trend: tc.trend, Zone: tc.zone})
+		if !ok {
+			t.Fatalf("%s should arm", tc.name)
+		}
+		inv, tgt := tc.zone.Invalidate, tc.zone.Target
+		switch z.Dir {
+		case "long":
+			if !(inv < z.Lo && tgt > z.Hi) {
+				t.Errorf("long: want stop %.2f below band [%.2f,%.2f] and target %.2f above it", inv, z.Lo, z.Hi, tgt)
+			}
+		case "short":
+			if !(inv > z.Hi && tgt < z.Lo) {
+				t.Errorf("short: want stop %.2f above band [%.2f,%.2f] and target %.2f below it", inv, z.Lo, z.Hi, tgt)
+			}
+		default:
+			t.Fatalf("unexpected dir %q", z.Dir)
 		}
 	}
 }

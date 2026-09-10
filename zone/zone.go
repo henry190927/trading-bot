@@ -322,6 +322,26 @@ func AutoZoneFrom(short string, tf market.Timeframe, st signal.StructureState) (
 	default:
 		return Zone{}, false
 	}
+	// The direction above comes from Trend (the 3-swing HH-HL/LH-LL context);
+	// every price below comes from st.Zone (the CURRENT LEG). Those two can
+	// disagree, and when they do the emitted zone described a trade nobody
+	// intended: measured 2026-09-10, XAG read Trend=HH-HL uptrend with
+	// Zone.Dir=LH-LL downtrend, so two armed zones went out labelled
+	// dir="long" while carrying stop 68.37 ABOVE the band and target 66.05
+	// BELOW it — a short's bracket under a green LONG push (zonealert.go
+	// renders 🟢 + "LONG" straight off Dir). All 8 (symbol, TF) combinations
+	// disagreed that morning.
+	//
+	// REFUSING is the fix rather than relabelling from Zone.Dir. This channel
+	// is documented to "fade WITH the trend, never against" — relabelling
+	// would have silently converted it into an auto-armed COUNTER-trend fader,
+	// which is a strategy change, not a display fix. Disagreement is a
+	// transitional state (an HH-HL classification whose latest leg already
+	// turned down); there is no trend-aligned pivot zone to arm, so arm
+	// nothing.
+	if st.Zone.Dir != st.Trend {
+		return Zone{}, false
+	}
 	lo, hi := st.Zone.Lo, st.Zone.Hi
 	if hi < lo {
 		lo, hi = hi, lo
