@@ -26,23 +26,13 @@ type Opens struct {
 // Note: candles must span at least the relevant period — e.g. weekly open
 // requires history back to the most recent Monday 00:00 UTC.
 func ComputeOpens(candles []market.Candle, now time.Time) Opens {
-	if len(candles) == 0 {
-		return Opens{}
-	}
-	nowUTC := now.UTC()
-
-	dayStart := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), 0, 0, 0, 0, time.UTC)
-	// Week boundary: most recent Monday 00:00 UTC. time.Weekday: Sunday=0, Monday=1, …
-	weekday := int(nowUTC.Weekday()) // 0..6, Sun..Sat
-	daysSinceMonday := (weekday + 6) % 7
-	weekStart := dayStart.AddDate(0, 0, -daysSinceMonday)
-	monthStart := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
-
-	out := Opens{}
-	out.Daily = findOpenAtOrAfter(candles, dayStart)
-	out.Weekly = findOpenAtOrAfter(candles, weekStart)
-	out.Monthly = findOpenAtOrAfter(candles, monthStart)
-	return out
+	// Delegates to ComputePeriodLevels so the day/week/month boundary
+	// arithmetic exists once (signal/periods.go). Behaviour is unchanged:
+	// Period.Open is the open of the first candle at or after the boundary,
+	// and zero when history starts mid-period — same as findOpenAtOrAfter,
+	// which several backtests still call directly.
+	pl := ComputePeriodLevels(candles, now)
+	return Opens{Daily: pl.Day.Open, Weekly: pl.Week.Open, Monthly: pl.Month.Open}
 }
 
 // findOpenAtOrAfter returns the Open of the first candle at/after the

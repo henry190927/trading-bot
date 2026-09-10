@@ -66,6 +66,7 @@ type Signal struct {
 	VP            indicator.VolumeProfile // chip-concentration map (籌碼密集區)
 	POCMig        indicator.POCMigration  // POC drift across 50/100/200 windows (display + validator only)
 	Opens         Opens                   // daily / weekly / monthly opening prices (display-only)
+	Periods       PeriodLevels            // day / week / month open+high+low (display-only)
 	Plan          Plan                    // execution plan (entry/stop/TP)
 }
 
@@ -229,7 +230,10 @@ func Evaluate(in Inputs) Signal {
 	}
 	vp := indicator.BuildVolumeProfile(in.Candles[vpStart:], 80, 5)
 	pocMig := indicator.ComputePOCMigration(in.Candles, 50, 100, 200)
-	opens := ComputeOpens(in.Candles, in.Candles[len(in.Candles)-1].OpenTime)
+	// One pass for both: ComputeOpens delegates to ComputePeriodLevels, so
+	// calling the latter and taking .Open off it avoids walking the series twice.
+	periods := ComputePeriodLevels(in.Candles, in.Candles[len(in.Candles)-1].OpenTime)
+	opens := Opens{Daily: periods.Day.Open, Weekly: periods.Week.Open, Monthly: periods.Month.Open}
 
 	var cvdDiv analyzer.Divergence
 	if len(in.Trades) > 0 {
@@ -237,7 +241,7 @@ func Evaluate(in Inputs) Signal {
 		cvdDiv = analyzer.Detect(closes, cvd, 60, 2)
 	}
 
-	sig := Signal{Symbol: in.Symbol, Timeframe: in.Timeframe, Price: price, Fib: fib, VP: vp, POCMig: pocMig, Opens: opens}
+	sig := Signal{Symbol: in.Symbol, Timeframe: in.Timeframe, Price: price, Fib: fib, VP: vp, POCMig: pocMig, Opens: opens, Periods: periods}
 	// Dual-axis vote accumulators. MR (mean-reversion) is the legacy axis:
 	// RSI extreme, MACD cross, BOLL band touch, Fib pullback, sweep, RSI/CVD
 	// divergence, range expansion. MOM (momentum) is the new axis for
