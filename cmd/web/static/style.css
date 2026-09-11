@@ -6597,3 +6597,14 @@ html[data-density="compact"] .setups-table {
 .cal-surp.cal-hot { background: var(--wash-red); }
 .cal-surp.cal-cool { background: var(--wash-green); }
 .cal-surp.cal-inline { background: var(--wash-dim); }
+
+/* OI row in the /chart TF-bias strip. Colour marks a threshold crossing, not
+   a market direction: "longs building" and "shorts building" are both past
+   the same +2% bar and which way the tape takes it is not this row's claim. */
+.tf-bias-oi { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline;
+    font-size: 0.68rem; font-variant-numeric: tabular-nums;
+    padding: 2px 6px; border-radius: 4px; margin-top: 4px;
+    background: var(--wash-dim); color: var(--text-dim); cursor: help; }
+.tf-bias-oi.oi-armed { background: var(--wash-yellow); color: var(--yellow); font-weight: 700; }
+.tf-bias-oi.oi-unwind { color: var(--text); }
+.tf-bias-oi .oi-verdict { font-size: 0.64rem; opacity: 0.95; }

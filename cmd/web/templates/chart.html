@@ -2675,6 +2675,37 @@
                           + '<span class="tf-bias-dot">' + m.dot + '</span>'
                           + '<span class="tf-bias-sc">' + sc + '</span></div>';
                 });
+                // OI row. A number and a verdict, deliberately not a
+                // sparkline — see computeChartOI for why the source cannot
+                // support a slope at chart resolution.
+                if (d.oi && d.oi.oi) {
+                    var o = d.oi, oTxt, oCls = 'oi-flat', oTip;
+                    var fTxt = (typeof o.funding === 'number' && o.funding !== 0)
+                        ? ((o.funding >= 0 ? '+' : '') + (o.funding * 100).toFixed(4) + '%') : '—';
+                    if (o.static) {
+                        oTxt = 'OI n/a';
+                        oTip = '交易所對這個合成合約公布固定 OI(30 次取樣只有 1 個相異值),所以沒有變化量可讀。funding 是真的。';
+                    } else if (typeof o.delta === 'number') {
+                        oTxt = 'OI ' + (o.delta >= 0 ? '+' : '') + (o.delta * 100).toFixed(2) + '%';
+                        if (typeof o.priceDelta === 'number') {
+                            oTxt += ' · 價 ' + (o.priceDelta >= 0 ? '+' : '') + (o.priceDelta * 100).toFixed(2) + '%';
+                        }
+                        if (o.quadrant === 'shorts-building' || o.quadrant === 'longs-building') oCls = 'oi-armed';
+                        else if (o.quadrant) oCls = 'oi-unwind';
+                        oTip = (o.reading || '門檻內,沒有結論')
+                             + '\n窗口 1 小時(固定 —— BingX 沒有 OI 歷史端點,且每約 10 分鐘才重發一次,更短的窗會在量發布頻率)'
+                             + '\nOI ' + Math.round(o.oi).toLocaleString('en-US') + 'u · funding ' + fTxt
+                             + '\n快照 ' + (o.ageMin || 0) + ' 分鐘前'
+                             + '\nOI 說「有多少」,價格說「是誰的」:OI↑價↑=多單堆積、OI↑價↓=空單堆積、OI↓價↑=空單回補、OI↓價↓=多單解除';
+                    } else {
+                        oTxt = 'OI —';
+                        oTip = '尚未累積滿 1 小時的快照,或缺同窗價格。';
+                    }
+                    html += '<div class="tf-bias-oi ' + oCls + '" title="'
+                          + oTip.replace(/"/g, '&quot;') + '">' + oTxt
+                          + (o.reading ? '<span class="oi-verdict">' + o.reading + '</span>' : '')
+                          + '</div>';
+                }
                 if (d.hvn && (d.hvn.above || d.hvn.below)) {
                     var fmtH = function (v) { return v >= 1000 ? v.toFixed(0) : (v >= 1 ? v.toFixed(2) : v.toFixed(4)); };
                     var hv = '';

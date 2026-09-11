@@ -10,6 +10,7 @@ import (
 
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
+	"myFirstGo/trading-bot/oi"
 	"myFirstGo/trading-bot/signal"
 
 	"github.com/gin-gonic/gin"
@@ -141,6 +142,70 @@ func computeTFBias(tf market.Timeframe, st signal.StructureState, sig signal.Sig
 	}
 }
 
+// computeChartOI is the open-interest read for the chart, from the same store
+// and the same rule as the /ops card (oiQuadrant).
+//
+// FIXED at a 1-hour window regardless of the chart's timeframe, and that is a
+// data limit rather than a choice. BingX publishes no OI history endpoint —
+// both openInterestHist spellings answer "this api is not exist" — so the only
+// series is the one cmd/monitor samples, and the venue itself republishes the
+// figure only about every ten minutes: 112 of 254 consecutive 5-minute samples
+// came back byte-identical. A delta measured over less than an hour would
+// therefore be reporting the publication cadence. An hour spans roughly six
+// published values, which is enough.
+//
+// Which is also why this reports a NUMBER and not a sparkline. The same source
+// that supports "OI is up 4.7% over the hour" cannot support a slope drawn at
+// chart resolution, and drawing one would render a publication artifact as
+// market structure.
+//
+// BingX on purpose, not Binance. Binance publishes a real 5m series and a
+// whale/retail split, but it is a different book — this answers "is my
+// position on the crowded side of the exchange my order actually sits in",
+// and for that the venue you trade on is the right one.
+func computeChartOI(sym market.Symbol) gin.H {
+	snaps := oi.Load()
+	if len(snaps) == 0 {
+		return nil
+	}
+	now := time.Now().UTC()
+	cur, ok := oi.Latest(snaps, string(sym))
+	if !ok || cur.OI <= 0 {
+		return nil
+	}
+	out := gin.H{
+		"oi":      cur.OI,
+		"funding": cur.Funding,
+		"ageMin":  int(now.Sub(cur.Time).Minutes()),
+		"window":  "1h",
+	}
+	// The synthetics publish a frozen figure — one distinct value across 30
+	// samples — so their delta is structurally zero forever. Say so instead of
+	// rendering 0.00%, which reads as "quiet" rather than "impossible".
+	if oiIsStatic(snaps, string(sym)) {
+		out["static"] = true
+		return out
+	}
+	bar := market.BarDuration(market.TF1h)
+	prev := oi.PrevFor(snaps, string(sym), bar, now)
+	if prev <= 0 {
+		return out
+	}
+	d := (cur.OI - prev) / prev
+	out["delta"] = d
+	if pd, ok := oi.PriceChangeOver(snaps, string(sym), bar, now); ok {
+		out["priceDelta"] = pd
+		if key, label := oiQuadrant(d, pd); key != "" {
+			out["quadrant"] = key
+			out["reading"] = label
+		}
+	} else if d <= -oiDeltaThreshold || d >= oiDeltaThreshold {
+		out["quadrant"] = "no-price"
+		out["reading"] = "OI 已過門檻,但缺同窗價格,無法判邊"
+	}
+	return out
+}
+
 // handleChartBias — GET /api/chart/bias?symbol=X
 // Returns the multi-TF bias strip for the symbol. Cached 30s per symbol
 // because each TF is a full scanOne (~0.5s) and the strip is refreshed on
@@ -191,6 +256,9 @@ func (s *server) handleChartBias(c *gin.Context) {
 	}
 	if rg := computeRange(refCandles, refPrice, fmt.Sprint(align["state"])); rg != nil {
 		resp["range"] = rg
+	}
+	if o := computeChartOI(sym); o != nil {
+		resp["oi"] = o
 	}
 	biasCacheMu.Lock()
 	biasCache[short] = biasCacheEntry{at: time.Now(), resp: resp}
