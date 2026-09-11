@@ -159,11 +159,18 @@ func TestActual(t *testing.T) {
 func TestStale(t *testing.T) {
 	s := fixture()
 	base := s.FetchedAt
-	if s.Stale(base.Add(time.Hour)) {
-		t.Error("a one-hour-old cache should not be stale")
+	// Relative to MinRefresh, not a hardcoded hour. The first version asserted
+	// "one hour old is not stale", which was true at MinRefresh 6h and broke
+	// the moment it became 1h — a test that pins the constant's VALUE instead
+	// of its MEANING.
+	if s.Stale(base.Add(MinRefresh - time.Minute)) {
+		t.Errorf("a cache younger than MinRefresh (%v) should not be stale", MinRefresh)
 	}
 	if !s.Stale(base.Add(MinRefresh)) {
 		t.Errorf("a cache exactly %v old should be stale", MinRefresh)
+	}
+	if !s.Stale(base.Add(MinRefresh + time.Minute)) {
+		t.Error("a cache older than MinRefresh should be stale")
 	}
 	if !(Store{}).Stale(base) {
 		t.Error("an unfetched cache must always be stale")
