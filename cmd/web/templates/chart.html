@@ -1647,11 +1647,20 @@
             byPrice[key].labels.push(o.label);
         });
 
-        // Pass 2 — merge by SCREEN DISTANCE. Identical-price merging is not
-        // enough once the layer carries nine levels: 日高 2467.8 and 月開
-        // 2466.6 are different prices 0.05% apart, which lands them on the
-        // same pixel row and hides one behind the other. Grouping by y keeps
-        // every price readable, which is the whole point of the label.
+        // Pass 2 — SPREAD vertically, do not merge.
+        //
+        // The first fix joined colliding labels into one line ("日高 2467.8 ·
+        // 月開 2466.6"), which read fine but forced one background colour on
+        // levels from different periods — and the colour IS the period now
+        // (see OPEN_COLORS). So instead of combining them, push them apart:
+        // every level keeps its own div, its own colour and its own price,
+        // and the stack just stops overlapping.
+        //
+        // Two passes, the standard label-collision resolution. Down first,
+        // enforcing a minimum gap; then up, because a dense cluster near the
+        // bottom would otherwise walk off the plot. A label displaced this way
+        // is no longer exactly on its line, which is why the price stays in
+        // the text — the number is what gets used, not the pixel.
         var items = [];
         priceOrder.forEach(function (key) {
             var g = byPrice[key];
@@ -1662,36 +1671,31 @@
         });
         items.sort(function (a, b) { return a.y - b.y; });
 
-        var clusters = [];
-        items.forEach(function (g) {
-            var last = clusters[clusters.length - 1];
-            if (last && Math.abs(g.y - last.y) < LABEL_MIN_GAP) {
-                last.members.push(g);
-                return;
+        for (var i = 1; i < items.length; i++) {
+            if (items[i].y - items[i - 1].y < LABEL_MIN_GAP) {
+                items[i].y = items[i - 1].y + LABEL_MIN_GAP;
             }
-            clusters.push({ y: g.y, kind: g.kind, members: [g] });
-        });
+        }
+        for (var j = items.length - 2; j >= 0; j--) {
+            if (items[j + 1].y - items[j].y < LABEL_MIN_GAP) {
+                items[j].y = items[j + 1].y - LABEL_MIN_GAP;
+            }
+        }
+        // A stack taller than the plot cannot be resolved; clamp the top and
+        // accept that the densest region overlaps rather than drawing labels
+        // off-screen where they cannot be read at all.
+        if (items.length && items[0].y < upper) {
+            var shift = upper - items[0].y;
+            items.forEach(function (g) { g.y = Math.min(g.y + shift, lower); });
+        }
 
-        clusters.forEach(function (c) {
+        items.forEach(function (g) {
             var el = document.createElement('div');
             el.className = 'chart-poc-label';
-            el.style.top = c.y + 'px';
-            // Colour from the member nearest the top of the cluster. A cluster
-            // spanning periods has no single right colour, and inventing a
-            // blended one would read as a period that does not exist.
-            el.style.backgroundColor = OPEN_COLORS[c.kind] || '#adb5bd';
-            if (c.members.length === 1) {
-                el.textContent = c.members[0].labels.join('/') + ' ' + c.members[0].key;
-            } else {
-                // Different prices on one row: keep EVERY price. A span or a
-                // single representative would drop the number an order needs.
-                el.textContent = c.members.map(function (m) {
-                    return m.labels.join('/') + ' ' + m.key;
-                }).join(' · ');
-            }
-            el.title = c.members.map(function (m) {
-                return m.labels.join('/') + ' ' + m.key;
-            }).join('\n');
+            el.style.top = g.y + 'px';
+            el.style.backgroundColor = OPEN_COLORS[g.kind] || '#adb5bd';
+            el.textContent = g.labels.join('/') + ' ' + g.key;
+            el.title = g.labels.join('/') + ' ' + g.key;
             host.appendChild(el);
         });
     }
