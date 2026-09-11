@@ -668,12 +668,13 @@
             return;
         }
         var thr = ((d.deltaThreshold || 0.02) * 100).toFixed(0);
-        note.textContent = d.samples + ' 筆快照 · 跨距 ' + d.spanMin + ' 分鐘 · 門檻 ±' + thr + '%'
+        note.textContent = 'BingX ' + d.samples + ' 筆快照 · 跨距 ' + d.spanMin + ' 分鐘 · 門檻 ±' + thr + '%'
+            + (d.bnFetchedTPE ? ' · Binance 交叉參考 ' + d.bnFetchedTPE : ' · Binance 無快取')
             + (d.hasHourOfDepth ? '' : ' — 尚未累積滿 1 小時,Δ 欄會是空的')
             + ' · ' + d.atTPE;
         var rows = (d.rows || []).map(function (r) {
             if (r.state !== 'ok') {
-                return '<tr><td>' + r.short + '</td><td class="note" colspan="5">尚無快照</td></tr>';
+                return '<tr><td>' + r.short + '</td><td class="note" colspan="7">尚無快照</td></tr>';
             }
             var dTxt = '—', dCls = 'dim';
             if (r.oiStatic) {
@@ -701,15 +702,38 @@
                         : (r.fundingSide === 'longs-crowded' ? '多方付錢' : '')));
             var readCls = 'note';
             if (r.quadrant === 'shorts-building' || r.quadrant === 'longs-building') readCls = 'note armed';
+            // Binance cross-reference. 15m appears ONLY here: Binance buckets
+            // are genuinely 5-minutely, so three of them is a real reading,
+            // whereas the BingX column cannot honestly go under an hour.
+            var bnTxt = '—';
+            if (typeof r.bnDelta1h === 'number') {
+                bnTxt = (r.bnDelta1h >= 0 ? '+' : '') + (r.bnDelta1h * 100).toFixed(2) + '%';
+                if (typeof r.bnDelta15m === 'number') {
+                    bnTxt += ' / ' + (r.bnDelta15m >= 0 ? '+' : '') + (r.bnDelta15m * 100).toFixed(2) + '%';
+                }
+            }
+            var wTxt = '—', wCls = 'dim';
+            if (typeof r.whaleTop === 'number') {
+                wTxt = r.whaleTop.toFixed(2) + ' / ' + r.whaleAll.toFixed(2);
+                if (r.crowd) {
+                    wCls = 'crowded';
+                    wTxt += r.crowd === 'retail-longer' ? ' 散戶偏多' : ' 散戶偏空';
+                }
+            }
             return '<tr><td>' + r.short + '</td>'
                  + '<td class="dim">' + oiFmtNotional(r.oi) + '</td>'
                  + '<td class="' + dCls + '">' + dTxt + '</td>'
                  + '<td class="' + pCls + '">' + pTxt + '</td>'
                  + '<td class="' + fCls + '">' + fTxt + '</td>'
+                 + '<td class="dim">' + bnTxt + '</td>'
+                 + '<td class="' + wCls + '">' + wTxt + '</td>'
                  + '<td class="' + readCls + '">' + readTxt + '</td></tr>';
         }).join('');
         host.innerHTML = '<table class="ops-oi"><thead><tr>'
-            + '<th>標的</th><th>OI</th><th>OI 1hΔ</th><th>價格 1hΔ</th><th>funding</th><th style="text-align:left">判讀</th>'
+            + '<th>標的</th><th>OI</th><th>OI 1hΔ</th><th>價格 1hΔ</th><th>funding</th>'
+            + '<th title="Binance 的真 5m 序列 — 交叉參考,不是替代">BN 1h/15m</th>'
+            + '<th title="大戶 vs 全體,兩者都按帳戶數。負 = 散戶比大戶更偏多">大戶/全體</th>'
+            + '<th style="text-align:left">判讀</th>'
             + '</tr></thead><tbody>' + rows + '</tbody></table>';
     }
     function fetchOI() {

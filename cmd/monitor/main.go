@@ -172,6 +172,11 @@ func main() {
 	// never fetches from a page load.
 	go runBLSRefresh(ctx)
 
+	// Binance positioning cross-reference. Unlike the oi/ sampler this does
+	// not accumulate — Binance publishes the OI series itself, so the loop
+	// only refreshes an expiring cache.
+	go runBinFutRefresh(ctx)
+
 	// MONITOR_ZONE_ONLY=1 keeps the zone-fade + breakout-tripwire channel
 	// (zonealert), autoexec and macrowarn, and skips the multi-TF confluence
 	// scan / structalert — for when the user wants the zone alerts without the

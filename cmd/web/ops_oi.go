@@ -20,6 +20,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"myFirstGo/trading-bot/binfut"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/oi"
 	"myFirstGo/trading-bot/signal"
@@ -29,6 +30,15 @@ import (
 // annotateContextWarnings uses ±0.02) so the card cannot disagree with the
 // warning it is previewing.
 const oiDeltaThreshold = 0.02
+
+// bnFetched renders the Binance cache age, or "" when nothing is cached —
+// so a blank cross-reference column is distinguishable from a stale one.
+func bnFetched(s binfut.Store, loc *time.Location) string {
+	if s.FetchedAt.IsZero() {
+		return ""
+	}
+	return s.FetchedAt.In(loc).Format("15:04:05")
+}
 
 // oiStaticMinSamples is how much evidence it takes to call a symbol's open
 // interest constant rather than merely quiet. Six samples is 30 minutes at
@@ -115,6 +125,7 @@ func (s *server) handleOpsOI(c *gin.Context) {
 	tpe := time.FixedZone("Asia/Taipei", 8*3600)
 
 	bar := market.BarDuration(market.TF1h)
+	bfStore := binfut.Load()
 	rows := make([]gin.H, 0, len(uiSymbols))
 	for _, short := range uiSymbols {
 		sym, err := resolveWebSymbol(short)
@@ -169,6 +180,32 @@ func (s *server) handleOpsOI(c *gin.Context) {
 				row["reading"] = "OI 已過門檻,但缺同窗價格,無法判邊"
 			}
 		}
+		// Binance cross-reference: a real 5-minute OI series where BingX has
+		// only a 10-minute republish, and the whale-vs-retail split BingX
+		// cannot answer at all. Kept in separate keys, never merged into the
+		// BingX figures — they are different books, and an entry fills
+		// against BingX's.
+		if b, ok := bfStore.LatestOI(short); ok {
+			row["bnOI"] = b.Value
+			if d, ok := bfStore.OIChange(short, time.Hour); ok {
+				row["bnDelta1h"] = d
+			}
+			// 15 minutes is possible HERE and nowhere else: Binance buckets
+			// are genuinely 5m, so three of them is a real reading rather
+			// than a re-read of one published value.
+			if d, ok := bfStore.OIChange(short, 15*time.Minute); ok {
+				row["bnDelta15m"] = d
+			}
+		}
+		if w, ok := bfStore.Whales(short); ok {
+			row["whaleTop"] = w.Top
+			row["whaleAll"] = w.All
+			row["whaleGap"] = w.Gap
+			row["whaleTopSize"] = w.TopSz
+			if c := w.Crowd(); c != "" {
+				row["crowd"] = c
+			}
+		}
 		rows = append(rows, row)
 	}
 
@@ -190,6 +227,7 @@ func (s *server) handleOpsOI(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"rows":           rows,
+		"bnFetchedTPE":   bnFetched(bfStore, tpe),
 		"samples":        len(snaps),
 		"spanMin":        spanMin,
 		"hasHourOfDepth": spanMin >= 60,
