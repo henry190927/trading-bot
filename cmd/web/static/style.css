@@ -5853,12 +5853,23 @@ main { overflow-x: hidden; }
 .chart-side .chart-struct-panel { margin: 0; }
 
 @media (max-width: 1024px) {
-    /* mobile: side stacks below the chart, toggle hidden (always shown) */
+    /* mobile: one column, toggle hidden (the panel is always shown) */
     .chart-grid, .chart-grid.side-collapsed { grid-template-columns: 1fr; }
     .chart-grid.side-collapsed .chart-side { display: flex; }
     .chart-side { position: static; max-height: none; }
     .chart-side-toggle { display: none; }
     .chart-side .chart-header { flex-direction: row; flex-wrap: wrap; }
+
+    /* Side panel ABOVE the chart on phones (2026-09-12, trial).
+       Two things pushed this. The TF-bias panel moved off the plot into
+       this column, and on a phone that put it below a ~666px chart — the
+       read you check first became the thing you scroll furthest for. And
+       the panel is where the numbers live (price, 24h, score, struct),
+       which is summary-before-detail, the usual phone ordering.
+       DOM order is unchanged so desktop and screen readers keep
+       chart-then-panel; only the visual order flips. */
+    .chart-side { order: 1; }
+    .chart-wrap { order: 2; }
 }
 
 /* =====================================================================
