@@ -169,3 +169,47 @@ func TestStale(t *testing.T) {
 		t.Error("an unfetched cache must always be stale")
 	}
 }
+
+func TestDailyBudget(t *testing.T) {
+	day := time.Date(2026, 9, 11, 15, 0, 0, 0, time.UTC)
+	next := day.AddDate(0, 0, 1)
+
+	// A cache that never fetched has the whole budget.
+	if got := (Store{}).BudgetLeft(day); got != DailyBudget {
+		t.Errorf("BudgetLeft(fresh) = %d, want %d", got, DailyBudget)
+	}
+
+	// Spending walks the counter within a day and resets across UTC midnight.
+	s := Store{}
+	for i := 1; i <= 3; i++ {
+		s.QueryDay, s.QueryCount = s.SpendQuery(day)
+		if s.QueryCount != i {
+			t.Fatalf("after %d spends QueryCount = %d", i, s.QueryCount)
+		}
+	}
+	if got := s.BudgetLeft(day); got != DailyBudget-3 {
+		t.Errorf("BudgetLeft after 3 = %d, want %d", got, DailyBudget-3)
+	}
+	if got := s.BudgetLeft(next); got != DailyBudget {
+		t.Errorf("BudgetLeft on the next UTC day = %d, want a full %d", got, DailyBudget)
+	}
+	if d, c := s.SpendQuery(next); d != "2026-09-12" || c != 1 {
+		t.Errorf("SpendQuery across midnight = (%q, %d), want (2026-09-12, 1)", d, c)
+	}
+
+	// Exhausted must report 0, never negative — the caller compares <= 0 but
+	// a negative would read as a corrupt counter in the log line.
+	spent := Store{QueryDay: day.Format("2006-01-02"), QueryCount: DailyBudget + 5}
+	if got := spent.BudgetLeft(day); got != 0 {
+		t.Errorf("BudgetLeft(overspent) = %d, want 0", got)
+	}
+
+	// The budget must stay under the API's own cap, or the guard guards nothing.
+	if DailyBudget >= DailyCap {
+		t.Errorf("DailyBudget %d must leave headroom under DailyCap %d", DailyBudget, DailyCap)
+	}
+	// And one query per MinRefresh must fit inside the budget.
+	if perDay := int(24 * time.Hour / MinRefresh); perDay > DailyCap {
+		t.Errorf("MinRefresh %v implies %d queries/day, over the cap %d", MinRefresh, perDay, DailyCap)
+	}
+}

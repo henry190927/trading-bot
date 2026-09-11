@@ -33,15 +33,35 @@ import (
 // picking up a number at 20:35 and at 02:00 the next day is the whole point.
 const blsRefreshTick = 30 * time.Minute
 
+// budgetWarned keeps the exhausted-budget line to once per exhaustion rather
+// than once per 30-minute wake.
+var budgetWarned bool
+
 func runBLSRefresh(ctx context.Context) {
-	log.Printf("blsrefresh: up — wake every %s, fetch when older than %s -> %s",
-		blsRefreshTick, bls.MinRefresh, bls.Path())
+	log.Printf("blsrefresh: up — wake every %s, fetch when older than %s, budget %d/day (cap %d) -> %s",
+		blsRefreshTick, bls.MinRefresh, bls.DailyBudget, bls.DailyCap, bls.Path())
 
 	refresh := func() {
+		now := time.Now().UTC()
 		cur := bls.Load()
-		if !cur.Stale(time.Now().UTC()) {
+		if !cur.Stale(now) {
 			return
 		}
+		// Budget before staleness matters: at MinRefresh 1h the loop wants 24
+		// queries a day against a cap of 25, so a single extra caller would
+		// push it over and the API would start refusing. Exceeding fails as a
+		// silently frozen cache, which is the worst shape for this data — stop
+		// short instead, and say so once rather than every wake.
+		if left := cur.BudgetLeft(now); left <= 0 {
+			if !budgetWarned {
+				budgetWarned = true
+				log.Printf("blsrefresh: daily budget spent (%d/%d) — holding the cache until UTC midnight",
+					cur.QueryCount, bls.DailyBudget)
+			}
+			return
+		}
+		budgetWarned = false
+
 		c, cancel := context.WithTimeout(ctx, 45*time.Second)
 		defer cancel()
 		st, err := bls.Fetch(c)
@@ -52,6 +72,9 @@ func runBLSRefresh(ctx context.Context) {
 			log.Printf("blsrefresh: fetch failed, keeping cache: %v", err)
 			return
 		}
+		// Carry the meter forward: Fetch returns a fresh Store that knows
+		// nothing about today's spend.
+		st.QueryDay, st.QueryCount = cur.SpendQuery(now)
 		if err := bls.Save(st); err != nil {
 			log.Printf("blsrefresh: save failed: %v", err)
 			return

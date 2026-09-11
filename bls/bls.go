@@ -78,6 +78,12 @@ type Point struct {
 type Store struct {
 	FetchedAt time.Time          `json:"fetched_at"`
 	Series    map[string][]Point `json:"series"`
+	// QueryDay / QueryCount meter the daily budget across restarts. Held in
+	// the cache file rather than in memory because the monitor is redeployed
+	// several times on an active day, and a counter that resets on restart
+	// would meter nothing.
+	QueryDay   string `json:"query_day,omitempty"` // UTC date, "2006-01-02"
+	QueryCount int    `json:"query_count,omitempty"`
 }
 
 // Path is the on-disk cache (env BLS_CACHE or default).
@@ -90,11 +96,25 @@ func Path() string {
 
 // MinRefresh is the shortest gap between live fetches.
 //
-// Six hours puts a full day inside 4 of the 25 daily queries, leaving room
-// for manual refreshes, and no BLS series updates more than monthly — the
-// only thing a tighter cadence would buy is picking up a release sooner on
-// the one morning a month it lands.
-const MinRefresh = 6 * time.Hour
+// Was six hours, which put a whole day inside 4 of the 25 daily queries. The
+// cost showed up on 2026-09-11: CPI released at 20:30 TPE, the cache had last
+// fetched at 18:11, and the actual would not have appeared until 00:11 — five
+// and a half hours after the number that moved ETH 8% in two bars.
+//
+// One hour caps the day at 24 queries against a 25 limit. That is deliberately
+// tight, so DailyBudget below stops it short of the cliff rather than trusting
+// the arithmetic: a manual run, a probe, or any second caller would otherwise
+// push it over and the API would start refusing — which fails as a silently
+// frozen cache, the worst shape for this data.
+const MinRefresh = time.Hour
+
+// DailyCap is the BLS v1 limit: 25 queries per day, keyless. A registration
+// key raises it to 500 and makes this guard largely moot.
+const DailyCap = 25
+
+// DailyBudget is what this package will actually spend, leaving headroom for
+// a manual run or a probe on the same IP.
+const DailyBudget = 20
 
 type apiResponse struct {
 	Status  string   `json:"status"`
@@ -225,6 +245,27 @@ func Save(s Store) error {
 		return fmt.Errorf("bls: cache failed its own re-read")
 	}
 	return os.Rename(tmp, p)
+}
+
+// SpendQuery records one query against today's budget and returns the
+// updated counters, rolling over at UTC midnight.
+func (s Store) SpendQuery(now time.Time) (day string, count int) {
+	d := now.UTC().Format("2006-01-02")
+	if s.QueryDay != d {
+		return d, 1
+	}
+	return d, s.QueryCount + 1
+}
+
+// BudgetLeft reports how many queries remain today under DailyBudget.
+func (s Store) BudgetLeft(now time.Time) int {
+	if s.QueryDay != now.UTC().Format("2006-01-02") {
+		return DailyBudget
+	}
+	if left := DailyBudget - s.QueryCount; left > 0 {
+		return left
+	}
+	return 0
 }
 
 // Stale reports whether the cache is old enough to refresh.
