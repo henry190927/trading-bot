@@ -1746,7 +1746,11 @@ footer {
 }
 .chart-canvas {
     width: 100%;
-    height: clamp(560px, 78vh, 880px);
+    /* Raised 2026-09-12 when the TF-bias overlay moved to the side panel.
+       That widget occupied the top-left of the plot, so the usable price
+       area was smaller than the box; with it gone the same box shows more
+       chart. Pure taste — adjust freely. */
+    height: clamp(560px, 82vh, 960px);
     background: #0f0b07;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -5591,23 +5595,34 @@ main { overflow-x: hidden; }
    Per-symbol composite vote {N-struct, POC regime, engine} per TF,
    stacked vertically. Colours match the candle up/down palette;
    strong = deeper tint, lean = faint. rgba solids (no color-mix). */
+/* TF bias — a side-panel card since 2026-09-12, not a plot overlay.
+   It used to sit absolutely over the chart's top-left, which is exactly
+   where the visible range starts: the panel was covering price in order to
+   show a read about that price. Now it matches .chart-struct-panel's card
+   chrome (surface, border, left accent) so the side column reads as one
+   design instead of a floating widget that wandered in. */
 .tf-bias-panel {
-  position: absolute; top: 36px; left: 10px; z-index: 6;
-  display: flex; flex-direction: column; gap: 2px;
-  padding: .28rem .35rem; border-radius: 8px; font-size: .7rem;
-  width: max-content;
-  background: rgba(var(--bg-rgb),0.72); backdrop-filter: blur(3px);
-  border: 1px solid rgba(255,255,255,0.09);
+  display: flex; flex-direction: column; gap: 3px;
+  width: 100%;
+  padding: 0.4rem 0.7rem;
+  font-size: .7rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--cyan);
+  border-radius: 0 6px 6px 0;
   user-select: none;
 }
 .tf-bias-panel:empty { display: none; }
 .tf-bias-title {
   color: var(--text-dim); font-weight: 700; font-size: var(--fs-xs);
   text-transform: uppercase; letter-spacing: .06em;
-  text-align: center; margin-bottom: 2px;
+  text-align: left; margin-bottom: 3px;
 }
 .tf-bias-row {
-  display: grid; grid-template-columns: 2.2em 1.1em 1.6em; align-items: center;
+  /* Last column 1fr since 2026-09-12: the fixed 1.6em was sized for a
+     max-content overlay, and in the side card it left the score floating
+     mid-width with dead space to its right. Now the row spans the card. */
+  display: grid; grid-template-columns: 2.2em 1.1em 1fr; align-items: center;
   gap: .3rem; padding: .12rem .32rem; border-radius: 5px; cursor: default;
   border: 1px solid transparent;
 }

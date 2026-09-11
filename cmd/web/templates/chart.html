@@ -187,7 +187,6 @@
     <div class="chart-column">
       <div class="chart-plot-wrap">
         <div id="chart-container" class="chart-canvas"></div>
-        <div class="tf-bias-panel" id="tf-bias" aria-label="multi-timeframe bias"></div>
         <!-- OHLC readout — top-left overlay showing the values of the
              bar currently under the crosshair. Follows the bar as the
              cursor moves; falls back to the last bar when the cursor
@@ -271,6 +270,13 @@
     <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
     <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
   </div>
+    <!-- TF bias — moved out of the plot overlay 2026-09-12. It sat
+         absolutely positioned over the chart's top-left, which is where
+         the first bars of the visible range are, so the panel was covering
+         price to show a read ABOUT that price. Here it is a normal side
+         card and the plot is clean. Same #tf-bias id, so the renderer
+         finds it unchanged. -->
+    <div class="tf-bias-panel" id="tf-bias" aria-label="multi-timeframe bias"></div>
   </aside>
   </div><!-- /chart-grid -->
   <script>
