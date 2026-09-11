@@ -95,6 +95,45 @@
   <!-- Card 2: No-fill discipline — biggest leak (31% no-fill) -->
   <details class="tip-card">
     <summary class="tip-summary">
+      <span class="tip-icon">📐</span>
+      <span class="tip-title">
+        <span class="i18n-en">Reading the regime: <em>measure range expansion, not the trend label</em></span>
+        <span class="i18n-zh">判讀 regime:<em>量 range 擴張,別看 trend 標籤</em></span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>The <code>trend</code> label LAGS — do not time entries with it.</b> Reconstructed from the live series: at 8/20 08:00, in the middle of a <b>+17.16%</b> twelve-bar run, <code>trend</code> still read <code>neutral</code>. It only printed <code>HH-HL uptrend</code> at 8/20 20:00 — twelve hours later, after the move was over. By the time it names a trend you are chasing.</span>
+          <span class="i18n-zh"><b><code>trend</code> 標籤是落後的 —— 不要用它抓進場。</b> 從實際序列重建:8/20 08:00,在一段 12 根 <b>+17.16%</b> 的行情正中間,<code>trend</code> 還是 <code>neutral</code>。它到 8/20 20:00 才印出 <code>HH-HL uptrend</code> —— 晚了 12 小時,行情走完了。等它說出趨勢,你已經在追。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en"><b>Step 1 — range expansion is the regime switch.</b> Average 1h range over the last 12 bars, against the prior baseline. <b>8/19 20:00 → 8/20 08:00 went 0.39% → 2.61%, a 6.7× jump.</b> Under ~1.5× you are in a range regime whatever the price level suggests; over ~2.5× fade nothing, the edges will not hold.</span>
+          <span class="i18n-zh"><b>第 1 步 —— range 擴張才是 regime 開關。</b> 近 12 根的平均 1h range,對比前一段基線。<b>8/19 20:00 → 8/20 08:00 從 0.39% 跳到 2.61%,6.7 倍。</b> 低於約 1.5 倍就是區間 regime,價位看起來多高多低都一樣;高於約 2.5 倍就什麼都不要 fade,邊緣守不住。</span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en"><b>Step 2 — directional consistency picks the side.</b> Count up-closes vs down-closes over the same 12 bars. <b>8/20 was 10 up / 2 down.</b> A 6/6 or 4/8 split is a turn inside a range, not a trend — no matter how far price has travelled.</span>
+          <span class="i18n-zh"><b>第 2 步 —— 方向一致性決定哪一邊。</b> 同樣 12 根,數陽線對陰線。<b>8/20 是 10 陽 / 2 陰。</b> 6/6 或 4/8 是區間內的轉向不是趨勢,不管價格走了多遠。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>Step 3 — read <code>event</code>, not <code>trend</code>, and read it as confirmation.</b> BOS / CHoCH lead the label by hours. Then: a bounce into a pool with <b>no</b> structure event is a liquidity grab — fade it. A bounce that prints <b>CHoCH-up AND holds its Protected low on a retest</b> is a character change — do not fade it.</span>
+          <span class="i18n-zh"><b>第 3 步 —— 讀 <code>event</code> 不是 <code>trend</code>,而且當「確認」讀。</b> BOS / CHoCH 領先標籤好幾個小時。然後:反彈進池子但<b>沒有</b>結構事件 = 流動性獵取,可以 fade;反彈<b>印出 CHoCH-up 且回測守住 Protected</b> = 性格轉變,不要 fade。</span>
+        </li>
+        <li class="tip-step step-neutral">
+          <span class="i18n-en"><b>Default to RANGE.</b> It is the base rate, your engine is a mean-reversion engine and the n=574 sweep-reject edge is built on range behaviour, and a trend regime announces itself with expansion you can measure in one line. Assuming trend by default makes you chase in the 90% of hours that are not trending.</span>
+          <span class="i18n-zh"><b>預設假設「區間」。</b> 它是基準率;你的引擎就是均值回歸引擎、n=574 的 sweep-reject 邊建立在區間行為上;而趨勢 regime 會用一行就能量出來的擴張自己宣告。預設趨勢會讓你在 90% 不是趨勢的小時裡追高殺低。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">⚠️ <b>Nothing in the system computes this yet.</b> The engine has a per-BAR range-expansion vote at 1.5× (one bar vs the 20-bar mean) — a different scale from the 12-bar regime read above. Directional consistency is not computed anywhere. These numbers came from an ad-hoc probe over the live series; treat the card as the procedure, not as a readout.</span>
+        <span class="i18n-zh">⚠️ <b>系統目前沒有在算這個。</b> 引擎有一個<b>逐棒</b>的 range 擴張投票(門檻 1.5 倍,單根對 20 根均值)—— 跟上面那個 12 根的 regime 讀數是不同尺度。方向一致性全庫沒有實作。上面的數字來自對實際序列的一次性探測;這張卡是「步驟」,不是儀表板。</span>
+      </p>
+    </div>
+  </details>
+
+  <details class="tip-card">
+    <summary class="tip-summary">
       <span class="tip-icon">🎣</span>
       <span class="tip-title">
         <span class="i18n-en">Pullback limits won't fill in a trend — stop parking them</span>

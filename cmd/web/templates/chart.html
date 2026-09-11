@@ -1622,6 +1622,10 @@
     // Left-side HTML labels for the session opens — mirrors the POC-migration
     // overlay so the right price axis / VP histogram stays uncluttered when
     // several price layers are on at once.
+    // Label height in px. Two labels closer than this overlap, so they get
+    // merged into one line instead of hiding each other.
+    var LABEL_MIN_GAP = 13;
+
     function drawOpenLabels() {
         var host = document.getElementById('chart-open-labels');
         if (!host) return;
@@ -1631,27 +1635,63 @@
         var ohlc = document.getElementById('chart-ohlc');
         var upper = (ohlc ? ohlc.offsetTop + ohlc.offsetHeight : 8) + 18;
         var lower = plotH - 30;
-        // Merge opens that sit at the SAME price into one label — e.g. on a
-        // Monday the daily open (Mon 00:00 UTC) IS the weekly open, so they'd
-        // otherwise draw two labels stacked on top of each other ("日開" hidden
-        // under "週開"). Grouped → "日開/週開 77638.2".
-        var groups = {}, order = [];
+
+        // Pass 1 — merge levels at the IDENTICAL price. On a Monday the daily
+        // open IS the weekly open; today ETH's day low and week low are both
+        // 2404.85. One price, one label: "日低/週低 2404.9".
+        var byPrice = {}, priceOrder = [];
         lastOpens.forEach(function (o) {
             if (!o || !o.price) return;
             var key = o.price >= 1000 ? o.price.toFixed(1) : o.price.toFixed(3);
-            if (!groups[key]) { groups[key] = { price: o.price, kind: o.kind, labels: [] }; order.push(key); }
-            groups[key].labels.push(o.label);
+            if (!byPrice[key]) { byPrice[key] = { price: o.price, kind: o.kind, labels: [], key: key }; priceOrder.push(key); }
+            byPrice[key].labels.push(o.label);
         });
-        order.forEach(function (key) {
-            var g = groups[key];
+
+        // Pass 2 — merge by SCREEN DISTANCE. Identical-price merging is not
+        // enough once the layer carries nine levels: 日高 2467.8 and 月開
+        // 2466.6 are different prices 0.05% apart, which lands them on the
+        // same pixel row and hides one behind the other. Grouping by y keeps
+        // every price readable, which is the whole point of the label.
+        var items = [];
+        priceOrder.forEach(function (key) {
+            var g = byPrice[key];
             var y = candleSeries.priceToCoordinate(g.price);
             if (y == null || y < -40 || y > plotH + 40) return;
-            y = Math.max(upper, Math.min(y, lower));
+            g.y = Math.max(upper, Math.min(y, lower));
+            items.push(g);
+        });
+        items.sort(function (a, b) { return a.y - b.y; });
+
+        var clusters = [];
+        items.forEach(function (g) {
+            var last = clusters[clusters.length - 1];
+            if (last && Math.abs(g.y - last.y) < LABEL_MIN_GAP) {
+                last.members.push(g);
+                return;
+            }
+            clusters.push({ y: g.y, kind: g.kind, members: [g] });
+        });
+
+        clusters.forEach(function (c) {
             var el = document.createElement('div');
             el.className = 'chart-poc-label';
-            el.style.top = y + 'px';
-            el.style.backgroundColor = OPEN_COLORS[g.kind] || '#adb5bd';
-            el.textContent = g.labels.join('/') + ' ' + key;
+            el.style.top = c.y + 'px';
+            // Colour from the member nearest the top of the cluster. A cluster
+            // spanning periods has no single right colour, and inventing a
+            // blended one would read as a period that does not exist.
+            el.style.backgroundColor = OPEN_COLORS[c.kind] || '#adb5bd';
+            if (c.members.length === 1) {
+                el.textContent = c.members[0].labels.join('/') + ' ' + c.members[0].key;
+            } else {
+                // Different prices on one row: keep EVERY price. A span or a
+                // single representative would drop the number an order needs.
+                el.textContent = c.members.map(function (m) {
+                    return m.labels.join('/') + ' ' + m.key;
+                }).join(' · ');
+            }
+            el.title = c.members.map(function (m) {
+                return m.labels.join('/') + ' ' + m.key;
+            }).join('\n');
             host.appendChild(el);
         });
     }
