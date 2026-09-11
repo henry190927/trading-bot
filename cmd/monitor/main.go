@@ -166,6 +166,12 @@ func main() {
 	// are too short-lived to remember an hour ago.
 	go runOISampler(ctx, client)
 
+	// BLS actuals refresher. Above the zone-only branch like the other
+	// data-only loops, and the ONLY caller of bls.Fetch: the keyless v1 API
+	// allows 25 queries a day, so cmd/web reads the cache this writes and
+	// never fetches from a page load.
+	go runBLSRefresh(ctx)
+
 	// MONITOR_ZONE_ONLY=1 keeps the zone-fade + breakout-tripwire channel
 	// (zonealert), autoexec and macrowarn, and skips the multi-TF confluence
 	// scan / structalert — for when the user wants the zone alerts without the

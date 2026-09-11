@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"myFirstGo/trading-bot/bls"
 	"myFirstGo/trading-bot/earnings"
 	"myFirstGo/trading-bot/econcal"
 	"myFirstGo/trading-bot/macro"
@@ -30,6 +32,13 @@ type calEvent struct {
 	Impact   string // data releases only: High / Medium
 	Forecast string // data releases only
 	Previous string // data releases only
+	// Actual is the RELEASED figure, read from BLS (package bls) rather than
+	// from the forecast feed — that feed's `actual` field is empty on every
+	// row, published or not. Blank covers three different states the template
+	// must not conflate: series not mapped, month not released yet, no cache.
+	// Surprise is set only when the actual and the forecast both parse.
+	Actual   string
+	Surprise string // hot / cool / inline
 	// Speaker promotes central-bank speech past the feed's own rating. The
 	// feed calls "FOMC Member Waller Speaks" LOW impact; rendering it as low
 	// priority is how it got overlooked on 2026-09-03.
@@ -39,6 +48,33 @@ type calEvent struct {
 type calMonth struct {
 	Label  string
 	Events []calEvent
+}
+
+// surpriseOf compares a released figure against its forecast string.
+//
+// Returns "" when the forecast does not parse, which is the normal case for
+// speeches and policy statements — an empty column beats a verdict computed
+// from something that was never a number.
+//
+// The band is a tenth of the quoted unit (0.1pp for percentages, 1K for
+// payrolls) because BLS publishes CPI and PPI to one decimal place: a gap
+// smaller than that is the rounding, not a surprise.
+func surpriseOf(actual float64, forecast string) string {
+	f := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(forecast), "%"))
+	if strings.HasSuffix(f, "K") || strings.HasSuffix(f, "k") {
+		f = f[:len(f)-1]
+	}
+	want, err := strconv.ParseFloat(strings.TrimSpace(f), 64)
+	if err != nil {
+		return ""
+	}
+	switch d := actual - want; {
+	case d >= 0.1:
+		return "hot"
+	case d <= -0.1:
+		return "cool"
+	}
+	return "inline"
 }
 
 func categorizeEvent(name string) string {
@@ -122,6 +158,11 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 
 	// Economic-data releases (ForexFactory feed) — display layer, NOT a blackout
 	// gate. Shows impact/forecast/previous like an FX calendar.
+	// Read-only here: the cache is refreshed by the monitor
+	// (cmd/monitor/blsrefresh.go), because BLS v1 allows 25 queries a DAY and
+	// a page load must never spend one. An empty store leaves the column blank.
+	blsStore := bls.Load()
+
 	for _, e := range econcal.All() {
 		name := e.Title
 		if e.Country != "" && e.Country != "USD" {
@@ -148,6 +189,20 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 			Forecast: e.Forecast,
 			Previous: e.Previous,
 			Speaker:  e.Speaker,
+		}
+		// The released figure, and whether it beat the forecast. This is the
+		// question a calendar of forecasts alone cannot answer: on 2026-09-10
+		// a PPI print moved BTC 1,290 points in an hour and the only way to
+		// ask "was it actually hot?" was to read it off the price — which gave
+		// the wrong answer, since headline PPI came in at +0.40% against a
+		// +0.4% forecast, exactly in line.
+		if a, unit, ok := blsStore.Actual(e.Title, e.DatetimeUTC); ok {
+			if unit == "k" {
+				ev.Actual = fmt.Sprintf("%+.0fK", a)
+			} else {
+				ev.Actual = fmt.Sprintf("%+.2f%%", a)
+			}
+			ev.Surprise = surpriseOf(a, e.Forecast)
 		}
 		if ev.Status == "upcoming" {
 			ev.Days = int(e.DatetimeUTC.Sub(now).Hours() / 24)

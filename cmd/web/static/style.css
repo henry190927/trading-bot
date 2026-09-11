@@ -6584,3 +6584,16 @@ html[data-density="compact"] .setups-table {
 .mkt-ico { font-size: 1.15rem; }
 .mkt-tab { font-size: .92rem; padding: .32rem .85rem; }
 .cal-cat.cat-data { background: rgba(var(--blue-rgb), .15); color: var(--blue); }
+
+/* Released figure vs forecast on /calendar. Colour carries the SURPRISE, not
+   a market direction: a hot inflation print and a hot payrolls print are both
+   "above forecast", and which way the tape takes it is not this table's claim
+   to make. */
+.cal-act { font-variant-numeric: tabular-nums; }
+.cal-surp { font-size: 0.68rem; padding: 0 4px; border-radius: 3px; white-space: nowrap; }
+.cal-hot { color: var(--red); }
+.cal-cool { color: var(--green); }
+.cal-inline { color: var(--text-dim); }
+.cal-surp.cal-hot { background: var(--wash-red); }
+.cal-surp.cal-cool { background: var(--wash-green); }
+.cal-surp.cal-inline { background: var(--wash-dim); }
