@@ -1570,16 +1570,34 @@
     // group references. Backend ships exact levels from a 1h fetch.
     var openLines = [];
     var lastOpens = [];
-    // Opens are cool/neutral anchors; period extremes reuse the chart's
-    // existing above-is-red / below-is-green convention (same as EQH/EQL) so
-    // a glance tells you which side of price a level sits on.
+    // COLOUR = WHICH PERIOD, LINE STYLE = WHICH KIND.
+    //
+    // The first cut coloured by kind instead (highs red, lows green, opens
+    // cyan/amber), which put four different colours on the day's three levels
+    // and made "is that a daily or a weekly line" the hard question — the
+    // wrong question, since the period is what decides how much weight a
+    // level carries. So every 日* shares one colour, every 週* shares
+    // another, and open-vs-high-vs-low is carried by the dash pattern plus
+    // the label, which was already distinguishing them.
+    //
+    // What this trades away: the above-is-red / below-is-green hint the
+    // extremes used to borrow from EQH/EQL. Acceptable — a high and a low of
+    // the same period sit either side of price by definition, so the colour
+    // was spending itself on something the position on screen already says.
+    //
+    // London and NY stay on their own colours: they are session opens, not
+    // calendar periods, and grouping them with 日* would imply they reset
+    // together. They do not.
     var OPEN_COLORS = {
-        daily: '#22b8cf', weekly: '#f59f00', london: '#7048e8', ny: '#e64980', monthly: '#ffd43b',
-        dayHigh: '#ff6b6b', dayLow: '#51cf66', weekHigh: '#c92a2a', weekLow: '#2f9e44',
+        daily: '#22b8cf', dayHigh: '#22b8cf', dayLow: '#22b8cf',   // 日 — cyan
+        weekly: '#f59f00', weekHigh: '#f59f00', weekLow: '#f59f00', // 週 — amber
+        monthly: '#ffd43b',                                          // 月
+        london: '#7048e8', ny: '#e64980',                            // sessions
     };
-    // Period extremes are dotted, opens dashed, HVN sparsely dotted, plan
-    // solid — four price layers can be on at once and the line has to say
-    // which one it belongs to without reading the label.
+    // Extremes dotted, opens dashed, HVN sparsely dotted, plan solid — four
+    // price layers can be on at once and the line has to say which one it
+    // belongs to without reading the label. This now carries the whole
+    // open-vs-extreme distinction, so it is load-bearing rather than decoration.
     var EXTREME_KINDS = { dayHigh: 1, dayLow: 1, weekHigh: 1, weekLow: 1 };
     function clearOpenLines() {
         openLines.forEach(function (l) { candleSeries.removePriceLine(l); });
