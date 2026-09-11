@@ -166,6 +166,45 @@
   <!-- Card 3: Don't fade a stacked regime -->
   <details class="tip-card">
     <summary class="tip-summary">
+      <span class="tip-icon">📦</span>
+      <span class="tip-title">
+        <span class="i18n-en">Reading OI: <em>it says how many, never whose</em></span>
+        <span class="i18n-zh">判讀 OI:<em>它說「有多少」,從不說「是誰的」</em></span>
+      </span>
+      <span class="tip-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="tip-body">
+      <ol class="tip-steps">
+        <li class="tip-step step-neutral">
+          <span class="i18n-en"><b>Every contract has a long AND a short.</b> So open interest carries no direction on its own — it counts positions that EXIST. It moves only when one is opened or closed, never when one changes hands: both sides opening → OI up; both closing → OI down; one opening while the other closes → OI flat. <b>OI says new-or-old; price says whose.</b></span>
+          <span class="i18n-zh"><b>每一張合約必然有一個多方和一個空方。</b> 所以 OI 本身不帶方向 —— 它數的是「存在的倉位」。它只在開倉或平倉時變動,換手不算:兩邊都開新倉 → OI 增;兩邊都平 → OI 減;一邊開一邊平 → OI 不變。<b>OI 說「新舊」,價格說「是誰的」。</b></span>
+        </li>
+        <li class="tip-step step-trend">
+          <span class="i18n-en"><b>The four quadrants.</b> <code>OI↑ + price↑</code> = new longs, the healthiest continuation up. <code>OI↑ + price↓</code> = new shorts, the healthiest continuation down — <em>and simultaneously squeeze fuel</em>. <code>OI↓ + price↑</code> = shorts covering, the rally is burning its fuel. <code>OI↓ + price↓</code> = longs capitulating, the drop is burning its fuel.</span>
+          <span class="i18n-zh"><b>四象限。</b> <code>OI↑ + 價格↑</code> = 新多單,最健康的續漲。<code>OI↑ + 價格↓</code> = 新空單,最健康的續跌 —— <em>同時是擠壓燃料</em>。<code>OI↓ + 價格↑</code> = 空單回補,漲勢在燒燃料。<code>OI↓ + 價格↓</code> = 多單投降,跌勢在燒燃料。</span>
+        </li>
+        <li class="tip-step step-agree">
+          <span class="i18n-en"><b>A falling-OI move is the weaker one.</b> A rally on shrinking OI is shorts buying back — when they finish there is no bid left. A rally on growing OI is new money, and that can keep going. Same logic inverted for a sell-off.</span>
+          <span class="i18n-zh"><b>OI 減的行情比較弱。</b> 上漲配 OI 減 = 空單在回補,補完就沒有買盤了。上漲配 OI 增 = 真的有新錢進來,那才能延續。下跌同理反過來。</span>
+        </li>
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>OI says how many, funding says who is paying.</b> They only mean something together: <code>OI↑ + price↓ + funding NEGATIVE</code> = shorts are both numerous and paying to hold = textbook squeeze setup. <code>OI↑ + price↓ + funding POSITIVE</code> = shorts are building but longs still pay = far less crowded than it looks. Thresholds the engine uses: OI ±2%, funding ±0.05% crowded / ±0.10% extreme.</span>
+          <span class="i18n-zh"><b>OI 說「有多少」,funding 說「誰在付錢」。</b> 兩個合起來才有意義:<code>OI↑ + 價格↓ + funding 為負</code> = 空單又多又在付錢 = 教科書擠壓設定。<code>OI↑ + 價格↓ + funding 為正</code> = 空單在建但多方還在付錢 = 沒有看起來那麼擠。引擎用的門檻:OI ±2%、funding ±0.05% 擁擠 / ±0.10% 極端。</span>
+        </li>
+        <li class="tip-step step-clash">
+          <span class="i18n-en"><b>⚠ Do NOT read a slope off the 5-minute samples.</b> BingX republishes open interest roughly every 10 minutes: measured on our own store, <b>44% of consecutive 5-minute samples are byte-identical</b> (112 of 254 on ETH). Those zeros are "the venue has not updated", not "nobody opened a position". Any "one bucket carried 54% of the build" read off raw 5-minute steps is measuring the publication cadence, not a whale. Dedupe repeated readings before computing any rate.</span>
+          <span class="i18n-zh"><b>⚠ 不要用 5 分鐘取樣去讀斜率。</b> BingX 大約每 10 分鐘才重新發布一次 OI:量我們自己的 store,<b>連續 5 分鐘樣本有 44% 是完全相同的數字</b>(ETH 254 格裡 112 格)。那些「0」的意思是「交易所還沒更新」,不是「沒有人開倉」。任何從原始 5 分鐘級距讀出來的「某一格佔了 54% 的堆積量」都是在量發布頻率,不是在量巨鯨。要算任何速率之前,先把重複值去掉。</span>
+        </li>
+      </ol>
+      <p class="tip-foot">
+        <span class="i18n-en">📊 The /ops card does the quadrant for the whole roster with mark price from the same window. The 7 NCCO*/NCSK* synthetics publish a FIXED open interest — one distinct value across 30 samples — so their OI column reads <code>n/a</code> by design; their funding is real. And this is BingX's book only, not the market's.</span>
+        <span class="i18n-zh">📊 /ops 那張卡會對整個 roster 做四象限判讀,用同一個窗口的標記價。七個 NCCO*/NCSK* 合成合約的 OI 是<b>固定值</b>(30 次取樣只有一個相異值),所以它們的 OI 欄按設計顯示 <code>n/a</code>;funding 則是真的。另外這只是 BingX 一家的帳本,不是全市場。</span>
+      </p>
+    </div>
+  </details>
+
+  <details class="tip-card">
+    <summary class="tip-summary">
       <span class="tip-icon">🛑</span>
       <span class="tip-title">
         <span class="i18n-en">Don't fade a stacked regime — MR longs need range</span>
