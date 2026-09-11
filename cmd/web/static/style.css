@@ -6608,3 +6608,12 @@ html[data-density="compact"] .setups-table {
 .tf-bias-oi.oi-armed { background: var(--wash-yellow); color: var(--yellow); font-weight: 700; }
 .tf-bias-oi.oi-unwind { color: var(--text); }
 .tf-bias-oi .oi-verdict { font-size: 0.64rem; opacity: 0.95; }
+
+/* Binance cross-reference line under the chart's OI row. Deliberately quieter
+   than the BingX row above it: it informs, it is not the book an order fills
+   against. */
+.tf-bias-bn { font-size: 0.64rem; font-variant-numeric: tabular-nums;
+    padding: 1px 6px; margin-top: 2px; border-radius: 4px;
+    background: var(--wash-dim); color: var(--text-dim); cursor: help;
+    border-left: 2px solid var(--border); }
+.tf-bias-bn.bn-crowd { color: var(--yellow); }

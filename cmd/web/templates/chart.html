@@ -2705,6 +2705,30 @@
                           + oTip.replace(/"/g, '&quot;') + '">' + oTxt
                           + (o.reading ? '<span class="oi-verdict">' + o.reading + '</span>' : '')
                           + '</div>';
+                    // Binance cross-reference, its own line so it can never be
+                    // mistaken for the BingX figure above. Different book —
+                    // the entry fills against BingX's.
+                    var bnBits = [];
+                    if (typeof o.bnDelta1h === 'number') {
+                        var b = 'BN ' + (o.bnDelta1h >= 0 ? '+' : '') + (o.bnDelta1h * 100).toFixed(2) + '%';
+                        if (typeof o.bnDelta15m === 'number') {
+                            b += ' / ' + (o.bnDelta15m >= 0 ? '+' : '') + (o.bnDelta15m * 100).toFixed(2) + '%';
+                        }
+                        bnBits.push(b);
+                    }
+                    if (typeof o.whaleTop === 'number') {
+                        bnBits.push('大戶 ' + o.whaleTop.toFixed(2) + ' / 全體 ' + o.whaleAll.toFixed(2)
+                            + (o.crowd === 'retail-longer' ? ' 散戶偏多'
+                             : o.crowd === 'retail-shorter' ? ' 散戶偏空' : ''));
+                    }
+                    if (bnBits.length) {
+                        var bnTip = 'Binance 交叉參考 —— 不同的帳本,你的單在 BingX 成交。'
+                            + '\n15m 只有這一側有:Binance 發布真正的 5 分鐘桶,BingX 那側 15 分鐘只是重讀同一個值。'
+                            + '\n大戶/全體兩者都按帳戶數(可比);另有按倉位大小的大戶比率不併入此差值。'
+                            + '\n差距在 ±0.25 內不標註 —— 兩個母體結構不同,小差距是基線不是訊號。';
+                        html += '<div class="tf-bias-bn' + (o.crowd ? ' bn-crowd' : '') + '" title="'
+                              + bnTip.replace(/"/g, '&quot;') + '">' + bnBits.join(' · ') + '</div>';
+                    }
                 }
                 if (d.hvn && (d.hvn.above || d.hvn.below)) {
                     var fmtH = function (v) { return v >= 1000 ? v.toFixed(0) : (v >= 1 ? v.toFixed(2) : v.toFixed(4)); };

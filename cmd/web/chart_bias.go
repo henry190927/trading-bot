@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"myFirstGo/trading-bot/binfut"
 	"myFirstGo/trading-bot/indicator"
 	"myFirstGo/trading-bot/market"
 	"myFirstGo/trading-bot/oi"
@@ -184,6 +185,32 @@ func computeChartOI(sym market.Symbol) gin.H {
 	// rendering 0.00%, which reads as "quiet" rather than "impossible".
 	if oiIsStatic(snaps, string(sym)) {
 		out["static"] = true
+		// Do NOT return early any more. The frozen synthetics are exactly the
+		// symbols Binance can answer for and BingX cannot, so skipping the
+		// cross-reference here would blank the only readable OI they have.
+	}
+	// Binance cross-reference, kept in separate keys. Different book: an
+	// entry fills against BingX's, so these never merge into the figures
+	// above. The 15m reading exists only on this side — Binance publishes
+	// genuine 5-minute buckets, while BingX would be re-reading one value.
+	if short := market.Short(sym); short != "" {
+		bf := binfut.Load()
+		if d, ok := bf.OIChange(short, time.Hour); ok {
+			out["bnDelta1h"] = d
+		}
+		if d, ok := bf.OIChange(short, 15*time.Minute); ok {
+			out["bnDelta15m"] = d
+		}
+		if w, ok := bf.Whales(short); ok {
+			out["whaleTop"] = w.Top
+			out["whaleAll"] = w.All
+			if c := w.Crowd(); c != "" {
+				out["crowd"] = c
+			}
+		}
+	}
+
+	if out["static"] == true {
 		return out
 	}
 	bar := market.BarDuration(market.TF1h)
