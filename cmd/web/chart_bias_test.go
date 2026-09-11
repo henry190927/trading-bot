@@ -22,7 +22,9 @@ func tfScores(m5, m15, h1, h2, h4 int) []gin.H {
 
 // Every case below is hand-traced against the rule: conflict first (HTF sum
 // sign vs LTF sum sign), then dom = sign(total), then breadth
-// (agree>=2 && agree>against && (htfAgree>=1 || agree>=3)).
+// (broad && agree>against && !1h-dissent), where broad = agree>=3 or an
+// unopposed HTF-led pair. Tightened 2026-09-11 — see the three cases at the
+// end of the table.
 func TestComputeAlignment(t *testing.T) {
 	cases := []struct {
 		name                   string
@@ -59,6 +61,20 @@ func TestComputeAlignment(t *testing.T) {
 		// Total nets to zero with real votes on both sides inside the LTF
 		// group: htfSum 0, ltfSum 0 → dom 0 → mixed.
 		{"nets to zero", 1, -1, 0, 0, 0, "mixed", 0, 0},
+
+		// ── Tightened 2026-09-11 ────────────────────────────────────────
+		// THE REGRESSION, from the live ETH strip: 15m +2, 1h -1, 4h +1,
+		// 5m/2h neutral. The shipped rule read agree 2 with htfAgree 1 and
+		// printed "✓ TF 一致偏多 (2/5·反1)". Two things now stop it: the
+		// minority is CONTESTED (against 1, so the unopposed clause fails
+		// and agree>=3 fails), and the dissenter is 1h.
+		{"contested 2 of 5, 1h dissents", 0, 2, -1, 0, 1, "weak-long", 2, 1},
+		// The veto on its own. A real majority (agree 3) that 1h objects to
+		// is still not actionable: 1h is the only timeframe any shipped edge
+		// is validated on (isStructureTF, the daemon, the sweep-reject A/B).
+		{"majority but 1h dissents", 1, 1, -1, 1, 0, "weak-long", 3, 1},
+		// And a NEUTRAL 1h must not veto — only actual opposition does.
+		{"1h neutral does not veto", 1, 1, 0, 1, 0, "aligned-long", 3, 0},
 	}
 
 	for _, tc := range cases {
@@ -126,5 +142,23 @@ func TestComputeRangeEngagesOnWeakAlignment(t *testing.T) {
 		if !tc.wantIsRange && !strings.Contains(act, "趨勢中") {
 			t.Errorf("%s: action = %q, want the trend advice", tc.state, act)
 		}
+	}
+}
+
+// A downgrade has to say WHY, or the operator sees 弱共識 and cannot tell
+// whether breadth was thin or the 1h lens objected — two different reads with
+// two different responses.
+func TestAlignmentLabelNamesTheOneHourVeto(t *testing.T) {
+	// agree 3 / against 1, downgraded purely by the 1h veto.
+	got := computeAlignment(tfScores(1, 1, -1, 1, 0))
+	label, _ := got["label"].(string)
+	if !strings.Contains(label, "1h 反對") {
+		t.Errorf("label = %q, want it to name the 1h dissent", label)
+	}
+	// A thin-breadth downgrade must NOT claim a 1h veto that did not happen.
+	got = computeAlignment(tfScores(-1, -1, 0, 0, 0))
+	label, _ = got["label"].(string)
+	if strings.Contains(label, "1h 反對") {
+		t.Errorf("label = %q claims a 1h veto, but 1h was neutral", label)
 	}
 }

@@ -61,26 +61,26 @@ func fundamentalSymbols() []string {
 // fundRow is a flat display row usable from either the precomputed board or an
 // on-demand fetch.
 type fundRow struct {
-	Symbol       string
-	Label        string
-	Quality      float64
-	Valuation    float64
-	Growth       float64
+	Symbol        string
+	Label         string
+	Quality       float64
+	Valuation     float64
+	Growth        float64
 	Profitability float64
-	BalanceSheet float64
-	Confidence   string
-	Rich         bool
-	PrevLabel    string
-	Downgraded   bool
-	Note         string
-	PE           float64
-	PS           float64
-	RevGrowthYoY float64
-	NetMargin    float64
-	DebtToEquity float64
-	NextEarnings *earnings.Event
-	DaysToER     int
-	Err          string
+	BalanceSheet  float64
+	Confidence    string
+	Rich          bool
+	PrevLabel     string
+	Downgraded    bool
+	Note          string
+	PE            float64
+	PS            float64
+	RevGrowthYoY  float64
+	NetMargin     float64
+	DebtToEquity  float64
+	NextEarnings  *earnings.Event
+	DaysToER      int
+	Err           string
 }
 
 func firstNote(ns []string) string {

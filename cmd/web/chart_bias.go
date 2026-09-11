@@ -38,7 +38,7 @@ const biasCacheTTL = 30 * time.Second
 // computeTFBias combines the three lenses into a single [-3,+3] score plus a
 // direction label. Each lens contributes at most ±1, so no single lens can
 // dominate — a TF only reads "strong" when at least two lenses agree.
-func computeTFBias(st signal.StructureState, sig signal.Signal) gin.H {
+func computeTFBias(tf market.Timeframe, st signal.StructureState, sig signal.Signal) gin.H {
 	// Lens 1 — N-struct: trend classification, nudged by any structural
 	// event (CHoCH/BOS), clamped to ±1.
 	sv := 0
@@ -106,7 +106,23 @@ func computeTFBias(st signal.StructureState, sig signal.Signal) gin.H {
 	case indicator.POCFalling:
 		pocArrow = "↘"
 	}
-	pocLabel := fmt.Sprintf("POC %s %+.1f%%", pocArrow, sig.POCMig.DriftPct*100)
+	// Name the WINDOW, not just the number. DriftPct is
+	// (POC50 - POC200) / POC200, so the span is 200 bars OF THIS TIMEFRAME —
+	// on 4h that is 800 hours, about 33 days. A chip read as "the 4h bias"
+	// was reporting a month-old drift: ETH printed "POC ↗ +32.5% stacked" on
+	// 2026-09-11 because it ran 1,900 -> 2,475 since mid-August, and that one
+	// vote was what tipped the alignment label to "一致偏多" while the 1h
+	// lens read short. The figure was never wrong; the label let it be read
+	// as recent momentum.
+	span := ""
+	if d := market.BarDuration(tf); d > 0 {
+		if days := (200 * d).Hours() / 24; days >= 1 {
+			span = fmt.Sprintf("/200根≈%.0f天", days)
+		} else {
+			span = fmt.Sprintf("/200根≈%.0f小時", (200 * d).Hours())
+		}
+	}
+	pocLabel := fmt.Sprintf("POC%s %s %+.1f%%", span, pocArrow, sig.POCMig.DriftPct*100)
 	if sig.POCMig.Stacked {
 		pocLabel += " stacked"
 	} else {
@@ -160,7 +176,7 @@ func (s *server) handleChartBias(c *gin.Context) {
 			continue
 		}
 		st := signal.AnalyzeStructure(view.Candles, 2)
-		b := computeTFBias(st, view.Signal)
+		b := computeTFBias(tf, st, view.Signal)
 		b["tf"] = tfStr
 		tfs = append(tfs, b)
 		if tfStr == "1h" {
@@ -264,13 +280,39 @@ func computeAlignment(tfs []gin.H) gin.H {
 		}
 	}
 
-	// Breadth test: enough TFs leaning, a clear majority of the ones that do,
-	// and either an HTF participating or the entire LTF stack agreeing.
-	strong := agree >= 2 && agree > against && (htfAgree >= 1 || agree >= 3)
+	// Breadth test. Three conditions, and the last two were added on
+	// 2026-09-11 after the strip printed "✓ TF 一致偏多 (2/5·反1)" — a label
+	// whose own parenthetical contradicted it.
+	//
+	// A contested minority is not 一致. The shipped rule accepted agree>=2
+	// with an HTF on board, which printed "✓ TF 一致偏多 (2/5·反1)" — a label
+	// its own parenthetical contradicted.
+	//
+	// A blunt majority-of-all test was the first fix and it was too blunt: it
+	// also downgraded {2h +2, 4h +1, LTFs all neutral}, where both higher
+	// timeframes agree and NOTHING opposes them. That is a real alignment;
+	// neutral is not opposition. What the defect actually was is calling a
+	// CONTESTED minority aligned.
+	//
+	// So: a genuine majority of the strip, or an unopposed HTF-led lean.
+	broad := agree >= 3 || (agree >= 2 && against == 0 && htfAgree >= 1)
+	// 1h HOLDS A VETO. Every shipped edge is validated on 1h and nothing
+	// else: isStructureTF() returns true only for "1h", the daemon runs 1h,
+	// the sweep-reject A/B is 1h. On the 2026-09-11 case the dissenter WAS
+	// 1h and it was outvoted by 15m and 4h — 15m being the timeframe the TF
+	// decisions call poison. A consensus that the only validated lens
+	// disagrees with is not a consensus worth acting on.
+	oneHourDissents := signs["1h"] != 0 && signs["1h"] == -dom
+	strong := broad && agree > against && !oneHourDissents
 
 	breadth := fmt.Sprintf(" (%d/%d)", agree, len(tfs))
 	if against > 0 {
 		breadth = fmt.Sprintf(" (%d/%d·反%d)", agree, len(tfs), against)
+	}
+	// Say WHY it was downgraded, or the operator reads "弱共識" and cannot
+	// tell whether breadth was thin or the 1h lens objected.
+	if oneHourDissents {
+		breadth += "·1h 反對"
 	}
 
 	state, label := "weak-", "⚠ TF 弱共識偏"
