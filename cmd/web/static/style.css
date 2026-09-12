@@ -1554,6 +1554,12 @@ footer {
     position: relative;
     width: 100%;
     min-width: 0;
+    /* Absorbs the column's spare height so the plot, not a gap, is what
+       grows when the side panel is the taller of the two. min-height carries
+       the intended size; flex-grow only ever adds to it. The sub-panes (RSI)
+       sit beside this in .chart-column and keep their own heights. */
+    flex: 1 1 auto;
+    min-height: clamp(560px, 82vh, 960px);
 }
 /* Shared column that stacks the main plot + sub-panes (RSI, etc.)
    so they inherit the exact same width — critical for x-axis
@@ -1746,11 +1752,10 @@ footer {
 }
 .chart-canvas {
     width: 100%;
-    /* Raised 2026-09-12 when the TF-bias overlay moved to the side panel.
-       That widget occupied the top-left of the plot, so the usable price
-       area was smaller than the box; with it gone the same box shows more
-       chart. Pure taste — adjust freely. */
-    height: clamp(560px, 82vh, 960px);
+    /* Height comes from .chart-plot-wrap now, so the canvas tracks whatever
+       the grid row ends up being. The clamp that used to live here moved
+       there as a min-height; LWC runs autoSize:true and follows the box. */
+    height: 100%;
     background: #0f0b07;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -5811,8 +5816,16 @@ main { overflow-x: hidden; }
     display: grid;
     grid-template-columns: 1fr 340px;
     gap: var(--sp-3);
-    align-items: start;   /* panel hugs its content, top-aligned with the chart — no empty void below */
+    /* stretch, NOT start. `start` was here so a SHORT panel hugged its
+       content instead of leaving a void below it — but it also meant a TALL
+       panel left a void beside the CHART, which is what happened once the
+       TF-bias card moved into this column. The panel keeps the old behaviour
+       via align-self below; the chart now absorbs whichever is taller. */
+    align-items: stretch;
 }
+/* Panel still hugs its content — the original `align-items: start` intent,
+   scoped to the item that wanted it. */
+.chart-side { align-self: start; }
 .chart-grid.side-collapsed { grid-template-columns: 1fr; gap: 0; }
 .chart-side {
     display: flex;
