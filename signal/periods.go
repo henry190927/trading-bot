@@ -3,7 +3,7 @@ package signal
 import (
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Period is one calendar period's open, high and low.

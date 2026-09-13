@@ -27,9 +27,9 @@ import (
 	"strconv"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/oi"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/oi"
 )
 
 const (

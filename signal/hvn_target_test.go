@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"myFirstGo/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/indicator"
 )
 
 func vp(poc float64, hvn ...float64) indicator.VolumeProfile {

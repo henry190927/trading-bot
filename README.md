@@ -246,15 +246,15 @@ synthetics and the crypto alts that are deliberately kept out of the daemon
 universe:
 
 ```bash
-go run ./trading-bot/cmd/analyze -symbols BTC,ETH,SUI,SNDK -tf 1h
+go run ./cmd/analyze -symbols BTC,ETH,SUI,SNDK -tf 1h
 ```
 
 ```bash
-go run ./trading-bot/cmd/analyze                  # default 1h
-go run ./trading-bot/cmd/analyze -tf=15m          # 15-minute snapshot
-go run ./trading-bot/cmd/analyze -tf=4h           # 4-hour snapshot
-go run ./trading-bot/cmd/analyze -tf=4h -min-score=4   # stricter threshold
-go run ./trading-bot/cmd/analyze -bias            # opt into MTF bias filter
+go run ./cmd/analyze                  # default 1h
+go run ./cmd/analyze -tf=15m          # 15-minute snapshot
+go run ./cmd/analyze -tf=4h           # 4-hour snapshot
+go run ./cmd/analyze -tf=4h -min-score=4   # stricter threshold
+go run ./cmd/analyze -bias            # opt into MTF bias filter
 ```
 
 ### `cmd/serve` — live monitor daemon
@@ -263,16 +263,16 @@ Runs forever. Wakes 2 seconds after every `-tf` boundary, scans, dedups, pushes 
 
 ```bash
 # Default 1h, alerts on score≥3, no sweep filter
-go run ./trading-bot/cmd/serve
+go run ./cmd/serve
 
 # Recommended: 1h, score≥3, sweep-only
-go run ./trading-bot/cmd/serve -tf=1h -min-score=3 -sweep-only
+go run ./cmd/serve -tf=1h -min-score=3 -sweep-only
 
 # Background it
-nohup go run ./trading-bot/cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading-bot.log 2>&1 &
+nohup go run ./cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading-bot.log 2>&1 &
 
 # 15-minute cadence (more frequent alerts; check live trades count first)
-go run ./trading-bot/cmd/serve -tf=15m -min-score=3 -sweep-only
+go run ./cmd/serve -tf=15m -min-score=3 -sweep-only
 ```
 
 #### Heartbeat logging
@@ -303,11 +303,11 @@ This makes "why didn't I get a buzz?" diagnostics trivial — `tlog` shows exact
 Pulls `-days` of history at `-tf`, replays the engine, simulates each setup with a fee model. Prints per-symbol stats (WR, net R, max drawdown). Use to validate the strategy before live trading.
 
 ```bash
-go run ./trading-bot/cmd/backtest                              # default 1h, 60 days
-go run ./trading-bot/cmd/backtest -tf=15m -days=30             # 15-min over 30 days
-go run ./trading-bot/cmd/backtest -tf=1h -sweep-only           # sweep-only
-go run ./trading-bot/cmd/backtest -tf=1h -fee-bps=10           # taker fee assumption
-go run ./trading-bot/cmd/backtest -tf=1h -v                    # print every trade
+go run ./cmd/backtest                              # default 1h, 60 days
+go run ./cmd/backtest -tf=15m -days=30             # 15-min over 30 days
+go run ./cmd/backtest -tf=1h -sweep-only           # sweep-only
+go run ./cmd/backtest -tf=1h -fee-bps=10           # taker fee assumption
+go run ./cmd/backtest -tf=1h -v                    # print every trade
 ```
 
 ### `cmd/validate` — score a proposed trade
@@ -315,9 +315,9 @@ go run ./trading-bot/cmd/backtest -tf=1h -v                    # print every tra
 Given a symbol, side, entry price, and timeframe, scores **your proposed entry** 0–10 against the engine's current state and HVN structure. Use when you're considering a discretionary entry and want a sanity check.
 
 ```bash
-go run ./trading-bot/cmd/validate -symbol=BTC -side=long -entry=74500 -tf=1h
-go run ./trading-bot/cmd/validate -symbol=XAG -side=short -entry=75.80 -tf=15m
-go run ./trading-bot/cmd/validate -symbol=ETH -side=long -entry=2030 -tf=1h -fee-bps=10
+go run ./cmd/validate -symbol=BTC -side=long -entry=74500 -tf=1h
+go run ./cmd/validate -symbol=XAG -side=short -entry=75.80 -tf=15m
+go run ./cmd/validate -symbol=ETH -side=long -entry=2030 -tf=1h -fee-bps=10
 ```
 
 Symbol aliases: `BTC` / `ETH` / `XAU` or `GOLD` / `XAG` or `SILVER`. Side: `long` / `short` (or `l` / `s`).
@@ -1179,15 +1179,18 @@ The first deploy installs the systemd unit, shell aliases, and binaries. Subsequ
 Run these on your **Mac** (replace `<vps-ip>` with your actual IP):
 
 ```bash
-cd ~/GolandProjects/myFirstGo
+git clone https://github.com/henry190927/trading-bot.git
+cd trading-bot
 
-# Update Makefile with your VPS IP if it's not your.vps.ip
-sed -i '' 's/^ORACLE_HOST ?=.*/ORACLE_HOST ?= <vps-ip>/' trading-bot/Makefile
+# Point the Makefile at your VPS. Prefer Makefile.local (gitignored) over
+# editing Makefile itself, so `git pull` never conflicts with your host:
+cp Makefile.local.example Makefile.local
+$EDITOR Makefile.local   # set ORACLE_HOST / ORACLE_KEY / ORACLE_USER
 
 # Cross-compile all 4 binaries
 mkdir -p /tmp/oracle-deploy
 for cmd in serve analyze validate backtest; do
-  GOOS=linux GOARCH=amd64 go build -o /tmp/oracle-deploy/trading-bot-$cmd ./trading-bot/cmd/$cmd
+  GOOS=linux GOARCH=amd64 go build -o /tmp/oracle-deploy/trading-bot-$cmd ./cmd/$cmd
 done
 
 # Copy .env and systemd files into the bundle
@@ -1501,7 +1504,7 @@ worth reading first.
 1. **Pre-market sanity check** (10 sec): `go run ./trading/cmd/backtest -tf=1h -days=30 -fee-bps=6 -sweep-only` — verify the strategy still has edge on the last 30 days.
 2. **Start the monitor:**
    ```bash
-   nohup go run ./trading-bot/cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading-bot.log 2>&1 &
+   nohup go run ./cmd/serve -tf=1h -min-score=3 -sweep-only > ~/trading-bot.log 2>&1 &
    ```
 3. **macOS banner + stdout line** on every 1h close where a score≥3 sweep-anchored setup fires.
 4. **Place limit order** at the entry price shown. Set stop and TP brackets immediately.

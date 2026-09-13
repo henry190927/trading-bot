@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"myFirstGo/trading-bot/autostrat"
-	"myFirstGo/trading-bot/autotrade"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/autostrat"
+	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/market"
 
 	"github.com/gin-gonic/gin"
 )

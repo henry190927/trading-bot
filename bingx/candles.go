@@ -3,7 +3,7 @@ package bingx
 import (
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // dropForming returns candles minus a trailing still-forming bar.

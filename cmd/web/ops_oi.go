@@ -20,10 +20,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/binfut"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/oi"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/binfut"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/oi"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // oiDeltaThreshold mirrors the engine's own trigger (signal/engine.go:

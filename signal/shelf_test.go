@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // narrowBars turns a price path into candles with High == Low == price, so the

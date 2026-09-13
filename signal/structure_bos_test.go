@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // mkC builds a candle from high/low/close (open/time irrelevant to structure).

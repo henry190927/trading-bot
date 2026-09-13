@@ -25,8 +25,8 @@ import (
 	"context"
 	"fmt"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Plan is the preview of what attaching stop/tp to a live position would do.

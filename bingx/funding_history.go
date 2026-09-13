@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // FundingPoint is one historical funding-rate observation. BingX

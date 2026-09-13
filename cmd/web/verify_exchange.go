@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/bracket"
-	"myFirstGo/trading-bot/journal"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/bracket"
+	"github.com/henry190927/trading-bot/journal"
 
 	"github.com/gin-gonic/gin"
 )

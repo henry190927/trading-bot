@@ -7,12 +7,12 @@ import (
 	"os"
 	"time"
 
-	"myFirstGo/trading-bot/autostrat"
-	"myFirstGo/trading-bot/autotrade"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/notify"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/autostrat"
+	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/notify"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // autoSymbols maps the friendly ticker in autotrade.json to the BingX symbol.

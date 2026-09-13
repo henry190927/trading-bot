@@ -49,12 +49,12 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/bracket"
-	"myFirstGo/trading-bot/journal"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/notify"
-	"myFirstGo/trading-bot/protect"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/bracket"
+	"github.com/henry190927/trading-bot/journal"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/notify"
+	"github.com/henry190927/trading-bot/protect"
 )
 
 const (

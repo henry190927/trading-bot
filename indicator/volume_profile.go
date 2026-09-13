@@ -3,7 +3,7 @@ package indicator
 import (
 	"sort"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // BodyWeight, if in (0,1), routes that fraction of each candle's volume into

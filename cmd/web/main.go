@@ -19,14 +19,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/ai"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/config"
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/econcal"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/onchain"
+	"github.com/henry190927/trading-bot/ai"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/config"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/econcal"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/onchain"
 )
 
 //go:embed templates/*.html static

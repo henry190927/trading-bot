@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/zone"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/zone"
 )
 
 // The bar that motivated close confirmation: BTC 1h, 2026-09-02 21:00 UTC+8,

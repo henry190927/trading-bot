@@ -3,7 +3,7 @@ package fundamental
 import (
 	"testing"
 
-	"myFirstGo/trading-bot/earnings/finnhub"
+	"github.com/henry190927/trading-bot/earnings/finnhub"
 )
 
 func TestScore_NVDA_StrongButExpensive_Hold(t *testing.T) {

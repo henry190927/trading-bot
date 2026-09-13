@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/econcal"
-	"myFirstGo/trading-bot/macro"
+	"github.com/henry190927/trading-bot/econcal"
+	"github.com/henry190927/trading-bot/macro"
 )
 
 // /today — the "attention feed" home. Answers the morning questions on one

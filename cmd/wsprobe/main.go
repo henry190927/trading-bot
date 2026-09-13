@@ -21,7 +21,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"myFirstGo/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/bingx"
 )
 
 func main() {

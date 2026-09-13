@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"myFirstGo/trading-bot/risk"
+	"github.com/henry190927/trading-bot/risk"
 
 	"github.com/gin-gonic/gin"
 )

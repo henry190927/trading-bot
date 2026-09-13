@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/notify"
-	sig "myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/notify"
+	sig "github.com/henry190927/trading-bot/signal"
 )
 
 // runStructureAlerts pushes an ntfy when a symbol's N-字 structure flips on a

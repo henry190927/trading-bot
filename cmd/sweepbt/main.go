@@ -17,12 +17,12 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/autotrade"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/config"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/config"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 func main() {

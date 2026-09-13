@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/bingx"
 )
 
 var errTest = errors.New("read: websocket: close 1006 (abnormal closure)")

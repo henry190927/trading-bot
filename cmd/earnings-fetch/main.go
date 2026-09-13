@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/earnings/finnhub"
+	"github.com/henry190927/trading-bot/earnings/finnhub"
 )
 
 func main() {

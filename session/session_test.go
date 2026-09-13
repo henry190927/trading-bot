@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // bar builds a candle spanning [startUTC, startUTC+d) with a range expressed

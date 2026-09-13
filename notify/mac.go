@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // Mac posts a macOS Notification Center banner via osascript. Banner

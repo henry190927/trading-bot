@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/zone"
+	"github.com/henry190927/trading-bot/zone"
 
 	"github.com/gin-gonic/gin"
 )

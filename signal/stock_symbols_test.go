@@ -3,7 +3,7 @@ package signal
 import (
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Locks in the forward-log stock treatment: SNDK→veto, NVDA→zone (their

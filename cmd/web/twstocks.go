@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/twse"
+	"github.com/henry190927/trading-bot/twse"
 )
 
 // /tw — Taiwan-stock spot fundamental board. TWSE open data is bulk (3 calls

@@ -3,8 +3,8 @@ package main
 import (
 	"time"
 
-	"myFirstGo/trading-bot/autotrade"
-	"myFirstGo/trading-bot/journal"
+	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/journal"
 )
 
 // Shared input for the three portfolio views (equity curve, R histogram,

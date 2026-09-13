@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 
 	"github.com/gin-gonic/gin"
 )

@@ -15,15 +15,15 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/analyzer"
-	"myFirstGo/trading-bot/ansi"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/config"
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/session"
-	"myFirstGo/trading-bot/signal"
-	"myFirstGo/trading-bot/validator"
+	"github.com/henry190927/trading-bot/analyzer"
+	"github.com/henry190927/trading-bot/ansi"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/config"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/session"
+	"github.com/henry190927/trading-bot/signal"
+	"github.com/henry190927/trading-bot/validator"
 )
 
 func main() {

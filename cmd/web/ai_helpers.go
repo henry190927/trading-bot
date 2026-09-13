@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math"
 
-	"myFirstGo/trading-bot/ai"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/ai"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // parentTimeframes returns the parent TFs to fetch for multi-TF context

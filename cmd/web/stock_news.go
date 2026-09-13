@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/earnings/finnhub"
+	"github.com/henry190927/trading-bot/earnings/finnhub"
 )
 
 // Per-symbol company-news, fetched live from Finnhub on demand (option A) and

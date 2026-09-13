@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"myFirstGo/trading-bot/analyzer"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/analyzer"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
 )
 
 type OrderType int

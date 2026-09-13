@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"myFirstGo/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/indicator"
 )
 
 // Summary is a pure-function rule-based one-line description of a symbol's

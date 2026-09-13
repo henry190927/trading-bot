@@ -22,7 +22,7 @@ import (
 	"log"
 	"time"
 
-	"myFirstGo/trading-bot/binfut"
+	"github.com/henry190927/trading-bot/binfut"
 )
 
 const binfutTick = 2 * time.Minute

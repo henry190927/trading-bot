@@ -3,7 +3,7 @@ package signal
 import (
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // The core 4 + stock synthetics must run MR on EVERY timeframe — StructMomentum

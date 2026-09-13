@@ -1,8 +1,8 @@
 package signal
 
 import (
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Bias returns the directional bias implied by the MACD(12,26,9) histogram

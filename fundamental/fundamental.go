@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	"myFirstGo/trading-bot/earnings/finnhub"
+	"github.com/henry190927/trading-bot/earnings/finnhub"
 )
 
 // Rating is the spot indicator's verdict for one symbol.

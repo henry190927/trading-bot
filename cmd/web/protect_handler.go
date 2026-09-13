@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/protect"
+	"github.com/henry190927/trading-bot/protect"
 
 	"github.com/gin-gonic/gin"
 )

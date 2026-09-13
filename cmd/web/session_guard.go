@@ -18,9 +18,9 @@ import (
 	"context"
 	"time"
 
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/session"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/session"
 )
 
 // The median moves at most once a day, so an hour of staleness is free and

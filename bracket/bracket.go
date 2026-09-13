@@ -47,9 +47,9 @@ import (
 	"fmt"
 	"strings"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/journal"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/journal"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // State is what the exchange says about one open journal trade.

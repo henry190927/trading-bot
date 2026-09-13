@@ -25,8 +25,8 @@ import (
 	"strconv"
 	"strings"
 
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/risk"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/risk"
 )
 
 // riskLimits reads the ceilings from the environment. Every one defaults to 0,

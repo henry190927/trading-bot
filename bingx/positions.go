@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Position is a (much) trimmed-down view of one BingX open position.

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Both /setups outcome classifiers were untested, which is how classifyOutcome

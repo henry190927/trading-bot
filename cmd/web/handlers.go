@@ -19,18 +19,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/ai"
-	"myFirstGo/trading-bot/analyzer"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/fundamental"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/journal"
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/oi"
-	"myFirstGo/trading-bot/onchain"
-	"myFirstGo/trading-bot/signal"
-	"myFirstGo/trading-bot/validator"
+	"github.com/henry190927/trading-bot/ai"
+	"github.com/henry190927/trading-bot/analyzer"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/fundamental"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/journal"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/oi"
+	"github.com/henry190927/trading-bot/onchain"
+	"github.com/henry190927/trading-bot/signal"
+	"github.com/henry190927/trading-bot/validator"
 )
 
 type server struct {

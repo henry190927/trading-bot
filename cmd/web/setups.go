@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 
 	"github.com/gin-gonic/gin"
 )

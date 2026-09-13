@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"math"
 
-	"myFirstGo/trading-bot/analyzer"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/analyzer"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // Axis tags which scoring axis a factor contributes to. Used by the

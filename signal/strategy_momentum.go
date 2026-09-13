@@ -3,8 +3,8 @@ package signal
 import (
 	"fmt"
 
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // StrategyKind selects which evaluation path a symbol runs through Evaluate.

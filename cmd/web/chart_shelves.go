@@ -14,8 +14,8 @@ package main
 import (
 	"strconv"
 
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 const (

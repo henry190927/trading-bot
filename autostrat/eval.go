@@ -12,12 +12,12 @@ import (
 	"strconv"
 	"strings"
 
-	"myFirstGo/trading-bot/autotrade"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
-	"myFirstGo/trading-bot/validator"
+	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
+	"github.com/henry190927/trading-bot/validator"
 )
 
 // Trigger is what a strategy would do on the current closed bar.

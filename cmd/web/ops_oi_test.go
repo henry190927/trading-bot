@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/oi"
+	"github.com/henry190927/trading-bot/oi"
 )
 
 func oiRows(sym string, vals ...float64) []oi.Snapshot {

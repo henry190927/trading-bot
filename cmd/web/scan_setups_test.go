@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"myFirstGo/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/autotrade"
 )
 
 // scanRR replaced an inline calculation that assigned `risk` from the LONG

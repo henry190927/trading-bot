@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // Ntfy pushes alerts via ntfy.sh — free, no account, topic-based.

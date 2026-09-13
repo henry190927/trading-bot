@@ -8,13 +8,13 @@ import (
 	"os"
 	"time"
 
-	"myFirstGo/trading-bot/backtest"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/config"
-	"myFirstGo/trading-bot/dxy"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/backtest"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/config"
+	"github.com/henry190927/trading-bot/dxy"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 func main() {

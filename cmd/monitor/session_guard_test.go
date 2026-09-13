@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/autostrat"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/session"
+	"github.com/henry190927/trading-bot/autostrat"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/session"
 )
 
 // 2026-09-10 is a Thursday, so its cash open is a real one (NextCashOpen

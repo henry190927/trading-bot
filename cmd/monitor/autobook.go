@@ -6,9 +6,9 @@ import (
 	"log"
 	"time"
 
-	"myFirstGo/trading-bot/autotrade"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Cross-rule book assembly for the global risk caps (autotrade.CheckCaps).

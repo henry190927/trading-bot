@@ -32,7 +32,7 @@ import (
 	// Sunday of November and stays broken until March.
 	_ "time/tzdata"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // NYSE regular-hours open, in exchange-local time.

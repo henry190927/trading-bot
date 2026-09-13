@@ -19,7 +19,7 @@ package signal
 import (
 	"sort"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Shelf is a price band touched by swings of both kinds.

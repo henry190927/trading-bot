@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Liquidity detection — equal highs / equal lows (EQH/EQL) as resting-liquidity

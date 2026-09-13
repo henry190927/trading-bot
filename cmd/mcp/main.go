@@ -29,11 +29,11 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	"myFirstGo/trading-bot/ai"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/journal"
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/ai"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/journal"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/market"
 )
 
 func main() {

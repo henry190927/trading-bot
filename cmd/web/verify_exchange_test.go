@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/journal"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/journal"
 )
 
 // The interesting rows cannot be produced against the live API on demand, so

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // gz compresses like the exchange does, so the tests exercise the real path

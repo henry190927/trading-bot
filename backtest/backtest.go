@@ -6,12 +6,12 @@ import (
 	"sort"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/dxy"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
-	"myFirstGo/trading-bot/validator"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/dxy"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
+	"github.com/henry190927/trading-bot/validator"
 )
 
 // Options configures a backtest run. Zero values mean "no fees, no filter".

@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // TestUISymbolsMatchMarketResolve keeps the dropdown and the resolver from

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // buildTestCandles makes n 1h candles ending at endUTC with a gentle

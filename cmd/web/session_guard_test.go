@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // The guard's scope, pinned. The measurement behind it (package session) was

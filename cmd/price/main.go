@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"myFirstGo/trading-bot/ansi"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/config"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/ansi"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/config"
+	"github.com/henry190927/trading-bot/market"
 )
 
 type row struct {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
 )
 
 func longPos() *bingx.Position {

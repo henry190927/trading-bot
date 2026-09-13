@@ -24,7 +24,7 @@ import (
 	"log"
 	"time"
 
-	"myFirstGo/trading-bot/bls"
+	"github.com/henry190927/trading-bot/bls"
 )
 
 // blsRefreshTick is how often the loop WAKES. Whether it actually fetches is

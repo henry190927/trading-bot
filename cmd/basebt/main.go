@@ -6,9 +6,9 @@
 package main
 import(
  "context";"flag";"fmt";"math";"os";"time"
- "myFirstGo/trading-bot/autotrade";"myFirstGo/trading-bot/bingx"
- "myFirstGo/trading-bot/config";"myFirstGo/trading-bot/indicator"
- "myFirstGo/trading-bot/market";"myFirstGo/trading-bot/signal"
+ "github.com/henry190927/trading-bot/autotrade";"github.com/henry190927/trading-bot/bingx"
+ "github.com/henry190927/trading-bot/config";"github.com/henry190927/trading-bot/indicator"
+ "github.com/henry190927/trading-bot/market";"github.com/henry190927/trading-bot/signal"
 )
 func alignRight(a []float64,n int)[]float64{if len(a)==n{return a};o:=make([]float64,n);d:=n-len(a);for i:=range o{if i<d{if len(a)>0{o[i]=a[0]}}else{o[i]=a[i-d]}};return o}
 type buk struct{n,tp,st int;r float64}

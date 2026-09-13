@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/earnings"
 )
 
 func TestSynthDatetime(t *testing.T) {

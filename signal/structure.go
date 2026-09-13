@@ -1,7 +1,7 @@
 package signal
 
 import (
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // TrendStructure classifies the recent price series by swing-point

@@ -47,7 +47,7 @@ laptop config could route real orders. Don't.)
 ### 2. Build + install the MCP binary
 
 ```bash
-cd /Users/henry.yeh/GolandProjects/myFirstGo/trading-bot
+cd /Users/henry.yeh/GolandProjects/github.com/henry190927/trading-bot
 make mcp-install
 ```
 

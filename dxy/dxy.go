@@ -17,7 +17,7 @@ import (
 	"net/http"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Yahoo symbol for the ICE U.S. Dollar Index. NYICDX is the cash index;

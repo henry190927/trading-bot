@@ -34,15 +34,15 @@ import (
 	"syscall"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/config"
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/notify"
-	sig "myFirstGo/trading-bot/signal"
-	"myFirstGo/trading-bot/validator"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/config"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/notify"
+	sig "github.com/henry190927/trading-bot/signal"
+	"github.com/henry190927/trading-bot/validator"
 )
 
 func main() {

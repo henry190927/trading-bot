@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/zone"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/zone"
 
 	"github.com/gin-gonic/gin"
 )

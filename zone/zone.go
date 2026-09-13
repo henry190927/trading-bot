@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // FmtPrice renders a price for humans — thousands-separated for BTC/ETH/XAU

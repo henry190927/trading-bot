@@ -28,7 +28,7 @@ import (
 	"strconv"
 	"strings"
 
-	"myFirstGo/trading-bot/shipgate"
+	"github.com/henry190927/trading-bot/shipgate"
 )
 
 func main() {

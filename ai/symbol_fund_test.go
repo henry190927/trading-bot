@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 func TestSymbolContext_FundamentalSection(t *testing.T) {

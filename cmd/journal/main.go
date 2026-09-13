@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/ansi"
-	"myFirstGo/trading-bot/journal"
+	"github.com/henry190927/trading-bot/ansi"
+	"github.com/henry190927/trading-bot/journal"
 )
 
 func main() {

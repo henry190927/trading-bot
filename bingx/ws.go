@@ -14,7 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Stream is the BingX swap-market WebSocket consumer.

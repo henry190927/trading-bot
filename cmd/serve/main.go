@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/config"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/notify"
-	sig "myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/config"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/notify"
+	sig "github.com/henry190927/trading-bot/signal"
 )
 
 // serve runs an infinite loop that wakes shortly after every timeframe

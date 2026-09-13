@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // dryRunResult builds a deterministic-shape mock for DryRun branches so

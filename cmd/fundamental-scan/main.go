@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/earnings/finnhub"
-	"myFirstGo/trading-bot/fundamental"
+	"github.com/henry190927/trading-bot/earnings/finnhub"
+	"github.com/henry190927/trading-bot/fundamental"
 )
 
 const bingxContractsURL = "https://open-api.bingx.com/openApi/swap/v2/quote/contracts"

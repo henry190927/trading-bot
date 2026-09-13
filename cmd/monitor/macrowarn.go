@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/notify"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/notify"
 )
 
 // runMacroWarn pushes an ntfy heads-up BEFORE a macro-event blackout window

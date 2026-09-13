@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"myFirstGo/trading-bot/binfut"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/oi"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/binfut"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/oi"
+	"github.com/henry190927/trading-bot/signal"
 
 	"github.com/gin-gonic/gin"
 )

@@ -3,7 +3,7 @@ package autotrade
 import (
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Book assembly, shared by the executor (which enforces the caps) and the /ops

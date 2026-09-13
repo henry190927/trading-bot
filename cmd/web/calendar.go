@@ -10,10 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/bls"
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/econcal"
-	"myFirstGo/trading-bot/macro"
+	"github.com/henry190927/trading-bot/bls"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/econcal"
+	"github.com/henry190927/trading-bot/macro"
 )
 
 // /calendar — the macro-event calendar (the SAME curated list that drives the

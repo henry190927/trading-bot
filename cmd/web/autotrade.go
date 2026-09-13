@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/autotrade"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // handleOpsAutotrade — GET /ops/autotrade. Read-only monitoring of the auto-executor:

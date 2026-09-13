@@ -3,7 +3,7 @@ package autotrade
 import (
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // OutcomeStatus classifies what happened to a paper fire once its closed candles

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/autotrade"
 )
 
 func d(day, hour int) time.Time {

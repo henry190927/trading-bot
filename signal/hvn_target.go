@@ -18,7 +18,7 @@ import (
 	"math"
 	"sort"
 
-	"myFirstGo/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/indicator"
 )
 
 // HVNTarget is one candidate take-profit at a volume node.

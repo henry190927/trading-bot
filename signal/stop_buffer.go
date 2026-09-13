@@ -3,7 +3,7 @@ package signal
 import (
 	"math"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // PerSymbolStopBuffer widens the stop by `fraction * original_risk` for the

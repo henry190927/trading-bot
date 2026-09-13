@@ -30,10 +30,10 @@ import (
 	"log"
 	"time"
 
-	"myFirstGo/trading-bot/autostrat"
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/session"
+	"github.com/henry190927/trading-bot/autostrat"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/session"
 )
 
 // autoSessionBlock returns a non-empty reason when this fire should not be

@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // FilledOrder is one execution as the exchange recorded it.

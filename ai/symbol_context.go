@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/journal"
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/journal"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // SymbolAnalysisInputs is the dashboard-level (non-trade) equivalent of

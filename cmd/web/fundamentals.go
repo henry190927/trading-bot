@@ -12,9 +12,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/earnings/finnhub"
-	"myFirstGo/trading-bot/fundamental"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/earnings/finnhub"
+	"github.com/henry190927/trading-bot/fundamental"
 )
 
 // Consumer B surface: /fundamentals — a standalone spot buy/hold/avoid board.

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // bar builds one candle. Times are only used for ordering and fire stamps.

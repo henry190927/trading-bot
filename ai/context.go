@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/journal"
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/journal"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // BuildTradeAnalysisMessage assembles the user-message payload sent

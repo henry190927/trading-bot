@@ -79,7 +79,7 @@ import (
     "testing"
     "time"
 
-    "myFirstGo/trading-bot/market"
+    "github.com/henry190927/trading-bot/market"
 )
 
 func TestDropForming(t *testing.T) {
@@ -1078,8 +1078,8 @@ package backtest
 import (
     "time"
 
-    "myFirstGo/trading-bot/indicator"
-    "myFirstGo/trading-bot/market"
+    "github.com/henry190927/trading-bot/indicator"
+    "github.com/henry190927/trading-bot/market"
 )
 
 // VolWindow is a contiguous span where ATR(14) ran hot relative to its

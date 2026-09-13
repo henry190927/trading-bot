@@ -1,8 +1,8 @@
 package signal
 
 import (
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/session"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/session"
 )
 
 // SessionVolBaseline switches the engine's three volume gates from a trailing

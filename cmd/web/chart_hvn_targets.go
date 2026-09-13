@@ -10,7 +10,7 @@ package main
 // was BEYOND it for only 1.1R more, and ETH had no clean node at all.
 
 import (
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // minHVNTargetR drops nodes too close to entry to be worth naming. A "target"

@@ -13,8 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // Server-owned price fan-out (design B) over Server-Sent Events.

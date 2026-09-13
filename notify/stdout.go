@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 type Stdout struct{}

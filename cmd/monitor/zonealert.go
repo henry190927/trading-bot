@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"myFirstGo/trading-bot/bingx"
-	"myFirstGo/trading-bot/market"
-	"myFirstGo/trading-bot/notify"
-	"myFirstGo/trading-bot/zone"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/market"
+	"github.com/henry190927/trading-bot/notify"
+	"github.com/henry190927/trading-bot/zone"
 )
 
 const (

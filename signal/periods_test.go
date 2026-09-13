@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 // 2026-09-10 is a Thursday, so the week boundary is Monday 2026-09-07 and the

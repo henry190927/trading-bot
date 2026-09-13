@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/market"
 )
 
 func volCandle(startUTC time.Time, vol float64) market.Candle {

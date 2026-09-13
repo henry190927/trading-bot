@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"myFirstGo/trading-bot/analyzer"
-	"myFirstGo/trading-bot/dxy"
-	"myFirstGo/trading-bot/earnings"
-	"myFirstGo/trading-bot/indicator"
-	"myFirstGo/trading-bot/macro"
-	"myFirstGo/trading-bot/market"
+	"github.com/henry190927/trading-bot/analyzer"
+	"github.com/henry190927/trading-bot/dxy"
+	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/indicator"
+	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/market"
 )
 
 type Side int

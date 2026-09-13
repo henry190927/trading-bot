@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"myFirstGo/trading-bot/signal"
+	"github.com/henry190927/trading-bot/signal"
 )
 
 // The band that caused this feature: BTC 77390–77476.3 (EQL 3x + 日開 77396.9
