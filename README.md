@@ -1581,3 +1581,17 @@ disprove, which is the point of writing them down.
 1. **Minimum fee-budget filter** — skip any setup where `fee_R > 0.3R`. Cheap, untested.
 2. **MTF veto for breakdown only** — the narrow form of the rejected MTF bias: do not suppress all counter-trend entries, only longs into a clean 4h breakdown. Note that the *broad* form of this idea — extending the N字 structure veto to 2h/4h — was measured and rejected on 2026-09-10 (see above), so this narrower version starts from a worse prior than it did.
 
+---
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Henry Yeh.
+
+Use it, fork it, learn from it. The licence carries no warranty, and this repo
+carries an additional caveat that matters more than the legal one: **it is a
+research tool, not financial advice.** It places real orders against a real
+exchange. Every strategy in it was measured against `shipgate` before shipping
+and several were measured and rejected — that record is in *Roadmap* above,
+including the ones that lost money. Read those before trusting any of it with
+capital.
+
