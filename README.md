@@ -37,7 +37,7 @@ flowchart TB
         store[("flat files, env-overridable paths<br/>journal.csv (v9, 30 col)<br/>zones · autotrade · setups")]
     end
 
-    subgraph Core["🧠 Importable packages — 27 pkg / 42k lines / 51 test files"]
+    subgraph Core["🧠 Importable packages — 31 pkg / 47k lines / 62 test files"]
         datain["DATA IN<br/>bingx (REST+WS) · market · twse · onchain<br/>econcal · earnings · fundamental · macro · dxy"]
         math["PURE MATH<br/>indicator — RSI · BOLL · MACD · ATR · HVN/POC"]
         detect["DETECTION<br/>signal — confluence votes · N字 BOS/CHoCH · EQH/EQL pools<br/>analyzer · zone · session (cash-open bar)"]

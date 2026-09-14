@@ -1,3 +1,22 @@
+{{define "bdTable"}}
+<div class="dt-scroll">
+<table class="dt">
+  <thead><tr><th>key</th><th class="num">n</th><th class="num">tp/stop</th><th class="num">勝率</th><th class="num">net R</th><th class="num">R/筆</th></tr></thead>
+  <tbody>
+  {{range .}}
+    <tr>
+      <td><strong>{{.Key}}</strong></td>
+      <td class="num cs-dim">{{.Total}}</td>
+      <td class="num">{{if or .TP .Stop}}<span style="color:var(--green)">{{.TP}}</span>/<span style="color:var(--red)">{{.Stop}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+      <td class="num">{{if or .TP .Stop}}{{printf "%.0f" (mulPct .WinRate)}}%{{else}}<span class="cs-dim">—</span>{{end}}</td>
+      <td class="num"><span style="color:{{if ge .NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .NetR}}</span></td>
+      <td class="num">{{if or .TP .Stop}}<span style="color:{{if ge .RPerTrade 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .RPerTrade}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -66,7 +85,7 @@
   <div class="stats-card">
     <h2 class="section-title">Paper P&amp;L <span class="section-meta">replayed from closed candles</span></h2>
     <div class="stats-grid" id="at-pnl-grid">
-      <div><span class="lbl">fires</span><span class="val">{{.Sum.Total}}</span></div>
+      <div><span class="lbl" title="去重後的部位數(一倉一單),不是 autotrade_paper.jsonl 的行數 —— 同一 setup 每根重複觸發算一個部位">positions <span class="cs-dim">一倉一單</span></span><span class="val">{{.Sum.Total}}</span></div>
       <div><span class="lbl">filled</span><span class="val">{{.Sum.Filled}} <span class="cs-dim">({{printf "%.0f" (mulPct .Sum.FillPct)}}%)</span></span></div>
       <div><span class="lbl">pending</span><span class="val">{{.Sum.Pending}} <span class="cs-dim">掛單中</span></span></div>
       <div><span class="lbl">no-fill</span><span class="val">{{.Sum.NoFill}}</span></div>
@@ -77,6 +96,23 @@
       <div><span class="lbl">浮動 R <span class="cs-dim">open</span></span><span class="val" style="color:{{if ge .Sum.UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.8">{{printf "%+.2f" .Sum.UnrealR}}R*</span></div>
     </div>
     <p class="glossary-hint" style="margin-top:.5rem"><b>pending</b> = 掛價還沒被觸及、6 根內仍在等成交;<b>no-fill</b> = 6 根過了還沒觸及(視為失效);<b>open</b> = 已成交未出場;outcome 先撞先算,同根撞到保守算 stop;<b>net R</b> = 已結算(tp/stop)。歷史 tp/stop 用收盤棒補抓 wick,<b>當前狀態疊加即時 mark 價</b>:現價已穿 tp/stop 即結算,否則 <b>浮動 R*</b> = open 單 mark-to-<b>即時價</b>(同 dashboard 開倉卡)。fill% 只算已定案的(pending 不計)。</p>
+  </div>
+  {{end}}
+
+  {{if .Sum.Total}}
+  {{/* Per-cut breakdown. Computed with autotrade.Breakdown over EVERY position
+       — a PARTITION, so each table's net R column sums to the book's net R
+       above. The Positions table further down is capped at a display depth;
+       folding a breakdown off those rendered rows describes only the newest
+       slice while reading like it describes the book. */}}
+  <div class="stats-card">
+    <h2 class="section-title">Breakdown <span class="section-meta">全部 {{.Sum.Total}} 筆部位 · 各表 net R 加總 = 上方總計</span></h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:1rem">
+      <div><h3 class="section-title" style="font-size:.85rem;margin:0 0 .35rem">by strategy</h3>{{template "bdTable" .ByStrategy}}</div>
+      <div><h3 class="section-title" style="font-size:.85rem;margin:0 0 .35rem">by side</h3>{{template "bdTable" .BySide}}</div>
+      <div><h3 class="section-title" style="font-size:.85rem;margin:0 0 .35rem">by symbol</h3>{{template "bdTable" .BySymbol}}</div>
+    </div>
+    <p class="glossary-hint" style="margin-top:.6rem"><b>n</b> = 該組全部部位(含未結算);<b>勝率</b>和 <b>R/筆</b> 的分母只算已結算的 tp+stop —— open/pending/no-fill 還沒貢獻 R,算進分母會把虧損規則稀釋得比實際溫和。<b style="color:var(--red)">這是事後分組,不是 A/B</b>:各組的 n 小、互相重疊(同一筆同時出現在三張表),不足以單獨用來開關規則 —— 要改閘門得在 fire 生成階段跑 shipgate。</p>
   </div>
   {{end}}
 

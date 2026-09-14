@@ -155,6 +155,14 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	statTrades, statUnscoreable := rTradesFromPositions(positions)
 	statOpenR, statOpenN := openUnrealR(positions)
 
+	// Per-cut breakdowns over EVERY position, not the display-capped table.
+	// Folding these by hand off the rendered rows was how a "range-edge is
+	// 0/7" read got produced from the newest 60 of 123 positions — numbers
+	// that describe a slice while reading like they describe the book.
+	byStrategy := autotrade.Breakdown(positions, autotrade.ByStrategy)
+	bySymbol := autotrade.Breakdown(positions, autotrade.BySymbol)
+	bySide := autotrade.Breakdown(positions, autotrade.BySide)
+
 	var rows []fireRow
 	var outs []autotrade.Outcome
 	clsFor := map[autotrade.OutcomeStatus]string{
@@ -196,6 +204,9 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		// trade. candlesFor is already the panel's cached kline source.
 		"Book":            book,
 		"BookUnscored":    unscored,
+		"ByStrategy":      byStrategy,
+		"BySymbol":        bySymbol,
+		"BySide":          bySide,
 		"CapsEnforced":    true,
 		"Cooldown":        cooldown,
 		"CooldownUniform": cooldownUniform,
