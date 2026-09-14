@@ -25,10 +25,18 @@ var autoSymbols = map[string]market.Symbol{
 
 type autoState struct {
 	lastFireBar time.Time // dedup: one placement per rule per bar
-	// lastBlockBar dedups the C7 blocked-candidate record. Separate from
-	// lastFireBar on purpose: the block path places nothing, so it must NOT
-	// consume the fire dedup — a candidate blocked at 20:01 has to stay
-	// eligible to fire at 20:02 if a slot frees up.
+	// lastBlockBar dedups BOTH the C7 blocked-candidate record and the
+	// one-line block log. Separate from lastFireBar on purpose: the block
+	// path places nothing, so it must NOT consume the fire dedup — a
+	// candidate blocked at 20:01 has to stay eligible to fire at 20:02 if a
+	// slot frees up.
+	//
+	// The log line used to sit OUTSIDE this guard, which meant the 2026-09-04
+	// fix covered only half the problem it described. Confirmed live on
+	// 2026-09-14: max_same_symbol_side=1 held an ETH long open and the
+	// executor printed the same "BLOCKED by caps" line every 60 seconds for
+	// as long as the position lasted — 60 identical lines an hour, burying
+	// the naked-position and macro alerts this daemon exists to surface.
 	lastBlockBar time.Time
 }
 
@@ -154,7 +162,6 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			if v := autotrade.CheckCaps(cfg, book, autotrade.Candidate{
 				Symbol: r.Symbol, Side: trig.Side, Margin: r.MarginUSDT,
 			}); v.Blocked {
-				log.Printf("autoexec: %s %s/%s BLOCKED by caps — %s", r.Symbol, r.TF, r.Strategy, v.Reason)
 				// Record WHAT was denied, not just that something was (C7).
 				// The one-line log above cannot answer "would best-first have
 				// beaten first-come", because entry/stop/target/score are all
@@ -168,6 +175,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				// ~60x the real candidate count and useless for ranking.
 				if !st.lastBlockBar.Equal(barTime) {
 					st.lastBlockBar = barTime
+					log.Printf("autoexec: %s %s/%s BLOCKED by caps — %s", r.Symbol, r.TF, r.Strategy, v.Reason)
 					qty := r.MarginUSDT * float64(r.Leverage) / trig.Entry
 					autotrade.AppendBlocked(autotrade.BlockedCandidate{
 						Fire: autotrade.PaperFire{
@@ -188,13 +196,13 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			// the fire: it needs the resolved entry/stop, and a candidate the
 			// caps already denied should not spend a history fetch.
 			if why := autoSessionBlock(ctx, client, sym, r.TF, trig, time.Now().UTC()); why != "" {
-				log.Printf("autoexec: %s %s/%s BLOCKED by session guard — %s",
-					r.Symbol, r.TF, r.Strategy, why)
 				// Recorded like a caps block so the same replay can rank what
 				// was refused. Uses lastBlockBar, not lastFireBar: nothing was
 				// placed, so the rule stays eligible on the next bar.
 				if !st.lastBlockBar.Equal(barTime) {
 					st.lastBlockBar = barTime
+					log.Printf("autoexec: %s %s/%s BLOCKED by session guard — %s",
+						r.Symbol, r.TF, r.Strategy, why)
 					q := r.MarginUSDT * float64(r.Leverage) / trig.Entry
 					autotrade.AppendBlocked(autotrade.BlockedCandidate{
 						Fire: autotrade.PaperFire{
