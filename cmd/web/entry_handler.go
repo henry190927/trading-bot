@@ -28,6 +28,7 @@ package main
 //     exchange is holding the bundled stop.
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/henry190927/trading-bot/entryplan"
+	"github.com/henry190927/trading-bot/journal"
 )
 
 func (s *server) handleOpsEntry(c *gin.Context) {
@@ -133,7 +135,14 @@ func (s *server) handleOpsEntry(c *gin.Context) {
 		return
 	}
 
-	if err := s.client.SetLeverage(ctx, sym, plan.Side, plan.Leverage); err != nil {
+	// BOTH in one-way mode, LONG/SHORT only in hedge mode — the same mapping
+	// placeEntryOnBingX uses. Sending "LONG" to a one-way account sets a side
+	// that account does not have.
+	levSide := "BOTH"
+	if hedgeModeEnabled() {
+		levSide = strings.ToUpper(plan.Side)
+	}
+	if err := s.client.SetLeverage(ctx, sym, levSide, plan.Leverage); err != nil {
 		// Not fatal: the account may already be at this leverage, and BingX
 		// rejects a no-op change on some symbols. The placed order carries its
 		// own leverage, and the response says what happened.
@@ -147,8 +156,31 @@ func (s *server) handleOpsEntry(c *gin.Context) {
 		return
 	}
 	out["stage"] = "sent"
+	orderID := ""
 	if res != nil {
-		out["order_id"] = res.OrderID
+		orderID = res.OrderID
+		out["order_id"] = orderID
+	}
+
+	// Journal the row in the SAME call that placed the order.
+	//
+	// /ops/verify's whole job is comparing the journal against the exchange,
+	// so an order placed without a row becomes the orphan position that page
+	// is built to flag — and the flag fires at whatever hour the limit fills,
+	// which for a level 1.3% away is usually the middle of the night. The
+	// +record path has always written its row first for this reason.
+	//
+	// Written AFTER the placement, not before, and deliberately: this route's
+	// preview/confirm split means a refused plan never reaches here, and a
+	// row for an order the exchange rejected is a lie in the opposite
+	// direction. A failed write is reported, never fatal — the money is
+	// already committed by this point and the caller needs to know the order
+	// exists more than it needs a clean response.
+	if jerr := s.journalEntry(ctx, plan, symbolRaw, orderID, c); jerr != nil {
+		out["journal"] = "FAILED: " + jerr.Error()
+		out["journal_ok"] = false
+	} else {
+		out["journal_ok"] = true
 	}
 	// The bundled stop is the part that has failed silently before. An order id
 	// says BingX accepted the ENTRY; it says nothing about the SL/TP riding on
@@ -156,4 +188,51 @@ func (s *server) handleOpsEntry(c *gin.Context) {
 	out["next"] = "run /ops/orders (or trading-acct) to confirm the exchange is holding the bundled stop, " +
 		"and /ops/verify again once it fills"
 	c.JSON(http.StatusOK, out)
+}
+
+// journalEntry writes the placed order into journal.csv as an open trade.
+//
+// tf/score/anchor/notes are optional passthroughs: this route is usually
+// driven from a phone or a shell, where the full /journal/new form is not
+// available, and a row with the numbers and a blank anchor is far better than
+// no row. TP1 is left at 0 — the bundled take-profit closes 100%, so a partial
+// TP1 is a separate reduce-only order placed after the fill, and recording one
+// that does not exist would make /ops/verify report a stop that is not there.
+func (s *server) journalEntry(ctx context.Context, plan entryplan.Plan, symbol, orderID string, c *gin.Context) error {
+	trades, err := journal.ReadAll("")
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	notes := strings.TrimSpace(c.PostForm("notes"))
+	if notes == "" {
+		notes = fmt.Sprintf("placed via /ops/entry — resting LIMIT %.4f x %.4f (%.2fu x %dx), "+
+			"bundled stop %.4f, bundled tp %.4f, mark at placement %.4f",
+			plan.Entry, plan.Qty, plan.MarginUSDT, plan.Leverage, plan.Stop, plan.TP, plan.Entry)
+	}
+	t := journal.Trade{
+		ID:         journal.NextID(trades),
+		OpenedAt:   now,
+		AnalyzedAt: now,
+		Symbol:     strings.ToUpper(symbol),
+		Side:       plan.Side,
+		TF:         strings.TrimSpace(c.PostForm("tf")),
+		Score:      strings.TrimSpace(c.PostForm("score")),
+		Entry:      plan.Entry,
+		Stop:       plan.Stop,
+		TP2:        plan.TP,
+		Anchor:     strings.TrimSpace(c.PostForm("anchor")),
+		OpenNotes:  notes,
+		Leverage:   plan.Leverage,
+		MarginUSDT: plan.MarginUSDT,
+		// The bundled legs ARE live on the exchange the moment the entry
+		// fills, so the sweep must not place duplicates.
+		StopAuto:     plan.Stop > 0,
+		TP2Auto:      plan.TP > 0,
+		EntryOrderID: orderID,
+		EquityUSDT:   s.equityAtEntry(ctx),
+	}
+	// FilledAt stays zero: the order is RESTING. Marking it filled here is
+	// what would make /ops/verify demand a position that does not exist yet.
+	return journal.WriteAll("", append(trades, t))
 }

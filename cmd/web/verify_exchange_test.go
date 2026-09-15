@@ -120,3 +120,37 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 		}
 	})
 }
+
+// A journal row for a RESTING limit — recorded, not yet filled — must produce
+// no warning. /ops/entry writes exactly this shape: the order is on the book,
+// FilledAt is zero, and there is no position to find.
+//
+// The stale-journal branch is what would fire here, and it is gated on
+// FilledAt being set. Ungating it would make every resting entry render
+// "journal says filled but the exchange has no position" — a false alarm on
+// the one page whose value is that its alarms are real.
+func TestPendingEntryIsNotAStaleJournal(t *testing.T) {
+	pending := journal.Trade{
+		ID: 71, Symbol: "ETH", Side: "long",
+		Entry: 2441, Stop: 2424.88, TP2: 2480.50,
+		Leverage: 125, MarginUSDT: 56.44,
+		OpenedAt: time.Now().UTC(),
+		StopAuto: true, TP2Auto: true,
+		EntryOrderID: "2099785767551463424",
+		// FilledAt deliberately zero — this is the whole point.
+	}
+	if !pending.IsPending() {
+		t.Fatalf("fixture is not pending: open=%v filled=%v", pending.IsOpen(), pending.FilledAt)
+	}
+	_, warn := classifyVerify(pending, nil, nil)
+	if warn != "" {
+		t.Errorf("a resting entry warned: %q", warn)
+	}
+
+	// Once it fills, the same row with no position IS stale and must warn.
+	filled := pending
+	filled.FilledAt = time.Now().UTC()
+	if _, w := classifyVerify(filled, nil, nil); w == "" {
+		t.Error("a filled row with no position must still warn")
+	}
+}
