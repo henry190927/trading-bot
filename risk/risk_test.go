@@ -8,14 +8,15 @@ import (
 
 func near(a, b float64) bool { return math.Abs(a-b) < 1e-4 }
 
-// The three unplanned trades of 2026-09-08, with equity as it stood at each
-// point. These are the inputs the system had and did not use.
+// The three unplanned trades of the liquidation this package exists to
+// prevent, with equity as it stood at each point. These are the inputs the
+// system had and did not use.
 var (
-	equityBeforeA  = 217.31 // after #66's stop
-	equityBeforeBC = 139.66 // after A closed at -77.65
-	notionalA      = 8219.0
-	notionalB      = 8822.0
-	notionalC      = 7641.0
+	equityBeforeA  = 220.0 // after the preceding trade stopped out
+	equityBeforeBC = 140.0 // after A closed at a loss
+	notionalA      = 8200.0
+	notionalB      = 8800.0
+	notionalC      = 7700.0
 )
 
 func flat(equity float64) Exposure {
@@ -33,19 +34,19 @@ func TestFatalSequenceIsBlocked(t *testing.T) {
 	if v.Blocked {
 		t.Errorf("A alone was blocked: %s", v.Reason)
 	}
-	if !near(v.LevAfter, 37.8215) {
-		t.Errorf("A LevAfter = %.4f, want 37.8215", v.LevAfter)
+	if !near(v.LevAfter, 37.2727) {
+		t.Errorf("A LevAfter = %.4f, want 37.2727", v.LevAfter)
 	}
-	if !near(v.KillDistancePct, 2.6440) {
-		t.Errorf("A kill distance = %.4f%%, want 2.6440%%", v.KillDistancePct)
+	if !near(v.KillDistancePct, 2.6829) {
+		t.Errorf("A kill distance = %.4f%%, want 2.6829%%", v.KillDistancePct)
 	}
 
-	// B opens while A is still on: 78.4x. This is the order that had to be
+	// B opens while A is still on: 77.3x. This is the order that had to be
 	// refused, and no margin-based cap could see it — margin was 136.33u
 	// against a 140u ceiling.
 	withA := flat(equityBeforeA)
 	withA.OpenNotional, withA.OpenCount = notionalA, 1
-	withA.Legs = []string{"ETH short 8,219u"}
+	withA.Legs = []string{"ETH short 8,200u"}
 	v = Check(l, withA, notionalB)
 	if !v.Blocked {
 		t.Fatalf("A+B was ALLOWED at %.1fx — this is the order the cap exists to refuse", v.LevAfter)
@@ -53,10 +54,10 @@ func TestFatalSequenceIsBlocked(t *testing.T) {
 	if !v.Enforced {
 		t.Error("verdict not marked Enforced despite full inputs")
 	}
-	if !near(v.LevAfter, 78.4179) {
-		t.Errorf("A+B LevAfter = %.4f, want 78.4179", v.LevAfter)
+	if !near(v.LevAfter, 77.2727) {
+		t.Errorf("A+B LevAfter = %.4f, want 77.2727", v.LevAfter)
 	}
-	for _, want := range []string{"max-account-leverage", "78.4x", "cap 40.0x", "ETH short 8,219u"} {
+	for _, want := range []string{"max-account-leverage", "77.3x", "cap 40.0x", "ETH short 8,200u"} {
 		if !strings.Contains(v.Reason, want) {
 			t.Errorf("reason %q does not contain %q", v.Reason, want)
 		}
@@ -69,29 +70,29 @@ func TestFatalSequenceIsBlocked(t *testing.T) {
 	if !v.Blocked {
 		t.Fatal("B+C was allowed")
 	}
-	if !near(v.LevAfter, 117.8791) {
-		t.Errorf("B+C LevAfter = %.4f, want 117.8791", v.LevAfter)
+	if !near(v.LevAfter, 117.8571) {
+		t.Errorf("B+C LevAfter = %.4f, want 117.8571", v.LevAfter)
 	}
-	if !near(v.KillDistancePct, 0.8483) {
-		t.Errorf("B+C kill distance = %.4f%%, want 0.8483%% (the figure from the post-mortem)", v.KillDistancePct)
+	if !near(v.KillDistancePct, 0.8485) {
+		t.Errorf("B+C kill distance = %.4f%%, want 0.8485%%", v.KillDistancePct)
 	}
 }
 
-// The pair the trader was shown the arithmetic for and chose to keep, at
-// 55.8x. A cap set at 60 must allow it: this package does not overrule a
-// decision that was made deliberately.
+// A pair kept on deliberately at 55.1x after the arithmetic was laid out. A
+// cap set at 60 must allow it: this package does not overrule a decision that
+// was made on purpose.
 func TestAcceptedPairIsNotOverruled(t *testing.T) {
-	e := flat(336.30)
+	e := flat(340)
 	e.OpenNotional, e.OpenCount = 9375, 1
 	v := Check(Limits{MaxAccountLev: 60}, e, 9375)
 	if v.Blocked {
 		t.Errorf("55.8x was blocked under a 60x cap: %s", v.Reason)
 	}
-	if !near(v.LevAfter, 55.7538) {
-		t.Errorf("LevAfter = %.4f, want 55.7538", v.LevAfter)
+	if !near(v.LevAfter, 55.1471) {
+		t.Errorf("LevAfter = %.4f, want 55.1471", v.LevAfter)
 	}
-	if !near(v.KillDistancePct, 1.7936) {
-		t.Errorf("kill distance = %.4f%%, want 1.7936%%", v.KillDistancePct)
+	if !near(v.KillDistancePct, 1.8133) {
+		t.Errorf("kill distance = %.4f%%, want 1.8133%%", v.KillDistancePct)
 	}
 }
 
@@ -99,8 +100,8 @@ func TestAcceptedPairIsNotOverruled(t *testing.T) {
 // existed must not freeze the order path — autotrade's caps shipped with
 // exactly this bug once.
 func TestZeroMeansUnlimited(t *testing.T) {
-	e := flat(139.66)
-	e.OpenNotional, e.OpenCount = 16463, 2
+	e := flat(140)
+	e.OpenNotional, e.OpenCount = 16500, 2
 	v := Check(Limits{}, e, 50000)
 	if v.Blocked {
 		t.Fatalf("an empty Limits blocked an order: %s", v.Reason)
@@ -210,17 +211,17 @@ func TestMaxNotionalBindsWithoutEquity(t *testing.T) {
 // Warn-only is how this ships: advisory numbers with nothing refused, so the
 // figure becomes visible before anyone has to choose a hard ceiling.
 func TestWarnOnlyNeverBlocks(t *testing.T) {
-	e := flat(139.66)
-	e.OpenNotional, e.OpenCount = 8822, 1
-	v := Check(Limits{WarnAccountLev: 30}, e, 7641)
+	e := flat(140)
+	e.OpenNotional, e.OpenCount = 8800, 1
+	v := Check(Limits{WarnAccountLev: 30}, e, 7700)
 	if v.Blocked {
 		t.Fatalf("warn-only mode blocked: %s", v.Reason)
 	}
 	if !v.Enforced {
 		t.Error("Enforced false despite complete inputs")
 	}
-	if !near(v.LevAfter, 117.8791) {
-		t.Errorf("LevAfter = %.4f, want 117.8791", v.LevAfter)
+	if !near(v.LevAfter, 117.8571) {
+		t.Errorf("LevAfter = %.4f, want 117.8571", v.LevAfter)
 	}
 	joined := strings.Join(v.Warnings, " | ")
 	for _, want := range []string{"117.9x", "0.848%", "30.0x"} {
@@ -252,9 +253,9 @@ func TestQuietWhenWithinLimits(t *testing.T) {
 // matters is that a hard block always beats a warning, so a blocked verdict
 // never carries a "would have been" warning that reads like approval.
 func TestBlockedVerdictHasNoApprovalNoise(t *testing.T) {
-	e := flat(139.66)
-	e.OpenNotional, e.OpenCount = 8822, 1
-	v := Check(Limits{MaxAccountLev: 40, WarnAccountLev: 30}, e, 7641)
+	e := flat(140)
+	e.OpenNotional, e.OpenCount = 8800, 1
+	v := Check(Limits{MaxAccountLev: 40, WarnAccountLev: 30}, e, 7700)
 	if !v.Blocked {
 		t.Fatal("not blocked")
 	}

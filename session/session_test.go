@@ -241,15 +241,15 @@ func TestStopWarningHandlesOpenAlreadyInProgress(t *testing.T) {
 // ---------------------------------------------------------------------
 
 func TestMaxLeverageForOpenBar(t *testing.T) {
-	const equity, margin, risk = 336.30, 75.0, 0.05
+	const equity, margin, risk = 300.0, 75.0, 0.05
 	for _, tc := range []struct {
 		name      string
 		medianPct float64
 		want      float64
 	}{
-		// notional = 336.30*0.05 / (pct/100); lev = notional/75
-		{"SNDK 3.75%", 3.75, 5.978667},
-		{"NVDA 1.69%", 1.69, 13.266272},
+		// notional = 300*0.05 / (pct/100); lev = notional/75
+		{"SNDK 3.75%", 3.75, 5.333333},
+		{"NVDA 1.69%", 1.69, 11.834320},
 	} {
 		got := MaxLeverageForOpenBar(equity, margin, tc.medianPct, risk)
 		if math.Abs(got-tc.want) > 1e-5 {

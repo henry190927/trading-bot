@@ -13,6 +13,11 @@ ROADMAP.md
 # User trade journal — personal data, lives on the VPS
 journal.csv
 
+# Incident record — journal trade numbers, real balances and position sizes.
+# The CODE keeps the mechanism (why a rail exists, what failure it prevents);
+# this file keeps the account-identifying half. See docs/incidents.md.
+docs/incidents.md
+
 # Build artifacts
 /tmp/
 *.exe

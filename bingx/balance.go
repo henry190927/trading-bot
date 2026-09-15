@@ -4,7 +4,7 @@ package bingx
 //
 // This was inline in cmd/web's /ops/balance handler until sizing needed it too.
 // A trade's risk cannot be stated without equity: notional alone says nothing,
-// because 16,463u is a rounding error on a large account and a liquidation on a
+// because 16,500u is a rounding error on a large account and a liquidation on a
 // small one. So the read moved here, where the order-placement path can reach
 // it as well as the panel.
 

@@ -165,7 +165,7 @@ func TestDecideNakedModes(t *testing.T) {
 
 // The case cmd/web structurally cannot reach: it skips placement once
 // StopOrderID is set, so a cancelled stop leaves the journal reading
-// protected forever. #60 failed exactly this way.
+// protected forever. A live trade has failed exactly this way.
 func TestDecideGhostStop(t *testing.T) {
 	tr := openTrade()
 	tr.StopOrderID = "2094351178603393024"

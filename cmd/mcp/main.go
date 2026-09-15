@@ -7,7 +7,7 @@
 // This is the zero-cost alternative to the trading-web /ai/analyze
 // endpoint: instead of calling Anthropic's API with a key, the user
 // asks Claude Code (already authenticated to their account via OAuth)
-// to "analyze trade #25", and Claude Code calls the tools below to
+// to "analyze trade 25", and Claude Code calls the tools below to
 // gather context, then synthesizes the analysis using its own session.
 // No API key, no incremental billing.
 //

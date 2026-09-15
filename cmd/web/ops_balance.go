@@ -5,14 +5,15 @@ package main
 // Added 2026-09-08 because there was no online way to answer "what is the
 // balance right now". cmd/acct can read it but was never deployed, and the
 // home IP is not on the BingX whitelist, so every balance figure quoted during
-// a session came from a stale snapshot — 336.30u was being repeated for three
-// days while the real number moved. Sizing arithmetic built on a stale equity
+// a session came from a stale snapshot — one figure was quoted for three days
+// while the real number moved. Sizing arithmetic built on a stale equity
 // is wrong in the direction that matters.
 //
 // Extended the same day with the exposure block. Equity alone still cannot say
-// whether a book is survivable: the pair that closed the account was 16,463u
+// whether a book is survivable: the pair that closed the account was 16,500u
 // of notional, which is unremarkable next to a large balance and fatal next to
-// 139.66u. Account leverage and its reciprocal, the kill distance, are the
+// an account of roughly 140u. Account leverage and its reciprocal, the kill
+// distance, are the
 // comparable figures, and until now neither existed anywhere in the system.
 //
 // Read-only throughout: two signed GETs, nothing mutable.

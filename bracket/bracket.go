@@ -6,16 +6,16 @@
 // The existing auto-stop placement lives inline in cmd/web's
 // buildOpenTradeCards, whose only callers are the dashboard and /today
 // handlers. It therefore runs when — and only when — a browser loads a page.
-// That is the mechanism behind every naked position in the journal: #60 went
-// naked entirely on 2026-08-31, and #62/#63/#64 carried a planned stop that
-// never reached BingX because the fills landed while nobody was at a desk.
+// That is the mechanism behind every naked position this has produced: one
+// went naked entirely, and three others carried a planned stop that never
+// reached BingX because the fills landed while nobody was at a desk.
 // A protective order that depends on a human refreshing a tab is not a
 // protective order.
 //
 // It also never re-checked. cmd/web skips placement once StopOrderID is
 // non-empty, so a stop that was placed and then cancelled, expired or
-// silently rejected leaves the journal reading "protected" forever. #60's
-// bundled stop failed to attach exactly this way.
+// silently rejected leaves the journal reading "protected" forever. A
+// bundled stop has failed to attach exactly this way.
 //
 // THREE INVARIANTS
 //
@@ -40,7 +40,7 @@
 // EXISTENCE: any reduce-only stop on the closing side protects the position,
 // whatever its trigger. A trailing stop or a profit-lock is still a stop, and
 // an earlier price-matching check in cmd/protect forbade every one of them
-// (see feedback_order_guard_vs_mark).
+// (an entry-based stop check forbids every trailing/profit-lock stop).
 package bracket
 
 import (
@@ -109,10 +109,10 @@ const (
 	// leaves the sending to a human via /ops/verify.
 	//
 	// This is the default, and the reason is not timidity. journal.Stop is
-	// the ANALYSIS stop — the R baseline — and the trader keeps it
-	// deliberately distinct from whatever price is actually resting on the
-	// exchange (see feedback_journal_stop_two_meanings; #61 recorded an
-	// analysis stop of 77,380 while a 77,900 profit-lock rested live).
+	// the ANALYSIS stop — the R baseline — and it is kept deliberately
+	// distinct from whatever price is actually resting on the exchange: a
+	// trade can record one number as its R baseline while a profit-lock
+	// several hundred points away rests live.
 	// Auto-placing the analysis stop would collapse two numbers that were
 	// separated on purpose.
 	ModeAlert Mode = "alert"

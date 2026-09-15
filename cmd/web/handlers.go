@@ -1012,8 +1012,9 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		TP2Auto:    autoTP2,
 		// Equity at entry, captured whether or not this trade auto-opens.
 		// Without it the row can state notional but not what fraction of the
-		// account was at risk, which is the gap that let a +19.04R journal
-		// coexist with a zero balance. 0 when the balance read fails, and
+		// account was at risk. R is blind to position size, so without this a
+		// journal can report a healthy cumulative R beside a drained account.
+		// 0 when the balance read fails, and
 		// journal.AccountLeverage degrades to 0 rather than guessing.
 		EquityUSDT: s.equityAtEntry(c.Request.Context()),
 	}
@@ -1253,8 +1254,8 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 // entry?" is a question about intent, and the answer is allowed to be no: a
 // stop above entry on a long is a profit lock, which is exactly what you place
 // when the trade is in profit. The old guard refused it outright, so trailing a
-// stop through the UI was impossible — hit on 2026-09-03 trailing BTC #61 to
-// 77,900 against an entry of 77,640.
+// stop through the UI was impossible — hit on a live BTC long whose profit-lock
+// sat several hundred points above its entry.
 //
 // The question that actually protects the user is "would this order execute the
 // instant it lands?" — and that is answered by the mark, not the entry.
@@ -3166,7 +3167,7 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 	res := validator.Validate(sym, tf, side, entry, feeBps, candles, markPrice)
 	// Cash-open-bar check, PRE-TRADE. This warning already existed on two
 	// surfaces and both were post-hoc: the place-stop response (below) and
-	// /ops/verify. Journal #67 is why that is not enough — a SNDK short with a
+	// /ops/verify. A live trade is why that is not enough — a SNDK short with a
 	// stop 1/7.4 of the symbol's median cash-open-bar range, filled 7 seconds
 	// into the open and stopped 24 seconds later. An advisory that arrives
 	// after the fill cannot be acted on. Checked against SuggStop because
@@ -3235,7 +3236,7 @@ func (s *server) handleAPIChartValidate(c *gin.Context) {
 	res := validator.Validate(sym, tf, side, entry, feeBps, candles, markPrice)
 	// Cash-open-bar check, PRE-TRADE. This warning already existed on two
 	// surfaces and both were post-hoc: the place-stop response (below) and
-	// /ops/verify. Journal #67 is why that is not enough — a SNDK short with a
+	// /ops/verify. A live trade is why that is not enough — a SNDK short with a
 	// stop 1/7.4 of the symbol's median cash-open-bar range, filled 7 seconds
 	// into the open and stopped 24 seconds later. An advisory that arrives
 	// after the fill cannot be acted on. Checked against SuggStop because

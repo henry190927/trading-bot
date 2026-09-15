@@ -3,24 +3,24 @@ package main
 // POST /ops/entry — place a resting LIMIT entry with a BingX-bundled stop and
 // take-profit, from the phone.
 //
-// WHY IT EXISTS: on 2026-09-15 a level the trader had named hours earlier
-// (ETH 2441, a three-way confluence of a 4h HVN, a 3-touch EQL and a 109-bar
-// pivot shelf) filled three separate times and worked every time — on a day
-// when the same account's only loss came from a chased market entry. The order
-// was never placed because placing one meant leaving this tool and opening the
-// exchange app. The journal already measures a 31% no-fill rate on limits that
-// WERE placed; an order never sent does not even appear in that number.
+// WHY IT EXISTS: a level identified hours in advance — a three-way confluence
+// of a 4h HVN, a 3-touch EQL and a long pivot shelf — filled three separate
+// times in one session and held its stop every time. No order was ever placed,
+// because placing one meant leaving this tool and opening the exchange app.
+// The journal already measures a 31% no-fill rate on limits that WERE placed;
+// an order never sent does not even appear in that number.
 //
 // THIS ROUTE OPENS POSITIONS. Every other order surface here is reduce-only.
 // The rails, in the order they matter:
 //
 //  1. A stop is REQUIRED, with no override (package entryplan). Not "warned
-//     about" — refused. #60 went naked on a silently-failed bundled stop and
-//     #70 had its stop removed by hand at 4am; a route where naked is one
-//     blank field away will eventually place a naked one.
+//     about" — refused. A bundled stop has silently failed to attach before,
+//     and a live stop has been removed by hand; a route where naked
+//     is one blank field away will eventually place a naked one.
 //  2. A limit that would fill instantly against the mark is refused unless
-//     allow_marketable=1, because "I think it's breaking out" market entries
-//     are this account's most expensive documented habit.
+//     allow_marketable=1. A marketable limit is a market order wearing a
+//     limit's clothes, and an entry placed on a feeling that a level is about
+//     to break is the failure this route exists to make deliberate.
 //  3. Size ceilings come from package risk — the SAME gate the rest of the
 //     system uses, warn-only at the owner's explicit choice.
 //  4. Two-step: without confirm=1 this returns a PREVIEW and sends nothing.

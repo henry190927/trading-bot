@@ -38,7 +38,7 @@ import (
 // position size cancels out of R.
 //
 // margin_usdt x leverage already gave NOTIONAL on 48% of filled rows, but
-// notional alone answers nothing: 16,463u is a rounding error on a large
+// notional alone answers nothing: 16,500u is a rounding error on a large
 // account and a liquidation on a small one. Only notional/equity — account
 // leverage — is comparable across time, and the fatal pair of 2026-09-08 sat
 // at 117.9x with a 0.848% kill distance that nothing in the system computed.

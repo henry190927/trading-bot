@@ -109,7 +109,7 @@ func TestOpenOrdersKeepsRowsWithNoSymbol(t *testing.T) {
 func TestOpenOrdersEmptySymbolReturnsEverything(t *testing.T) {
 	body := `{"orders":[
       {"symbol":"BTC-USDT","orderId":1,"type":"LIMIT","side":"SELL","price":"79685.0","origQty":"0.1173"},
-      {"symbol":"ETH-USDT","orderId":2,"type":"LIMIT","side":"BUY","price":"2441.0","origQty":"2.89"}
+      {"symbol":"ETH-USDT","orderId":2,"type":"LIMIT","side":"BUY","price":"2400.0","origQty":"3.12"}
     ]}`
 	got, err := decodeOpenOrders(t, body, "")
 	if err != nil {
@@ -121,8 +121,8 @@ func TestOpenOrdersEmptySymbolReturnsEverything(t *testing.T) {
 	}
 	// A named symbol must still filter, or this fix would have traded one bug
 	// for the cross-attribution bug the filter exists to prevent.
-	if one, _ := decodeOpenOrders(t, body, "ETH-USDT"); len(one) != 1 || one[0].Price != 2441 {
-		t.Errorf("ETH-USDT returned %d rows, want just the 2441 limit", len(one))
+	if one, _ := decodeOpenOrders(t, body, "ETH-USDT"); len(one) != 1 || one[0].Price != 2400 {
+		t.Errorf("ETH-USDT returned %d rows, want just the 2400 limit", len(one))
 	}
 }
 
@@ -132,12 +132,12 @@ func TestOpenOrdersEmptySymbolReturnsEverything(t *testing.T) {
 // not parsed at all, which made a protected resting entry indistinguishable
 // from a naked one: the entry appeared, its stop existed nowhere.
 //
-// Fixture is the live order placed that day, copied from the exchange.
+// Fixture mirrors the shape the exchange returns for such an order.
 func TestOpenOrdersParsesBundledStopAndTP(t *testing.T) {
-	body := `{"orders":[{"symbol":"ETH-USDT","orderId":2099785767551463400,"type":"LIMIT",
-      "side":"BUY","positionSide":"LONG","price":"2441.00","origQty":"2.89","reduceOnly":false,
-      "stopLoss":{"price":0,"quantity":0,"stopPrice":2424.88,"type":"STOP_MARKET"},
-      "takeProfit":{"price":0,"quantity":0,"stopPrice":2480.5,"type":"TAKE_PROFIT_MARKET"}}]}`
+	body := `{"orders":[{"symbol":"ETH-USDT","orderId":1234567890123456789,"type":"LIMIT",
+      "side":"BUY","positionSide":"LONG","price":"2400.00","origQty":"3.12","reduceOnly":false,
+      "stopLoss":{"price":0,"quantity":0,"stopPrice":2384,"type":"STOP_MARKET"},
+      "takeProfit":{"price":0,"quantity":0,"stopPrice":2440,"type":"TAKE_PROFIT_MARKET"}}]}`
 	got, err := decodeOpenOrders(t, body, "ETH-USDT")
 	if err != nil {
 		t.Fatal(err)
@@ -145,11 +145,11 @@ func TestOpenOrdersParsesBundledStopAndTP(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("got %d rows, want 1", len(got))
 	}
-	if got[0].BundledStop != 2424.88 {
-		t.Errorf("BundledStop = %v, want 2424.88", got[0].BundledStop)
+	if got[0].BundledStop != 2384 {
+		t.Errorf("BundledStop = %v, want 2384", got[0].BundledStop)
 	}
-	if got[0].BundledTP != 2480.5 {
-		t.Errorf("BundledTP = %v, want 2480.5", got[0].BundledTP)
+	if got[0].BundledTP != 2440 {
+		t.Errorf("BundledTP = %v, want 2440", got[0].BundledTP)
 	}
 	// The row's own stopPrice is absent here and must stay 0 — conflating the
 	// two would make an entry look like a stop order.
@@ -159,7 +159,7 @@ func TestOpenOrdersParsesBundledStopAndTP(t *testing.T) {
 
 	// An order with no bundled stop reads as zero, which is what /ops/orders
 	// calls "naked".
-	naked := `{"orders":[{"symbol":"ETH-USDT","orderId":3,"type":"LIMIT","price":"2441.0","origQty":"1"}]}`
+	naked := `{"orders":[{"symbol":"ETH-USDT","orderId":3,"type":"LIMIT","price":"2400.0","origQty":"1"}]}`
 	n, _ := decodeOpenOrders(t, naked, "ETH-USDT")
 	if len(n) != 1 || n[0].BundledStop != 0 {
 		t.Errorf("missing stopLoss should read 0, got %v", n)

@@ -40,13 +40,13 @@ func TestParseBalanceRealZero(t *testing.T) {
 }
 
 func TestParseBalanceNonZero(t *testing.T) {
-	b, err := parseBalance([]byte(`{"balance":{"asset":"USDT","balance":"336.30000000","equity":"340.11","usedMargin":"75"}}`))
+	b, err := parseBalance([]byte(`{"balance":{"asset":"USDT","balance":"300.00000000","equity":"312.50","usedMargin":"75"}}`))
 	if err != nil {
 		t.Fatalf("parseBalance: %v", err)
 	}
 	v, ok := b.EquityOrZero()
-	if !ok || v != 340.11 {
-		t.Errorf("EquityOrZero = (%v, %v), want (340.11, true) — equity wins over balance", v, ok)
+	if !ok || v != 312.50 {
+		t.Errorf("EquityOrZero = (%v, %v), want (312.50, true) — equity wins over balance", v, ok)
 	}
 	if b.UsedMargin == nil || *b.UsedMargin != 75 {
 		t.Errorf("UsedMargin = %v, want 75", b.UsedMargin)

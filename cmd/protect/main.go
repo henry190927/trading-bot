@@ -114,7 +114,7 @@ func main() {
 		// "stop landed, tp failed" as success.
 		os.Exit(1)
 	}
-	fmt.Println("\nnow re-check /ops/verify — an orderId is not proof the exchange is holding it (see #60)")
+	fmt.Println("\nnow re-check /ops/verify — an orderId is not proof the exchange is holding it")
 }
 
 // findPosition returns the open position to protect. With -side given it asks

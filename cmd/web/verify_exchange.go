@@ -38,9 +38,9 @@ type verifyTrade struct {
 //
 // This page iterated the journal and nothing else, so a position placed
 // outside it produced zero rows — and zero rows rendered the GREEN
-// "all trades protected & matched" badge. On 2026-09-10 that badge was showing
-// while a BTC long (0.1202 @ 78,264.5, 125x cross, 9,407u notional against
-// 258.52u of equity) sat naked for five hours. The page's own subtitle says
+// "all trades protected & matched" badge. That badge has shown green while a
+// 125x cross BTC long at roughly 36x account leverage sat naked for five
+// hours. The page's own subtitle says
 // "trust the exchange, not local bookkeeping"; the LIST of what to check came
 // from local bookkeeping.
 type orphanPos struct {
@@ -212,9 +212,9 @@ func classifyVerify(t journal.Trade, pos *bingx.Position, ords []bingx.OpenOrder
 		return hasStop, "⚠ journal 記為已成交,但交易所沒有部位(可能已平/已停損)"
 	case pos != nil && !hasStop:
 		// Decide returns skip for a trade with no journal stop, and a naked
-		// position on such a trade would otherwise render clean. #62 was
-		// exactly this row: 100x, no stop recorded, none on the exchange, and
-		// it gave back 97% of the position's margin.
+		// position on such a trade would otherwise render clean. A live trade
+		// was exactly this row: 100x, no stop recorded, none on the exchange,
+		// and it gave back 97% of the position's margin.
 		return hasStop, "⚠ 有部位但交易所沒有停損單 — 裸單!(journal 也沒記停損價)"
 	case pos == nil && !t.FilledAt.IsZero():
 		// The stale-journal warning has to survive the skip states too.

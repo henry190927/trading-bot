@@ -78,7 +78,7 @@ func main() {
 
 	// Cash-open-bar check, PRE-TRADE. The same advisory exists in the web app,
 	// where BOTH call sites are post-hoc (the place-stop response and
-	// /ops/verify). Journal #67 is why that is not enough: a SNDK short with a
+	// /ops/verify). A live trade is why that is not enough: a SNDK short with a
 	// stop 1/7.4 of that symbol's median cash-open-bar range, filled 7 seconds
 	// into the open and stopped 24 seconds later. A warning that arrives after
 	// the fill cannot be acted on.

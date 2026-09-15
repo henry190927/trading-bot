@@ -91,10 +91,10 @@ type Trade struct {
 	// 0.15 means price went 15% of one R past the stop). Reclaimed =
 	// did price come back through entry within ReclaimWindow bars?
 	// ReclaimBars = bars to reclaim (1-N) or 0 if never within window.
-	WickPastStop   float64
-	WickPastStopR  float64
-	Reclaimed      bool
-	ReclaimBars    int
+	WickPastStop  float64
+	WickPastStopR float64
+	Reclaimed     bool
+	ReclaimBars   int
 
 	// Validator-replay diagnostic (populated only when ReplayValidator
 	// option is on). Records what validator.Validate would have said
@@ -128,15 +128,15 @@ type Result struct {
 
 	// Stop-hunt diagnostics: how often does price stop us out and
 	// then reverse through entry within ReclaimWindow bars?
-	StopHits         int     // total trades that hit stop
-	StopHitsReclaim  int     // of those, how many later reclaimed entry
-	StopReclaimPct   float64 // 100 * StopHitsReclaim / StopHits
-	MedWickR         float64 // median wick depth past stop (in R units)
-	WickBucket005    int     // 0    – 0.05R past stop
-	WickBucket010    int     // 0.05 – 0.10R
-	WickBucket025    int     // 0.10 – 0.25R
-	WickBucket050    int     // 0.25 – 0.50R
-	WickBucketBig    int     // > 0.50R
+	StopHits        int     // total trades that hit stop
+	StopHitsReclaim int     // of those, how many later reclaimed entry
+	StopReclaimPct  float64 // 100 * StopHitsReclaim / StopHits
+	MedWickR        float64 // median wick depth past stop (in R units)
+	WickBucket005   int     // 0    – 0.05R past stop
+	WickBucket010   int     // 0.05 – 0.10R
+	WickBucket025   int     // 0.10 – 0.25R
+	WickBucket050   int     // 0.25 – 0.50R
+	WickBucketBig   int     // > 0.50R
 }
 
 // Run replays Signal.Evaluate over candles and simulates every score>=threshold
@@ -179,8 +179,8 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 			}
 		}
 		sig := signal.Evaluate(signal.Inputs{
-			Symbol:    sym,
-			Timeframe: tf,
+			Symbol:     sym,
+			Timeframe:  tf,
 			Candles:    slice,
 			Bias:       biases[i],
 			DXYTrend:   dxyTrends[i],
@@ -567,9 +567,9 @@ func (r Result) ValidatorReplaySummary() string {
 		{"AVOID (<2)", -1, 2},
 	}
 	type band struct {
-		n     int
-		totR  float64
-		wins  int
+		n    int
+		totR float64
+		wins int
 	}
 	stats := make(map[string]*band)
 	any := false
@@ -615,8 +615,8 @@ func (r Result) ValidatorReplaySummary() string {
 }
 
 // StopHuntSummary describes how often stops were swept and reverted —
-// the diagnostic the user asked for after observing trade #8 wick past
-// the stop then pull back. A reclaim rate above ~25% strongly suggests
+// the diagnostic that follows from watching a stop wick past and then
+// pull back. A reclaim rate above ~25% strongly suggests
 // a buffered-stop A/B is worth running.
 func (r Result) StopHuntSummary() string {
 	if r.StopHits == 0 {

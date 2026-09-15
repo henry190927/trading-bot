@@ -1,6 +1,6 @@
 // Package macro provides a blackout-window gate so the signal engine
 // can skip generating trade plans around known macro releases (CPI,
-// FOMC, NFP, PPI). The motivation traces to trade #23 (XAG short
+// FOMC, NFP, PPI). The motivation traces to a live XAG short
 // stopped on a CPI-driven wick before mark price reverted past TP2):
 // signals fired in the predicted direction were correct, but the path
 // got dominated by macro-event volatility we hadn't accounted for.

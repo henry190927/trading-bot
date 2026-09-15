@@ -6,7 +6,7 @@ package main
 // that one bar a day (the one holding 9:30 ET) carries 2.5-7.25x these
 // symbols' median hourly range and sets the day's extreme 25-58% of the time.
 // A stop inside that bar's ordinary travel is reached by noise, not by being
-// wrong — which is what happened to SNDK #62 on 2026-09-03.
+// wrong — which is what happened to a live SNDK entry.
 //
 // Deliberately ADVISORY. It rides along with the placement result and shows on
 // /ops/verify; it never refuses an order. A stop tighter than the open bar is

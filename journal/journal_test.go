@@ -13,8 +13,8 @@ const eps = 1e-9
 
 func close2(a, b float64) bool { return math.Abs(a-b) < 1e-6 }
 
-// #66 as it was actually recorded, plus the equity that was NOT recorded at
-// the time and is the whole point of v9.
+// A trade as it was actually recorded, plus the equity that was NOT recorded
+// at the time and is the whole point of v9.
 func trade66() Trade {
 	return Trade{
 		ID: 66, Symbol: "BTC", Side: "long", TF: "1h",
@@ -43,15 +43,15 @@ func TestRiskDerivations(t *testing.T) {
 		t.Errorf("KillDistancePct() = %v, want 2.484722891566265", got)
 	}
 
-	// The pair that took the account to zero on 2026-09-08, as a single
-	// synthetic position: 16,463u notional against 139.66u of equity.
-	fatal := Trade{MarginUSDT: 139.66, Leverage: 1, EquityUSDT: 139.66}
-	fatal.MarginUSDT, fatal.Leverage = 16463, 1
-	if got := fatal.AccountLeverage(); !close2(got, 117.87913504224545) {
-		t.Errorf("fatal AccountLeverage() = %v, want 117.87913504224545", got)
+	// The pair that took the account to zero, as a single synthetic position:
+	// 16,500u of notional against 140u of equity. 16500/140 = 117.857...x, and
+	// its reciprocal as a percentage is the kill distance.
+	fatal := Trade{MarginUSDT: 16500, Leverage: 1, EquityUSDT: 140}
+	if got := fatal.AccountLeverage(); !close2(got, 117.85714285714286) {
+		t.Errorf("fatal AccountLeverage() = %v, want 117.85714285714286", got)
 	}
-	if got := fatal.KillDistancePct(); !close2(got, 0.8483265504464557) {
-		t.Errorf("fatal KillDistancePct() = %v, want 0.8483265504464557 (the 0.848%% from the post-mortem)", got)
+	if got := fatal.KillDistancePct(); !close2(got, 0.8484848484848485) {
+		t.Errorf("fatal KillDistancePct() = %v, want 0.8484848484848485", got)
 	}
 }
 
@@ -155,7 +155,7 @@ func TestUnrecordedEquityStaysBlank(t *testing.T) {
 // breaks, every process that reads journal.csv fails at once.
 func TestReadsV8AndUpgradesToV9(t *testing.T) {
 	v8Header := strings.Join(Header[:29], ",")
-	// #61 as recorded, trimmed to the v8 column count.
+	// A v8 row as recorded, trimmed to the v8 column count.
 	v8Row := "61,2026-09-03T15:50:31+08:00,2026-09-03T15:50:31+08:00,2026-09-03T21:38:53+08:00," +
 		"BTC,long,1h,zone,77640,77380,78900,79222.3,weekopen,notes,78552.6,manual,3.5100,closenotes," +
 		"125,2026-09-03T15:50:31+08:00,,,,75,,,,,"
@@ -250,7 +250,7 @@ func TestWriteAllLeavesTheJournalIntactWhenTheWriteFails(t *testing.T) {
 		t.Fatalf("journal holds %d trades, want the original 1", len(got))
 	}
 	if got[0].ID != 66 || !close2(got[0].Entry, 79006) {
-		t.Errorf("journal = #%d entry %.1f, want the untouched #66 entry 79006 "+
+		t.Errorf("journal = #%d entry %.1f, want the untouched entry 79006 "+
 			"— the failed write reached the live file", got[0].ID, got[0].Entry)
 	}
 }

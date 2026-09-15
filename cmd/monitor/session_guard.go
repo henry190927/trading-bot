@@ -2,11 +2,11 @@ package main
 
 // Cash-open stop guard for the auto executor.
 //
-// Two of the three SNDK entries in the journal died the same way. #62 and #67
-// were both placed within seconds of 9:30 ET with a stop tighter than the
-// cash-open bar's ordinary travel — #67's was 0.5065%, one seventh of the
-// 3.75% median that session.MedianOpenBarRangePct measures over 148 days — and
-// both were stopped out inside half a minute, #67 in twenty-four seconds.
+// Two of the three SNDK entries this has taken died the same way. Both were
+// placed within seconds of 9:30 ET with a stop tighter than the cash-open
+// bar's ordinary travel — one of them at 0.5065%, a seventh of the 3.75%
+// median that session.MedianOpenBarRangePct measures over 148 days — and both
+// were stopped out inside half a minute, one in twenty-four seconds.
 //
 // session.StopWarning has been able to say this all along. It just was not
 // wired anywhere the auto executor could hear it: a grep for `session.` across

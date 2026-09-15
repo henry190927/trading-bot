@@ -4,12 +4,11 @@ package main
 //
 // autotrade.CheckCaps guards the paper executor's firing path and is genuinely
 // enforced there. It never saw a manual order, and — more to the point — it
-// would not have stopped the 2026-09-08 liquidation even if it had. Its caps
-// were 4 positions / 140u TOTAL MARGIN / -3.0R daily, and the three unplanned
-// trades committed 65.75u, 70.58u and 61.13u: every combination stayed under
-// 140u. Yet two of them together were 16,463u of notional against 139.66u of
-// equity — 117.9x, a 0.848% kill distance — and a 0.757% move closed the
-// account.
+// would not have stopped the liquidation even if it had. Its caps were 4
+// positions / 140u TOTAL MARGIN / -3.0R daily, and three trades committing
+// roughly 65u, 70u and 62u leave every combination under 140u. Yet two of them
+// together reached about 118x account leverage and a 0.85% kill distance, and
+// a sub-1% adverse move closed the account.
 //
 // Margin is leverage-divided, so a margin cap cannot see exposure. This file
 // prices the account in notional/equity instead, and it builds that from the
@@ -106,7 +105,7 @@ func shortOrRaw(sym market.Symbol) string {
 	return string(sym)
 }
 
-// usdt renders a notional with thousands separators — 16,463u is legible and
+// usdt renders a notional with thousands separators — 16,500u is legible and
 // 16463u is not, and this string ends up in a refusal a human has to read
 // while deciding whether to argue with it.
 func usdt(v float64) string {

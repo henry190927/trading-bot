@@ -4,12 +4,12 @@ package main
 // position from the phone. This is B2: the same thing cmd/protect does, minus
 // the SSH.
 //
-// WHY IT MATTERS: on 2026-08-31 trade #60 went naked; on 2026-09-03 #61 and
-// #62 sat naked for hours with +108u unrealised, because attaching a stop was
-// a CLI operation and the trader was at work. On 2026-09-05 two resting limits
-// were placed that BingX will fill into an UNPROTECTED position — a
-// reduce-only stop cannot rest before a position exists, so the gap is
-// structural, not an oversight.
+// WHY IT MATTERS: a position has gone naked outright, and others have sat
+// unprotected for hours while well in profit, because attaching a stop was a
+// CLI operation and nobody was at a terminal. Resting limits compound it —
+// BingX fills them into an UNPROTECTED position, and a reduce-only stop cannot
+// rest before a position exists, so the gap is structural rather than an
+// oversight.
 //
 // SAFETY, in order of how much each one matters:
 //
@@ -102,7 +102,7 @@ func (s *server) handleOpsProtect(c *gin.Context) {
 	out["tp_order_id"] = res.TPOrderID
 	out["errors"] = res.Errors
 	// Always tell the caller to re-verify, including on a partial failure.
-	// A bundled SL silently failing to attach is exactly how #60 went naked,
+	// A bundled SL silently failing to attach is exactly how a position has gone naked,
 	// so an order id in the response is not proof the exchange is holding it.
 	out["next"] = "re-open /ops/verify to confirm the exchange is actually holding these"
 	if len(res.Errors) > 0 && !res.Sent() {

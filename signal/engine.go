@@ -143,7 +143,7 @@ func Evaluate(in Inputs) Signal {
 	// Macro blackout gate. If we're inside the [-before, +after] window of
 	// a CPI/FOMC/NFP/PPI release, suppress the signal regardless of what
 	// the engine thinks: data-driven wicks dominate setup mechanics during
-	// these windows (see #23: XAG short stopped on a CPI wick before mark
+	// these windows (an XAG short stopped on a CPI wick before mark
 	// reverted past TP2). Daemon, monitor, dashboard, validator all see a
 	// Flat signal and the Reason carries the event name so the user knows
 	// why nothing is being suggested.

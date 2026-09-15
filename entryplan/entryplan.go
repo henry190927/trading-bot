@@ -6,11 +6,11 @@
 // rails are the strict ones.
 //
 // The rule that matters is the first fault below: an entry without a stop is
-// REFUSED, not warned about. Trade #60 went naked because a bundled stop
-// silently failed to attach; #70 sat naked for 58 minutes and then had its
-// stop removed by hand. A surface that makes placing a naked entry one field
-// away from placing a protected one will eventually be used to place a naked
-// one at 4am. There is no override for this.
+// REFUSED, not warned about. A position has gone naked because a bundled stop
+// silently failed to attach; another sat unprotected for the better part of an
+// hour and then had its stop removed by hand. A surface that makes
+// placing a naked entry one field away from placing a protected one will
+// eventually be used to place a naked one. There is no override for this.
 //
 // Leverage, notional and concurrency caps are NOT re-implemented here — they
 // live in package risk, which the handler consults with the same Limits the
@@ -38,7 +38,7 @@ type Inputs struct {
 
 	// AllowMarketable lets a limit that would fill immediately through. Off by
 	// default: a long limit ABOVE the mark is a market buy wearing a limit's
-	// clothes, and chasing is this account's most expensive documented habit.
+	// clothes, and a chased entry is the failure this package exists to stop.
 	AllowMarketable bool
 }
 

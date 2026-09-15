@@ -4,21 +4,22 @@
 //
 // autotrade.CheckCaps already caps concurrent positions, TOTAL MARGIN and
 // daily realised R, and it is genuinely enforced at the firing path. It would
-// not have prevented the 2026-09-08 liquidation, and the numbers say so
-// plainly. The live caps were 4 positions / 140u margin / -3.0R daily, and the
-// three unplanned trades committed 65.75u, 70.58u and 61.13u of margin:
+// not have prevented the liquidation that motivated this package, and the
+// arithmetic says so plainly. Take its caps — 4 positions / 140u total margin
+// / -3.0R daily — and three trades committing 65u, 70u and 62u of margin:
 //
-//	A alone       65.75u  < 140u   allowed
-//	A + B        136.33u  < 140u   allowed
-//	B + C        131.71u  < 140u   allowed
+//	A alone       65u  < 140u   allowed
+//	A + B        135u  < 140u   allowed
+//	B + C        132u  < 140u   allowed
 //
-// Every one passes. Yet B and C together were 16,463u of notional against
-// 139.66u of equity — 117.9x account leverage, a 0.848% kill distance — and
-// they were both long, on correlated assets, with no stop. A 0.757% adverse
-// move closed the account.
+// Every combination passes. Yet B and C together, at 125x, are 16,500u of
+// exposure; against an account whose equity is of the same order as the margin
+// cap itself that is roughly 118x account leverage and a 0.85% kill distance.
+// Both long, on correlated assets, with no stop. A 0.76% adverse move closes
+// the account — which is what happened.
 //
-// The margin cap cannot see that, because MARGIN IS LEVERAGE-DIVIDED. 131.71u
-// of margin at 125x is 16,463u of exposure and at 5x it is 658u; the cap
+// The margin cap cannot see that, because MARGIN IS LEVERAGE-DIVIDED. 132u
+// of margin at 125x is 16,500u of exposure and at 5x it is 660u; the cap
 // values them identically. The same blindness runs through R (leverage-
 // independent by definition) and through the journal, which records margin on
 // 48% of filled rows and equity on none. So the one quantity that separates a
@@ -31,19 +32,19 @@
 // form worth reading, because it is denominated in the same unit as a chart.
 // For scale, over the last 500 1h bars:
 //
-//	BTC 1h  median range 0.518%   p90 1.096%   19% of bars exceed 0.848%
-//	ETH 1h  median range 0.662%   p90 1.494%   34% of bars exceed 0.848%
+//	BTC 1h  median range 0.518%   p90 1.096%   19% of bars exceed 0.85%
+//	ETH 1h  median range 0.662%   p90 1.494%   34% of bars exceed 0.85%
 //
-// A 0.848% kill distance is inside one ordinary hourly candle. That is the
+// A 0.85% kill distance is inside one ordinary hourly candle. That is the
 // whole argument for capping this rather than margin.
 //
 // # WHAT THIS PACKAGE DELIBERATELY DOES NOT DO
 //
-// It does not pick the limits. 2026-09-04's BTC+ETH pair ran at 55.8x
-// (18,750u on 336.30u) after the trader was shown the arithmetic and chose to
-// keep it; that was their call. A cap of zero means UNLIMITED here, matching
-// autotrade's convention, so limits arrive from config and never from this
-// file's opinion.
+// It does not pick the limits. A correlated BTC+ETH pair has been kept on at
+// roughly 56x account leverage after the arithmetic was laid out — that is the
+// desk's call to make, not this package's. A cap of zero means UNLIMITED here,
+// matching autotrade's convention, so limits arrive from config and never from
+// this file's opinion.
 //
 // It also does not model correlation. B and C were both long on BTC and ETH,
 // which is closer to one position than two, and notional summed across

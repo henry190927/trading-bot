@@ -1,7 +1,7 @@
 // shelfbt — C10. A/B the SHELF RETEST as an entry.
 //
-// The claim under test, from the desk: "方向的拐點基本上高機率發生在這個帶裡面"
-// — turns happen inside the shelf band with high probability.
+// The claim under test: turns happen inside the shelf band with high
+// probability.
 //
 // HALF OF THAT NEEDS NO TEST. A shelf is BY DEFINITION a band where swing
 // highs and swing lows have both already clustered, so "turns have happened

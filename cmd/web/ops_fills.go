@@ -3,7 +3,7 @@ package main
 // GET /ops/fills — read-only filled-order history from the exchange.
 //
 // Closing a trade by hand on the phone leaves the journal depending on
-// recollection of the price. #63/#64 were closed over a weekend with a
+// recollection of the price. Two trades were closed over a weekend with a
 // reversal in between; reconstructing that from memory is how an R baseline
 // drifts from what actually happened. This asks the exchange instead.
 //

@@ -4,10 +4,10 @@ package bingx
 // none of them can create, modify or cancel an order.
 //
 // Why it exists: closing a trade by hand on the phone leaves the journal
-// depending on the trader's memory of the price. #63/#64 were closed over a
-// weekend at 79,805.5 and 2,493.65 with a reversal in between, and
-// reconstructing that from recollection is how an R baseline quietly drifts
-// from what actually happened. The exchange knows; ask it.
+// depending on someone's memory of the price. Two trades were closed over a
+// weekend with a reversal in between, and reconstructing that from
+// recollection is how an R baseline quietly drifts from what actually
+// happened. The exchange knows; ask it.
 
 import (
 	"context"

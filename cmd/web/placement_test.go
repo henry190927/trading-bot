@@ -5,9 +5,10 @@ import (
 	"testing"
 )
 
-// The case that motivated the change: BTC #61, entry 77,640, mark ~78,540,
-// stop trailed up to 77,900 to lock in profit. The old entry-based guard
-// refused it because 77,900 > 77,640, which made trailing a stop through the
+// The case that motivated the change: a BTC long at entry 77,640 with the mark
+// around 78,540, stop trailed up to 77,900 to lock in profit. The old
+// entry-based guard refused it because 77,900 > 77,640, which made trailing a
+// stop through the
 // UI impossible.
 const (
 	btcEntry = 77640.0
@@ -84,7 +85,7 @@ func TestStopPlacementRefusesWithoutMark(t *testing.T) {
 }
 
 func TestTPPlacementRestsAboveMark(t *testing.T) {
-	// The TP actually placed for #61.
+	// The TP actually placed on that trade.
 	if fault := tpPlacementFault("long", 78900, btcMark); fault != "" {
 		t.Fatalf("TP above mark refused: %s", fault)
 	}

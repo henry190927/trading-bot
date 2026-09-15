@@ -69,7 +69,7 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 	})
 
 	// The row cmd/web could never reach before, because it stopped checking
-	// once StopOrderID was set. #60's bundled stop failed to attach this way.
+	// once StopOrderID was set. A bundled stop has failed to attach this way.
 	t.Run("journal names a stop the exchange does not have", func(t *testing.T) {
 		tr := vexTrade()
 		tr.StopOrderID = "2094351178603393024"
@@ -82,7 +82,7 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 		}
 	})
 
-	// #62: 100x SNDK, no stop recorded anywhere, no stop on the exchange.
+	// A live row: 100x SNDK, no stop recorded anywhere, no stop on the exchange.
 	// Decide skips it for lack of intent, so the page must catch it itself.
 	t.Run("no journal stop and no exchange stop still warns", func(t *testing.T) {
 		tr := vexTrade()
@@ -123,7 +123,7 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 
 // A journal row for a RESTING limit — recorded, not yet filled — must produce
 // no warning. /ops/entry writes exactly this shape: the order is on the book,
-// FilledAt is zero, and there is no position to find.
+// FilledAt is zero, and there is no position to find yet.
 //
 // The stale-journal branch is what would fire here, and it is gated on
 // FilledAt being set. Ungating it would make every resting entry render
@@ -131,12 +131,12 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 // the one page whose value is that its alarms are real.
 func TestPendingEntryIsNotAStaleJournal(t *testing.T) {
 	pending := journal.Trade{
-		ID: 71, Symbol: "ETH", Side: "long",
-		Entry: 2441, Stop: 2424.88, TP2: 2480.50,
-		Leverage: 125, MarginUSDT: 56.44,
+		ID: 1, Symbol: "ETH", Side: "long",
+		Entry: 2400, Stop: 2384, TP2: 2440,
+		Leverage: 125, MarginUSDT: 60,
 		OpenedAt: time.Now().UTC(),
 		StopAuto: true, TP2Auto: true,
-		EntryOrderID: "2099785767551463424",
+		EntryOrderID: "1234567890123456789",
 		// FilledAt deliberately zero — this is the whole point.
 	}
 	if !pending.IsPending() {

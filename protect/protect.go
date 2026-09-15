@@ -2,8 +2,8 @@
 // ALREADY-OPEN position.
 //
 // It exists so the rules live in exactly ONE place. They were previously only
-// in cmd/protect, reachable only over SSH, which is how #61 and #62 sat naked
-// for hours on 2026-09-03 while the trader was at work — and how #60 went
+// in cmd/protect, reachable only over SSH, which is how positions have sat
+// naked for hours with nobody at a terminal — and how one went
 // naked entirely on 2026-08-31. cmd/protect and the /ops/verify button now
 // call the same BuildPlan, so a fix to the sanity rules cannot land in one and
 // miss the other.

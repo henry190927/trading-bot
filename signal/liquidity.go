@@ -43,7 +43,7 @@ type LiquidityLevel struct {
 // (sweep-reject: run above an EQH then close back below → short; mirror for
 // EQL → long), i.e. EQH reads bearish and EQL bullish.
 //
-// A/B-gated per [[feedback_strategy_changes]]: wire via cmd/backtest --liq-vote
+// A/B-gated before shipping: wire via cmd/backtest --liq-vote
 // and prove +R across 60/90/120d per symbol before considering a default.
 // TESTED 2026-09-02 → REJECTED in BOTH polarities, at two tolerances, across
 // 60/90/120d on the core four. Core-4 total netR:

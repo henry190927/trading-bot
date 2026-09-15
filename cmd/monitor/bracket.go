@@ -6,11 +6,11 @@ package main
 //
 // cmd/web already knows how to attach a reduce-only stop to a filled trade.
 // Its only callers are the dashboard and /today HTTP handlers, so it runs when
-// a browser loads a page and at no other time. Every naked position in the
-// journal traces to that: #60 (2026-08-31) went naked entirely, and
-// #62/#63/#64 carried a planned stop that never reached BingX because the
-// fills landed while nobody was at a desk. On 2026-09-05/06 both #63 and #64
-// had weekend highs travel THROUGH their planned stops with no order resting.
+// a browser loads a page and at no other time. Every naked position this has
+// produced traces to that: one went naked entirely, and three others carried a
+// planned stop that never reached BingX because the fills landed while nobody
+// was at a desk. Two of those had weekend highs travel THROUGH their planned
+// stops with no order resting.
 //
 // It also never re-checked: cmd/web skips placement once StopOrderID is set,
 // so a stop that was cancelled, expired or silently rejected leaves the
@@ -25,8 +25,9 @@ package main
 //
 // It also does not decide, by default, that the journal's stop should become a
 // live order. journal.Stop is the ANALYSIS stop — the R baseline — kept
-// deliberately distinct from whatever rests on the exchange (#61 recorded
-// 77,380 as its R baseline while a 77,900 profit-lock rested live). So the
+// deliberately distinct from whatever rests on the exchange — a trade can
+// record one number as its R baseline while a profit-lock several hundred
+// points away rests live. So the
 // default is ALERT: say loudly that a live position has no stop, and leave the
 // send to /ops/verify, which is one tap away. Two things override that and
 // place the order:
@@ -352,9 +353,9 @@ func sideZH(side string) string {
 // WHY THIS EXISTS SEPARATELY FROM bracketCycle. That function enumerates from
 // the journal — `syms` is built from open trades and it returns early on
 // `len(open) == 0`, which the comment there defends as "a flat journal costs
-// zero API calls". On 2026-09-10 that cost real money instead: a BTC long,
-// 0.1202 @ 78,264.5, 125x cross, 9,407u notional on 258.52u of equity, was
-// placed outside the journal. With zero open journal rows the guard returned
+// zero API calls". That has cost real money instead: a 125x cross BTC long at
+// roughly 36x account leverage was placed outside the journal. With zero open
+// journal rows the guard returned
 // before making a single exchange call, and /ops/verify — whose own subtitle
 // reads "trust the exchange, not local bookkeeping" — showed a GREEN "all
 // trades protected & matched" because it had zero rows to iterate. The

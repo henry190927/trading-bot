@@ -34,7 +34,7 @@ func TestAutoSessionApplies(t *testing.T) {
 		now  time.Time
 		want bool
 	}{
-		// The case that killed #62 and #67: an entry landing in the run-up
+		// The case that killed both SNDK entries: one landing in the run-up
 		// to the bell with a stop inside the open bar's travel.
 		{"29m before open, 1h rule", market.SNDKUSDT, "1h", trig, open.Add(-29 * time.Minute), true},
 		{"1m before open", market.SNDKUSDT, "1h", trig, open.Add(-time.Minute), true},

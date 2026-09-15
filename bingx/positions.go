@@ -22,8 +22,8 @@ type Position struct {
 
 // Notional is the position's face value in USDT at its average entry. This is
 // the exposure number — margin x leverage — and the one that has to be
-// compared against equity, because margin alone is blind to leverage: 131.71u
-// of margin at 125x is 16,463u of exposure.
+// compared against equity, because margin alone is blind to leverage: 132u
+// of margin at 125x is 16,500u of exposure.
 func (p Position) Notional() float64 { return p.Quantity * p.EntryPrice }
 
 // rawPosition mirrors the BingX position payload. Fields are stringly-typed.
