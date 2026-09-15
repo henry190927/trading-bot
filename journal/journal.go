@@ -223,7 +223,7 @@ func ReadAll(path string) ([]Trade, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	r := csv.NewReader(f)
 	rows, err := r.ReadAll()
@@ -256,18 +256,27 @@ func WriteAll(path string, trades []Trade) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	w := csv.NewWriter(f)
 	if err := w.Write(Header); err != nil {
+		_ = f.Close()
 		return err
 	}
 	for _, t := range trades {
 		if err := w.Write(rowFromTrade(t)); err != nil {
+			_ = f.Close()
 			return err
 		}
 	}
 	w.Flush()
-	return w.Error()
+	if err := w.Error(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	// NOT deferred. os.Create truncated the existing journal before the first
+	// byte was written, so a Close that fails means the file on disk is short
+	// — and returning w.Error() (nil) while that happened tells the caller
+	// every trade was saved.
+	return f.Close()
 }
 
 // NextID returns the next unique ID for an Add operation.

@@ -338,9 +338,10 @@ func runWalkForward(series map[string][]market.Candle, atrs map[string][]float64
 }, tolFrac, bufATR, rMult float64, longOnly bool, trainDays, testDays int, tf market.Timeframe) {
 	grid := []float64{0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.50}
 	barsPerDay := 24.0
-	if tf == "2h" {
+	switch tf {
+	case "2h":
 		barsPerDay = 12
-	} else if tf == "4h" {
+	case "4h":
 		barsPerDay = 6
 	}
 	trainBars := int(float64(trainDays) * barsPerDay)

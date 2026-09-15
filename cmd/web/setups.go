@@ -103,7 +103,7 @@ func readSetups() ([]Setup, error) {
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var out []Setup
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
@@ -129,11 +129,12 @@ func writeSetups(all []Setup) error {
 	w := bufio.NewWriter(f)
 	for _, s := range all {
 		b, _ := json.Marshal(s)
-		w.Write(b)
-		w.WriteByte('\n')
+		// bufio.Writer latches its first error; Flush below reports it.
+		_, _ = w.Write(b)
+		_ = w.WriteByte('\n')
 	}
 	if err := w.Flush(); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Close(); err != nil {

@@ -48,7 +48,7 @@ func main() {
 	symFlag := flag.String("symbol", "", "override market.All() with a single BingX contract code, e.g. NCCO1OILBRENT2USD-USDT — for pre-flighting new symbols without polluting the live daemon universe.")
 	disablePerSym := flag.Bool("no-per-symbol-buffer", false, "clear signal.PerSymbolStopBuffer for this run — A/B comparison against the pre-2026-06-03 baseline before per-symbol stop buffers shipped.")
 	replayValidator := flag.Bool("replay-validator", false, "diagnostic: run validator.Validate on each emitted signal; bucket realized R by validator verdict (STRONG/TAKE/NEUTRAL/WEAK/AVOID). Used to A/B whether validator weight changes improve predictive correlation.")
-	useFunding := flag.Bool("funding", true, "fetch per-symbol funding-rate history and pass to engine via Context. Activates applyContextFilters' crowd penalties + applyFundingContrarianVote's contrarian +1/+2 votes. Default ON (matches shipped engine behavior).")
+	useFunding := flag.Bool("funding", true, "fetch per-symbol funding-rate history and pass to engine via Context. Activates annotateContextWarnings' crowd warnings (display-only; they do not change trade selection). Default ON (matches shipped engine behavior). NOTE: this does NOT activate applyFundingContrarianVote — that vote was reverted 2026-06-08 after its own A/B and is unwired; see the note at its call site in signal/engine.go.")
 	noFundingVote := flag.Bool("no-funding-vote", false, "disable signal.FundingContrarianVoteEnabled — the contrarian +1/+2 vote stays off even when --funding is on. A/B switch for the pre-2026-06-08 baseline.")
 	flag.Parse()
 	if *structMomentum && *noStructMomentum {

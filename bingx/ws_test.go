@@ -3,6 +3,7 @@ package bingx
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"testing"
 	"time"
 
@@ -158,7 +159,7 @@ func TestDecodeMarkFrameErrors(t *testing.T) {
 
 func TestSubscribeMarkPricesRejectsNoSymbols(t *testing.T) {
 	s := NewStream()
-	if err := s.SubscribeMarkPrices(nil, nil, make(chan MarkPrice, 1)); err == nil {
+	if err := s.SubscribeMarkPrices(context.Background(), nil, make(chan MarkPrice, 1)); err == nil {
 		t.Error("want an error with no symbols")
 	}
 }

@@ -41,7 +41,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "dial %s: %v%s\n", bingx.HostWSSwap, err, status)
 		os.Exit(1)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	fmt.Printf("connected %s\n", bingx.HostWSSwap)
 
 	for i, ch := range strings.Split(*channel, ",") {

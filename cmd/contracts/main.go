@@ -136,10 +136,10 @@ func vetCandidates(csv string) {
 		// A recent LISTING and a series full of holes both show up as low
 		// coverage but mean opposite things: the first is backtestable on a
 		// shorter window, the second is not backtestable at all.
-		firstT, lastT, gaps, maxGap := "—", "—", 0, 0.0
 		if len(cs) > 1 {
-			firstT = cs[0].OpenTime.Format("01-02")
-			lastT = cs[len(cs)-1].OpenTime.Format("01-02")
+			firstT := cs[0].OpenTime.Format("01-02")
+			lastT := cs[len(cs)-1].OpenTime.Format("01-02")
+			gaps, maxGap := 0, 0.0
 			span := cs[len(cs)-1].OpenTime.Sub(cs[0].OpenTime).Hours()
 			for i := 1; i < len(cs); i++ {
 				d := cs[i].OpenTime.Sub(cs[i-1].OpenTime).Hours()

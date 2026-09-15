@@ -43,12 +43,12 @@ func AppendFire(pf PaperFire) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	b, err := json.Marshal(pf)
 	if err != nil {
 		return
 	}
-	f.Write(append(b, '\n'))
+	_, _ = f.Write(append(b, '\n'))
 }
 
 // ReadFires returns the most recent `limit` fires (newest first).
@@ -57,7 +57,7 @@ func ReadFires(limit int) []PaperFire {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var all []PaperFire
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)

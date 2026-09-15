@@ -59,10 +59,10 @@ func AppendBlocked(bc BlockedCandidate) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	b, err := json.Marshal(bc)
 	if err != nil {
 		return
 	}
-	f.Write(append(b, '\n'))
+	_, _ = f.Write(append(b, '\n'))
 }

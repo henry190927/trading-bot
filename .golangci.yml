@@ -6,6 +6,15 @@ version: "2"
 run:
   timeout: 3m
 
+issues:
+  # Defaults are max-issues-per-linter 50 and max-same-issues 3, which means
+  # the reported total is a display cap, not a count. Measured 2026-09-15: the
+  # first run said "57 issues", and fixing some made previously-hidden ones of
+  # the same kind appear. A gate that under-reports its own backlog is worse
+  # than no number at all.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
 linters:
   # errcheck/govet/ineffassign/staticcheck/unused are v2's default set; listed
   # explicitly so the file states the whole gate rather than half of it.
@@ -27,6 +36,39 @@ linters:
     - noctx
     - errorlint
   settings:
+    errcheck:
+      # Closers on a READ path only. Closing an HTTP response body or a gzip
+      # reader after the bytes are already decoded reports nothing a caller
+      # could act on — there is no pending data to lose.
+      #
+      # Deliberately NOT a blanket (io.Closer).Close exclusion: Close on a
+      # WRITE path is where a buffered-write failure (ENOSPC, EIO) finally
+      # surfaces, and journal.WriteAll was silently swallowing exactly that.
+      # Those stay checked.
+      exclude-functions:
+        - (io.ReadCloser).Close
+        - (*compress/gzip.Reader).Close
+
+    staticcheck:
+      # Everything except QF1001. The two sites it fires on read
+      # `!a && !(b && c)` — one guard per line, each independently
+      # readable. Its rewrite, `!(a || (b && c))`, folds them into a single
+      # negated disjunction that has to be unpacked mentally to answer
+      # "what turns this off". The other quickfix checks (tagged switches,
+      # redundant type declarations) genuinely simplify and stay on.
+      # golangci-lint's default set, minus QF1001. The default is NOT "all" —
+      # writing `[all, -QF1001]` turns on six ST checks that were off by
+      # design and took staticcheck from 13 findings to 59.
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - -QF1001
+
     misspell:
       # `strat` is this codebase's deliberate shorthand for "strategy" — it is
       # the JSON field in autotrade_paper.jsonl and a column header on

@@ -72,7 +72,13 @@ func readDaemonStatus(service string) opsStatus {
 
 	// Unprivileged: is-active is a read-only D-Bus query. Keeping sudo here
 	// meant the status card depended on a blanket NOPASSWD grant.
-	out, _ := exec.Command("systemctl", "is-active", service).CombinedOutput()
+	//
+	// Bounded: this runs inline in a page render, and a wedged systemd would
+	// otherwise hang the request with no upper limit. 5s is far above the
+	// milliseconds a D-Bus read takes.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, _ := exec.CommandContext(ctx, "systemctl", "is-active", service).CombinedOutput()
 	state := strings.TrimSpace(string(out))
 	st.State = state
 	st.Active = state == "active"
@@ -204,10 +210,13 @@ func systemctlAction(service, action string) error {
 	if !contains(allowedServices, service) {
 		return fmt.Errorf("invalid service %q", service)
 	}
-	cmd := exec.Command("sudo", "systemctl", action, service)
-	out, err := cmd.CombinedOutput()
+	// 30s, not the status path's 5s: a restart legitimately takes seconds
+	// while the unit stops and comes back.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", action, service).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("systemctl %s %s: %v (%s)", action, service, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("systemctl %s %s: %w (%s)", action, service, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -349,7 +358,9 @@ func (s *server) handleOpsZoneConfig(c *gin.Context) {
 func (s *server) handleOpsZoneLogs(c *gin.Context) {
 	// No sudo: the service account is in the adm group, which is what
 	// grants journal access.
-	out, _ := exec.Command("journalctl", "-u", "trading-monitor",
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	out, _ := exec.CommandContext(ctx, "journalctl", "-u", "trading-monitor",
 		"-n", "300", "--no-pager", "--output=short-iso").CombinedOutput()
 	var lines []string
 	for _, l := range strings.Split(string(out), "\n") {
@@ -638,12 +649,12 @@ func (s *server) handleOpsLogs(c *gin.Context) {
 		"--output=short-iso")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Fprintf(c.Writer, "data: pipe error: %s\n\n", err.Error())
+		_, _ = fmt.Fprintf(c.Writer, "data: pipe error: %s\n\n", err.Error())
 		flusher.Flush()
 		return
 	}
 	if err := cmd.Start(); err != nil {
-		fmt.Fprintf(c.Writer, "data: start error: %s\n\n", err.Error())
+		_, _ = fmt.Fprintf(c.Writer, "data: start error: %s\n\n", err.Error())
 		flusher.Flush()
 		return
 	}
@@ -660,7 +671,7 @@ func (s *server) handleOpsLogs(c *gin.Context) {
 		// SSE format: "data: <line>\n\n". Newlines within the line must be
 		// split into multiple "data:" lines, but journalctl produces one
 		// log entry per line so this is safe.
-		fmt.Fprintf(c.Writer, "data: %s\n\n", scanner.Text())
+		_, _ = fmt.Fprintf(c.Writer, "data: %s\n\n", scanner.Text())
 		flusher.Flush()
 	}
 	// scanner.Err() typically returns "signal: killed" when context cancels;

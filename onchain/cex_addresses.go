@@ -1,6 +1,7 @@
 package onchain
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -89,7 +90,16 @@ func (r *CEXRegistry) loadFromBytes(b []byte, source string) {
 func (r *CEXRegistry) refreshLoop(url string) {
 	fetch := func() {
 		client := &http.Client{Timeout: 30 * time.Second}
-		resp, err := client.Get(url)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			r.mu.Lock()
+			r.lastError = fmt.Sprintf("remote fetch %s: %v", url, err)
+			r.mu.Unlock()
+			return
+		}
+		resp, err := client.Do(req)
 		if err != nil {
 			r.mu.Lock()
 			r.lastError = fmt.Sprintf("remote fetch %s: %v", url, err)

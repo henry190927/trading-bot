@@ -171,7 +171,7 @@ func cmdClose(args []string) error {
 	if err != nil {
 		return err
 	}
-	idx := -1
+	var idx int
 	if id, err := strconv.Atoi(idOrSym); err == nil {
 		idx = journal.FindByID(trades, id)
 		if idx >= 0 && !trades[idx].IsOpen() {

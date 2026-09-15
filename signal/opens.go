@@ -34,18 +34,3 @@ func ComputeOpens(candles []market.Candle, now time.Time) Opens {
 	pl := ComputePeriodLevels(candles, now)
 	return Opens{Daily: pl.Day.Open, Weekly: pl.Week.Open, Monthly: pl.Month.Open}
 }
-
-// findOpenAtOrAfter returns the Open of the first candle at/after the
-// boundary. Returns 0 if our data starts after the boundary (we'd be
-// mistakenly treating our slice's earliest candle as the boundary open).
-func findOpenAtOrAfter(candles []market.Candle, boundary time.Time) float64 {
-	if len(candles) == 0 || candles[0].OpenTime.After(boundary) {
-		return 0
-	}
-	for _, c := range candles {
-		if !c.OpenTime.Before(boundary) {
-			return c.Open
-		}
-	}
-	return 0
-}

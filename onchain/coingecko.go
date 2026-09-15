@@ -12,30 +12,27 @@ import (
 )
 
 const (
-	coingeckoBase       = "https://api.coingecko.com/api/v3"
-	coingeckoTimeout    = 20 * time.Second
-	symbolCacheTTL      = 1 * time.Hour
-	coinDetailCacheTTL  = 30 * time.Minute
-	coingeckoUserAgent  = "trading-bot-onchain/1.0"
+	coingeckoBase      = "https://api.coingecko.com/api/v3"
+	coingeckoTimeout   = 20 * time.Second
+	symbolCacheTTL     = 1 * time.Hour
+	coinDetailCacheTTL = 30 * time.Minute
+	coingeckoUserAgent = "trading-bot-onchain/1.0"
 )
 
 // CoinGecko is a thin free-tier client that resolves a user-typed
 // symbol to a CoinGecko id + contract-per-chain.
 //
-// Two caches keep RPS under the free tier's ~30 req/min limit:
+// A per-coin-id cache of /coins/{id} responses (30 min TTL) keeps RPS under
+// the free tier's ~30 req/min limit. It is read under RLock, populated under
+// Lock.
 //
-//   - symbolIndex: full /coins/list (id + symbol + name) refreshed 1h
-//   - detail:      per-coin-id /coins/{id} response, 30 min TTL
-//
-// Both caches are read under RLock, populated under Lock.
+// A second cache over the full /coins/list index was declared here and never
+// wired to anything — allocated in the constructor, never read, never written.
+// Removed 2026-09-15. Resolve() calls /search per lookup instead; if that ever
+// needs cutting, the index cache comes back deliberately rather than as three
+// fields that look live.
 type CoinGecko struct {
 	HTTP *http.Client
-
-	// symbolIndex: uppercased ticker -> matching coin refs (may be many
-	// due to symbol collisions like "AKE").
-	indexMu       sync.RWMutex
-	symbolIndex   map[string][]coinRef
-	indexLoadedAt time.Time
 
 	detailMu    sync.RWMutex
 	detailCache map[string]detailCacheEntry // key = coin id
@@ -56,7 +53,6 @@ type detailCacheEntry struct {
 func NewCoinGecko() *CoinGecko {
 	return &CoinGecko{
 		HTTP:        &http.Client{Timeout: coingeckoTimeout},
-		symbolIndex: map[string][]coinRef{},
 		detailCache: map[string]detailCacheEntry{},
 	}
 }
@@ -195,12 +191,12 @@ func (c *CoinGecko) fetchDetail(ctx context.Context, id string) (CoinResolved, e
 	}
 
 	var payload struct {
-		ID         string            `json:"id"`
-		Symbol     string            `json:"symbol"`
-		Name       string            `json:"name"`
-		Platforms  map[string]string `json:"platforms"`
+		ID              string            `json:"id"`
+		Symbol          string            `json:"symbol"`
+		Name            string            `json:"name"`
+		Platforms       map[string]string `json:"platforms"`
 		DetailPlatforms map[string]struct {
-			DecimalPlace  int    `json:"decimal_place"`
+			DecimalPlace    int    `json:"decimal_place"`
 			ContractAddress string `json:"contract_address"`
 		} `json:"detail_platforms"`
 		MarketData struct {

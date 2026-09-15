@@ -56,25 +56,25 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 	// --- Section: trade plan + journal metadata ---
 	t := in.Trade
 	sb.WriteString("## Trade plan (#")
-	sb.WriteString(fmt.Sprintf("%d", t.ID))
+	fmt.Fprintf(&sb, "%d", t.ID)
 	sb.WriteString(")\n\n")
 	sb.WriteString("```\n")
-	sb.WriteString(fmt.Sprintf("symbol/side/tf : %s %s / %s\n", t.Symbol, strings.ToUpper(t.Side), t.TF))
-	sb.WriteString(fmt.Sprintf("entry / stop   : %.4f / %.4f (risk = %.4f pts, %.2f%% from entry)\n",
-		t.Entry, t.Stop, riskDistance(t.Entry, t.Stop), pctMove(t.Stop, t.Entry)))
-	sb.WriteString(fmt.Sprintf("tp1 / tp2      : %.4f (+1R, %.2f%%) / %.4f (+2R, %.2f%%)\n",
-		t.TP1, pctMove(t.TP1, t.Entry), t.TP2, pctMove(t.TP2, t.Entry)))
-	sb.WriteString(fmt.Sprintf("score / anchor : %s — %s\n", t.Score, t.Anchor))
+	fmt.Fprintf(&sb, "symbol/side/tf : %s %s / %s\n", t.Symbol, strings.ToUpper(t.Side), t.TF)
+	fmt.Fprintf(&sb, "entry / stop   : %.4f / %.4f (risk = %.4f pts, %.2f%% from entry)\n",
+		t.Entry, t.Stop, riskDistance(t.Entry, t.Stop), pctMove(t.Stop, t.Entry))
+	fmt.Fprintf(&sb, "tp1 / tp2      : %.4f (+1R, %.2f%%) / %.4f (+2R, %.2f%%)\n",
+		t.TP1, pctMove(t.TP1, t.Entry), t.TP2, pctMove(t.TP2, t.Entry))
+	fmt.Fprintf(&sb, "score / anchor : %s — %s\n", t.Score, t.Anchor)
 	if t.SignalCtx != "" {
-		sb.WriteString(fmt.Sprintf("signal_ctx     : %s\n", t.SignalCtx))
+		fmt.Fprintf(&sb, "signal_ctx     : %s\n", t.SignalCtx)
 	}
 	if t.Leverage > 0 {
-		sb.WriteString(fmt.Sprintf("leverage       : %dx\n", t.Leverage))
+		fmt.Fprintf(&sb, "leverage       : %dx\n", t.Leverage)
 	}
 	if t.MarginUSDT > 0 {
-		sb.WriteString(fmt.Sprintf("margin         : %.2f USDT (notional %.2f)\n", t.MarginUSDT, t.MarginUSDT*float64(t.Leverage)))
+		fmt.Fprintf(&sb, "margin         : %.2f USDT (notional %.2f)\n", t.MarginUSDT, t.MarginUSDT*float64(t.Leverage))
 	}
-	sb.WriteString(fmt.Sprintf("opened_at      : %s\n", t.OpenedAt.Local().Format("2006-01-02 15:04 -0700")))
+	fmt.Fprintf(&sb, "opened_at      : %s\n", t.OpenedAt.Local().Format("2006-01-02 15:04 -0700"))
 	// Explicit tri-state status. The previous binary "OPEN vs CLOSED"
 	// let the LLM assume "OPEN" meant "position live", including for
 	// LIMIT orders that had never filled — LLM would then invent
@@ -83,14 +83,14 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 	// carry an explicit "do not compute unrealized R" directive.
 	switch {
 	case !t.ClosedAt.IsZero():
-		sb.WriteString(fmt.Sprintf("filled_at      : %s\n", t.FilledAt.Local().Format("2006-01-02 15:04 -0700")))
-		sb.WriteString(fmt.Sprintf("closed_at      : %s\n", t.ClosedAt.Local().Format("2006-01-02 15:04 -0700")))
-		sb.WriteString(fmt.Sprintf("status         : CLOSED (outcome=%s, R=%+.3f)\n", t.Outcome, t.RRealized))
+		fmt.Fprintf(&sb, "filled_at      : %s\n", t.FilledAt.Local().Format("2006-01-02 15:04 -0700"))
+		fmt.Fprintf(&sb, "closed_at      : %s\n", t.ClosedAt.Local().Format("2006-01-02 15:04 -0700"))
+		fmt.Fprintf(&sb, "status         : CLOSED (outcome=%s, R=%+.3f)\n", t.Outcome, t.RRealized)
 		if t.ExitPrice != 0 {
-			sb.WriteString(fmt.Sprintf("exit_price     : %.4f\n", t.ExitPrice))
+			fmt.Fprintf(&sb, "exit_price     : %.4f\n", t.ExitPrice)
 		}
 	case !t.FilledAt.IsZero():
-		sb.WriteString(fmt.Sprintf("filled_at      : %s\n", t.FilledAt.Local().Format("2006-01-02 15:04 -0700")))
+		fmt.Fprintf(&sb, "filled_at      : %s\n", t.FilledAt.Local().Format("2006-01-02 15:04 -0700"))
 		sb.WriteString("status         : OPEN (LIMIT filled, position live)\n")
 	default:
 		sb.WriteString("filled_at      : (LIMIT NOT YET FILLED)\n")
@@ -116,10 +116,10 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 		p := in.LivePosition
 		sb.WriteString("## Live BingX position\n\n")
 		sb.WriteString("```\n")
-		sb.WriteString(fmt.Sprintf("qty       : %g %s (side=%s)\n", p.Quantity, p.Symbol, p.Side))
-		sb.WriteString(fmt.Sprintf("avg fill  : %.4f\n", p.EntryPrice))
+		fmt.Fprintf(&sb, "qty       : %g %s (side=%s)\n", p.Quantity, p.Symbol, p.Side)
+		fmt.Fprintf(&sb, "avg fill  : %.4f\n", p.EntryPrice)
 		if in.MarkPrice > 0 {
-			sb.WriteString(fmt.Sprintf("mark      : %.4f (%.2f%% from avg)\n", in.MarkPrice, pctMove(in.MarkPrice, p.EntryPrice)))
+			fmt.Fprintf(&sb, "mark      : %.4f (%.2f%% from avg)\n", in.MarkPrice, pctMove(in.MarkPrice, p.EntryPrice))
 			// Compute unrealized R if we have plan risk
 			if r := riskDistance(t.Entry, t.Stop); r > 0 {
 				var unrealR float64
@@ -128,17 +128,17 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 				} else {
 					unrealR = (p.EntryPrice - in.MarkPrice) / r
 				}
-				sb.WriteString(fmt.Sprintf("unreal R  : %+.2fR (plan risk = %.4f pts)\n", unrealR, r))
+				fmt.Fprintf(&sb, "unreal R  : %+.2fR (plan risk = %.4f pts)\n", unrealR, r)
 			}
 		}
-		sb.WriteString(fmt.Sprintf("leverage  : %dx\n", p.Leverage))
+		fmt.Fprintf(&sb, "leverage  : %dx\n", p.Leverage)
 		sb.WriteString("```\n\n")
 	}
 
 	// --- Section: bar path summary (digest, not raw bars) ---
 	if len(in.RecentBars) > 0 {
 		sb.WriteString("## Recent price path (")
-		sb.WriteString(fmt.Sprintf("last %d closed %s bars)\n\n", len(in.RecentBars), t.TF))
+		fmt.Fprintf(&sb, "last %d closed %s bars)\n\n", len(in.RecentBars), t.TF)
 		summarizeBars(&sb, in.RecentBars, t)
 		sb.WriteString("\n")
 	}
@@ -147,8 +147,8 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 	if len(in.MacroNear) > 0 {
 		sb.WriteString("## Macro events within ±24h\n\n")
 		for _, e := range in.MacroNear {
-			sb.WriteString(fmt.Sprintf("- %s @ %s UTC (blackout %dmin before / %dmin after)\n",
-				e.Name, e.DatetimeUTC.Format("2006-01-02 15:04"), e.BeforeMinutes, e.AfterMinutes))
+			fmt.Fprintf(&sb, "- %s @ %s UTC (blackout %dmin before / %dmin after)\n",
+				e.Name, e.DatetimeUTC.Format("2006-01-02 15:04"), e.BeforeMinutes, e.AfterMinutes)
 		}
 		sb.WriteString("\n")
 	}
@@ -169,16 +169,16 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 			case in.FundingRate <= -0.0005:
 				crowded = " ⚠ shorts crowded"
 			}
-			sb.WriteString(fmt.Sprintf("- funding: %+.5f%%/interval (~%+.2f%% annualized)%s\n",
-				in.FundingRate*100, annualized, crowded))
+			fmt.Fprintf(&sb, "- funding: %+.5f%%/interval (~%+.2f%% annualized)%s\n",
+				in.FundingRate*100, annualized, crowded)
 		}
 		if in.StructureNote != "" {
-			sb.WriteString(fmt.Sprintf("- structure on %s: %s\n", t.TF, in.StructureNote))
+			fmt.Fprintf(&sb, "- structure on %s: %s\n", t.TF, in.StructureNote)
 		}
 		if len(in.TopHVNs) > 0 {
 			sb.WriteString("- top HVNs (chip zones):\n")
 			for _, h := range in.TopHVNs {
-				sb.WriteString(fmt.Sprintf("    · %s\n", h))
+				fmt.Fprintf(&sb, "    · %s\n", h)
 			}
 		}
 		if len(in.HigherTFs) > 0 {
@@ -186,9 +186,9 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 			sb.WriteString("  | TF | side | score | MR | MOM | POC drift | structure |\n")
 			sb.WriteString("  |---|---|---:|---:|---:|---|---|\n")
 			for _, h := range in.HigherTFs {
-				sb.WriteString(fmt.Sprintf("  | %s | %s | %d | %d | %d | %s %+.2f%% | %s |\n",
+				fmt.Fprintf(&sb, "  | %s | %s | %d | %d | %d | %s %+.2f%% | %s |\n",
 					h.Timeframe, h.Side, h.Score, h.MRScore, h.MomentumScore,
-					h.POCTrend, h.POCDriftPct*100, h.StructureNote))
+					h.POCTrend, h.POCDriftPct*100, h.StructureNote)
 			}
 		}
 		sb.WriteString("\n")
@@ -199,7 +199,7 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 		sb.WriteString("## Recent ")
 		sb.WriteString(string(t.Symbol))
 		sb.WriteString(" journal context (last ")
-		sb.WriteString(fmt.Sprintf("%d closed trades, newest first)\n\n", len(in.RecentSame)))
+		fmt.Fprintf(&sb, "%d closed trades, newest first)\n\n", len(in.RecentSame))
 		sb.WriteString("| # | side/tf | score | outcome | R | open→close |\n")
 		sb.WriteString("|---|---|---|---|---|---|\n")
 		for _, r := range in.RecentSame {
@@ -207,20 +207,20 @@ func BuildTradeAnalysisMessage(in TradeAnalysisInputs) string {
 			if !r.ClosedAt.IsZero() && !r.OpenedAt.IsZero() {
 				dur = r.ClosedAt.Sub(r.OpenedAt).Round(time.Minute).String()
 			}
-			sb.WriteString(fmt.Sprintf("| %d | %s/%s | %s | %s | %+.2f | %s |\n",
-				r.ID, r.Side, r.TF, r.Score, r.Outcome, r.RRealized, dur))
+			fmt.Fprintf(&sb, "| %d | %s/%s | %s | %s | %+.2f | %s |\n",
+				r.ID, r.Side, r.TF, r.Score, r.Outcome, r.RRealized, dur)
 		}
 		sb.WriteString("\n**Notes excerpts** (patterns worth spotting across recent trades):\n\n")
 		for _, r := range in.RecentSame {
 			if r.OpenNotes == "" && r.CloseNotes == "" {
 				continue
 			}
-			sb.WriteString(fmt.Sprintf("*#%d %s (%s, R=%+.2f)*\n", r.ID, strings.ToUpper(r.Side), r.Outcome, r.RRealized))
+			fmt.Fprintf(&sb, "*#%d %s (%s, R=%+.2f)*\n", r.ID, strings.ToUpper(r.Side), r.Outcome, r.RRealized)
 			if r.OpenNotes != "" {
-				sb.WriteString(fmt.Sprintf("- open: %s\n", truncateOneLine(r.OpenNotes, 220)))
+				fmt.Fprintf(&sb, "- open: %s\n", truncateOneLine(r.OpenNotes, 220))
 			}
 			if r.CloseNotes != "" {
-				sb.WriteString(fmt.Sprintf("- close: %s\n", truncateOneLine(r.CloseNotes, 220)))
+				fmt.Fprintf(&sb, "- close: %s\n", truncateOneLine(r.CloseNotes, 220))
 			}
 		}
 		sb.WriteString("\n")
@@ -241,7 +241,7 @@ func summarizeBars(sb *strings.Builder, bars []market.Candle, t journal.Trade) {
 	}
 	first := bars[0]
 	last := bars[len(bars)-1]
-	var hi, lo float64 = -1e18, 1e18
+	hi, lo := -1e18, 1e18
 	var hiBar, loBar market.Candle
 	for _, b := range bars {
 		if b.High > hi {
@@ -253,12 +253,12 @@ func summarizeBars(sb *strings.Builder, bars []market.Candle, t journal.Trade) {
 			loBar = b
 		}
 	}
-	sb.WriteString(fmt.Sprintf("- window     : %s → %s\n",
+	fmt.Fprintf(sb, "- window     : %s → %s\n",
 		first.OpenTime.Local().Format("2006-01-02 15:04"),
-		last.CloseTime.Local().Format("2006-01-02 15:04")))
-	sb.WriteString(fmt.Sprintf("- first/last : O=%.4f C=%.4f (%.2f%% net move)\n", first.Open, last.Close, pctMove(last.Close, first.Open)))
-	sb.WriteString(fmt.Sprintf("- peak       : %.4f at %s\n", hi, hiBar.OpenTime.Local().Format("01-02 15:04")))
-	sb.WriteString(fmt.Sprintf("- trough     : %.4f at %s\n", lo, loBar.OpenTime.Local().Format("01-02 15:04")))
+		last.CloseTime.Local().Format("2006-01-02 15:04"))
+	fmt.Fprintf(sb, "- first/last : O=%.4f C=%.4f (%.2f%% net move)\n", first.Open, last.Close, pctMove(last.Close, first.Open))
+	fmt.Fprintf(sb, "- peak       : %.4f at %s\n", hi, hiBar.OpenTime.Local().Format("01-02 15:04"))
+	fmt.Fprintf(sb, "- trough     : %.4f at %s\n", lo, loBar.OpenTime.Local().Format("01-02 15:04"))
 
 	// Relate path to plan levels.
 	if r := riskDistance(t.Entry, t.Stop); r > 0 {
@@ -270,8 +270,8 @@ func summarizeBars(sb *strings.Builder, bars []market.Candle, t journal.Trade) {
 			maxR = (t.Entry - lo) / r
 			minR = (t.Entry - hi) / r
 		}
-		sb.WriteString(fmt.Sprintf("- peak R     : %+.2fR (max unrealized in window)\n", maxR))
-		sb.WriteString(fmt.Sprintf("- trough R   : %+.2fR (max drawdown in window)\n", minR))
+		fmt.Fprintf(sb, "- peak R     : %+.2fR (max unrealized in window)\n", maxR)
+		fmt.Fprintf(sb, "- trough R   : %+.2fR (max drawdown in window)\n", minR)
 	}
 
 	// Thumbnail of the last 5 bars so the LLM can spot direction/momentum.
@@ -281,8 +281,8 @@ func summarizeBars(sb *strings.Builder, bars []market.Candle, t journal.Trade) {
 	}
 	sb.WriteString("- last 5 bars:\n")
 	for _, b := range tail {
-		sb.WriteString(fmt.Sprintf("    %s  O=%.4f H=%.4f L=%.4f C=%.4f V=%.0f\n",
-			b.OpenTime.Local().Format("01-02 15:04"), b.Open, b.High, b.Low, b.Close, b.Volume))
+		fmt.Fprintf(sb, "    %s  O=%.4f H=%.4f L=%.4f C=%.4f V=%.0f\n",
+			b.OpenTime.Local().Format("01-02 15:04"), b.Open, b.High, b.Low, b.Close, b.Volume)
 	}
 }
 

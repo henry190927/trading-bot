@@ -314,7 +314,7 @@ func (s *mcpServer) handleGetRecentCandles(ctx context.Context, req mcp.CallTool
 
 	first := candles[0]
 	last := candles[len(candles)-1]
-	var hi, lo float64 = -1e18, 1e18
+	hi, lo := -1e18, 1e18
 	var hiB, loB market.Candle
 	for _, b := range candles {
 		if b.High > hi {

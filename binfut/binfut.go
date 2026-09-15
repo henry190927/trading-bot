@@ -250,7 +250,7 @@ func Save(s Store) error {
 	}
 	var check Store
 	if b2, err := os.ReadFile(tmp); err != nil || json.Unmarshal(b2, &check) != nil || len(check.Symbols) == 0 {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return fmt.Errorf("binfut: cache failed its own re-read")
 	}
 	return os.Rename(tmp, p)

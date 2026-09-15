@@ -262,9 +262,10 @@ func scoreConcurrent(fires []autotrade.PaperFire, maxN int, cs []market.Candle) 
 		oc := autotrade.EvaluateFire(f, cs, 6)
 		out = append(out, autotrade.Position{Fire: f, Outcome: oc})
 		exit := f.Time.Add(1_000_000 * time.Hour) // open/no-fill hold the slot ~forever
-		if oc.Status == autotrade.OutTP || oc.Status == autotrade.OutStop {
+		switch oc.Status {
+		case autotrade.OutTP, autotrade.OutStop:
 			exit = oc.ExitAt
-		} else if oc.Status == autotrade.OutNoFill {
+		case autotrade.OutNoFill:
 			exit = f.Time.Add(6 * time.Hour)
 		}
 		open = append(open, openPos{exit})

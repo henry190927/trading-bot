@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/henry190927/trading-bot/signal"
 )
@@ -47,7 +48,12 @@ func (m Mac) Notify(_ context.Context, sig signal.Signal, _ signal.Context) erro
 		`display notification "%s" with title "%s" subtitle "%s" sound name "%s"`,
 		escape(body), escape(title), escape(subtitle), escape(sound),
 	)
-	cmd := exec.Command("osascript", "-e", script)
+	// osascript can block indefinitely if the WindowServer is unresponsive,
+	// and this is called from the alert path — a notification that never
+	// returns would stall the caller behind it.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "osascript", "-e", script)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("osascript: %w (%s)", err, strings.TrimSpace(string(out)))
 	}

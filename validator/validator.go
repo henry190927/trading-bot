@@ -319,10 +319,10 @@ func Verdict(score float64) string {
 func scoreFactors(r *Result) []Factor {
 	var fs []Factor
 
-	switch {
-	case r.EngineSide == r.Side:
+	switch r.EngineSide {
+	case r.Side:
 		fs = append(fs, Factor{"direction aligned with engine", +2.0, fmt.Sprintf("engine: %s score %d", r.EngineSide, r.EngineScore), AxisBoth})
-	case r.EngineSide == signal.Flat:
+	case signal.Flat:
 		fs = append(fs, Factor{"engine flat — neutral on direction", 0, "no engine confirmation", AxisBoth})
 	default:
 		fs = append(fs, Factor{"direction opposes engine", -2.0, fmt.Sprintf("engine: %s, you: %s", r.EngineSide, r.Side), AxisBoth})

@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -52,11 +53,17 @@ type serviceHealth struct {
 func readServiceHealth(unit string) serviceHealth {
 	h := serviceHealth{Unit: unit, State: "unknown", Enabled: "unknown", ReadOnly: unit == "trading-web"}
 
-	if out, err := exec.Command("systemctl", "is-active", unit).Output(); err == nil || len(out) > 0 {
+	// Three systemd reads on a page-render path. Bounded together: without a
+	// cap a wedged dbus hangs the panel with no upper limit, and 5s is orders
+	// of magnitude above what these queries take.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if out, err := exec.CommandContext(ctx, "systemctl", "is-active", unit).Output(); err == nil || len(out) > 0 {
 		h.State = strings.TrimSpace(string(out))
 		h.Active = h.State == "active"
 	}
-	if out, err := exec.Command("systemctl", "is-enabled", unit).Output(); err == nil || len(out) > 0 {
+	if out, err := exec.CommandContext(ctx, "systemctl", "is-enabled", unit).Output(); err == nil || len(out) > 0 {
 		if s := strings.TrimSpace(string(out)); s != "" {
 			h.Enabled = s
 		}
@@ -64,7 +71,7 @@ func readServiceHealth(unit string) serviceHealth {
 	// ActiveEnterTimestamp is when the unit last went active — uptime for a
 	// running unit, and the thing that reveals "something restarted it".
 	if h.Active {
-		out, _ := exec.Command("systemctl", "show", "-p", "ActiveEnterTimestamp", "--value", unit).Output()
+		out, _ := exec.CommandContext(ctx, "systemctl", "show", "-p", "ActiveEnterTimestamp", "--value", unit).Output()
 		if ts := strings.TrimSpace(string(out)); ts != "" {
 			// systemd format: "Mon 2026-09-01 17:45:02 CST"
 			for _, layout := range []string{"Mon 2006-01-02 15:04:05 MST", "Mon 2006-01-02 15:04:05 -0700"} {

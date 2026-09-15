@@ -103,10 +103,10 @@ func DecodeMarkFrame(raw []byte) (isPing bool, mp *MarkPrice, err error) {
 	if err != nil {
 		return false, nil, err
 	}
-	switch s := strings.TrimSpace(string(body)); {
-	case s == "Ping":
+	switch strings.TrimSpace(string(body)) {
+	case "Ping":
 		return true, nil, nil
-	case s == "":
+	case "":
 		// An empty frame carries nothing. Per this function's contract that
 		// makes it ignorable traffic, not an error — errors are reserved for
 		// frames that SHOULD have meant something and didn't.
@@ -171,7 +171,7 @@ func (s *Stream) SubscribeMarkPrices(ctx context.Context, syms []market.Symbol, 
 		}
 		return fmt.Errorf("dial %s: %w", s.URL, err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	for i, sym := range syms {
 		req := map[string]any{

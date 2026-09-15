@@ -269,7 +269,7 @@ func Evaluate(in Inputs) Signal {
 	// CFD perps have high volume variance). So enable for XAU/XAG only.
 	volumeConfirmEnabled := isVolumeConfirmSymbol(in.Symbol)
 	const volumeConfirmThreshold = 1.0
-	var relVol float64 = 1.0
+	relVol := 1.0
 	if last >= 20 {
 		var avgVol float64
 		for i := last - 19; i < last; i++ {

@@ -86,12 +86,12 @@ func Append(s Snapshot) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	b, err := json.Marshal(s)
 	if err != nil {
 		return
 	}
-	f.Write(append(b, '\n'))
+	_, _ = f.Write(append(b, '\n'))
 }
 
 // Load returns every snapshot in the store, oldest first. A missing file is
@@ -101,7 +101,7 @@ func Load() []Snapshot {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var out []Snapshot
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
@@ -189,19 +189,20 @@ func Prune(now time.Time) error {
 		if err != nil {
 			continue
 		}
-		w.Write(append(b, '\n'))
+		// bufio.Writer latches its first error; Flush below reports it.
+		_, _ = w.Write(append(b, '\n'))
 	}
 	if err := w.Flush(); err != nil {
-		f.Close()
-		os.Remove(tmp)
+		_ = f.Close()
+		_ = os.Remove(tmp)
 		return err
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return err
 	}
 	if err := os.Rename(tmp, p); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return err
 	}
 	return nil

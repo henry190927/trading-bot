@@ -24,11 +24,11 @@ const bingxContractsURL = "https://open-api.bingx.com/openApi/swap/v2/quote/cont
 func main() {
 	log.SetFlags(0)
 	var (
-		out      = flag.String("out", envOr("FUNDAMENTALS_FILE", "/opt/trading/fundamentals.json"), "output path")
-		symsCSV  = flag.String("symbols", "", "comma-separated tickers (overrides the NCSK universe scan)")
-		limit    = flag.Int("limit", 0, "cap number of symbols (0 = all; for testing)")
-		sleepMS  = flag.Int("sleep-ms", 1100, "delay between Finnhub calls (~54/min at 1100)")
-		minCap   = flag.Float64("min-market-cap", 1000, "skip symbols below this market cap (Finnhub units = USD millions; 1000 = $1B); 0 disables")
+		out     = flag.String("out", envOr("FUNDAMENTALS_FILE", "/opt/trading/fundamentals.json"), "output path")
+		symsCSV = flag.String("symbols", "", "comma-separated tickers (overrides the NCSK universe scan)")
+		limit   = flag.Int("limit", 0, "cap number of symbols (0 = all; for testing)")
+		sleepMS = flag.Int("sleep-ms", 1100, "delay between Finnhub calls (~54/min at 1100)")
+		minCap  = flag.Float64("min-market-cap", 1000, "skip symbols below this market cap (Finnhub units = USD millions; 1000 = $1B); 0 disables")
 	)
 	flag.Parse()
 
@@ -120,10 +120,13 @@ func main() {
 // ncskUniverse fetches BingX contracts and returns the bare tickers of the
 // NCSK*2USD-USDT stock synthetics.
 func ncskUniverse() ([]string, error) {
-	req, _ := http.NewRequest(http.MethodGet, bingxContractsURL, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, bingxContractsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

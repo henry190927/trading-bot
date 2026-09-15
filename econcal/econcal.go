@@ -72,10 +72,8 @@ func IsCentralBankSpeaker(title string) bool {
 }
 
 var (
-	mu       sync.RWMutex
-	cache    []Event
-	loadedAt time.Time
-	loadErr  error
+	mu    sync.RWMutex
+	cache []Event
 )
 
 type rawEvent struct {
@@ -98,17 +96,11 @@ func Load(ctx context.Context) error {
 	req.Header.Set("User-Agent", "trading-bot/1.0")
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
-		mu.Lock()
-		loadErr = err
-		mu.Unlock()
 		return err
 	}
 	defer resp.Body.Close()
 	var raw []rawEvent
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		mu.Lock()
-		loadErr = err
-		mu.Unlock()
 		return err
 	}
 	var out []Event
@@ -138,7 +130,7 @@ func Load(ctx context.Context) error {
 		})
 	}
 	mu.Lock()
-	cache, loadedAt, loadErr = out, time.Now(), nil
+	cache = out
 	mu.Unlock()
 	return nil
 }

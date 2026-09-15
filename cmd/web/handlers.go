@@ -2511,11 +2511,8 @@ func buildDailyCalendar(trades []rTrade, days int) [][]dailyCell {
 	}
 
 	// Find max absolute daily R for color scaling.
-	var maxAbs float64 = 1.0 // floor so a single +0.5R day isn't max intensity
+	maxAbs := 1.0 // floor so a single +0.5R day isn't max intensity
 	for _, a := range byDate {
-		if abs := a.r; abs < 0 {
-			abs = -abs
-		}
 		if absR := a.r; absR < 0 {
 			absR = -absR
 			if absR > maxAbs {
@@ -4009,7 +4006,9 @@ func (s *server) handleChartData(c *gin.Context) {
 
 	limit := 400
 	if v := c.Query("limit"); v != "" {
-		fmt.Sscanf(v, "%d", &limit)
+		// A malformed ?limit= leaves the 400 default in place, which is the
+		// wanted behaviour — a bad query param should not 400 the chart.
+		_, _ = fmt.Sscanf(v, "%d", &limit)
 		if limit < 60 {
 			limit = 60
 		}
@@ -4023,7 +4022,8 @@ func (s *server) handleChartData(c *gin.Context) {
 	// ending just before that timestamp so the client can prepend.
 	var beforeSec int64
 	if v := c.Query("before"); v != "" {
-		fmt.Sscanf(v, "%d", &beforeSec)
+		// Same: a malformed cursor leaves 0, i.e. "no cursor".
+		_, _ = fmt.Sscanf(v, "%d", &beforeSec)
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
@@ -4591,7 +4591,7 @@ func collectOpenPositionsForChart(short string, markPrice float64) []map[string]
 				unrealR = moved / risk
 			}
 		}
-		filled := t.FilledAt.IsZero() == false
+		filled := !t.FilledAt.IsZero()
 		out = append(out, map[string]any{
 			"id":       t.ID,
 			"side":     strings.ToLower(t.Side),
@@ -5054,79 +5054,6 @@ func computeChartMarkers(candles []market.Candle) []map[string]any {
 		}
 		seen[key] = true
 		out = append(out, m)
-	}
-	return out
-}
-
-// volumeByPrice builds a per-price-bucket buy/sell volume histogram
-// suitable for a right-side "chip distribution" overlay. Each candle's
-// volume is uniformly attributed across its [low, high] range and
-// classified buy (close >= open) or sell (close < open). Mirrors the
-// existing indicator.BuildVolumeProfile shape but splits by direction.
-func volumeByPrice(candles []market.Candle, bins int) []map[string]any {
-	if len(candles) < 2 || bins < 2 {
-		return nil
-	}
-	minP, maxP := candles[0].Low, candles[0].High
-	for _, c := range candles {
-		if c.Low < minP {
-			minP = c.Low
-		}
-		if c.High > maxP {
-			maxP = c.High
-		}
-	}
-	if maxP <= minP {
-		return nil
-	}
-	binWidth := (maxP - minP) / float64(bins)
-	buy := make([]float64, bins)
-	sell := make([]float64, bins)
-	for _, c := range candles {
-		if c.Volume <= 0 || c.High <= c.Low {
-			continue
-		}
-		sb := int((c.Low - minP) / binWidth)
-		eb := int((c.High - minP) / binWidth)
-		if sb < 0 {
-			sb = 0
-		}
-		if eb >= bins {
-			eb = bins - 1
-		}
-		if eb < sb {
-			eb = sb
-		}
-		n := eb - sb + 1
-		per := c.Volume / float64(n)
-		bull := c.Close >= c.Open
-		for i := sb; i <= eb; i++ {
-			if bull {
-				buy[i] += per
-			} else {
-				sell[i] += per
-			}
-		}
-	}
-	out := make([]map[string]any, bins)
-	// Find POC (bin with highest total volume) for a UI callout.
-	pocIdx := 0
-	pocMax := 0.0
-	for i := 0; i < bins; i++ {
-		total := buy[i] + sell[i]
-		if total > pocMax {
-			pocMax = total
-			pocIdx = i
-		}
-	}
-	for i := 0; i < bins; i++ {
-		out[i] = map[string]any{
-			"priceLow":  minP + float64(i)*binWidth,
-			"priceHigh": minP + float64(i+1)*binWidth,
-			"buy":       buy[i],
-			"sell":      sell[i],
-			"isPOC":     i == pocIdx,
-		}
 	}
 	return out
 }

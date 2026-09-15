@@ -76,11 +76,9 @@ func runStructureAlerts(ctx context.Context, client interface {
 				}
 				title := fmt.Sprintf("🔀 %s %s %s", short, tf, label)
 				body := fmt.Sprintf("%s %s 結構轉變:%s(%s)@ %.4f — regime flip, 重看方向", short, tf, label, zh, st.EventPrice)
-				tags := "twisted_rightwards_arrows"
+				tags := "twisted_rightwards_arrows,green_circle"
 				if st.Event == sig.EvCHoCHDown || st.Event == sig.EvBOSDown {
 					tags = "twisted_rightwards_arrows,red_circle"
-				} else {
-					tags = "twisted_rightwards_arrows,green_circle"
 				}
 				if err := n.Push(ctx, title, body, tags); err != nil {
 					log.Printf("structalert: push failed: %v", err)

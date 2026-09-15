@@ -241,7 +241,7 @@ func Save(s Store) error {
 	}
 	var check Store
 	if b2, err := os.ReadFile(tmp); err != nil || json.Unmarshal(b2, &check) != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return fmt.Errorf("bls: cache failed its own re-read")
 	}
 	return os.Rename(tmp, p)
