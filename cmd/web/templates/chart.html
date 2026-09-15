@@ -210,6 +210,7 @@
         <div id="chart-shelf-bands" class="chart-zone-bands chart-shelf-host" aria-hidden="true"></div>
         <div id="chart-poc-labels" class="chart-poc-labels chart-labels-right" aria-hidden="true"></div>
         <div id="chart-open-labels" class="chart-poc-labels" aria-hidden="true"></div>
+        <div id="chart-hvn-labels" class="chart-poc-labels" aria-hidden="true"></div>
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
         <div class="chart-price-marker" id="chart-price-marker" hidden>
           <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
@@ -1561,13 +1562,18 @@
     var lastPositions = [];
     var hvnLines = [];
     var lastHVN = [];
+    // Y rows the opens layer resolved to, published for other left-edge layers.
+    var leftLabelRows = [];
     function clearHVNLines() {
         hvnLines.forEach(function (l) { candleSeries.removePriceLine(l); });
         hvnLines = [];
     }
     function applyHVNLinesVisibility() {
         clearHVNLines();
-        if (!layerOn('hvn') || !lastHVN.length) return;
+        if (!layerOn('hvn') || !lastHVN.length) {
+            drawHVNLabels();
+            return;
+        }
         lastHVN.forEach(function (price, i) {
             if (!price) return;
             hvnLines.push(candleSeries.createPriceLine({
@@ -1575,9 +1581,76 @@
                 color: i === 0 ? '#845ef7' : '#5c7cfa', // POC purple, HVN blue-purple
                 lineWidth: 1,
                 lineStyle: 3,      // sparsely dotted
-                axisLabelVisible: true,
+                // Label drawn on the LEFT, like the opens and POC-migration
+                // layers. The right axis is where the live price, the plan
+                // lines and the liquidity pools already compete for room.
+                axisLabelVisible: false,
                 title: i === 0 ? 'POC' : 'HVN',
             }));
+        });
+        drawHVNLabels();
+    }
+
+    // HVN / POC labels pinned to the LEFT edge. Same two-pass spread as the
+    // opens layer, but seeded with the rows that layer already took so the two
+    // stacks interleave instead of overlapping.
+    function drawHVNLabels() {
+        var host = document.getElementById('chart-hvn-labels');
+        if (!host) return;
+        while (host.firstChild) host.removeChild(host.firstChild);
+        if (!layerOn('hvn') || !lastHVN.length) return;
+        var plotH = host.clientHeight || 600;
+        var ohlc = document.getElementById('chart-ohlc');
+        var upper = (ohlc ? ohlc.offsetTop + ohlc.offsetHeight : 8) + 18;
+        var lower = plotH - 30;
+
+        var items = [];
+        lastHVN.forEach(function (price, i) {
+            if (!price) return;
+            var y = candleSeries.priceToCoordinate(price);
+            if (y == null || y < -40 || y > plotH + 40) return;
+            items.push({
+                price: price, isPOC: i === 0,
+                y: Math.max(upper, Math.min(y, lower)),
+            });
+        });
+        if (!items.length) return;
+        items.sort(function (a, b) { return a.y - b.y; });
+
+        // Rows the opens layer is already occupying. Nudging off one of these
+        // is what keeps the two stacks legible when both layers are on.
+        var taken = (layerOn('opens') ? leftLabelRows : []).slice().sort(function (a, b) { return a - b; });
+        function collides(y) {
+            for (var t = 0; t < taken.length; t++) {
+                if (Math.abs(taken[t] - y) < LABEL_MIN_GAP) return true;
+            }
+            return false;
+        }
+
+        for (var i = 1; i < items.length; i++) {
+            if (items[i].y - items[i - 1].y < LABEL_MIN_GAP) items[i].y = items[i - 1].y + LABEL_MIN_GAP;
+        }
+        for (var j = items.length - 2; j >= 0; j--) {
+            if (items[j + 1].y - items[j].y < LABEL_MIN_GAP) items[j].y = items[j + 1].y - LABEL_MIN_GAP;
+        }
+        // Then step off any row the opens layer holds. Bounded: give up after
+        // a few nudges rather than loop, and accept an overlap over a hang.
+        items.forEach(function (it) {
+            for (var n = 0; n < 6 && collides(it.y); n++) {
+                it.y = Math.min(lower, it.y + LABEL_MIN_GAP);
+            }
+        });
+
+        var dp = items[0].price >= 1000 ? 1 : 3;
+        items.forEach(function (it) {
+            var el = document.createElement('div');
+            el.className = 'chart-poc-label';
+            el.style.top = it.y + 'px';
+            el.style.backgroundColor = it.isPOC ? '#845ef7' : '#5c7cfa';
+            var txt = (it.isPOC ? 'POC ' : 'HVN ') + it.price.toFixed(dp);
+            el.textContent = txt;
+            el.title = txt;
+            host.appendChild(el);
         });
     }
 
@@ -1646,6 +1719,9 @@
         var host = document.getElementById('chart-open-labels');
         if (!host) return;
         while (host.firstChild) host.removeChild(host.firstChild);
+        // Cleared on every early return too: a stale row list would make the
+        // HVN layer step around labels that are no longer on screen.
+        leftLabelRows = [];
         if (!layerOn('opens') || !lastOpens.length) return;
         var plotH = host.clientHeight || 600;
         var ohlc = document.getElementById('chart-ohlc');
@@ -1714,6 +1790,10 @@
             el.title = g.labels.join('/') + ' ' + g.key;
             host.appendChild(el);
         });
+        // Publish the resolved rows so other LEFT-edge label layers can avoid
+        // them. Two layers each running their own collision pass in their own
+        // container cannot see each other, and would stack on the same pixels.
+        leftLabelRows = items.map(function (g) { return g.y; });
     }
 
     // ── Liquidity pools (EQH / EQL) ───────────────────────────────
@@ -2563,6 +2643,8 @@
             // re-position on any price-scale change too.
             if (typeof drawPOCMigLabels === 'function') drawPOCMigLabels();
             if (typeof drawOpenLabels === 'function') drawOpenLabels();
+            // AFTER drawOpenLabels — it publishes the rows this one avoids.
+            if (typeof drawHVNLabels === 'function') drawHVNLabels();
             if (typeof drawZoneBands === 'function') drawZoneBands();
             if (typeof drawShelves === 'function') drawShelves();
         });
