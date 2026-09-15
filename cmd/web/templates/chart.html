@@ -202,6 +202,7 @@
           <span class="ohlc-chg" id="ohlc-chg">—</span>
         </div>
         <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div id="chart-vp-tip" class="chart-vp-tip" hidden></div>
         <!-- POC migration labels — HTML text pinned to the LEFT
              edge of the plot. Kept off the right axis so the VP
              histogram there stays uncluttered. -->
@@ -454,8 +455,10 @@
               <p class="glossary-how"><b>Levels:</b>
                 <br>• <b>POC</b> (highest-volume row) — magnet; price tends to revert
                 <br>• <b>HVN</b> — support below current price / resistance above
-                <br>• <b>LVN</b> — air gap; price moves fast through
+                <br>• <b>VA / VAH / VAL</b> — the dashed lines. The value area is the contiguous span around the POC holding <b>70% of the window's volume</b>, grown outward one row at a time toward whichever neighbour is heavier. It is usually NOT centred on the POC, and the asymmetry is the point: the near edge tells you which side is thin.
+                <br>• Rows <b>outside</b> the VA are drawn faint. A long faint bar is a band that traded but holds little resting interest — price crosses it quickly. Hover any row for its share of the POC.
               </p>
+              <p class="glossary-how"><b>The window is the VISIBLE range</b>, so the whole profile changes as you zoom — the bar count beside the legend says which window you are reading. The same band can look empty on one lookback and busy on another; on 2026-09-15 a region that read as empty over 200×4h bars was not empty at all over 200×1h, because a single spike's volume was diluted across 33 days instead of 8. Check the bar count before concluding anything about a band.</p>
               <p class="glossary-how"><b>Reading combinations:</b>
                 <br>• Blue-heavy at HIGH prices + orange-heavy at LOW prices → <b>trend-up structure</b>: buyers stepping up on rallies, sellers exhausted on dips. Blue HVN below current price often becomes <span class="dir-long">support</span>.
                 <br>• Orange-heavy at HIGH + blue-heavy at LOW → mirror bearish structure. Orange HVN above becomes <span class="dir-short">resistance</span>.
@@ -469,11 +472,13 @@
                 <br>• <span style="color:#4c6ef5">■ 藍色</span> = 綠 K（收 ≥ 開）的成交量 — 該價位是買方主導成交
                 <br>• <span style="color:#f59f00">■ 橘色</span> = 紅 K 的成交量 — 該價位是賣方主導成交
               </p>
-              <p class="glossary-how"><b>三個關鍵位置：</b>
+              <p class="glossary-how"><b>關鍵位置：</b>
                 <br>• <b>POC</b>（最大量價位）— 磁吸點，價格常回歸
                 <br>• <b>HVN</b>（高量區）— 現價下方為支撐、上方為壓力
-                <br>• <b>LVN</b>（低量區）— 真空帶，價格快速穿越
+                <br>• <b>VA / VAH / VAL</b>（價值區）— 圖上那兩條虛線。以 POC 為起點，每次往「量比較重的那一側」擴一格，直到涵蓋視窗內 <b>70% 的成交量</b>。它通常<b>不是</b>以 POC 為中心，而這個不對稱正是重點：比較近的那一邊，就是比較薄的那一邊。
+                <br>• 價值區<b>之外</b>的格子畫得很淡。又長又淡的一條 = 那個價帶成交過，但沒有留下掛單 —— 價格會快速穿過。滑過任一格可看它佔 POC 的百分比。
               </p>
+              <p class="glossary-how"><b>視窗就是你看得到的範圍</b>，所以縮放會改變整個分佈 —— 圖例旁邊的根數就是告訴你現在讀的是哪個視窗。<b>同一個價帶在不同回看長度下可以完全不同</b>：2026-09-15 有一段區域在 200×4h（33 天）下看起來是空的，但在 200×1h（8 天）下一點也不空，因為一根 spike 的量被攤到 33 天和攤到 8 天差很多。下任何關於「這裡是不是空的」的結論之前，先看根數。</p>
               <p class="glossary-how"><b>顏色分佈組合解讀：</b>
                 <br>• 高價區藍多、低價區橘多 → <b>多頭結構</b>：買方在高位承接、賣方在低位力竭。下方藍色 HVN 常成為<span class="dir-long">支撐</span>。
                 <br>• 高價區橘多、低價區藍多 → 空頭結構，上方橘色 HVN 成為<span class="dir-short">壓力</span>。
@@ -760,6 +765,8 @@
     <span class="chart-legend-group chart-legend-vp">
       <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#4c6ef5"></span>VP buy</span>
       <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#f59f00"></span>VP sell</span>
+      <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:transparent;border-top:1px dashed var(--text-dim)"></span>VA 70%</span>
+      <span class="chart-legend-item chart-vp-meta" data-legend-layer="vp" id="chart-vp-meta"></span>
     </span>
   </div>
 
@@ -1029,7 +1036,7 @@
     var allMid = [];
     var allLower = [];
     var allVol = [];
-    var currentVP = null; // last-received volumeProfile buckets
+    var currentVP = null; // {bins, vah, val, bars, vaPct} for the visible range
 
     // Track plan price lines so we can clear them when data reloads.
     var planLines = [];
@@ -1259,6 +1266,9 @@
         lowerSeries.applyOptions({ visible: layerOn('boll') });
         volSeries.applyOptions({ visible: layerOn('vol') });
         if (vpSvg) vpSvg.style.display = layerOn('vp') ? '' : 'none';
+        if (typeof renderVPMeta === 'function') renderVPMeta(currentVP);
+        var vpTipEl = document.getElementById('chart-vp-tip');
+        if (vpTipEl && !layerOn('vp')) vpTipEl.hidden = true;
         // Plan + position lines: we redraw them from scratch on data
         // load, but here we also need to hide/show. Cheapest = re-
         // apply on toggle.
@@ -2335,14 +2345,23 @@
     // Kept lightweight (60 buckets × ~500 candles typical = ~30k ops
     // per compute) and throttled via rAF so wheel-zoom doesn't spam.
     var VP_BINS = 60;
+    // Share of total volume the value area encloses. 70% is the convention
+    // (Market Profile), kept so the number means the same thing it does
+    // everywhere else rather than something tuned to this chart.
+    var VP_VA_PCT = 0.70;
+    // Returns {bins, vah, val, bars, vaPct} — an object rather than the bare
+    // bin array it used to return, because the value area is a property of the
+    // whole profile and carrying it in a parallel global would let the two
+    // drift apart on any early-return path.
     function computeVPFromCandles(candles) {
-        if (!candles || candles.length < 2) return [];
+        var empty = { bins: [], vah: null, val: null, bars: 0, vaPct: VP_VA_PCT };
+        if (!candles || candles.length < 2) return empty;
         var minP = candles[0].low, maxP = candles[0].high;
         for (var i = 0; i < candles.length; i++) {
             if (candles[i].low  < minP) minP = candles[i].low;
             if (candles[i].high > maxP) maxP = candles[i].high;
         }
-        if (maxP <= minP) return [];
+        if (maxP <= minP) return empty;
         var w = (maxP - minP) / VP_BINS;
         var buy = new Array(VP_BINS).fill(0);
         var sell = new Array(VP_BINS).fill(0);
@@ -2358,11 +2377,28 @@
                 if (bull) buy[k] += per; else sell[k] += per;
             }
         }
-        var pocIdx = 0, pocMax = 0;
+        var tot = new Array(VP_BINS);
+        var pocIdx = 0, pocMax = 0, grand = 0;
         for (var m = 0; m < VP_BINS; m++) {
-            var t = buy[m] + sell[m];
-            if (t > pocMax) { pocMax = t; pocIdx = m; }
+            tot[m] = buy[m] + sell[m];
+            grand += tot[m];
+            if (tot[m] > pocMax) { pocMax = tot[m]; pocIdx = m; }
         }
+
+        // Value area: start at the POC and expand outward, each step taking
+        // whichever neighbour holds more volume, until VP_VA_PCT of the total
+        // is enclosed. This is the standard construction — NOT a fixed band
+        // around the POC — so an asymmetric profile gives an asymmetric VA,
+        // which is the whole point: the far edge tells you which side is thin.
+        var loI = pocIdx, hiI = pocIdx, acc = pocMax;
+        var target = grand * VP_VA_PCT;
+        while (acc < target && (loI > 0 || hiI < VP_BINS - 1)) {
+            var below = loI > 0 ? tot[loI - 1] : -1;
+            var above = hiI < VP_BINS - 1 ? tot[hiI + 1] : -1;
+            if (above >= below) { hiI++; acc += tot[hiI]; }
+            else                { loI--; acc += tot[loI]; }
+        }
+
         var out = [];
         for (var n = 0; n < VP_BINS; n++) {
             out.push({
@@ -2371,9 +2407,20 @@
                 buy:  buy[n],
                 sell: sell[n],
                 isPOC: n === pocIdx,
+                // Share of the heaviest row. This is the number that says
+                // "price moves fast here" — a 3% row has almost no resting
+                // interest to absorb an impulse.
+                frac: pocMax > 0 ? tot[n] / pocMax : 0,
+                inVA: n >= loI && n <= hiI,
             });
         }
-        return out;
+        return {
+            bins: out,
+            val: minP + loI * w,
+            vah: minP + (hiI + 1) * w,
+            bars: candles.length,
+            vaPct: VP_VA_PCT,
+        };
     }
 
     // Filter allCandles to visible time range + recompute VP.
@@ -2394,7 +2441,8 @@
 
     var vpSvg = document.getElementById('chart-vp-overlay');
     function drawVP() {
-        if (!vpSvg || !currentVP || currentVP.length === 0) {
+        var prof = currentVP;
+        if (!vpSvg || !prof || !prof.bins || prof.bins.length === 0) {
             if (vpSvg) vpSvg.innerHTML = '';
             return;
         }
@@ -2407,7 +2455,7 @@
         vpSvg.style.width  = svgWidth + 'px';
 
         var maxTotal = 0;
-        currentVP.forEach(function (b) {
+        prof.bins.forEach(function (b) {
             var t = (b.buy || 0) + (b.sell || 0);
             if (t > maxTotal) maxTotal = t;
         });
@@ -2415,7 +2463,7 @@
 
         var maxBarW = svgWidth - 6;
         var parts = [];
-        currentVP.forEach(function (b) {
+        prof.bins.forEach(function (b) {
             var yLow  = candleSeries.priceToCoordinate(b.priceLow);
             var yHigh = candleSeries.priceToCoordinate(b.priceHigh);
             if (yLow == null || yHigh == null) return;
@@ -2427,7 +2475,10 @@
             var buyW  = totalW * buyFrac;
             var sellW = totalW - buyW;
             var xRight = svgWidth - 2;
-            var opacity = b.isPOC ? 0.85 : 0.45;
+            // Rows outside the value area are drawn faint. That contrast IS
+            // the reading: a long faint bar is a price band that traded but
+            // holds little resting interest, and price crosses it quickly.
+            var opacity = b.isPOC ? 0.9 : (b.inVA ? 0.5 : 0.16);
             if (buyW > 0) {
                 parts.push('<rect x="' + (xRight - buyW) + '" y="' + barY + '" width="' + buyW + '" height="' + barH + '" fill="#4c6ef5" opacity="' + opacity + '" />');
             }
@@ -2435,8 +2486,69 @@
                 parts.push('<rect x="' + (xRight - buyW - sellW) + '" y="' + barY + '" width="' + sellW + '" height="' + barH + '" fill="#f59f00" opacity="' + opacity + '" />');
             }
         });
+
+        // VAH / VAL edges. Drawn after the bars so they sit on top.
+        [['vah', prof.vah], ['val', prof.val]].forEach(function (pair) {
+            if (pair[1] == null) return;
+            var y = candleSeries.priceToCoordinate(pair[1]);
+            if (y == null) return;
+            parts.push('<line x1="0" y1="' + y + '" x2="' + svgWidth + '" y2="' + y +
+                '" stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="3 3" opacity="0.7" />');
+            parts.push('<text x="2" y="' + (y - 3) + '" font-size="9" fill="var(--text-dim)" opacity="0.85">' +
+                pair[0].toUpperCase() + '</text>');
+        });
+
         vpSvg.innerHTML = parts.join('');
+        renderVPMeta(prof);
     }
+
+    // One line under the layer chips: how many bars this profile was built
+    // from, and where the value area sits. The window is the VISIBLE range,
+    // so it changes as you zoom — which is exactly why it has to be shown.
+    // Reading a profile without knowing its lookback is how a band looks
+    // empty on one window and busy on another.
+    function renderVPMeta(prof) {
+        var el = document.getElementById('chart-vp-meta');
+        if (!el) return;
+        if (!layerOn('vp') || !prof || !prof.bins.length) { el.textContent = ''; return; }
+        var dp = (prof.vah != null && prof.vah < 10) ? 4 : 2;
+        el.textContent = 'VP ' + prof.bins.length + ' 格 · ' + prof.bars + ' 根 · VA ' +
+            Math.round(prof.vaPct * 100) + '% ' +
+            prof.val.toFixed(dp) + '–' + prof.vah.toFixed(dp);
+    }
+
+    // Hover readout. The bar widths show shape; this gives the number —
+    // "this row is 3% of the heaviest one" is the fact that predicts how fast
+    // price crosses it, and it cannot be eyeballed off a 1px-tall bar.
+    (function () {
+        if (!vpSvg) return;
+        var tip = document.getElementById('chart-vp-tip');
+        if (!tip) return;
+        var host = vpSvg.parentElement;
+        function hide() { tip.hidden = true; }
+        host.addEventListener('mousemove', function (ev) {
+            var prof = currentVP;
+            if (!layerOn('vp') || !prof || !prof.bins.length) { hide(); return; }
+            var r = vpSvg.getBoundingClientRect();
+            if (ev.clientX < r.left || ev.clientX > r.right) { hide(); return; }
+            var y = ev.clientY - r.top;
+            var price = candleSeries.coordinateToPrice(y);
+            if (price == null) { hide(); return; }
+            var hit = null;
+            for (var i = 0; i < prof.bins.length; i++) {
+                if (price >= prof.bins[i].priceLow && price <= prof.bins[i].priceHigh) { hit = prof.bins[i]; break; }
+            }
+            if (!hit) { hide(); return; }
+            var dp = hit.priceHigh < 10 ? 4 : 2;
+            tip.innerHTML = '<b>' + hit.priceLow.toFixed(dp) + '–' + hit.priceHigh.toFixed(dp) + '</b><br>' +
+                Math.round(hit.frac * 100) + '% of POC · ' + (hit.inVA ? 'VA 內' : 'VA 外') +
+                (hit.isPOC ? ' · POC' : '');
+            tip.hidden = false;
+            tip.style.top  = Math.max(2, y - 34) + 'px';
+            tip.style.right = '162px';
+        });
+        host.addEventListener('mouseleave', hide);
+    })();
 
     // rAF-throttled recompute+redraw so continuous wheel-zoom doesn't
     // burn CPU on every event tick.

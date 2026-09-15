@@ -2302,6 +2302,29 @@ footer {
     pointer-events: none;
     z-index: 2;
 }
+.chart-vp-meta {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
+}
+/* Hover readout for the VP strip. Sits INSIDE the plot, left of the
+   histogram, and never intercepts pointer events — the chart still drags
+   and zooms with the cursor over it. */
+.chart-vp-tip {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+    padding: 0.25rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    background: rgba(20, 22, 28, 0.92);
+    background: color-mix(in srgb, var(--bg-elev) 92%, transparent);
+    border: 1px solid var(--border);
+}
+
 .chart-legend-row {
     display: flex;
     flex-wrap: wrap;
