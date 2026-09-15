@@ -154,3 +154,43 @@ func TestPendingEntryIsNotAStaleJournal(t *testing.T) {
 		t.Error("a filled row with no position must still warn")
 	}
 }
+
+// A bundled stop is protection that exists on the exchange without being a
+// separate reduce-only order, so HasStop — which counts those — is false for a
+// resting entry. The row used to render a red "🚨 NO STOP" over a trade that
+// was in fact protected, which is the worst direction for this badge to be
+// wrong in: it teaches the eye to skip the one alarm the page exists for.
+//
+// PendingStop is matched by ORDER ID. Two rows on the same symbol would
+// otherwise each claim the other's protection, and the second one to be wrong
+// is the one that is actually naked.
+func TestPendingStopMatchesByOrderIDNotSymbol(t *testing.T) {
+	mine := journal.Trade{ID: 1, Symbol: "ETH", Side: "long", EntryOrderID: "AAA"}
+	ords := []bingx.OpenOrder{
+		{OrderID: "AAA", Type: "LIMIT", Side: "BUY", Price: 2400, BundledStop: 2384, BundledTP: 2440},
+		{OrderID: "BBB", Type: "LIMIT", Side: "BUY", Price: 2350, BundledStop: 2330},
+	}
+
+	find := func(tr journal.Trade) (stop, tp float64) {
+		for _, o := range ords {
+			if o.OrderID == tr.EntryOrderID && !o.ReduceOnly {
+				return o.BundledStop, o.BundledTP
+			}
+		}
+		return 0, 0
+	}
+	if stop, tp := find(mine); stop != 2384 || tp != 2440 {
+		t.Errorf("own order: stop/tp = %v/%v, want 2384/2440", stop, tp)
+	}
+	// A row whose order is gone must report nothing rather than borrow the
+	// other resting order's stop.
+	gone := journal.Trade{ID: 2, Symbol: "ETH", Side: "long", EntryOrderID: "CCC"}
+	if stop, _ := find(gone); stop != 0 {
+		t.Errorf("a row with no matching order reported stop %v — it borrowed another order's", stop)
+	}
+	// A reduce-only row is protection for something else, not an entry.
+	ords[0].ReduceOnly = true
+	if stop, _ := find(mine); stop != 0 {
+		t.Errorf("a reduce-only order was read as a pending entry (stop %v)", stop)
+	}
+}

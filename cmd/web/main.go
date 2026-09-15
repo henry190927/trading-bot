@@ -169,6 +169,7 @@ func main() {
 	// POST-only and two-step (preview unless confirm=1) — see protect_handler.go.
 	r.POST("/ops/protect", srv.handleOpsProtect)
 	r.POST("/ops/entry", srv.handleOpsEntry)
+	r.POST("/ops/cancel", srv.handleOpsCancel)
 	// Read-only fill history for reconciling the journal against the
 	// exchange after a hand-closed trade. GET-only, signed GETs underneath.
 	r.GET("/ops/fills", srv.handleOpsFills)

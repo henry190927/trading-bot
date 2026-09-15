@@ -46,7 +46,7 @@
       {{if .SessionWarn}}<p class="glossary-hint" style="border-left:3px solid var(--yellow);padding-left:.6rem;color:var(--yellow)">⏰ {{.SessionWarn}}</p>{{end}}
       <div class="at-state">
         {{if .HasPosition}}<span class="badge b-green">✓ <span class="i18n-en">position</span><span class="i18n-zh">部位</span> {{printf "%.5f" .PosQty}} @ {{printf "%.2f" .PosEntry}}</span>{{else}}<span class="badge b-dim">— <span class="i18n-en">no position</span><span class="i18n-zh">無部位</span></span>{{end}}
-        {{if .HasStop}}<span class="badge b-green">🛡️ <span class="i18n-en">stop live</span><span class="i18n-zh">有停損</span></span>{{else}}<span class="badge b-red">🚨 <span class="i18n-en">NO STOP</span><span class="i18n-zh">無停損</span></span>{{end}}
+        {{if .HasStop}}<span class="badge b-green">🛡️ <span class="i18n-en">stop live</span><span class="i18n-zh">有停損</span></span>{{else if .PendingStop}}<span class="badge b-blue" title="bundled onto the resting entry — it activates the instant the order fills">⏳ <span class="i18n-en">stop bundled {{printf "%.4f" .PendingStop}}</span><span class="i18n-zh">綁定停損 {{printf "%.4f" .PendingStop}}</span></span>{{else}}<span class="badge b-red">🚨 <span class="i18n-en">NO STOP</span><span class="i18n-zh">無停損</span></span>{{end}}
         {{if .HasTP}}<span class="badge b-blue">🎯 <span class="i18n-en">tp live</span><span class="i18n-zh">有 TP</span></span>{{end}}
       </div>
       {{if .HasPosition}}
@@ -93,7 +93,7 @@
     </h3>
     {{if .Orphans}}
     {{range .Orphans}}
-    <div class="verify-card{{if not .HasStop}} b-red{{end}}">
+    <div class="verify-card{{if and (not .HasStop) (not .PendingStop)}} b-red{{end}}">
       <div><strong>{{.Symbol}} {{.Side}}</strong> · qty {{printf "%g" .Qty}} @ {{fmtPrice .Entry}}
         · <span class="i18n-en">notional</span><span class="i18n-zh">名目</span> {{printf "%.0f" .Notional}}u
         · {{.Leverage}}x {{.MarginMode}}</div>

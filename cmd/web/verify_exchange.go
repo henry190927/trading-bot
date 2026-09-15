@@ -26,6 +26,16 @@ type verifyTrade struct {
 	HasStop, HasTP        bool
 	Warn                  string
 
+	// PendingStop is the stop BUNDLED onto a resting entry that has not
+	// filled yet. It is protection that exists on the exchange but is not a
+	// separate reduce-only order, so HasStop — which counts those — reads
+	// false and the row rendered a red "🚨 NO STOP" over a trade that was in
+	// fact protected. That is the worst direction for this badge to be wrong
+	// in: it teaches the eye to skip the one alarm the page exists for.
+	// 0 when there is no such order.
+	PendingStop float64
+	PendingTP   float64
+
 	// SessionWarn is the cash-open-bar advisory for stock synthetics (see
 	// session_guard.go). Kept separate from Warn, and counted separately,
 	// because Warn means "the exchange disagrees with the journal" — fix it
@@ -150,6 +160,18 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 			}
 
 			vt.HasStop, vt.Warn = classifyVerify(t, pos, ords)
+			// No position yet: look for the resting entry this row placed and
+			// report the stop riding on it. Matched by order id rather than by
+			// price, because two rows on the same symbol would otherwise claim
+			// each other's protection.
+			if pos == nil && t.EntryOrderID != "" {
+				for _, o := range ords {
+					if o.OrderID == t.EntryOrderID && !o.ReduceOnly {
+						vt.PendingStop, vt.PendingTP = o.BundledStop, o.BundledTP
+						break
+					}
+				}
+			}
 			if vt.Warn != "" {
 				warnN++
 			}
