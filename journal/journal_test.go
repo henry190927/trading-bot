@@ -255,25 +255,44 @@ func TestWriteAllLeavesTheJournalIntactWhenTheWriteFails(t *testing.T) {
 	}
 }
 
-// A successful write must not leave its scratch file next to the real one:
-// a stale journal.csv.tmp beside journal.csv reads as a half-finished write.
-func TestWriteAllLeavesNoTempFileAndKeeps0644(t *testing.T) {
+// A successful write must not leave its scratch file next to the real one —
+// a stale journal.csv.tmp beside journal.csv reads as a half-finished write —
+// and it must not re-permission the journal. os.Create applies 0666&^umask
+// every time, so the mode was whatever the writing process's umask said; the
+// live file is 0664 and a silent drop to 0644 is how a second writer loses
+// access with nothing reporting an error.
+func TestWriteAllKeepsTheModeAndLeavesNoTempFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "journal.csv")
+
+	// A journal that does not exist yet gets 0644.
 	if err := WriteAll(path, []Trade{trade66()}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-
 	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
 		t.Errorf("journal.csv.tmp still present after a successful write (stat err = %v)", err)
 	}
-	// The temp file is what gets renamed, so ITS mode is the journal's mode.
-	// os.Create would have produced 0666&^umask instead.
 	fi, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := fi.Mode().Perm(); got != 0o644 {
-		t.Errorf("journal mode = %04o, want 0644", got)
+		t.Errorf("new journal mode = %04o, want 0644", got)
+	}
+
+	// An existing journal keeps whatever it already had — 0664 is the mode on
+	// the live VPS file.
+	if err := os.Chmod(path, 0o664); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteAll(path, []Trade{trade66()}); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	fi, err = os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o664 {
+		t.Errorf("rewritten journal mode = %04o, want the 0664 it already had", got)
 	}
 }

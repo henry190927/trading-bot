@@ -264,12 +264,27 @@ func WriteAll(path string, trades []Trade) error {
 		_ = os.MkdirAll(dir, 0755)
 	}
 
+	// The renamed file BECOMES journal.csv, so the temp file's mode is the mode
+	// the journal ends up with — os.Create's 0666&^umask would silently
+	// re-permission it on the next write. Carry the existing mode across
+	// instead of imposing one: the live file is 0664, and quietly dropping a
+	// group's write bit is how a second writer loses access without anything
+	// reporting an error.
+	mode := os.FileMode(0o644) // a journal that does not exist yet
+	if fi, serr := os.Stat(path); serr == nil {
+		mode = fi.Mode().Perm()
+	}
 	tmp := path + ".tmp"
-	// 0644 explicitly, not os.Create's 0666&^umask: the renamed file BECOMES
-	// journal.csv, so the temp file's mode is the mode the journal ends up
-	// with. The web service and the CLI both write this file as the same user.
-	f, err := os.OpenFile(tmp, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(tmp, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, mode)
 	if err != nil {
+		return err
+	}
+	// O_CREATE's mode is an upper bound, not the result — it is masked by the
+	// process umask, so a 022 umask turns a carried-over 0664 into 0644 and
+	// drops the bit this is trying to preserve. Chmod is not masked.
+	if err := f.Chmod(mode); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
 		return err
 	}
 	// Any failure past this point leaves a stale .tmp behind, which would then
