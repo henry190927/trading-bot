@@ -245,6 +245,17 @@ func ReadAll(path string) ([]Trade, error) {
 }
 
 // WriteAll rewrites the journal CSV at path (or DefaultPath) with all trades.
+//
+// Atomic: written to a sibling .tmp and renamed into place, the same shape
+// oi.Save and writeSetups already use. This one matters most. WriteAll is a
+// WHOLE-FILE rewrite, so the previous version of the code — os.Create on the
+// live path — truncated journal.csv before the first row was written. A crash,
+// a full disk or an OOM kill anywhere in the loop left a short file with no
+// intermediate state to recover from, and journal.csv is the only record of
+// what the account actually did.
+//
+// The rename is atomic only within one filesystem, which is why the temp file
+// is a sibling rather than something under os.TempDir.
 func WriteAll(path string, trades []Trade) error {
 	if path == "" {
 		path = DefaultPath()
@@ -252,31 +263,55 @@ func WriteAll(path string, trades []Trade) error {
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		_ = os.MkdirAll(dir, 0755)
 	}
-	f, err := os.Create(path)
+
+	tmp := path + ".tmp"
+	// 0644 explicitly, not os.Create's 0666&^umask: the renamed file BECOMES
+	// journal.csv, so the temp file's mode is the mode the journal ends up
+	// with. The web service and the CLI both write this file as the same user.
+	f, err := os.OpenFile(tmp, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
+	// Any failure past this point leaves a stale .tmp behind, which would then
+	// be O_TRUNC'd by the next attempt — but it is removed eagerly so a
+	// half-written journal is never sitting next to the real one.
+	fail := func(err error) error {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return err
+	}
+
 	w := csv.NewWriter(f)
 	if err := w.Write(Header); err != nil {
-		_ = f.Close()
-		return err
+		return fail(err)
 	}
 	for _, t := range trades {
 		if err := w.Write(rowFromTrade(t)); err != nil {
-			_ = f.Close()
-			return err
+			return fail(err)
 		}
 	}
 	w.Flush()
 	if err := w.Error(); err != nil {
-		_ = f.Close()
+		return fail(err)
+	}
+	// Flush only moved csv's buffer into the *os.File. Sync is what puts the
+	// bytes on the device — without it the rename can land while the data
+	// behind it has not, which is the one failure this whole function exists
+	// to prevent. A few times a day on a 50KB file; the cost is irrelevant.
+	if err := f.Sync(); err != nil {
+		return fail(err)
+	}
+	// Close, not deferred: a write error on the file itself (ENOSPC, EIO)
+	// surfaces here, and swallowing it would rename a short file into place.
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
-	// NOT deferred. os.Create truncated the existing journal before the first
-	// byte was written, so a Close that fails means the file on disk is short
-	// — and returning w.Error() (nil) while that happened tells the caller
-	// every trade was saved.
-	return f.Close()
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // NextID returns the next unique ID for an Add operation.

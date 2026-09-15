@@ -216,3 +216,64 @@ func TestParseRowRejectsUnknownWidths(t *testing.T) {
 		}
 	}
 }
+
+// WriteAll is a WHOLE-FILE rewrite, and until 2026-09-15 it opened
+// journal.csv itself with os.Create — which truncates before the first row is
+// written. A crash, a full disk or an OOM kill anywhere in the loop left a
+// short file with nothing to recover from. It now writes a sibling .tmp and
+// renames.
+//
+// The failure is injected by making the temp PATH a directory, so the open
+// fails with EISDIR before a single byte moves. Under the old code the journal
+// was ALREADY truncated by that point; under this one it must be untouched.
+func TestWriteAllLeavesTheJournalIntactWhenTheWriteFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "journal.csv")
+	orig := []Trade{trade66()}
+	if err := WriteAll(path, orig); err != nil {
+		t.Fatalf("setup write: %v", err)
+	}
+
+	if err := os.Mkdir(path+".tmp", 0o755); err != nil {
+		t.Fatalf("blocking the temp path: %v", err)
+	}
+	doomed := trade66()
+	doomed.ID, doomed.Entry = 99, 1234.5
+	if err := WriteAll(path, []Trade{doomed}); err == nil {
+		t.Fatal("WriteAll reported success with its temp path blocked")
+	}
+
+	got, err := ReadAll(path)
+	if err != nil {
+		t.Fatalf("journal unreadable after the failed write: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("journal holds %d trades, want the original 1", len(got))
+	}
+	if got[0].ID != 66 || !close2(got[0].Entry, 79006) {
+		t.Errorf("journal = #%d entry %.1f, want the untouched #66 entry 79006 "+
+			"— the failed write reached the live file", got[0].ID, got[0].Entry)
+	}
+}
+
+// A successful write must not leave its scratch file next to the real one:
+// a stale journal.csv.tmp beside journal.csv reads as a half-finished write.
+func TestWriteAllLeavesNoTempFileAndKeeps0644(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "journal.csv")
+	if err := WriteAll(path, []Trade{trade66()}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
+		t.Errorf("journal.csv.tmp still present after a successful write (stat err = %v)", err)
+	}
+	// The temp file is what gets renamed, so ITS mode is the journal's mode.
+	// os.Create would have produced 0666&^umask instead.
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o644 {
+		t.Errorf("journal mode = %04o, want 0644", got)
+	}
+}
