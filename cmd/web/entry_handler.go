@@ -225,10 +225,24 @@ func (s *server) journalEntry(ctx context.Context, plan entryplan.Plan, symbol, 
 		OpenNotes:  notes,
 		Leverage:   plan.Leverage,
 		MarginUSDT: plan.MarginUSDT,
-		// The bundled legs ARE live on the exchange the moment the entry
-		// fills, so the sweep must not place duplicates.
-		StopAuto:     plan.Stop > 0,
-		TP2Auto:      plan.TP > 0,
+		// FALSE, and this is the important line in the function.
+		//
+		// StopAuto does NOT mean "a stop already exists". bracket.Decide reads
+		// it as "place the journal stop for me" — it is the opt-in that makes
+		// the sweep act instead of alert. Setting it true here, on the reading
+		// that the bundled legs made it redundant, turned every /ops/entry
+		// trade into one the daemon would keep re-arming: on 2026-09-15 it
+		// re-placed a stop the desk had deliberately cancelled seven times,
+		// and the seventh filled two seconds after it landed, closing a
+		// position its owner had chosen to keep.
+		//
+		// The bundled stop and take-profit ride ON the entry order and BingX
+		// activates them the instant it fills, so there is nothing for the
+		// sweep to place. If one silently fails to attach, the sweep's DEFAULT
+		// alert mode says so loudly — which is the behaviour that belongs
+		// here. A guard may shout; it may not overrule.
+		StopAuto:     false,
+		TP2Auto:      false,
 		EntryOrderID: orderID,
 		EquityUSDT:   s.equityAtEntry(ctx),
 	}

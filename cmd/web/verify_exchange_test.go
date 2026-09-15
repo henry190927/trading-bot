@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/bracket"
 	"github.com/henry190927/trading-bot/journal"
 )
 
@@ -192,5 +193,48 @@ func TestPendingStopMatchesByOrderIDNotSymbol(t *testing.T) {
 	ords[0].ReduceOnly = true
 	if stop, _ := find(mine); stop != 0 {
 		t.Errorf("a reduce-only order was read as a pending entry (stop %v)", stop)
+	}
+}
+
+// /ops/entry must NOT set StopAuto. The flag reads as "place the journal stop
+// for me" (bracket.Decide), not "a stop already exists" — and the stop this
+// route relies on is BUNDLED onto the entry order, so there is nothing for the
+// sweep to place.
+//
+// Setting it true turned every trade from this route into one the daemon kept
+// re-arming. On 2026-09-15 it re-placed a deliberately cancelled stop seven
+// times and the seventh filled two seconds after it landed, closing a position
+// its owner had chosen to keep. A guard may shout; it may not overrule.
+func TestEntryRouteDoesNotArmTheStopSweep(t *testing.T) {
+	// The row /ops/entry writes, as journalEntry builds it.
+	row := journal.Trade{
+		ID: 1, Symbol: "ETH", Side: "long",
+		Entry: 2400, Stop: 2384, TP2: 2440,
+		Leverage: 125, MarginUSDT: 60,
+		EntryOrderID: "1234567890123456789",
+		StopAuto:     false,
+		TP2Auto:      false,
+	}
+	if row.StopAuto {
+		t.Error("StopAuto is set — the sweep will re-place a cancelled stop")
+	}
+	if row.TP2Auto {
+		t.Error("TP2Auto is set — the sweep will re-place a cancelled take-profit")
+	}
+	// And with it clear, bracket.Decide must not propose a placement in the
+	// default alert mode even when the position is naked.
+	pos := &bingx.Position{Symbol: "ETH-USDT", Side: "long", Quantity: 2.89, EntryPrice: 2400}
+	d := bracket.Decide(row, pos, nil, bracket.ModeAlert)
+	if d.PlaceStop != 0 {
+		t.Errorf("alert mode proposed placing %v — StopAuto is clear, so it must only report", d.PlaceStop)
+	}
+	if d.State != bracket.StateNaked {
+		t.Errorf("state = %v, want naked — it must still SAY the position is unprotected", d.State)
+	}
+	// The opt-in still works for rows that ask for it.
+	armed := row
+	armed.StopAuto = true
+	if got := bracket.Decide(armed, pos, nil, bracket.ModeAlert).PlaceStop; got != 2384 {
+		t.Errorf("StopAuto=true proposed %v, want 2384 — the opt-in must be unchanged", got)
 	}
 }
