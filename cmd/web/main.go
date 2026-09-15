@@ -168,9 +168,11 @@ func main() {
 	// B2: attach a reduce-only stop/tp to a live position without SSH.
 	// POST-only and two-step (preview unless confirm=1) — see protect_handler.go.
 	r.POST("/ops/protect", srv.handleOpsProtect)
+	r.POST("/ops/entry", srv.handleOpsEntry)
 	// Read-only fill history for reconciling the journal against the
 	// exchange after a hand-closed trade. GET-only, signed GETs underneath.
 	r.GET("/ops/fills", srv.handleOpsFills)
+	r.GET("/ops/orders", srv.handleOpsOrders)
 	// Read-only account equity. One signed GET; nothing mutable.
 	r.GET("/ops/balance", srv.handleOpsBalance)
 	r.GET("/ops/oi", srv.handleOpsOI)

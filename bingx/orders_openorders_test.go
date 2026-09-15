@@ -1,49 +1,35 @@
 package bingx
 
 import (
-	"encoding/json"
-	"strconv"
+	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/henry190927/trading-bot/market"
 )
 
-// Mirrors OpenOrders' parse + filter without the HTTP layer, so the two
-// defects found on 2026-09-05 with two live resting limits stay fixed.
-func decodeOpenOrders(body []byte, want string) ([]OpenOrder, error) {
-	var resp struct {
-		Orders []struct {
-			Symbol       string `json:"symbol"`
-			OrderID      int64  `json:"orderId"`
-			Type         string `json:"type"`
-			Side         string `json:"side"`
-			PositionSide string `json:"positionSide"`
-			Price        string `json:"price"`
-			StopPrice    string `json:"stopPrice"`
-			OrigQty      string `json:"origQty"`
-			Quantity     string `json:"quantity"`
-			ReduceOnly   bool   `json:"reduceOnly"`
-		} `json:"orders"`
-	}
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, err
-	}
-	out := make([]OpenOrder, 0, len(resp.Orders))
-	for _, o := range resp.Orders {
-		if o.Symbol != "" && o.Symbol != want {
-			continue
-		}
-		price, _ := strconv.ParseFloat(o.Price, 64)
-		stopPrice, _ := strconv.ParseFloat(o.StopPrice, 64)
-		qty, _ := strconv.ParseFloat(o.OrigQty, 64)
-		if qty == 0 {
-			qty, _ = strconv.ParseFloat(o.Quantity, 64)
-		}
-		out = append(out, OpenOrder{
-			Symbol: o.Symbol, OrderID: strconv.FormatInt(o.OrderID, 10),
-			Type: o.Type, Side: o.Side, PositionSide: o.PositionSide,
-			Price: price, StopPrice: stopPrice, Quantity: qty, ReduceOnly: o.ReduceOnly,
-		})
-	}
-	return out, nil
+// decodeOpenOrders drives the REAL OpenOrders against a fake exchange.
+//
+// It used to be a hand-written MIRROR of the parse-and-filter loop. That is
+// worse than no test: on 2026-09-15 /ops/orders was added, called OpenOrders
+// with an empty symbol to mean "the whole book", and got back an empty list
+// because the real filter drops every row whose symbol does not match — while
+// every one of these tests stayed green, because the mirror had the same bug
+// and neither was the code that ran. A copy of the logic can only ever confirm
+// itself.
+func decodeOpenOrders(t *testing.T, body string, want market.Symbol) ([]OpenOrder, error) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// signedRequest unwraps {code,msg,data}; the fixtures are the data.
+		_, _ = io.WriteString(w, `{"code":0,"msg":"","data":`+body+`}`)
+	}))
+	t.Cleanup(srv.Close)
+	c := New("test-key", "test-secret")
+	c.Host = srv.URL
+	return c.OpenOrders(context.Background(), want)
 }
 
 // The endpoint is sent symbol= and ignores it. With one BTC limit and one ETH
@@ -51,12 +37,12 @@ func decodeOpenOrders(body []byte, want string) ([]OpenOrder, error) {
 // under ETH — on the one surface whose purpose is to be trusted over local
 // bookkeeping.
 func TestOpenOrdersFiltersBySymbol(t *testing.T) {
-	body := []byte(`{"orders":[
+	body := `{"orders":[
       {"symbol":"BTC-USDT","orderId":2096057660269096960,"type":"LIMIT","side":"SELL","price":"79685.0","origQty":"0.1173","reduceOnly":false},
       {"symbol":"ETH-USDT","orderId":2096060337438814208,"type":"LIMIT","side":"SELL","price":"2463.0","origQty":"3.8062","reduceOnly":false}
-    ]}`)
+    ]}`
 
-	btc, err := decodeOpenOrders(body, "BTC-USDT")
+	btc, err := decodeOpenOrders(t, body, "BTC-USDT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +53,7 @@ func TestOpenOrdersFiltersBySymbol(t *testing.T) {
 		t.Errorf("wrong order kept: %s", btc[0].OrderID)
 	}
 
-	eth, err := decodeOpenOrders(body, "ETH-USDT")
+	eth, err := decodeOpenOrders(t, body, "ETH-USDT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,8 +65,8 @@ func TestOpenOrdersFiltersBySymbol(t *testing.T) {
 // Quantity comes back as origQty. Reading only "quantity" made every row show
 // qty 0.00000, so a real order looked like a zero-size one.
 func TestOpenOrdersReadsOrigQty(t *testing.T) {
-	body := []byte(`{"orders":[{"symbol":"BTC-USDT","orderId":1,"type":"LIMIT","price":"79685.0","origQty":"0.11733"}]}`)
-	got, err := decodeOpenOrders(body, "BTC-USDT")
+	body := `{"orders":[{"symbol":"BTC-USDT","orderId":1,"type":"LIMIT","price":"79685.0","origQty":"0.11733"}]}`
+	got, err := decodeOpenOrders(t, body, "BTC-USDT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,8 +77,8 @@ func TestOpenOrdersReadsOrigQty(t *testing.T) {
 
 // If BingX ever renames origQty, fall back rather than report zero.
 func TestOpenOrdersFallsBackToQuantity(t *testing.T) {
-	body := []byte(`{"orders":[{"symbol":"BTC-USDT","orderId":1,"type":"LIMIT","price":"1.0","quantity":"2.5"}]}`)
-	got, _ := decodeOpenOrders(body, "BTC-USDT")
+	body := `{"orders":[{"symbol":"BTC-USDT","orderId":1,"type":"LIMIT","price":"1.0","quantity":"2.5"}]}`
+	got, _ := decodeOpenOrders(t, body, "BTC-USDT")
 	if len(got) != 1 || got[0].Quantity != 2.5 {
 		t.Fatalf("quantity = %v, want the 2.5 fallback", got[0].Quantity)
 	}
@@ -102,12 +88,80 @@ func TestOpenOrdersFallsBackToQuantity(t *testing.T) {
 // to silently empty — showing no orders on this page reads as "nothing is
 // resting", which is the most dangerous wrong answer it can give.
 func TestOpenOrdersKeepsRowsWithNoSymbol(t *testing.T) {
-	body := []byte(`{"orders":[{"orderId":1,"type":"STOP_MARKET","price":"0","stopPrice":"79880.0","origQty":"0.1"}]}`)
-	got, _ := decodeOpenOrders(body, "BTC-USDT")
+	body := `{"orders":[{"orderId":1,"type":"STOP_MARKET","price":"0","stopPrice":"79880.0","origQty":"0.1"}]}`
+	got, _ := decodeOpenOrders(t, body, "BTC-USDT")
 	if len(got) != 1 {
 		t.Fatalf("got %d, want the symbol-less row kept", len(got))
 	}
 	if got[0].StopPrice != 79880.0 {
 		t.Errorf("stopPrice = %v, want 79880", got[0].StopPrice)
+	}
+}
+
+// An EMPTY symbol means "the whole book". /ops/orders needs exactly this: the
+// endpoint ignores its symbol parameter anyway, so one call answers for every
+// symbol, and asking per-symbol would be N signed calls for N copies of the
+// same response.
+//
+// Shipped without it on 2026-09-15 and the page rendered an empty book while a
+// real ETH limit was resting on the exchange — the filter dropped every row
+// because none of them equalled "".
+func TestOpenOrdersEmptySymbolReturnsEverything(t *testing.T) {
+	body := `{"orders":[
+      {"symbol":"BTC-USDT","orderId":1,"type":"LIMIT","side":"SELL","price":"79685.0","origQty":"0.1173"},
+      {"symbol":"ETH-USDT","orderId":2,"type":"LIMIT","side":"BUY","price":"2441.0","origQty":"2.89"}
+    ]}`
+	got, err := decodeOpenOrders(t, body, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d orders for the empty symbol, want both — an account with "+
+			"resting orders must not read as an empty book", len(got))
+	}
+	// A named symbol must still filter, or this fix would have traded one bug
+	// for the cross-attribution bug the filter exists to prevent.
+	if one, _ := decodeOpenOrders(t, body, "ETH-USDT"); len(one) != 1 || one[0].Price != 2441 {
+		t.Errorf("ETH-USDT returned %d rows, want just the 2441 limit", len(one))
+	}
+}
+
+// BingX nests an order's own stop and take-profit INSIDE the row rather than
+// listing them as separate resting orders, and their stopPrice is a JSON
+// number while the row's own stopPrice is a string. Until 2026-09-15 they were
+// not parsed at all, which made a protected resting entry indistinguishable
+// from a naked one: the entry appeared, its stop existed nowhere.
+//
+// Fixture is the live order placed that day, copied from the exchange.
+func TestOpenOrdersParsesBundledStopAndTP(t *testing.T) {
+	body := `{"orders":[{"symbol":"ETH-USDT","orderId":2099785767551463400,"type":"LIMIT",
+      "side":"BUY","positionSide":"LONG","price":"2441.00","origQty":"2.89","reduceOnly":false,
+      "stopLoss":{"price":0,"quantity":0,"stopPrice":2424.88,"type":"STOP_MARKET"},
+      "takeProfit":{"price":0,"quantity":0,"stopPrice":2480.5,"type":"TAKE_PROFIT_MARKET"}}]}`
+	got, err := decodeOpenOrders(t, body, "ETH-USDT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d rows, want 1", len(got))
+	}
+	if got[0].BundledStop != 2424.88 {
+		t.Errorf("BundledStop = %v, want 2424.88", got[0].BundledStop)
+	}
+	if got[0].BundledTP != 2480.5 {
+		t.Errorf("BundledTP = %v, want 2480.5", got[0].BundledTP)
+	}
+	// The row's own stopPrice is absent here and must stay 0 — conflating the
+	// two would make an entry look like a stop order.
+	if got[0].StopPrice != 0 {
+		t.Errorf("StopPrice = %v, want 0 (the bundled trigger is a different field)", got[0].StopPrice)
+	}
+
+	// An order with no bundled stop reads as zero, which is what /ops/orders
+	// calls "naked".
+	naked := `{"orders":[{"symbol":"ETH-USDT","orderId":3,"type":"LIMIT","price":"2441.0","origQty":"1"}]}`
+	n, _ := decodeOpenOrders(t, naked, "ETH-USDT")
+	if len(n) != 1 || n[0].BundledStop != 0 {
+		t.Errorf("missing stopLoss should read 0, got %v", n)
 	}
 }

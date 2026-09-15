@@ -384,6 +384,14 @@ type OpenOrder struct {
 	StopPrice    float64
 	Quantity     float64
 	ReduceOnly   bool
+
+	// Stop/TP BUNDLED onto this order, which BingX nests inside the row as
+	// stopLoss{}/takeProfit{} rather than listing them as separate resting
+	// orders. They were not parsed until 2026-09-15, which made a protected
+	// resting entry indistinguishable from a naked one on every read surface:
+	// the entry showed up, its stop did not exist anywhere. 0 = none.
+	BundledStop float64
+	BundledTP   float64
 }
 
 // OpenOrders lists the resting orders for a symbol (GET /trade/openOrders).
@@ -406,6 +414,16 @@ func (c *Client) OpenOrders(ctx context.Context, sym market.Symbol) ([]OpenOrder
 			OrigQty    string `json:"origQty"`
 			Quantity   string `json:"quantity"`
 			ReduceOnly bool   `json:"reduceOnly"`
+			// Nested triggers that ride on this order and activate the moment
+			// it fills. stopPrice inside them is a NUMBER on this endpoint
+			// while the row's own stopPrice is a STRING — hence json.Number,
+			// which reads both.
+			StopLoss struct {
+				StopPrice json.Number `json:"stopPrice"`
+			} `json:"stopLoss"`
+			TakeProfit struct {
+				StopPrice json.Number `json:"stopPrice"`
+			} `json:"takeProfit"`
 		} `json:"orders"`
 	}
 	if err := c.signedRequest(ctx, "GET", PathOpenOrders, q, &resp); err != nil {
@@ -421,7 +439,12 @@ func (c *Client) OpenOrders(ctx context.Context, sym market.Symbol) ([]OpenOrder
 		// orders is worse than showing none. Rows without a symbol field
 		// are kept — a response that stops reporting it should degrade to
 		// the old over-inclusive behaviour, not silently drop everything.
-		if o.Symbol != "" && o.Symbol != string(sym) {
+		// An EMPTY sym means "every symbol", which is what /ops/orders wants:
+		// the endpoint returns the whole book anyway, so one call answers for
+		// the roster. Without this the filter below drops every row that has
+		// a symbol — i.e. all of them — and an account with a live resting
+		// order reads as an empty book.
+		if sym != "" && o.Symbol != "" && o.Symbol != string(sym) {
 			continue
 		}
 		price, _ := strconv.ParseFloat(o.Price, 64)
@@ -430,7 +453,10 @@ func (c *Client) OpenOrders(ctx context.Context, sym market.Symbol) ([]OpenOrder
 		if qty == 0 {
 			qty, _ = strconv.ParseFloat(o.Quantity, 64)
 		}
+		bStop, _ := o.StopLoss.StopPrice.Float64()
+		bTP, _ := o.TakeProfit.StopPrice.Float64()
 		out = append(out, OpenOrder{
+			BundledStop: bStop, BundledTP: bTP,
 			Symbol:  o.Symbol,
 			OrderID: strconv.FormatInt(o.OrderID, 10), Type: o.Type, Side: o.Side, PositionSide: o.PositionSide,
 			Price: price, StopPrice: stopPrice, Quantity: qty, ReduceOnly: o.ReduceOnly,
