@@ -17,7 +17,7 @@ import (
 
 // Balance is the account-level view. Fields are pointers so "the exchange did
 // not send this" stays distinguishable from "the exchange sent zero" — a
-// balance of 0 is a real state (it happened on 2026-09-08) and must never be
+// balance of 0 is a real state, and must never be
 // confused with a parse failure.
 type Balance struct {
 	Asset            string

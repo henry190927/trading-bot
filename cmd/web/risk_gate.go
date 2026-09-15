@@ -7,8 +7,8 @@ package main
 // would not have stopped the liquidation even if it had. Its caps were 4
 // positions / 140u TOTAL MARGIN / -3.0R daily, and three trades committing
 // roughly 65u, 70u and 62u leave every combination under 140u. Yet two of them
-// together reached about 118x account leverage and a 0.85% kill distance, and
-// a sub-1% adverse move closed the account.
+// together reach about 118x account leverage and a 0.85% kill distance, where
+// a sub-1% adverse move is enough to close the account.
 //
 // Margin is leverage-divided, so a margin cap cannot see exposure. This file
 // prices the account in notional/equity instead, and it builds that from the

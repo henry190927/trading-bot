@@ -30,9 +30,9 @@ import (
 //
 // equity_usdt is the one column that makes the row say anything about RISK
 // rather than about the read. R is leverage-independent by definition, so the
-// R series is structurally incapable of showing an account going to zero: on
-// 2026-09-08 this file read 66 settled / gross +19.04R while the balance read
-// 0.00000000, and both numbers were correct. Bucketing the 50 filled trades by
+// R series is structurally incapable of showing an account going to zero —
+// this file has read 66 settled trades at a healthy gross R while the balance
+// read 0.00000000, and both numbers were correct. Bucketing the filled rows by
 // leverage confirms it is definitional and not a data gap — 100x+ averaged
 // +0.435R and leverage-not-recorded averaged +0.450R, identical, because the
 // position size cancels out of R.
@@ -40,8 +40,8 @@ import (
 // margin_usdt x leverage already gave NOTIONAL on 48% of filled rows, but
 // notional alone answers nothing: 16,500u is a rounding error on a large
 // account and a liquidation on a small one. Only notional/equity — account
-// leverage — is comparable across time, and the fatal pair of 2026-09-08 sat
-// at 117.9x with a 0.848% kill distance that nothing in the system computed.
+// leverage — is comparable across time, and the fatal pair sat at 117.9x with
+// a 0.848% kill distance that nothing in the system computed.
 var Header = []string{
 	"id", "opened_at", "analyzed_at", "closed_at", "symbol", "side", "tf", "score",
 	"entry", "stop", "tp1", "tp2",
@@ -158,9 +158,9 @@ func (t Trade) Notional() float64 {
 // account this single position represented. Zero when either is unrecorded.
 //
 // This is the number that separates a survivable trade from a fatal one, and
-// it is invisible to R. For scale, from the 2026-09-08 post-mortem: the pair
-// that took the account to zero sat at 117.9x combined, while the trades that
-// produced the journal's best results ran at 30-40x.
+// it is invisible to R. For scale, from this journal's own history: the pair
+// in the fatal configuration sits at 117.9x combined, while the trades that
+// produced the best results ran at 30-40x.
 func (t Trade) AccountLeverage() float64 {
 	n := t.Notional()
 	if n <= 0 || t.EquityUSDT <= 0 {

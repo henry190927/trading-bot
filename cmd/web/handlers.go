@@ -2833,7 +2833,7 @@ func templateFuncs() template.FuncMap {
 		// ETH's are 0.662% and 1.494%. So under 1% means an ordinary hour can
 		// end the account (19% of BTC bars and 34% of ETH bars exceed 0.85%),
 		// under 2.5% means a busy session can, and above that there is room.
-		// The 2026-09-08 liquidation ran at 0.848%.
+		// The configuration that closed this book ran at 0.848%.
 		"killClass": func(pct float64) string {
 			switch {
 			case pct <= 0:

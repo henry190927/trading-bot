@@ -3,8 +3,8 @@
 //
 // It exists so the rules live in exactly ONE place. They were previously only
 // in cmd/protect, reachable only over SSH, which is how positions have sat
-// naked for hours with nobody at a terminal — and how one went
-// naked entirely on 2026-08-31. cmd/protect and the /ops/verify button now
+// naked for hours with nobody at a terminal — and how one went naked
+// entirely. cmd/protect and the /ops/verify button now
 // call the same BuildPlan, so a fix to the sanity rules cannot land in one and
 // miss the other.
 //

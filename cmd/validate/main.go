@@ -281,8 +281,8 @@ func colorFee(feeR float64) string {
 // consequence was not cosmetic: the pre-trade validator REFUSED every stock
 // synthetic and every alt, so the one surface that scores a proposed entry
 // could not be pointed at SNDK/NVDA/SPCX/MSTR/APP/SOL/SUI/LINK/HYPE/NEAR at
-// all. A SNDK short was placed on 2026-09-08 with a stop 1/7.4 of that
-// symbol's median cash-open-bar range; `validate -symbol SNDK` would have
+// all. A SNDK short went on with a stop 1/7.4 of that symbol's median
+// cash-open-bar range; `validate -symbol SNDK` would have
 // answered "unknown symbol" rather than scoring it.
 //
 // The aliases the switch carried beyond the short names (GOLD, SILVER,

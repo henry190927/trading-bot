@@ -2,13 +2,12 @@ package bingx
 
 import "testing"
 
-// The payload the live account actually returned on 2026-09-08 at 14:14, when
-// the balance was genuinely zero. A parser that cannot tell this from a failed
-// read is worse than no parser: the post-mortem turned on being able to say
-// "this is a real zero".
+// The payload shape a live account returns when the balance is genuinely
+// zero. A parser that cannot tell this from a failed read is worse than no
+// parser: a post-mortem turns on being able to say "this is a real zero".
 //
 // userId / shortUid are SCRUBBED placeholders — the real ones were committed
-// here by accident on 2026-09-08 and removed on 2026-09-09. Nothing asserts on
+// here by accident once and removed the next day. Nothing asserts on
 // them; what this fixture has to preserve is the payload SHAPE (equity present
 // and equal to "0.00000000"), not the account it came from. Keep them fake.
 const realZeroPayload = `{"balance":{"userId":"1000000000000000000","asset":"USDT",` +

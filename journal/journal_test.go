@@ -43,7 +43,7 @@ func TestRiskDerivations(t *testing.T) {
 		t.Errorf("KillDistancePct() = %v, want 2.484722891566265", got)
 	}
 
-	// The pair that took the account to zero, as a single synthetic position:
+	// The fatal configuration as a single synthetic position:
 	// 16,500u of notional against 140u of equity. 16500/140 = 117.857...x, and
 	// its reciprocal as a percentage is the kill distance.
 	fatal := Trade{MarginUSDT: 16500, Leverage: 1, EquityUSDT: 140}
@@ -155,10 +155,10 @@ func TestUnrecordedEquityStaysBlank(t *testing.T) {
 // breaks, every process that reads journal.csv fails at once.
 func TestReadsV8AndUpgradesToV9(t *testing.T) {
 	v8Header := strings.Join(Header[:29], ",")
-	// A v8 row as recorded, trimmed to the v8 column count.
-	v8Row := "61,2026-09-03T15:50:31+08:00,2026-09-03T15:50:31+08:00,2026-09-03T21:38:53+08:00," +
-		"BTC,long,1h,zone,77640,77380,78900,79222.3,weekopen,notes,78552.6,manual,3.5100,closenotes," +
-		"125,2026-09-03T15:50:31+08:00,,,,75,,,,,"
+	// A v8 row in the shape v8 actually wrote, trimmed to its column count.
+	v8Row := "7,2026-01-02T15:00:00+08:00,2026-01-02T15:00:00+08:00,2026-01-02T21:00:00+08:00," +
+		"BTC,long,1h,zone,77600,77400,78900,79200,weekopen,notes,78500,manual,3.5000,closenotes," +
+		"125,2026-01-02T15:00:00+08:00,,,,75,,,,,"
 	if n := strings.Count(v8Row, ",") + 1; n != 29 {
 		t.Fatalf("fixture has %d columns, want 29 — the test's own premise is wrong", n)
 	}
@@ -175,7 +175,7 @@ func TestReadsV8AndUpgradesToV9(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("read %d trades, want 1", len(got))
 	}
-	if got[0].ID != 61 || got[0].Symbol != "BTC" || got[0].MarginUSDT != 75 || got[0].Leverage != 125 {
+	if got[0].ID != 7 || got[0].Symbol != "BTC" || got[0].MarginUSDT != 75 || got[0].Leverage != 125 {
 		t.Errorf("v8 row mis-parsed: %+v", got[0])
 	}
 	if got[0].EquityUSDT != 0 {
@@ -197,7 +197,7 @@ func TestReadsV8AndUpgradesToV9(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadAll after upgrade: %v", err)
 	}
-	if again[0].ID != 61 || again[0].MarginUSDT != 75 {
+	if again[0].ID != 7 || again[0].MarginUSDT != 75 {
 		t.Errorf("data lost across the v8 -> v9 upgrade: %+v", again[0])
 	}
 }

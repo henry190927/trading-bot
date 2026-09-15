@@ -10,7 +10,7 @@ package main
 // is wrong in the direction that matters.
 //
 // Extended the same day with the exposure block. Equity alone still cannot say
-// whether a book is survivable: the pair that closed the account was 16,500u
+// whether a book is survivable: the fatal pair was 16,500u
 // of notional, which is unremarkable next to a large balance and fatal next to
 // an account of roughly 140u. Account leverage and its reciprocal, the kill
 // distance, are the

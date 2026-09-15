@@ -23,13 +23,13 @@ func flat(equity float64) Exposure {
 	return Exposure{Equity: equity, EquityKnown: true, UsedMargin: 0, UsedMarginKnown: true}
 }
 
-// The whole point of the package: replay the sequence that took the account to
-// zero and confirm a leverage cap stops it where the margin cap did not.
+// The whole point of the package: replay the fatal sequence and confirm a
+// leverage cap stops it where the margin cap did not.
 func TestFatalSequenceIsBlocked(t *testing.T) {
 	l := Limits{MaxAccountLev: 40}
 
-	// A opens against a flat book: 37.8x, under the cap. Allowed — and it
-	// should be, because A alone did not kill the account.
+	// A opens against a flat book: 37.3x, under the cap. Allowed — and it
+	// should be: A alone is survivable.
 	v := Check(l, flat(equityBeforeA), notionalA)
 	if v.Blocked {
 		t.Errorf("A alone was blocked: %s", v.Reason)

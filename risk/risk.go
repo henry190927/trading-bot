@@ -16,7 +16,7 @@
 // exposure; against an account whose equity is of the same order as the margin
 // cap itself that is roughly 118x account leverage and a 0.85% kill distance.
 // Both long, on correlated assets, with no stop. A 0.76% adverse move closes
-// the account — which is what happened.
+// the account.
 //
 // The margin cap cannot see that, because MARGIN IS LEVERAGE-DIVIDED. 132u
 // of margin at 125x is 16,500u of exposure and at 5x it is 660u; the cap
@@ -64,7 +64,7 @@ import (
 // EquityKnown exists because "could not read equity" and "equity is zero" are
 // different facts with opposite correct handling, and conflating them is how a
 // transient API error becomes either a frozen order path or an infinite
-// computed leverage. On 2026-09-08 the account really did read 0.00000000.
+// computed leverage. A live account really has read 0.00000000.
 type Exposure struct {
 	Equity      float64
 	EquityKnown bool
