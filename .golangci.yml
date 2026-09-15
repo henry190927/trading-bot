@@ -1,0 +1,41 @@
+# golangci-lint v2 schema (v2.13.2). The handoff note carried a v1 config plus
+# a `golangci-lint migrate` step; nothing was installed yet, so the install
+# landed on v2 and the v1 detour is skipped.
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  # errcheck/govet/ineffassign/staticcheck/unused are v2's default set; listed
+  # explicitly so the file states the whole gate rather than half of it.
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    # bodyclose and errorlint are the two chosen for THIS codebase:
+    #   bodyclose — four keyless external feeds (BingX, Binance, BLS, econcal)
+    #     plus the WS client, all doing raw http.Get/Do. A leaked response body
+    #     holds its connection out of the pool for the life of the process.
+    #   errorlint — %w appears across 27 files while errors.Is/As appears in 1.
+    #     Wrapping without ever unwrapping means the chain is decoration, not
+    #     something any caller branches on.
+    - bodyclose
+    - noctx
+    - errorlint
+  settings:
+    misspell:
+      # `strat` is this codebase's deliberate shorthand for "strategy" — it is
+      # the JSON field in autotrade_paper.jsonl and a column header on
+      # /ops/autotrade. misspell reads it as a typo for "start".
+      ignore-rules:
+        - strat
+
+  exclusions:
+    rules:
+      # A discarded error in a test is usually the point of the test.
+      - path: _test\.go
+        linters: [errcheck]

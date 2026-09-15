@@ -42,10 +42,13 @@ SCP         := scp -i $(ORACLE_KEY)
 %:
 	@:
 
-.PHONY: help analyze validate serve serve-bg stop logs backtest build deploy deploy-all deploy-web ssh remote-status remote-logs jopen jclose jlist jstats jupdate jdelete janchors tconfig tstart tstop trestart web-status web-logs web-restart deploy-monitor monitor-status monitor-logs monitor-restart
+.PHONY: test test-race vet lint check help analyze validate serve serve-bg stop logs backtest build deploy deploy-all deploy-web ssh remote-status remote-logs jopen jclose jlist jstats jupdate jdelete janchors tconfig tstart tstop trestart web-status web-logs web-restart deploy-monitor monitor-status monitor-logs monitor-restart
 
 help:
 	@echo "trading — Makefile commands"
+	@echo
+	@echo "  make check                                vet + test-race + lint (pre-commit gate)"
+	@echo "  make test / test-race / vet / lint        Run one gate on its own"
 	@echo
 	@echo "  make analyze [TF]                         Snapshot all 4 symbols (default 1h)"
 	@echo "  make validate SYM SIDE ENTRY [TF]         Score a proposed trade"
@@ -144,6 +147,29 @@ backtest:
 	if [ -z "$$TF" ]; then TF=1h; fi; \
 	$(GO) run ./cmd/backtest -tf=$$TF -days=$$DAYS -fee-bps=6 -sweep-only
 
+# ---- quality gates -------------------------------------------------------
+# `test-race` is the one that earns its keep. 13 goroutine start points live
+# outside the tests, and only ONE of them (cmd/web/stream.go — the SSE hub) has
+# a test that drives it concurrently. So a green -race run says "the concurrent
+# paths the tests actually exercise are clean", NOT "this codebase is race
+# free". Read the result that way; the other 12 sites are where a race would
+# still be hiding.
+test:
+	@$(GO) test ./...
+
+test-race:
+	@$(GO) test -race ./...
+
+vet:
+	@$(GO) vet ./...
+
+lint:
+	@golangci-lint run ./...
+
+# One command before a commit or in CI.
+check: vet test-race lint
+	@echo "✅ vet + race + lint all clean"
+
 build:
 	@$(GO) build -o $(SERVE_BIN) ./cmd/serve && echo "built $(SERVE_BIN)"
 
@@ -233,7 +259,7 @@ monitor-restart:
 # any future linux deployment without runtime cgo deps.
 mcp-build:
 	@echo "▶ building trading-bot MCP server..."
-	@CGO_ENABLED=0 $(GO) build -buildvcs=false -o /tmp/trading-bot-mcp ./cmd/mcp
+	@CGO_ENABLED=0 $(GO) build -o /tmp/trading-bot-mcp ./cmd/mcp
 
 mcp-install: mcp-build
 	@mkdir -p $(HOME)/bin

@@ -160,6 +160,10 @@ func (s *Stream) SubscribeMarkPrices(ctx context.Context, syms []market.Symbol, 
 	}
 	dialCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
+	// nolint:bodyclose // gorilla's Dial contract: "The response body may not
+	// contain the entire response and does not need to be closed by the
+	// application." (websocket@v1.5.3 client.go). Closing it here would be
+	// closing something the library already owns.
 	c, resp, err := websocket.DefaultDialer.DialContext(dialCtx, s.URL, nil)
 	if err != nil {
 		if resp != nil {

@@ -350,7 +350,7 @@ func Evaluate(in Inputs) Signal {
 		}
 		// Volume confirmation: a sweep is a liquidity event where price
 		// punches through a level. Without volume, it's drift past the
-		// level rather than absorbtion of stops — historically lower
+		// level rather than absorption of stops — historically lower
 		// follow-through. Gate the sweep VOTE on relVol >= threshold;
 		// the sweep itself still surfaces in Reasons either way so the
 		// trader sees it.
@@ -880,6 +880,10 @@ var StructureVetoEnabled = false
 //
 // Same-side crowding is handled by annotateContextWarnings as an
 // advisory warning (display-only; doesn't affect trade selection).
+// annotateContextWarnings call site. Kept, with its constants and backtest
+// plumbing, so a revisit with tighter thresholds does not start from scratch.
+//
+//nolint:unused // Deliberately unwired — see the 2026-06-08 note at the
 func applyFundingContrarianVote(sig *Signal, ctx Context) {
 	if !FundingContrarianVoteEnabled || sig.Side == Flat || ctx.FundingRate == 0 {
 		return

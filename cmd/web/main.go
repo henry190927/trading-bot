@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	_ "net/http/pprof" // registers /debug/pprof/* on DefaultServeMux
 	"os"
 	"time"
 
@@ -202,6 +203,28 @@ func main() {
 	// Economic-data-release calendar (ForexFactory feed) — display layer for
 	// /calendar, refreshed hourly. Never fatal: feed down = calendar minus this row.
 	econcal.LoadAndWatch(context.Background(), time.Hour, log.Printf)
+
+	// pprof, opt-in and on its OWN listener. The blank import above registers
+	// the handlers on DefaultServeMux; Gin serves from its own router, so
+	// nothing is exposed unless this block runs.
+	//
+	// Deliberately not mounted on the Gin port: /debug/pprof/heap dumps live
+	// heap contents and /debug/pprof/goroutine?debug=2 dumps every goroutine
+	// stack. On the VPS the Gin port is reachable by anything on the tailnet,
+	// and there is no app-level auth in front of it.
+	//
+	//	PPROF_BIND=127.0.0.1:6060 make serve
+	if addr := os.Getenv("PPROF_BIND"); addr != "" {
+		go func() {
+			log.Printf("pprof listening on %s", addr)
+			// ReadHeaderTimeout: a bare ListenAndServe has no header timeout,
+			// which is a slowloris hole even on localhost.
+			srv := &http.Server{Addr: addr, ReadHeaderTimeout: 10 * time.Second}
+			if err := srv.ListenAndServe(); err != nil {
+				log.Printf("pprof: %v", err)
+			}
+		}()
+	}
 
 	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
 	if err := r.Run(bind); err != nil {
