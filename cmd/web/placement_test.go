@@ -145,3 +145,44 @@ func TestGuardsDoNotConsiderEntry(t *testing.T) {
 		t.Errorf("verdict should be entry-independent and allowed, got %q / %q", a, b)
 	}
 }
+
+// A target of 0 is "none planned", not a typo. /ops/entry writes tp1 = 0
+// deliberately — BingX's bundled take-profit closes 100% of a position, so a
+// partial TP1 is a separate reduce-only order placed after the fill, and
+// recording one that does not exist would make /ops/verify report protection
+// that is not there.
+//
+// The edit form used parseFloatPositive for both targets, so a row written by
+// that route could not be edited at all: setting filled_at on one failed with
+// "tp1 must be > 0". The form's error path re-renders with HTTP 200, so the
+// failure read as success from the outside.
+func TestParseFloatOptionalAcceptsZeroAndBlank(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		want float64
+		ok   bool
+	}{
+		{"", 0, true},    // not set
+		{"0", 0, true},   // explicitly none
+		{" 0 ", 0, true}, // and with the form's whitespace
+		{"2480.5", 2480.5, true},
+		{"-1", 0, false}, // a negative target is still a mistake
+		{"abc", 0, false},
+	} {
+		got, err := parseFloatOptional(c.in, "tp1")
+		if (err == nil) != c.ok {
+			t.Errorf("parseFloatOptional(%q) err = %v, want ok=%v", c.in, err, c.ok)
+			continue
+		}
+		if c.ok && got != c.want {
+			t.Errorf("parseFloatOptional(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+	// entry and stop keep the stricter rule — a plan without those is not a plan.
+	if _, err := parseFloatPositive("0", "entry"); err == nil {
+		t.Error("parseFloatPositive accepted 0 — entry and stop must stay required")
+	}
+	if _, err := parseFloatPositive("", "entry"); err == nil {
+		t.Error("parseFloatPositive accepted blank")
+	}
+}

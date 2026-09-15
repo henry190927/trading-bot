@@ -1709,12 +1709,22 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		rerender(err.Error())
 		return
 	}
-	tp1, err := parseFloatPositive(c.PostForm("tp1"), "tp1")
+	// A target of 0 means "none planned", which is a real state and not a
+	// typo: /ops/entry writes tp1 = 0 deliberately, because BingX's bundled
+	// take-profit closes 100% of the position and a partial TP1 is a separate
+	// reduce-only order placed after the fill. Recording a TP1 that does not
+	// exist yet would make /ops/verify report protection that is not there.
+	//
+	// Requiring > 0 here meant a row written by that route could not be edited
+	// at all — setting filled_at on one failed with "tp1 must be > 0", on a
+	// form whose error path returns 200 so the failure read as success.
+	// entry and stop stay required; a plan without those is not a plan.
+	tp1, err := parseFloatOptional(c.PostForm("tp1"), "tp1")
 	if err != nil {
 		rerender(err.Error())
 		return
 	}
-	tp2, err := parseFloatPositive(c.PostForm("tp2"), "tp2")
+	tp2, err := parseFloatOptional(c.PostForm("tp2"), "tp2")
 	if err != nil {
 		rerender(err.Error())
 		return
@@ -2092,6 +2102,25 @@ func (s *server) loadTradeByID(c *gin.Context) (journal.Trade, int, []journal.Tr
 		return journal.Trade{}, 0, nil, fmt.Errorf("no trade with id %d", id)
 	}
 	return trades[idx], idx, trades, nil
+}
+
+// parseFloatOptional accepts blank or 0 as "not set" and rejects anything
+// else that is not a positive number. Distinct from parseFloatPositive, which
+// treats absence as an error — the difference is whether a zero is a missing
+// requirement or a recorded decision.
+func parseFloatOptional(s, name string) (float64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, nil
+	}
+	v, err := parseFloat(s)
+	if err != nil {
+		return 0, fmt.Errorf("%s: not a number", name)
+	}
+	if v < 0 {
+		return 0, fmt.Errorf("%s must be >= 0", name)
+	}
+	return v, nil
 }
 
 func parseFloatPositive(s, name string) (float64, error) {
