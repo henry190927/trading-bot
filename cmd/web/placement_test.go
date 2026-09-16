@@ -178,7 +178,11 @@ func TestParseFloatOptionalAcceptsZeroAndBlank(t *testing.T) {
 			t.Errorf("parseFloatOptional(%q) = %v, want %v", c.in, got, c.want)
 		}
 	}
-	// entry and stop keep the stricter rule — a plan without those is not a plan.
+	// BOTH creation paths must agree. The edit handler was relaxed first and
+	// /journal/open was missed, so a row could be edited to tp1 = 0 but never
+	// created with it — which is how three real trades stayed off the book.
+	// entry and stop keep the stricter rule: a plan without those is not a
+	// plan, and the stop is the R baseline every statistic depends on.
 	if _, err := parseFloatPositive("0", "entry"); err == nil {
 		t.Error("parseFloatPositive accepted 0 — entry and stop must stay required")
 	}

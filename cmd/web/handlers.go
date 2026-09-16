@@ -912,12 +912,21 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		rerender(err.Error())
 		return
 	}
-	tp1, err := parseFloatPositive(tp1Str, "tp1")
+	// Optional, same as the edit form: a target of 0 means "none planned",
+	// which is a real state. /ops/entry writes tp1 = 0 because BingX's bundled
+	// take-profit closes 100% and a partial TP1 is a separate order placed
+	// after the fill; a trade recorded after the fact may have had no target
+	// at all. entry and stop stay REQUIRED — a plan without those is not a
+	// plan, and the stop is the R baseline every statistic depends on.
+	//
+	// The edit handler was relaxed first and this one was missed, so a row
+	// could be edited to tp1 = 0 but never created with it.
+	tp1, err := parseFloatOptional(tp1Str, "tp1")
 	if err != nil {
 		rerender(err.Error())
 		return
 	}
-	tp2, err := parseFloatPositive(tp2Str, "tp2")
+	tp2, err := parseFloatOptional(tp2Str, "tp2")
 	if err != nil {
 		rerender(err.Error())
 		return
