@@ -369,11 +369,34 @@ func FindByID(trades []Trade, id int) int {
 
 // RealizedR computes the R-multiple of t against the given exit price.
 // Returns 0 if risk is zero.
+// HasR reports whether this trade's R is DEFINED.
+//
+// R is measured against the PLANNED RISK, so a position taken without a stop
+// has no R at all. That is not the same as an R of zero: zero reads as a
+// break-even trade, counts in the denominator of every average, and drags the
+// whole series toward the middle. A trade with no stop still has a P&L, a
+// symbol and a time — it just cannot answer "how many times my planned risk
+// did this make", because there was no planned risk.
+//
+// Entry == Stop is the same condition arriving by a different route: the
+// divisor is zero either way.
+func (t Trade) HasR() bool { return t.Entry > 0 && t.Stop > 0 && t.Entry != t.Stop }
+
+// RealizedR returns 0 when there is no risk distance. Callers computing
+// STATISTICS must gate on HasR first — this zero is "undefined", and summing
+// it into an average silently states that the trade broke even.
 func RealizedR(t Trade, exit float64) float64 {
-	risk := math.Abs(t.Entry - t.Stop)
-	if risk == 0 {
+	// HasR, not risk != 0. A trade with no stop recorded has Stop == 0, and
+	// |entry - 0| is the ENTRY PRICE — a perfectly finite divisor that yields
+	// a small, plausible-looking R. SUI at entry 0.691 exiting 0.6879 came out
+	// as -0.0045R, which reads as "almost break-even" rather than "undefined",
+	// and there is nothing in that number to make a reader suspicious.
+	//
+	// The old guard only fired when entry == stop exactly.
+	if !t.HasR() {
 		return 0
 	}
+	risk := math.Abs(t.Entry - t.Stop)
 	if t.Side == "long" {
 		return (exit - t.Entry) / risk
 	}
@@ -708,7 +731,13 @@ func rowFromTrade(t Trade) []string {
 	if t.ExitPrice != 0 {
 		exit = strconv.FormatFloat(t.ExitPrice, 'f', -1, 64)
 	}
-	if !t.ClosedAt.IsZero() {
+	// Closed AND measurable. A trade with no stop has no R, and writing
+	// "0.0000" into this column says it broke even — to a human reading the
+	// CSV, to a spreadsheet, and to any future reader that does not know to
+	// check HasR. Blank is the honest cell, and it round-trips: parseRow
+	// leaves RRealized at 0 for an empty field, which HasR then reports as
+	// undefined again.
+	if !t.ClosedAt.IsZero() && t.HasR() {
 		rR = strconv.FormatFloat(t.RRealized, 'f', 4, 64)
 	}
 	marginStr := ""

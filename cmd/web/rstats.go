@@ -20,12 +20,16 @@ type rTrade struct {
 	Closed time.Time // when it settled; equity moves on CLOSE, not on entry
 }
 
-// rTradesFromJournal keeps the original filter exactly: open trades and
-// no-fills never moved the curve, because neither realizes R.
+// rTradesFromJournal keeps the original filter — open trades and no-fills
+// never moved the curve, because neither realizes R — and adds trades whose R
+// is UNDEFINED for want of a stop. Those have a real P&L but no risk to
+// measure it against, and journal.RealizedR returns 0 for them; charting that
+// zero would draw a flat step on the equity curve and a break-even bar in the
+// histogram for a trade that was neither.
 func rTradesFromJournal(trades []journal.Trade) []rTrade {
 	out := make([]rTrade, 0, len(trades))
 	for _, t := range trades {
-		if t.IsOpen() || t.ClosedAt.IsZero() || t.IsNoFill() {
+		if t.IsOpen() || t.ClosedAt.IsZero() || t.IsNoFill() || !t.HasR() {
 			continue
 		}
 		out = append(out, rTrade{R: t.RRealized, Closed: t.ClosedAt})

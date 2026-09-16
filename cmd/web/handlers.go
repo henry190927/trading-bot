@@ -907,7 +907,15 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		rerender(err.Error())
 		return
 	}
-	stop, err := parseFloatPositive(stopStr, "stop")
+	// stop MAY be 0: a position taken without one is a real state, and it is
+	// the state most worth recording — three real trades stayed off the book
+	// on 2026-09-16 because this field refused it. journal.HasR reads a zero
+	// stop as "R undefined", and every statistic skips those rather than
+	// counting them as break-even, so the row lands in the P&L and the trade
+	// count without touching win-rate or avg-R.
+	//
+	// entry stays required. Without it there is no trade, only a note.
+	stop, err := parseFloatOptional(stopStr, "stop")
 	if err != nil {
 		rerender(err.Error())
 		return
@@ -916,11 +924,8 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	// which is a real state. /ops/entry writes tp1 = 0 because BingX's bundled
 	// take-profit closes 100% and a partial TP1 is a separate order placed
 	// after the fill; a trade recorded after the fact may have had no target
-	// at all. entry and stop stay REQUIRED — a plan without those is not a
-	// plan, and the stop is the R baseline every statistic depends on.
-	//
-	// The edit handler was relaxed first and this one was missed, so a row
-	// could be edited to tp1 = 0 but never created with it.
+	// at all. The edit handler was relaxed first and this one was missed, so
+	// a row could be edited to tp1 = 0 but never created with it.
 	tp1, err := parseFloatOptional(tp1Str, "tp1")
 	if err != nil {
 		rerender(err.Error())
@@ -933,11 +938,11 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	}
 
 	// Sanity: directional consistency between entry/stop/TPs.
-	if side == "long" && stop >= entry {
+	if stop > 0 && side == "long" && stop >= entry {
 		rerender("for a long, stop must be below entry")
 		return
 	}
-	if side == "short" && stop <= entry {
+	if stop > 0 && side == "short" && stop <= entry {
 		rerender("for a short, stop must be above entry")
 		return
 	}
@@ -1713,7 +1718,9 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		rerender(err.Error())
 		return
 	}
-	stop, err := parseFloatPositive(c.PostForm("stop"), "stop")
+	// May be 0 — see the note on the create path. A row written without a
+	// stop must stay editable, or correcting its exit price is impossible.
+	stop, err := parseFloatOptional(c.PostForm("stop"), "stop")
 	if err != nil {
 		rerender(err.Error())
 		return
@@ -1727,7 +1734,6 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	// Requiring > 0 here meant a row written by that route could not be edited
 	// at all — setting filled_at on one failed with "tp1 must be > 0", on a
 	// form whose error path returns 200 so the failure read as success.
-	// entry and stop stay required; a plan without those is not a plan.
 	tp1, err := parseFloatOptional(c.PostForm("tp1"), "tp1")
 	if err != nil {
 		rerender(err.Error())
@@ -1738,11 +1744,11 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		rerender(err.Error())
 		return
 	}
-	if side == "long" && stop >= entry {
+	if stop > 0 && side == "long" && stop >= entry {
 		rerender("for a long, stop must be below entry")
 		return
 	}
-	if side == "short" && stop <= entry {
+	if stop > 0 && side == "short" && stop <= entry {
 		rerender("for a short, stop must be above entry")
 		return
 	}
@@ -2170,6 +2176,10 @@ func (s *server) handleJournalList(c *gin.Context) {
 	// hero pills.
 	var totalR, bestR, worstR float64
 	wins, closedCount, noFillCount := 0, 0, 0
+	// rCount is the denominator for win-rate and avg-R: closed trades that HAVE
+	// an R. noRCount is the rest — real trades, real P&L, no planned risk to
+	// measure against.
+	rCount, noRCount := 0, 0
 	pendingCount, activeCount := 0, 0
 	for _, t := range trades {
 		if t.IsPending() {
@@ -2184,8 +2194,19 @@ func (s *server) handleJournalList(c *gin.Context) {
 			noFillCount++
 			continue
 		}
-		// Anything that reaches here is a closed (non-no-fill) trade.
+		// A closed trade with no stop has a P&L but no R (journal.HasR). It is
+		// counted as a trade and excluded from every R statistic, because
+		// RealizedR returns 0 for it and a zero in these sums is a claim that
+		// it broke even.
+		if !t.HasR() {
+			closedCount++
+			noRCount++
+			continue
+		}
+		// Anything that reaches here is a closed (non-no-fill) trade with a
+		// measurable R.
 		closedCount++
+		rCount++
 		totalR += t.RRealized
 		if t.RRealized > 0 {
 			wins++
@@ -2197,11 +2218,13 @@ func (s *server) handleJournalList(c *gin.Context) {
 			worstR = t.RRealized
 		}
 	}
+	// Denominator is the trades that HAVE an R, not every closed trade —
+	// otherwise each stopless trade silently dilutes both figures.
 	wr := 0.0
 	avgR := 0.0
-	if closedCount > 0 {
-		wr = float64(wins) / float64(closedCount) * 100
-		avgR = totalR / float64(closedCount)
+	if rCount > 0 {
+		wr = float64(wins) / float64(rCount) * 100
+		avgR = totalR / float64(rCount)
 	}
 
 	// One adapter call feeds all three portfolio views; /ops/autotrade runs
@@ -2249,6 +2272,8 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"ActiveCount":  activeCount,
 		"ClosedCount":  closedCount,
 		"NoFillCount":  noFillCount,
+		"NoRCount":     noRCount,
+		"RCount":       rCount,
 		"WR":           wr,
 		"AvgR":         avgR,
 		"TotalR":       totalR,

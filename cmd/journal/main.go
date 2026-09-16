@@ -417,7 +417,14 @@ func printGroup(label string, ts []journal.Trade) {
 	wins := 0
 	bestR = -math.MaxFloat64
 	worstR = math.MaxFloat64
+	n := 0
 	for _, t := range ts {
+		// Skip trades with no R (no stop recorded). RealizedR returns 0 for
+		// them, and summing that zero states they broke even.
+		if !t.HasR() {
+			continue
+		}
+		n++
 		totalR += t.RRealized
 		if t.RRealized > 0 {
 			wins++
@@ -429,8 +436,12 @@ func printGroup(label string, ts []journal.Trade) {
 			worstR = t.RRealized
 		}
 	}
-	wr := float64(wins) / float64(len(ts)) * 100
-	avgR := totalR / float64(len(ts))
+	if n == 0 {
+		fmt.Printf("%s: %d trades, none with a recorded stop — no R to report\n", label, len(ts))
+		return
+	}
+	wr := float64(wins) / float64(n) * 100
+	avgR := totalR / float64(n)
 	avgCol := ansi.Dim
 	switch {
 	case avgR > 0:
@@ -438,10 +449,17 @@ func printGroup(label string, ts []journal.Trade) {
 	case avgR < 0:
 		avgCol = ansi.Red
 	}
-	fmt.Printf("  %-20s n=%-3d  WR=%5.1f%%  avgR=%s  totalR=%+6.2f  best=%+.2f worst=%+.2f\n",
-		label, len(ts), wr,
+	// n, not len(ts): the count shown has to be the denominator the WR and
+	// avgR beside it were actually divided by, or the line silently disagrees
+	// with itself the moment one trade has no stop.
+	note := ""
+	if skipped := len(ts) - n; skipped > 0 {
+		note = fmt.Sprintf("  (+%d no-stop)", skipped)
+	}
+	fmt.Printf("  %-20s n=%-3d  WR=%5.1f%%  avgR=%s  totalR=%+6.2f  best=%+.2f worst=%+.2f%s\n",
+		label, n, wr,
 		ansi.Wrap(fmt.Sprintf("%+5.2f", avgR), avgCol),
-		totalR, bestR, worstR)
+		totalR, bestR, worstR, note)
 }
 
 // --- anchors helper ------------------------------------------------------

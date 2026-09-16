@@ -296,3 +296,108 @@ func TestWriteAllKeepsTheModeAndLeavesNoTempFile(t *testing.T) {
 		t.Errorf("rewritten journal mode = %04o, want the 0664 it already had", got)
 	}
 }
+
+// A trade taken WITHOUT a stop has no R — not an R of zero.
+//
+// RealizedR divides by the risk distance and returns 0 when there is none,
+// which is the right thing for a formula and the wrong thing for a statistic:
+// zero reads as break-even, counts in the denominator of every average, and
+// drags the series toward the middle. HasR is the gate every statistic checks
+// before using that number.
+//
+// This matters because a stopless position is the state most worth recording.
+// The journal refused to store one until 2026-09-16, so three real trades —
+// two of them the day's only winners — stayed off the book entirely.
+func TestHasRSeparatesUndefinedFromZero(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		trade Trade
+		want  bool
+	}{
+		{"normal long", Trade{Entry: 2400, Stop: 2384, Side: "long"}, true},
+		{"normal short", Trade{Entry: 2400, Stop: 2416, Side: "short"}, true},
+		{"no stop recorded", Trade{Entry: 2400, Stop: 0, Side: "long"}, false},
+		{"no entry", Trade{Entry: 0, Stop: 2384, Side: "long"}, false},
+		// Same divisor-is-zero condition arriving by a different route.
+		{"stop equals entry", Trade{Entry: 2400, Stop: 2400, Side: "long"}, false},
+		{"neither", Trade{Side: "long"}, false},
+	} {
+		if got := c.trade.HasR(); got != c.want {
+			t.Errorf("%s: HasR() = %v, want %v", c.name, got, c.want)
+		}
+	}
+
+	// The trap in one assertion: a stopless trade that LOST money still
+	// reports RealizedR 0, indistinguishable from a break-even trade with a
+	// stop. Only HasR tells them apart.
+	stopless := Trade{Entry: 0.691, Stop: 0, Side: "long"}
+	breakeven := Trade{Entry: 2400, Stop: 2384, Side: "long"}
+	// Before HasR gated it, this returned -0.0045: |0.691 - 0| is the ENTRY
+	// PRICE, a finite divisor that produces a small plausible number rather
+	// than an obvious zero. Nothing in -0.0045R makes a reader suspicious.
+	if r := RealizedR(stopless, 0.6879); r != 0 {
+		t.Errorf("RealizedR with no stop = %v, want 0 — |entry-0| is not zero risk", r)
+	}
+	if r := RealizedR(breakeven, 2400); r != 0 {
+		t.Errorf("RealizedR at entry = %v, want 0", r)
+	}
+	if stopless.HasR() == breakeven.HasR() {
+		t.Error("a stopless loser and a genuine break-even are indistinguishable — " +
+			"that is exactly what HasR exists to prevent")
+	}
+}
+
+// The r_realized COLUMN must be blank for a trade with no stop, not "0.0000".
+// HasR protects the statistics; this protects the reader. A spreadsheet, or
+// anyone opening journal.csv, has no way to know that a zero there means
+// "undefined" rather than "broke even".
+func TestStoplessTradeWritesBlankR(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "journal.csv")
+	now := time.Now().UTC()
+	stopless := Trade{
+		ID: 1, Symbol: "SUI", Side: "long", Entry: 0.691, Stop: 0,
+		ExitPrice: 0.6879, Outcome: "manual", OpenedAt: now, ClosedAt: now,
+	}
+	withStop := Trade{
+		ID: 2, Symbol: "ETH", Side: "long", Entry: 2400, Stop: 2384,
+		ExitPrice: 2440, Outcome: "tp1", OpenedAt: now, ClosedAt: now,
+	}
+	withStop.RRealized = RealizedR(withStop, withStop.ExitPrice)
+	stopless.RRealized = RealizedR(stopless, stopless.ExitPrice)
+
+	if err := WriteAll(path, []Trade{stopless, withStop}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("got %d lines, want header + 2", len(lines))
+	}
+	col := 16 // r_realized, per Header
+	if Header[col] != "r_realized" {
+		t.Fatalf("Header[%d] = %q, want r_realized — the index moved", col, Header[col])
+	}
+	if got := strings.Split(lines[1], ",")[col]; got != "" {
+		t.Errorf("stopless r_realized = %q, want empty", got)
+	}
+	// 2440-2400 = 40 over a risk of 16 → +2.5000
+	if got := strings.Split(lines[2], ",")[col]; got != "2.5000" {
+		t.Errorf("with-stop r_realized = %q, want 2.5000", got)
+	}
+
+	// Round-trip: the blank comes back as undefined, not as a zero that now
+	// looks measurable.
+	back, err := ReadAll(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back[0].HasR() {
+		t.Error("the stopless row reads as having an R after a round-trip")
+	}
+	if !back[1].HasR() || back[1].RRealized != 2.5 {
+		t.Errorf("with-stop row round-tripped to HasR=%v R=%v", back[1].HasR(), back[1].RRealized)
+	}
+}
