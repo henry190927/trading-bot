@@ -50,14 +50,42 @@
         {{if .HasTP}}<span class="badge b-blue">🎯 <span class="i18n-en">tp live</span><span class="i18n-zh">有 TP</span></span>{{end}}
       </div>
       {{if .HasPosition}}
-      <form class="pr-form" data-symbol="{{.Symbol}}" data-side="{{.Side}}" onsubmit="return false">
+      <form class="pr-form" data-symbol="{{.Symbol}}" data-side="{{.Side}}"
+            data-qty="{{printf "%g" .PosQty}}" data-entry="{{printf "%g" .PosEntry}}"
+            data-jstop="{{printf "%g" .Stop}}" data-side-l="{{.Side}}" onsubmit="return false">
         <div class="pr-row">
-          <label>stop <input type="number" step="any" inputmode="decimal" name="stop" value="{{if .Stop}}{{printf "%g" .Stop}}{{end}}" placeholder="{{printf "%g" .Stop}}"></label>
-          <label>tp <input type="number" step="any" inputmode="decimal" name="tp" placeholder="{{if .TP1}}{{printf "%g" .TP1}}{{else}}—{{end}}"></label>
+          <label>stop
+            <input type="number" step="any" inputmode="decimal" name="stop"
+                   value="{{if .Stop}}{{printf "%g" .Stop}}{{end}}" placeholder="{{printf "%g" .Stop}}">
+          </label>
+          <label>tp
+            <input type="number" step="any" inputmode="decimal" name="tp"
+                   placeholder="{{if .TP1}}{{printf "%g" .TP1}}{{else}}—{{end}}">
+          </label>
           <button type="button" class="badge b-blue pr-preview">
             <span class="i18n-en">preview</span><span class="i18n-zh">預覽</span>
           </button>
         </div>
+        {{/* Quick-fills. Typing a price on a phone while a position is live is
+             the slowest part of this form, and the two values wanted most
+             often are already known: the stop the plan named, and the entry
+             (a break-even stop). */}}
+        <div class="pr-quick">
+          {{if .Stop}}<button type="button" class="pr-chip" data-fill="stop" data-val="{{printf "%g" .Stop}}">
+            <span class="i18n-en">plan {{printf "%g" .Stop}}</span><span class="i18n-zh">計畫 {{printf "%g" .Stop}}</span>
+          </button>{{end}}
+          {{if .PosEntry}}<button type="button" class="pr-chip" data-fill="stop" data-val="{{printf "%g" .PosEntry}}">
+            <span class="i18n-en">break-even {{printf "%g" .PosEntry}}</span><span class="i18n-zh">保本 {{printf "%g" .PosEntry}}</span>
+          </button>{{end}}
+          {{if .TP1}}<button type="button" class="pr-chip" data-fill="tp" data-val="{{printf "%g" .TP1}}">
+            <span class="i18n-en">tp1 {{printf "%g" .TP1}}</span><span class="i18n-zh">TP1 {{printf "%g" .TP1}}</span>
+          </button>{{end}}
+        </div>
+        {{/* What the typed number COSTS, computed from the live position size
+             rather than the journal's intended one. The decision this form
+             exists to support is "is this stop the right distance", and that
+             question is unanswerable from a price alone. */}}
+        <p class="pr-calc" aria-live="polite"></p>
         <p class="pr-out glossary-hint" hidden></p>
       </form>
       {{end}}
@@ -130,6 +158,14 @@
 .pr-row button{flex:0 0 auto;min-height:2.1rem;cursor:pointer;border:0;
   padding:.4rem .8rem;font:inherit;font-size:.8rem}
 .pr-out{margin:.45rem 0 0;white-space:pre-wrap;font-size:.76rem}
+.pr-quick{display:flex;flex-wrap:wrap;gap:.3rem;margin:.4rem 0 0}
+.pr-chip{padding:.22rem .5rem;font:inherit;font-size:.7rem;line-height:1.2;cursor:pointer;
+  border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text-dim);
+  font-variant-numeric:tabular-nums}
+.pr-chip:hover{color:var(--text);border-color:var(--text-dim)}
+.pr-calc{margin:.4rem 0 0;font-size:.74rem;color:var(--text-dim);font-variant-numeric:tabular-nums;min-height:1.1em}
+.pr-calc .bad{color:var(--red)}
+.pr-calc .num{color:var(--text)}
 </style>
 
 <script>
@@ -139,6 +175,59 @@
 // carries confirm=1. Nothing here computes an order size — that comes back
 // from the server, so a stale tab cannot place a mis-sized order.
 (function () {
+  // ── Cost readout ───────────────────────────────────────────────
+  // What the typed stop costs if it fills, from the LIVE position size. The
+  // form used to show a price and nothing else, so deciding whether a stop was
+  // the right distance meant doing qty x (entry - stop) in your head, on a
+  // phone, with a position open.
+  //
+  // Side matters: a "stop" above entry on a long is a profit lock, which is a
+  // legitimate order (the guard that refused those was fixed for exactly this
+  // reason). It is reported as a lock, not as a negative loss.
+  function fmtU(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + 'u'; }
+  function paintCalc(form) {
+    var out = form.querySelector('.pr-calc');
+    if (!out) return;
+    var qty = parseFloat(form.dataset.qty), entry = parseFloat(form.dataset.entry);
+    var long = form.dataset.sideL === 'long';
+    var stop = parseFloat(form.querySelector('[name=stop]').value);
+    var tp = parseFloat(form.querySelector('[name=tp]').value);
+    if (!(qty > 0) || !(entry > 0)) { out.textContent = ''; return; }
+    var parts = [];
+    if (stop > 0) {
+      var d = long ? entry - stop : stop - entry;      // >0 = a real stop
+      var pct = Math.abs(stop - entry) / entry * 100;
+      var usdt = qty * Math.abs(stop - entry);
+      if (d > 0) {
+        parts.push('停損 <span class="num">' + pct.toFixed(2) + '%</span> → <span class="bad">' + fmtU(-usdt) + '</span>');
+      } else if (d < 0) {
+        parts.push('鎖利 <span class="num">' + pct.toFixed(2) + '%</span> → <span class="num">' + fmtU(usdt) + '</span>');
+      } else {
+        parts.push('保本 <span class="num">0.00u</span>');
+      }
+    }
+    if (tp > 0) {
+      var g = long ? tp - entry : entry - tp;
+      var gp = Math.abs(tp - entry) / entry * 100;
+      parts.push('TP <span class="num">' + gp.toFixed(2) + '%</span> → <span class="num">' + fmtU(qty * g) + '</span>');
+    }
+    if (stop > 0 && tp > 0) {
+      var r = Math.abs(entry - stop);
+      if (r > 0) parts.push('<span class="num">' + (Math.abs(tp - entry) / r).toFixed(2) + 'R</span>');
+    }
+    out.innerHTML = parts.join(' · ');
+  }
+  document.querySelectorAll('.pr-form').forEach(function (form) {
+    form.addEventListener('input', function () { paintCalc(form); });
+    form.querySelectorAll('.pr-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var f = form.querySelector('[name=' + chip.dataset.fill + ']');
+        if (f) { f.value = chip.dataset.val; paintCalc(form); f.focus(); }
+      });
+    });
+    paintCalc(form); // the stop field is pre-filled from the journal
+  });
+
   function post(form, confirm) {
     const body = new URLSearchParams();
     body.set('symbol', form.dataset.symbol);

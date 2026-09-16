@@ -17,7 +17,12 @@
 
 <main class="chart-main">
 
-  <div class="chart-ticker" id="chart-ticker" aria-label="all symbols ticker"></div>
+  <div class="chart-ticker-wrap">
+    <button type="button" class="chart-fav-filter" id="chart-fav-filter"
+            title="只顯示已收藏的標的。目前看的那個一定會顯示,不管有沒有收藏。"
+            aria-pressed="false">☆ <span id="chart-fav-count"></span></button>
+    <div class="chart-ticker" id="chart-ticker" aria-label="all symbols ticker"></div>
+  </div>
 
   <div class="chart-controls">
   <div class="chart-toolbar">
@@ -2959,6 +2964,52 @@
     // the is-active button out from under a click and restart any animation.
     var tkEls = {}, tkBuiltKey = null, tkPrev = {};
 
+    // ── Favourites ────────────────────────────────────────────────
+    // The strip carries all 14 roster symbols, which on a phone is two
+    // screens of horizontal scrolling to reach the one being traded. The
+    // filter narrows it to a working set without changing what the page can
+    // show: the CURRENT symbol is always rendered even when it is not a
+    // favourite, or switching to an unstarred symbol would hide the chip for
+    // the chart you are looking at.
+    var FAV_KEY = 'tw-chart-favs', FAVFILTER_KEY = 'tw-chart-fav-only';
+    var favs = {}, favOnly = false;
+    try {
+        favs = JSON.parse(localStorage.getItem(FAV_KEY) || '{}') || {};
+        favOnly = localStorage.getItem(FAVFILTER_KEY) === '1';
+    } catch (e) { favs = {}; favOnly = false; }
+    function favCount() { return Object.keys(favs).filter(function (k) { return favs[k]; }).length; }
+    function saveFavs() {
+        try {
+            localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+            localStorage.setItem(FAVFILTER_KEY, favOnly ? '1' : '0');
+        } catch (e) {}
+    }
+    // Fail OPEN: with the filter on and nothing starred, show everything. An
+    // empty strip reads as "the feed is down", which is a different and much
+    // more alarming thing than "you have not picked any favourites".
+    function visibleRows(rows) {
+        if (!favOnly || favCount() === 0) return rows;
+        var cur = currentSym();
+        return rows.filter(function (t) { return favs[t.symbol] || t.symbol === cur; });
+    }
+    function paintFavButton() {
+        var b = document.getElementById('chart-fav-filter');
+        if (!b) return;
+        var n = favCount();
+        // Rebuild both spans rather than setting textContent and re-appending:
+        // assigning textContent destroys every child, which left the count
+        // node detached and the id pointing at a stale element.
+        b.innerHTML = '<span class="ff-star"></span><span id="chart-fav-count"></span>';
+        b.querySelector('.ff-star').textContent = (favOnly && n) ? '★' : '☆';
+        b.querySelector('#chart-fav-count').textContent = n ? String(n) : '';
+        b.title = n === 0
+            ? '先點標的左邊的 ☆ 收藏,再用這裡只看收藏的'
+            : (favOnly ? '顯示全部 ' + tkRosterN() + ' 個標的' : '只看收藏的 ' + n + ' 個（目前看的那個一定會顯示）');
+        b.setAttribute('aria-pressed', favOnly ? 'true' : 'false');
+        b.classList.toggle('on', favOnly && n > 0);
+    }
+    function tkRosterN() { return (tkRows && tkRows.length) || 0; }
+
     function tkChg(t) {
         var chg = (typeof t.changePct === 'number') ? t.changePct : null;
         return {
@@ -2970,7 +3021,12 @@
     function buildTicker(el, rows) {
         tkEls = {};
         el.innerHTML = rows.map(function (t) {
+            // The star is a SPAN inside the chip, not a nested <button> —
+            // nested buttons are invalid HTML and browsers flatten them, which
+            // would make every star tap also switch the chart.
             return '<button type="button" class="chart-ticker-item" data-sym="' + t.symbol + '">'
+                 + '<span class="tk-fav' + (favs[t.symbol] ? ' on' : '') + '" role="button" tabindex="-1"'
+                 + ' aria-label="favourite ' + t.symbol + '">' + (favs[t.symbol] ? '★' : '☆') + '</span>'
                  + '<span class="tk-sym">' + t.symbol + '</span>'
                  + '<span class="tk-px"></span>'
                  + '<span class="tk-chg"></span></button>';
@@ -3019,7 +3075,12 @@
         var el = document.getElementById('chart-ticker');
         if (!el || !rows) return;
         tkRows = rows;
-        var key = rows.map(function (t) { return t.symbol; }).join(',');
+        rows = visibleRows(rows);
+        paintFavButton();
+        // The key includes the filter state and the current symbol, because
+        // both change WHICH chips exist — without them a toggle repaints the
+        // old set of elements and nothing appears to happen.
+        var key = rows.map(function (t) { return t.symbol; }).join(',') + '|' + (favOnly ? 1 : 0) + '|' + currentSym();
         var rebuilt = false;
         if (key !== tkBuiltKey) { buildTicker(el, rows); tkBuiltKey = key; rebuilt = true; }
         paintTicker(rows, silent || rebuilt);
@@ -3062,9 +3123,39 @@
         tkStream.onerror = function () { tkAlive = false; tkStartPolling(); };
     }
     (function () {
+        var fb = document.getElementById('chart-fav-filter');
+        if (fb) {
+            paintFavButton();
+            fb.addEventListener('click', function () {
+                favOnly = !favOnly;
+                saveFavs();
+                paintFavButton();
+                if (tkRows) applyTickers(tkRows, true);
+            });
+        }
+    })();
+
+    (function () {
         var tk = document.getElementById('chart-ticker');
         if (!tk) return;
         tk.addEventListener('click', function (e) {
+            var star = e.target.closest('.tk-fav');
+            if (star) {
+                // Star taps must not fall through to the chip's symbol switch.
+                e.stopPropagation();
+                e.preventDefault();
+                var fs = star.closest('.chart-ticker-item').getAttribute('data-sym');
+                favs[fs] = !favs[fs];
+                if (!favs[fs]) delete favs[fs];
+                saveFavs();
+                star.textContent = favs[fs] ? '★' : '☆';
+                star.classList.toggle('on', !!favs[fs]);
+                paintFavButton();
+                // Re-render only while the filter is on — otherwise the strip
+                // does not change and a rebuild would drop the price flashes.
+                if (favOnly && tkRows) applyTickers(tkRows, true);
+                return;
+            }
             var btn = e.target.closest('.chart-ticker-item');
             if (!btn) return;
             var sym = btn.getAttribute('data-sym');
