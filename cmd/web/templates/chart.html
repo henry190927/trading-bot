@@ -875,7 +875,45 @@
         });
     })();
 
+    // Axis precision is READ OFF THE DATA, not guessed from the price
+    // magnitude. One setting cannot serve a roster spanning BTC at 76,000 and
+    // SUI at 0.69 — LWC's default (precision 2 / minMove 0.01) renders SUI's
+    // whole 0.68–0.72 range as four ticks, so the axis said 0.7 for
+    // everything and the chart was unreadable on it.
+    //
+    // A magnitude tier would fix that and still be wrong: the exchange quotes
+    // each symbol to its own tick, and those do not follow magnitude. BTC
+    // comes back "75905.2" (1 dp), SOL "97.103" (3), SUI "0.6888" (4) — the
+    // precision is already in the numbers, so count it instead of maintaining
+    // a table that drifts when a contract is re-listed.
+    //
+    // MAX over a sample, not the last bar: a close that happens to land on a
+    // round number would otherwise collapse the whole axis.
+    //
+    // minMove has to match precision rather than merely being small — it is
+    // the tick the labels snap to, so leaving it at 0.01 keeps them coarse
+    // however many decimals precision allows.
+    function dpOf(v) {
+        if (typeof v !== 'number' || !isFinite(v)) return 0;
+        var s = String(v);
+        if (s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return 8; // 1e-7 etc
+        var i = s.indexOf('.');
+        return i < 0 ? 0 : s.length - i - 1;
+    }
+    function priceFmtFrom(candles) {
+        var dp = 1, n = candles ? candles.length : 0;
+        for (var i = Math.max(0, n - 60); i < n; i++) {
+            var c = candles[i];
+            dp = Math.max(dp, dpOf(c.close), dpOf(c.high), dpOf(c.low));
+        }
+        if (dp > 8) dp = 8;
+        // Number('1e-4'), not Math.pow(10,-4): the latter returns
+        // 0.00009999999999999999, and a tick that is not exactly the decimal
+        // it claims to be is the wrong thing to hand a price axis.
+        return { type: 'price', precision: dp, minMove: Number('1e-' + dp) };
+    }
     var candleSeries = chart.addCandlestickSeries({
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         upColor: '#26a69a', downColor: '#ef5350',
         borderUpColor: '#26a69a', borderDownColor: '#ef5350',
         wickUpColor: '#26a69a',   wickDownColor: '#ef5350',
@@ -2684,6 +2722,12 @@
 
     function applyChart(data) {
         allCandles = patchFormingBar(data.candles || [], data.markPrice);
+        // Re-derive the axis precision on every load: switching from BTC to
+        // SUI changes the magnitude by five orders, and the format set at
+        // construction was for whatever loaded first.
+        if (allCandles.length) {
+            candleSeries.applyOptions({ priceFormat: priceFmtFrom(allCandles) });
+        }
         var bb = data.bollinger || {};
         allUpper = bb.upper || [];
         allMid   = bb.mid   || [];
