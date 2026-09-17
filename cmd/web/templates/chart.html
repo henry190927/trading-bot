@@ -2884,13 +2884,24 @@
             default:           return { dot: '·',  cls: 'bias-na' };
         }
     }
+    // Symbol currently being fetched, or null. A bias MISS costs a multi-TF
+    // scan server-side, so a slow one must never stack — but a switch to a
+    // DIFFERENT symbol is let through immediately, because that is the request
+    // the user is actually waiting on.
+    var biasInFlight = null;
     function loadBias() {
         var el = document.getElementById('tf-bias');
         if (!el) return;
-        fetch('/api/chart/bias?symbol=' + encodeURIComponent(currentSym()) + '&_=' + Date.now(),
+        var sym = currentSym();
+        if (biasInFlight === sym) return;
+        biasInFlight = sym;
+        fetch('/api/chart/bias?symbol=' + encodeURIComponent(sym) + '&_=' + Date.now(),
               { cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
+                // Switched away while this was in flight — painting now would
+                // show the previous symbol's bias under the new symbol's name.
+                if (sym !== currentSym()) return;
                 if (!d || !d.tfs) return;
                 var html = '<div class="tf-bias-title">TF bias</div>';
                 if (d.alignment && d.alignment.label) {
@@ -2994,7 +3005,8 @@
                 }
                 el.innerHTML = html;
             })
-            .catch(function () { /* strip is best-effort; ignore failures */ });
+            .catch(function () { /* strip is best-effort; ignore failures */ })
+            .then(function () { if (biasInFlight === sym) biasInFlight = null; });
     }
 
     // Top ticker bar — all symbols' live price + 24h %, click to switch.
@@ -3291,11 +3303,18 @@
     // series — enough to update the last few closed bars + the
     // forming bar without redrawing the whole chart.
     var pollTimer = null;
+    var biasTimer = null;
     var pollInFlight = false;
     function pollTick() {
-        // Bias only — the ticker strip is pushed by SSE now (tkStartStream),
-        // so polling it here would duplicate the fan-out this change removed.
-        loadBias();
+        // The ticker strip is pushed by SSE now (tkStartStream), so polling it
+        // here would duplicate the fan-out that change removed.
+        //
+        // loadBias() used to run on this 2s tick too. It does not any more: the
+        // server caches bias for 30s, so 14 of every 15 calls were pure
+        // overhead, and the one that landed on a TTL expiry paid a full
+        // multi-TF recompute while the next tick — 2s into a ~2.4s rebuild —
+        // started another. Bias has its own timer at the cache's own period.
+        //
         // If a previous poll is still resolving, skip this tick so we
         // don't stack requests during transient network slowness.
         if (pollInFlight) return;
@@ -3445,6 +3464,10 @@
         // symbol/TF switch.
         pollTick();
         pollTimer = setInterval(pollTick, 2000);
+        // Matches biasCacheTTL server-side: polling faster cannot produce a
+        // fresher answer, it can only produce a redundant request.
+        if (biasTimer) clearInterval(biasTimer);
+        biasTimer = setInterval(function () { if (!document.hidden) loadBias(); }, 30000);
         // One EventSource for the page lifetime — load() runs again on every
         // symbol/TF switch, so starting it there would leak a connection per
         // switch.
@@ -3452,6 +3475,7 @@
     }
     function stopPoll() {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        if (biasTimer) { clearInterval(biasTimer); biasTimer = null; }
     }
     // Pause polling when tab hidden (browsers throttle intervals anyway).
     document.addEventListener('visibilitychange', function () {

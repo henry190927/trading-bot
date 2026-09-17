@@ -715,29 +715,65 @@ func clampPct(v float64) float64 {
 func (s *server) scanOne(ctx context.Context, sym market.Symbol, tf market.Timeframe) symbolView {
 	v := symbolView{Symbol: sym, Short: shortSymbol(sym)}
 
-	candles, err := s.client.Klines(ctx, sym, tf, 300)
-	if err != nil {
-		v.Err = err.Error()
-		return v
-	}
-	sigCtx := signal.Context{}
+	// These three upstream reads are independent: the candle series, the
+	// funding/mark tick and the open-interest gauge share no inputs. Run
+	// sequentially a scan cost the SUM of three BingX round trips (~250ms
+	// each) when it only ever needed the MAX. /api/chart/data is where that
+	// surfaced — ~1s to switch symbol, and identical at limit=100 and
+	// limit=400, because the cost was round trips, not data.
+	//
+	// Each goroutine writes only its own locals and sigCtx is assembled after
+	// Wait, so nothing is written concurrently. scanOne is itself already
+	// called from goroutines by the multi-symbol dashboard scans, so it must
+	// stay free of shared mutable state — that is why the results come back
+	// as locals rather than being written straight into v.
+	//
 	// Mark price is the live perp price BingX continuously updates — what the
 	// BingX app shows. After Patch 1 trims the forming bar, the closed-candle
 	// close is up to one TF-bar stale, so we use mark price for the displayed
 	// "current price" while signal evaluation continues to use closed bars
 	// only (no lookahead). Falls back to candle close if funding fetch fails.
-	var markPrice float64
-	if fr, err := s.client.FundingRate(ctx, sym); err == nil {
-		sigCtx.FundingRate = fr.Rate
-		markPrice = fr.MarkPrice
+	var (
+		wg        sync.WaitGroup
+		candles   []market.Candle
+		klinesErr error
+		markPrice float64
+		fundRate  float64
+		haveOI    bool
+		oiVal     float64
+		prevOI    float64
+	)
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		candles, klinesErr = s.client.Klines(ctx, sym, tf, 300)
+	}()
+	go func() {
+		defer wg.Done()
+		if fr, err := s.client.FundingRate(ctx, sym); err == nil {
+			fundRate, markPrice = fr.Rate, fr.MarkPrice
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if val, err := s.client.OpenInterest(ctx, sym); err == nil {
+			haveOI, oiVal = true, val
+			// Prior reading from the monitor's sampler. Until this was wired,
+			// PrevOpenInterest had no producer anywhere, so the engine's two OI
+			// crowding warnings were unreachable. Zero when the store cannot
+			// answer, which leaves them silent exactly as before.
+			prevOI = oi.PrevFor(oi.Load(), string(sym), market.BarDuration(tf), time.Now().UTC())
+		}
+	}()
+	wg.Wait()
+	if klinesErr != nil {
+		v.Err = klinesErr.Error()
+		return v
 	}
-	if v, err := s.client.OpenInterest(ctx, sym); err == nil {
-		sigCtx.OpenInterest = v
-		// Prior reading from the monitor's sampler. Until this was wired,
-		// PrevOpenInterest had no producer anywhere, so the engine's two OI
-		// crowding warnings were unreachable. Zero when the store cannot
-		// answer, which leaves them silent exactly as before.
-		sigCtx.PrevOpenInterest = oi.PrevFor(oi.Load(), string(sym), market.BarDuration(tf), time.Now().UTC())
+	sigCtx := signal.Context{FundingRate: fundRate}
+	if haveOI {
+		sigCtx.OpenInterest = oiVal
+		sigCtx.PrevOpenInterest = prevOI
 	}
 	v.Signal = signal.Evaluate(signal.Inputs{
 		Symbol: sym, Timeframe: tf, Candles: candles, Ctx: sigCtx,
@@ -4102,6 +4138,9 @@ func (s *server) handleChartData(c *gin.Context) {
 	//    Signal/Diagnose + Klines(limit) for the OHLCV window.
 	var candles []market.Candle
 	var view symbolView
+	// Declared here, not with liquidity/bands/shelves below: the session-open
+	// fetch is kicked off in parallel with scanOne and writes this directly.
+	var opens []map[string]any
 	historicalOnly := beforeSec > 0
 
 	if historicalOnly {
@@ -4114,35 +4153,66 @@ func (s *server) handleChartData(c *gin.Context) {
 		}
 		candles = got
 	} else {
-		view = s.scanOne(ctx, sym, tf)
-		if view.Err != "" {
-			c.JSON(http.StatusBadGateway, gin.H{"error": view.Err})
-			return
-		}
-		// Chart display uses KlinesWithForming to include the current
-		// forming bar so the chart matches what BingX's own web UI
-		// shows in real-time. Engine paths (view.Signal/Diagnose) still
-		// use closed-only candles from scanOne — those stay canonical.
+		// scanOne, the display-candle fetch and the session-open fetch are
+		// mutually independent: three separate BingX round trips, none reading
+		// another's output. Run serially they cost the sum; run together they
+		// cost the max. Everything that DOES depend on a result — the
+		// forming-bar fallback to view.Candles, and the >1440 backfill, which
+		// needs candles[0] — stays sequential after Wait.
+		var (
+			wg    sync.WaitGroup
+			fresh []market.Candle
+		)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			view = s.scanOne(ctx, sym, tf)
+		}()
 		if s.client != nil {
 			fetch := limit
 			if fetch > 1440 {
 				fetch = 1440
 			}
-			if fresh, err := s.client.KlinesWithForming(ctx, sym, tf, fetch); err == nil && len(fresh) > 0 {
-				candles = fresh
-			} else {
-				candles = view.Candles
-			}
-			// If user requested > 1440, extend with older bars via KlinesRange.
-			if limit > 1440 && len(candles) > 0 {
-				endT := candles[0].OpenTime.Add(-time.Second)
-				startT := endT.Add(-time.Duration(limit-1440) * tfDurationSeconds(tf))
-				if older, err := s.client.KlinesRange(ctx, sym, tf, startT, endT); err == nil && len(older) > 0 {
-					candles = append(older, candles...)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// Chart display uses KlinesWithForming to include the current
+				// forming bar so the chart matches what BingX's own web UI
+				// shows in real-time. Engine paths (view.Signal/Diagnose) still
+				// use closed-only candles from scanOne — those stay canonical.
+				if got, err := s.client.KlinesWithForming(ctx, sym, tf, fetch); err == nil && len(got) > 0 {
+					fresh = got
 				}
-			}
+			}()
+		}
+		// Session opens cost their own Klines fetch and change slowly. They
+		// ride along here on full loads rather than adding a fourth serial
+		// wait further down; still skipped on the light poll, as before.
+		// computeChartOpens has its own s.client == nil guard.
+		if !light {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				opens = s.computeChartOpens(ctx, sym)
+			}()
+		}
+		wg.Wait()
+		if view.Err != "" {
+			c.JSON(http.StatusBadGateway, gin.H{"error": view.Err})
+			return
+		}
+		if len(fresh) > 0 {
+			candles = fresh
 		} else {
 			candles = view.Candles
+		}
+		// If user requested > 1440, extend with older bars via KlinesRange.
+		if s.client != nil && limit > 1440 && len(candles) > 0 {
+			endT := candles[0].OpenTime.Add(-time.Second)
+			startT := endT.Add(-time.Duration(limit-1440) * tfDurationSeconds(tf))
+			if older, err := s.client.KlinesRange(ctx, sym, tf, startT, endT); err == nil && len(older) > 0 {
+				candles = append(older, candles...)
+			}
 		}
 	}
 
@@ -4328,10 +4398,10 @@ func (s *server) handleChartData(c *gin.Context) {
 
 	// Session opens + liquidity pools change slowly and each costs a dedicated
 	// Klines fetch — compute them only on full loads, not the frequent light poll.
-	var opens, liquidity, bands, shelves []map[string]any
+	var liquidity, bands, shelves []map[string]any
 	if !light {
-		opens = s.computeChartOpens(ctx, sym)
-		pools, px := s.chartLiquidityPools(ctx, sym, tf)
+		// opens was fetched in parallel with scanOne above.
+		pools, px := chartLiquidityPools(view)
 		liquidity = liquidityLines(pools)
 		bands = mergeBands(pools, px)
 		// A2's second half: bands touched from BOTH sides. Distinct from the
@@ -4400,20 +4470,29 @@ func topFactors(factors []validator.Factor, n int) []map[string]any {
 	return out
 }
 
-// computeChartLiquidity returns EQH/EQL liquidity pools (equal highs/lows —
+// chartLiquidityPools returns EQH/EQL liquidity pools (equal highs/lows —
 // resting-liquidity magnets, the SMC concept behind the sweep-reject strategy)
-// for the chart's liquidity layer. Uses a DEDICATED fixed-size fetch (not the
-// display candles) so the pool set is stable regardless of the caller's limit —
-// otherwise the 3s poll (limit≈60) and the initial load (limit 400) would
-// compute different pools and the lines would jump every tick. Pools are then
-// filtered to within ~5% of the last price and capped to the nearest few each
-// side so the chart stays readable. Best-effort: nil on fetch error.
-func (s *server) chartLiquidityPools(ctx context.Context, sym market.Symbol, tf market.Timeframe) ([]signal.LiquidityLevel, float64) {
-	if s.client == nil {
-		return nil, 0
-	}
-	candles, err := s.client.Klines(ctx, sym, tf, 300)
-	if err != nil || len(candles) < 30 {
+// for the chart's liquidity layer. Pools are filtered to within ~5% of the last
+// price and capped to the nearest few each side so the chart stays readable.
+//
+// It takes the whole symbolView rather than a candle slice on purpose. The
+// series MUST be scanOne's — closed-only, and a fixed 300 bars whose length
+// does not vary with the caller's ?limit=. The handler's display candles
+// satisfy neither: they are sized by the request, so different limits would
+// compute different pools and the lines would jump; and they carry a forming
+// bar whose moving close would reclassify pools above/below price every tick.
+//
+// That stability is the whole reason this used to run its own
+// Klines(sym, tf, 300) fetch — a call byte-identical to the one scanOne had
+// already made microseconds earlier in the same request. Dropping the fetch
+// removed the round trip, not the requirement, and a []market.Candle parameter
+// would have left "pass the right series" as a comment the compiler ignores.
+// Taking symbolView makes the wrong series unpassable.
+//
+// Best-effort: nil when the series is too short to find pools in.
+func chartLiquidityPools(view symbolView) ([]signal.LiquidityLevel, float64) {
+	candles := view.Candles
+	if len(candles) < 30 {
 		return nil, 0
 	}
 	price := candles[len(candles)-1].Close

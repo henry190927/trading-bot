@@ -27,10 +27,13 @@ package oi
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -94,19 +97,93 @@ func Append(s Snapshot) {
 	_, _ = f.Write(append(b, '\n'))
 }
 
+// loadCache memoizes the parsed store between calls.
+//
+// Load re-read and re-parsed the whole file on every call, and the store is
+// append-only: a week of sampling is ~27k lines / ~3MB, and it only grows.
+// That was affordable when one process called it once, but every scanOne asks
+// for it, and the chart's TF-bias strip runs five scans plus its own OI read —
+// six full parses of the same megabytes to answer one request. Measured on the
+// VM that was ~4s of CPU per bias response, on two cores, which is what made
+// switching symbols feel stuck.
+//
+// The file only ever grows, so a changed size means appended bytes and nothing
+// else. offset records how many bytes have been parsed; a later call reads
+// only from there. A size SMALLER than offset means the file was truncated or
+// rotated, so the cache is dropped and rebuilt.
+var loadCache struct {
+	mu    sync.Mutex
+	path  string
+	snaps []Snapshot
+	// offset is the byte count consumed so far, and always lands just past a
+	// newline. The sampler appends with a single Write, but a reader can still
+	// arrive mid-append, so a trailing partial line is left unconsumed rather
+	// than parsed and skipped — the next call picks it up whole.
+	offset int64
+}
+
+// invalidateLoadCache forces the next Load to re-read from byte zero. Callers
+// that REPLACE the store (rather than append to it) must call this.
+func invalidateLoadCache() {
+	loadCache.mu.Lock()
+	loadCache.path, loadCache.snaps, loadCache.offset = "", nil, 0
+	loadCache.mu.Unlock()
+}
+
 // Load returns every snapshot in the store, oldest first. A missing file is
 // not an error — it is the state before the sampler has run once.
+//
+// The returned slice is SHARED with other callers and must not be modified.
+// Its capacity is clamped to its length, so an append by a caller allocates a
+// copy instead of writing into the cache. Every consumer in the package
+// (PriorTo, PrevFor, Latest, PriceChangeOver) is a read-only lookup.
 func Load() []Snapshot {
-	f, err := os.Open(Path())
+	path := Path()
+	st, err := os.Stat(path)
 	if err != nil {
 		return nil
 	}
+
+	loadCache.mu.Lock()
+	defer loadCache.mu.Unlock()
+
+	if loadCache.path != path || st.Size() < loadCache.offset {
+		loadCache.path, loadCache.snaps, loadCache.offset = path, nil, 0
+	}
+	if st.Size() == loadCache.offset && loadCache.snaps != nil {
+		return loadCache.snaps
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return loadCache.snaps
+	}
 	defer func() { _ = f.Close() }()
-	var out []Snapshot
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	if loadCache.offset > 0 {
+		if _, err := f.Seek(loadCache.offset, io.SeekStart); err != nil {
+			// Cannot resume; fall back to a full re-read.
+			loadCache.snaps, loadCache.offset = nil, 0
+			if _, err := f.Seek(0, io.SeekStart); err != nil {
+				return nil
+			}
+		}
+	}
+
+	tail, err := io.ReadAll(f)
+	if err != nil {
+		return loadCache.snaps
+	}
+	// Consume complete lines only. Anything after the final newline is a
+	// half-written record; leave it for the next call.
+	end := bytes.LastIndexByte(tail, '\n')
+	if end < 0 {
+		return loadCache.snaps
+	}
+	consumed := tail[:end+1]
+
+	out := loadCache.snaps
+	for _, raw := range bytes.Split(consumed, []byte{'\n'}) {
+		line := strings.TrimSpace(string(raw))
 		if line == "" {
 			continue
 		}
@@ -115,9 +192,11 @@ func Load() []Snapshot {
 			out = append(out, s)
 		}
 	}
-	_ = sc.Err()
 	sort.Slice(out, func(i, j int) bool { return out[i].Time.Before(out[j].Time) })
-	return out
+
+	loadCache.snaps = out[:len(out):len(out)]
+	loadCache.offset += int64(len(consumed))
+	return loadCache.snaps
 }
 
 // PriorTo returns the OI reading for sym nearest to `at`, provided it is
@@ -201,6 +280,12 @@ func Prune(now time.Time) error {
 		_ = os.Remove(tmp)
 		return err
 	}
+	// Prune REPLACES the file rather than appending to it, so the byte offset
+	// the load cache resumes from no longer refers to the same bytes. A smaller
+	// file would be caught by the size check in Load, but relying on "the
+	// rewrite always shrinks it" makes correctness depend on what Prune happens
+	// to do; say it outright instead.
+	defer invalidateLoadCache()
 	if err := os.Rename(tmp, p); err != nil {
 		_ = os.Remove(tmp)
 		return err

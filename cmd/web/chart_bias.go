@@ -30,9 +30,19 @@ type biasCacheEntry struct {
 	resp gin.H
 }
 
+// biasCall is one in-flight recompute. Requests that arrive for a symbol
+// already being recomputed wait on done and read resp, rather than each
+// starting their own full multi-TF scan.
+type biasCall struct {
+	done chan struct{}
+	once sync.Once
+	resp gin.H
+}
+
 var (
-	biasCacheMu sync.Mutex
-	biasCache   = map[string]biasCacheEntry{}
+	biasCacheMu  sync.Mutex
+	biasCache    = map[string]biasCacheEntry{}
+	biasInflight = map[string]*biasCall{}
 )
 
 const biasCacheTTL = 30 * time.Second
@@ -245,6 +255,8 @@ func (s *server) handleChartBias(c *gin.Context) {
 		return
 	}
 
+	// Three states, not two: fresh cache, someone else already recomputing,
+	// or this request does the work.
 	biasCacheMu.Lock()
 	if e, ok := biasCache[short]; ok && time.Since(e.at) < biasCacheTTL {
 		resp := e.resp
@@ -252,29 +264,75 @@ func (s *server) handleChartBias(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
+	// A recompute costs a multi-TF scan. The chart polls this endpoint on a
+	// timer, so without single-flight every TTL expiry let each poll tick that
+	// landed during the recompute start its OWN full scan — none of them able
+	// to see the others. Followers wait for the leader's result instead.
+	if call, ok := biasInflight[short]; ok {
+		biasCacheMu.Unlock()
+		select {
+		case <-call.done:
+			if call.resp == nil {
+				c.JSON(http.StatusBadGateway, gin.H{"error": "bias recompute failed"})
+				return
+			}
+			c.JSON(http.StatusOK, call.resp)
+		case <-c.Request.Context().Done():
+			// Caller gave up; nothing to write.
+		}
+		return
+	}
+	call := &biasCall{done: make(chan struct{})}
+	biasInflight[short] = call
 	biasCacheMu.Unlock()
+	defer func() {
+		biasCacheMu.Lock()
+		delete(biasInflight, short)
+		biasCacheMu.Unlock()
+		// Always closed, including on a panic, so followers are never stranded.
+		// call.resp stays nil in that case and they get a 502.
+		call.once.Do(func() { close(call.done) })
+	}()
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	// Deliberately NOT c.Request.Context(): this result is shared with every
+	// follower waiting on call.done, so one client navigating away must not
+	// cancel work the others are still waiting for.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	tfs := make([]gin.H, 0, len(biasStripTFs))
+	// One scanOne per TF, and they are independent — the 5m read does not feed
+	// the 4h read. Run sequentially this loop WAS the cache miss: five scans at
+	// ~470ms each, ~2.4s total. Run together it costs one scan.
+	//
+	// Results are written by index rather than appended, so the strip keeps its
+	// 5m→4h order no matter which scan finishes first. Distinct indices of a
+	// pre-sized slice are safe to write concurrently. refCandles/refPrice are
+	// written only by the "1h" iteration — a single writer — and read after
+	// Wait.
+	tfs := make([]gin.H, len(biasStripTFs))
 	var refCandles []market.Candle
 	var refPrice float64
-	for _, tfStr := range biasStripTFs {
-		tf := market.Timeframe(tfStr)
-		view := s.scanOne(ctx, sym, tf)
-		if view.Err != "" {
-			tfs = append(tfs, gin.H{"tf": tfStr, "dir": "na", "score": 0})
-			continue
-		}
-		st := signal.AnalyzeStructure(view.Candles, 2)
-		b := computeTFBias(tf, st, view.Signal)
-		b["tf"] = tfStr
-		tfs = append(tfs, b)
-		if tfStr == "1h" {
-			refCandles, refPrice = view.Candles, view.Signal.Price
-		}
+	var wg sync.WaitGroup
+	for i, tfStr := range biasStripTFs {
+		wg.Add(1)
+		go func(i int, tfStr string) {
+			defer wg.Done()
+			tf := market.Timeframe(tfStr)
+			view := s.scanOne(ctx, sym, tf)
+			if view.Err != "" {
+				tfs[i] = gin.H{"tf": tfStr, "dir": "na", "score": 0}
+				return
+			}
+			st := signal.AnalyzeStructure(view.Candles, 2)
+			b := computeTFBias(tf, st, view.Signal)
+			b["tf"] = tfStr
+			tfs[i] = b
+			if tfStr == "1h" {
+				refCandles, refPrice = view.Candles, view.Signal.Price
+			}
+		}(i, tfStr)
 	}
+	wg.Wait()
 
 	align := computeAlignment(tfs)
 	resp := gin.H{"symbol": short, "tfs": tfs, "alignment": align}
@@ -287,6 +345,7 @@ func (s *server) handleChartBias(c *gin.Context) {
 	if o := computeChartOI(sym); o != nil {
 		resp["oi"] = o
 	}
+	call.resp = resp // published to followers when the deferred close fires
 	biasCacheMu.Lock()
 	biasCache[short] = biasCacheEntry{at: time.Now(), resp: resp}
 	biasCacheMu.Unlock()
