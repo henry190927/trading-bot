@@ -190,3 +190,68 @@ func TestParseFloatOptionalAcceptsZeroAndBlank(t *testing.T) {
 		t.Error("parseFloatPositive accepted blank")
 	}
 }
+
+// The 2026-09-18 case: a BTC 0.0615 position split 50/50. placeTP1OnBingX did
+// not floor, so it asked BingX for 0.03075 — five decimals against BTC's
+// four-decimal lot step — while placeTP2OnBingX floored and sized itself as
+// the remainder after a floored TP1. Two orders, 0.06155 total, against a
+// 0.0615 position.
+func TestPartialQtyFloorsToLotStep(t *testing.T) {
+	// BTC step is 4 decimals: the odd half-step is truncated, not carried.
+	if got := partialQty("BTC", 0.0615, 50); got != 0.0307 {
+		t.Errorf("partialQty(BTC, 0.0615, 50%%) = %v, want 0.0307 (0.03075 is not a placeable BTC size)", got)
+	}
+	// ETH's step is coarser (2), so the same 50% truncates much harder.
+	if got := partialQty("ETH", 1.555, 50); got != 0.77 {
+		t.Errorf("partialQty(ETH, 1.555, 50%%) = %v, want 0.77", got)
+	}
+	// An unknown ticker must still produce a placeable size, not a panic.
+	if got := partialQty("WOOF", 0.0615, 50); got != 0.0307 {
+		t.Errorf("unknown symbol should fall back to 4 decimals, got %v", got)
+	}
+}
+
+// The two legs must close the position EXACTLY: never more than is held (the
+// exchange rejects the overshoot, and whichever leg loses the race leaves a
+// residue), and the odd step has to land on one side deterministically.
+func TestScaleOutLegsSumToPosition(t *testing.T) {
+	cases := []struct {
+		sym  string
+		qty  float64
+		pct  float64
+		want float64 // expected TP1 leg
+	}{
+		{"BTC", 0.0615, 50, 0.0307},    // odd step → remainder takes it (0.0308)
+		{"BTC", 0.0614, 50, 0.0307},    // even split, no residue
+		{"BTC", 0.0615, 30, 0.0184},    // 0.01845 floored
+		{"ETH", 1.55, 50, 0.77},        // 0.775 floored
+		{"SNDK", 0.00003, 50, 0.00001}, // 5-decimal step, 0.000015 floored
+	}
+	for _, c := range cases {
+		first := partialQty(c.sym, c.qty, c.pct)
+		last := remainderQty(c.sym, c.qty, c.pct)
+		if first != c.want {
+			t.Errorf("%s %g @ %.0f%%: first leg = %v, want %v", c.sym, c.qty, c.pct, first, c.want)
+		}
+		// Floating point: compare on the lot grid, not with ==.
+		if sum := first + last; sum > c.qty+1e-9 {
+			t.Errorf("%s %g @ %.0f%%: legs sum to %v — oversells the position by %v",
+				c.sym, c.qty, c.pct, sum, sum-c.qty)
+		}
+		if last <= 0 {
+			t.Errorf("%s %g @ %.0f%%: remainder leg is %v — TP2 would be skipped", c.sym, c.qty, c.pct, last)
+		}
+	}
+}
+
+// 100% on the first leg is a full-size TP, which is legal — but it must leave
+// nothing for the second, so placeTP2OnBingX skips rather than sending a
+// zero-or-negative order.
+func TestScaleOutFullFirstLegLeavesNoRemainder(t *testing.T) {
+	if got := partialQty("BTC", 0.0615, 100); got != 0.0615 {
+		t.Errorf("100%% of 0.0615 = %v, want the whole position", got)
+	}
+	if got := remainderQty("BTC", 0.0615, 100); got > 0 {
+		t.Errorf("remainder after a 100%% first leg = %v, want <= 0 so TP2 is skipped", got)
+	}
+}

@@ -83,10 +83,7 @@ func (s *server) handleOpsEntry(c *gin.Context) {
 	}
 
 	short := strings.ToUpper(symbolRaw)
-	prec, ok := qtyPrecision[short]
-	if !ok {
-		prec = 4
-	}
+	prec := lotPrec(short)
 	plan := entryplan.Build(entryplan.Inputs{
 		Side: c.PostForm("side"), Entry: entry, Stop: stop, TP: tp,
 		MarginUSDT: margin, Leverage: lev, Mark: mark,

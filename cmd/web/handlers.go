@@ -1159,9 +1159,10 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 		return "error", fault
 	}
 
-	qty := pos.Quantity * pct / 100
+	qty := partialQty(t.Symbol, pos.Quantity, pct)
 	if qty <= 0 {
-		return "error", "computed qty <= 0"
+		return "error", fmt.Sprintf("computed qty=%g <= 0 (%.0f%% of %g, floored to the %s lot step)",
+			qty, pct, pos.Quantity, t.Symbol)
 	}
 	hedgeMode := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
 	res, err := s.client.PlaceReduceOnlyLimit(ctx, sym, t.Side, qty, t.TP1, hedgeMode)
@@ -1190,6 +1191,37 @@ var qtyPrecision = map[string]int{
 func floorTo(v float64, decimals int) float64 {
 	f := math.Pow(10, float64(decimals))
 	return math.Floor(v*f) / f
+}
+
+// lotPrec is the symbol's quantity step in decimal places. 4 is the fallback
+// for a symbol qtyPrecision has not learned yet — the roster has grown four
+// times and an unknown ticker must still be able to place a stop.
+func lotPrec(symbol string) int {
+	if p, ok := qtyPrecision[symbol]; ok {
+		return p
+	}
+	return 4
+}
+
+// partialQty sizes one leg of a scale-out: pct% of the LIVE position, floored
+// to the symbol's lot step.
+//
+// One function because there used to be two, and only one of them floored.
+// placeTP1OnBingX computed pos.Quantity*pct/100 raw, so a 50% partial of a BTC
+// 0.0615 position asked BingX for 0.03075 — five decimals against BTC's
+// four-decimal step, which the exchange rejects. It also broke the pair:
+// placeTP2OnBingX sized itself as the remainder after a FLOORED TP1, so the
+// two orders together committed 0.03075 + 0.0308 = 0.06155 of a 0.0615
+// position. The halves of an odd quantity are not equal and both legs have to
+// agree on which side the odd step falls, so they share the arithmetic.
+func partialQty(symbol string, posQty, pct float64) float64 {
+	return floorTo(posQty*pct/100, lotPrec(symbol))
+}
+
+// remainderQty is the LAST leg of a scale-out: everything partialQty did not
+// take, so TP1+TP2 close the position exactly and never oversell it.
+func remainderQty(symbol string, posQty, firstPct float64) float64 {
+	return floorTo(posQty-partialQty(symbol, posQty, firstPct), lotPrec(symbol))
 }
 
 // hedgeModeEnabled reflects BINGX_HEDGE_MODE=true on the VPS. One-way
@@ -1221,10 +1253,7 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 		return "error", err.Error()
 	}
 	rawQty := t.MarginUSDT * float64(t.Leverage) / t.Entry
-	prec, ok := qtyPrecision[t.Symbol]
-	if !ok {
-		prec = 4
-	}
+	prec := lotPrec(t.Symbol)
 	qty := floorTo(rawQty, prec)
 	if qty <= 0 {
 		return "error", fmt.Sprintf("computed qty=%g <= 0 (margin %.2f × lev %d / entry %.4f, floored to %d decimals)", qty, t.MarginUSDT, t.Leverage, t.Entry, prec)
@@ -1448,12 +1477,7 @@ func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1Parti
 	if fault := tpPlacementFault(t.Side, t.TP2, mark); fault != "" {
 		return "error", fault
 	}
-	prec, ok := qtyPrecision[t.Symbol]
-	if !ok {
-		prec = 4
-	}
-	tp1Qty := floorTo(pos.Quantity*tp1PartialPct/100, prec)
-	tp2Qty := floorTo(pos.Quantity-tp1Qty, prec)
+	tp2Qty := remainderQty(t.Symbol, pos.Quantity, tp1PartialPct)
 	if tp2Qty <= 0 {
 		return "skip", fmt.Sprintf("TP1 partial=%.0f%% leaves no remainder for TP2", tp1PartialPct)
 	}
