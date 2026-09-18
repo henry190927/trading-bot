@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"html/template"
 	"strings"
 	"testing"
 	"time"
@@ -237,4 +239,80 @@ func TestEntryRouteDoesNotArmTheStopSweep(t *testing.T) {
 	if got := bracket.Decide(armed, pos, nil, bracket.ModeAlert).PlaceStop; got != 2384 {
 		t.Errorf("StopAuto=true proposed %v, want 2384 — the opt-in must be unchanged", got)
 	}
+}
+
+// TestVerifyExchangeRendersOrphans executes the WHOLE page with a non-empty
+// Orphans slice.
+//
+// TestTemplatesParse proves verify_exchange.html parses; it cannot prove the
+// orphan card renders, because a field that does not exist on the range
+// element is resolved at EXECUTE time. The card carried {{if and (not
+// .HasStop) (not .PendingStop)}} — copied from the verifyTrade card above it,
+// where PendingStop is real — while orphanPos has no such field. Execution
+// stopped mid-attribute, so the served page ended at `<div class="verify-card`
+// with no </body>: the 🚨 count banner rendered above the break, the card
+// naming the naked position did not, and gin had already written 200.
+//
+// A page whose entire job is showing an unjournaled naked position went a full
+// session unable to show one. Rendering it with real data is the only check
+// that would have caught it, so this test asserts the page is COMPLETE, not
+// merely that Execute returned nil.
+func TestVerifyExchangeRendersOrphans(t *testing.T) {
+	tpl := template.Must(template.New("").Funcs(templateFuncs()).ParseFS(assets, "templates/*.html"))
+
+	orphans := []orphanPos{
+		// Naked: no resting order, order book read cleanly. Red border.
+		{Symbol: "BTC", Side: "long", Qty: 0.0615, Entry: 76400, Notional: 4698.6,
+			Leverage: 125, MarginMode: "cross"},
+		// Protected but unjournaled. Green badge, no red border.
+		{Symbol: "ETH", Side: "short", Qty: 1.5, Entry: 2470, Notional: 3705,
+			Leverage: 20, MarginMode: "cross", HasStop: true},
+		// Order book unreadable — "unknown", NOT "naked". exchangeOrphans
+		// deliberately leaves these out of nakedN; the border must agree.
+		{Symbol: "SOL", Side: "long", Qty: 30, Entry: 100.1, Notional: 3003,
+			Leverage: 10, MarginMode: "cross", ReadErr: "read orders: 429 rate limited"},
+	}
+
+	var buf bytes.Buffer
+	err := tpl.ExecuteTemplate(&buf, "verify_exchange.html", map[string]any{
+		"Rows": []verifyTrade{}, "Orphans": orphans,
+		"OrphanNakedN": 1, "WarnN": 0, "SessionWarnN": 0, "NoClient": false,
+		"UpdatedUTC": "2026-09-18 09:00:00 UTC+8",
+	})
+	if err != nil {
+		t.Fatalf("verify_exchange.html failed to execute with orphans: %v", err)
+	}
+	out := buf.String()
+
+	// Completeness first: a mid-execution failure truncates rather than
+	// erroring once gin is streaming, so "it ended" is the real assertion.
+	if !strings.Contains(out, "</html>") {
+		t.Fatalf("page truncated — no </html>; last 200 bytes:\n%s", tail(out, 200))
+	}
+	if strings.Contains(out, `<div class="verify-card`) && !strings.Contains(out, "</div>") {
+		t.Errorf("verify-card opened but never closed — the 2026-09-18 truncation")
+	}
+
+	// Each orphan must actually reach the page. Without this the test would
+	// pass against a template that renders no cards at all.
+	for _, want := range []string{"BTC", "0.0615", "76400", "4699", "125x", "ETH", "SOL"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("orphan card missing %q from the rendered page", want)
+		}
+	}
+
+	// The red border tracks the 🚨 branch and nakedN: naked only. An
+	// unreadable order book rendering as naked is the cry-wolf direction
+	// exchangeOrphans explicitly refuses.
+	if n := strings.Count(out, "verify-card b-red"); n != 1 {
+		t.Errorf("b-red applied to %d cards, want exactly 1 (the naked BTC);"+
+			" a read error or a protected position must not paint red", n)
+	}
+}
+
+func tail(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[len(s)-n:]
 }

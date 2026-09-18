@@ -121,7 +121,7 @@
     </h3>
     {{if .Orphans}}
     {{range .Orphans}}
-    <div class="verify-card{{if and (not .HasStop) (not .PendingStop)}} b-red{{end}}">
+    <div class="verify-card{{if and (not .ReadErr) (not .HasStop)}} b-red{{end}}">
       <div><strong>{{.Symbol}} {{.Side}}</strong> · qty {{printf "%g" .Qty}} @ {{fmtPrice .Entry}}
         · <span class="i18n-en">notional</span><span class="i18n-zh">名目</span> {{printf "%.0f" .Notional}}u
         · {{.Leverage}}x {{.MarginMode}}</div>
