@@ -34,11 +34,12 @@ func main() {
 	side := flag.String("side", "", "position side to protect: long | short (blank = whichever is open)")
 	stop := flag.Float64("stop", 0, "reduce-only STOP_MARKET trigger price (0 = skip)")
 	tp := flag.Float64("tp", 0, "reduce-only LIMIT take-profit price (0 = skip)")
+	qty := flag.Float64("qty", 0, "protect only this much of the position (0 = the whole thing)")
 	confirm := flag.Bool("confirm", false, "actually send the orders")
 	flag.Parse()
 
 	if *symShort == "" || (*stop == 0 && *tp == 0) {
-		fmt.Fprintln(os.Stderr, "usage: protect -symbol BTC -stop 77900 -tp 78900 [-side short] [-confirm]")
+		fmt.Fprintln(os.Stderr, "usage: protect -symbol BTC -stop 77900 -tp 78900 [-side short] [-qty 0.0307] [-confirm]")
 		os.Exit(2)
 	}
 	// Single source of truth for the symbol table, now market.Resolve rather
@@ -70,6 +71,27 @@ func main() {
 	if err != nil || fr.MarkPrice <= 0 {
 		fmt.Fprintf(os.Stderr, "read mark price: %v\n", err)
 		os.Exit(1)
+	}
+
+	// -qty exists for the scale-out case the web buttons cannot express: two
+	// reduce-only targets at different prices, each over part of the position.
+	// The web TP1/TP2 pair derives its split from a percentage and rounds it
+	// itself; here the caller states the lot size outright, because the two
+	// halves of an odd quantity are not equal and only the caller knows which
+	// side the odd step belongs on. It never grows the order: a -qty above the
+	// live position is a typo, not a request to sell what is not held.
+	if *qty > 0 {
+		if pos == nil {
+			fmt.Fprintln(os.Stderr, "-qty given but there is no open position")
+			os.Exit(1)
+		}
+		if *qty > pos.Quantity {
+			fmt.Fprintf(os.Stderr, "-qty %g exceeds the live position %g\n", *qty, pos.Quantity)
+			os.Exit(1)
+		}
+		part := *pos
+		part.Quantity = *qty
+		pos = &part
 	}
 
 	plan := protect.BuildPlan(pos, fr.MarkPrice, *stop, *tp)
