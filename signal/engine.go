@@ -207,7 +207,13 @@ func Evaluate(in Inputs) Signal {
 	// blackout gates above. See docs/struct_momentum_strategy_design.md.
 	// StructMomentumOff wins over both the force-on flag and the allowlist —
 	// see its doc comment for why an SM-vs-MR A/B is inert without it.
-	if !StructMomentumOff && (StructMomentumEnabled || strategyFor(in.Symbol, in.Timeframe) == StrategyStructMomentum) {
+	useSM := StructMomentumEnabled || strategyFor(in.Symbol, in.Timeframe) == StrategyStructMomentum
+	if StructMomentumRegime {
+		// Replaces the per-symbol question with a per-bar one — see
+		// StructMomentumRegime for why the allowlist cannot express it.
+		useSM = regimeWantsMomentum(in.Candles)
+	}
+	if !StructMomentumOff && useSM {
 		return evaluateStructMomentum(in)
 	}
 

@@ -56,6 +56,89 @@ var StructMomentumEnabled = false
 // refuses it rather than silently picking one.
 var StructMomentumOff = false
 
+// StructMomentumRegime picks the strategy PER BAR from the measured structure
+// instead of from the per-symbol allowlist.
+//
+// The allowlist asks "is this symbol a momentum symbol?", which a whole-window
+// A/B answers on average. That average is the problem: a strategy that is
+// strongly positive while a trend is running and strongly negative while price
+// ranges can have a negative unconditional expectation and a positive
+// conditional one, and the per-symbol gate cannot express the difference.
+// StructMomentum failed on five of six alts that way — the question it was
+// asked was whether it wins ALWAYS, not whether it wins WHEN.
+//
+// So: a confirmed HH-HL / LH-LL structure runs StructMomentum, anything
+// neutral runs MR. The gate is deliberately the detector that already exists
+// and already A/B'd as a counter-trend veto (+30R XAG, +7R XAU, negative on
+// ETH) — that split is itself evidence that structure state carries
+// strategy-relevant information, and reusing it means the arm tests the
+// SELECTOR rather than a new detector at the same time.
+//
+// It must stay a pure function of closed candles. OI, funding and the whale
+// ratios all say something about regime and NONE of them can be backtested:
+// oi.jsonl holds about a week, so a 120-day window cannot see them. A regime
+// input that cannot be measured over the gate's windows cannot be shipped
+// through the gate.
+//
+// Selection is exhaustive: every bar gets exactly one strategy, none is
+// skipped. That keeps the arm comparable to both baselines on trade count,
+// which a post-hoc split of an existing run cannot be — under one-position
+// dedup, skipping an SM entry frees the slot for an MR entry, so the gated
+// arm has to be GENERATED gated, not filtered afterwards.
+//
+// Overrides StructMomentumEnabled and the allowlist, because it replaces the
+// question both of them answer. StructMomentumOff still wins: that is the
+// all-MR baseline the arm is measured against.
+//
+// RESULT 2026-09-19 — FAILS, 10 of 10 gate runs (BTC/ETH/SOL/SUI/NEAR 1h,
+// 60/90/120d, against both baselines). Kept off by default and kept in the
+// tree, because the negative result is the useful part and re-deriving it
+// costs another afternoon.
+//
+//	symbol  MR-all 60/90/120      SM-all               REGIME
+//	BTC     -4.96 -3.11 -11.05    -1.78 +0.56  +3.38   -6.69  -1.49  -1.44
+//	ETH    +13.82 +8.57 +16.39    -3.63 -5.11  -2.51   -5.32  -4.53  -0.76
+//	SOL     -8.67 -15.48 -19.75   +2.10 +2.48  +8.47   -4.35 -13.97  -8.32
+//	SUI     -9.59 -12.46 -17.89   +0.50 -0.69  +2.36   +1.52  -3.74  -3.46
+//	NEAR    +2.20 +12.45 +16.39   -5.22 -8.69 -11.78   -0.59  +9.21 +10.23
+//
+// The arm lands BETWEEN the two baselines everywhere and beats neither. That
+// is not bad luck; it is what the trade counts say happened. On BTC 60d MR
+// fires 52 times, SM 12, and the gated arm 49 — so gating does not split the
+// book, it swaps a handful of MR entries for a smaller number of SM ones. The
+// swap was negative on four of five symbols.
+//
+// ETH is the sharp case and it inverts the premise. Swapping roughly five
+// entries moved the 60d window from +13.82 to -5.32. The MR trades that occur
+// inside a CONFIRMED trend are ETH's best trades — buying the pullback in an
+// uptrend is mean reversion, and routing exactly those bars to momentum
+// deleted the edge. "MR for ranges, momentum for trends" is not true here.
+//
+// Two structural reasons, both known in advance and both worth stating rather
+// than rediscovering:
+//   - The gate is LATE by construction. A trend is confirmed only after the
+//     swings that define it, so the switch happens after the move it was meant
+//     to catch, and is least reliable at the turn — which is where both
+//     strategies are worst.
+//   - The costs are asymmetric. Deleting a good MR trade costs more than
+//     adding a mediocre SM trade gains, so a selector has to be RIGHT, not
+//     merely better than chance, to break even.
+//
+// A regime signal that is measurable, real, and even predictive is still not
+// evidence that switching on it helps — same lesson as the cash-open bias.
+var StructMomentumRegime = false
+
+// regimeWantsMomentum reports whether the latest closed bar sits in a
+// confirmed directional structure.
+//
+// Known cost, stated rather than discovered later: a trend is only confirmed
+// AFTER the swings that define it, so the gate is late by construction, and it
+// is latest exactly at a regime turn — which is where both strategies are at
+// their worst. If this arm fails, that is the first place to look.
+func regimeWantsMomentum(candles []market.Candle) bool {
+	return AnalyzeStructure(candles, 0).Trend != StructNeutral
+}
+
 // strategyFor returns the strategy a (symbol, timeframe) runs. Per-(symbol,TF)
 // allowlist — the A/B showed the StructMomentum edge is BOTH symbol- and
 // TF-specific, so assignment must be per-pair. Everything defaults to MR; a

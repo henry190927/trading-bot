@@ -123,3 +123,154 @@ func syntheticUptrendPullback() []market.Candle {
 	}
 	return cs
 }
+
+// choppyRange builds a series with no directional structure: swing highs and
+// lows oscillate inside a band, so ClassifyTrendStructure returns neutral.
+func choppyRange(n int) []market.Candle {
+	var cs []market.Candle
+	for i := 0; i < n; i++ {
+		// Period-8 oscillation between roughly 98 and 102, no drift.
+		base := 100.0
+		switch i % 8 {
+		case 0, 1:
+			base = 101.5
+		case 2, 3:
+			base = 98.5
+		case 4, 5:
+			base = 101.0
+		case 6, 7:
+			base = 99.0
+		}
+		cs = append(cs, market.Candle{Open: base, High: base + 0.6, Low: base - 0.6, Close: base})
+	}
+	return cs
+}
+
+// staircaseUp builds an impulse/retrace zigzag that steps upward, which is
+// what ClassifyTrendStructure actually needs: it requires >= 3 swing tops AND
+// >= 3 swing bottoms and checks the last three of each for strict ascent.
+//
+// syntheticUptrendPullback cannot serve here — it rises +1.0 every bar, and a
+// monotonic ramp has no local extremes, so the fractal finder returns almost
+// no swing points and the series classifies as NEUTRAL despite going straight
+// up. "Price rose a lot" and "the structure is an uptrend" are different
+// claims and this detector only makes the second one.
+func staircaseUp(legs int) []market.Candle {
+	var cs []market.Candle
+	price := 100.0
+	for l := 0; l < legs; l++ {
+		for i := 0; i < 6; i++ { // impulse
+			o := price
+			price += 2.0
+			cs = append(cs, market.Candle{Open: o, High: price + 0.3, Low: o - 0.2, Close: price})
+		}
+		for i := 0; i < 3; i++ { // shallower retrace, so each leg nets +9
+			o := price
+			price -= 1.0
+			cs = append(cs, market.Candle{Open: o, High: o + 0.2, Low: price - 0.3, Close: price})
+		}
+	}
+	return cs
+}
+
+func TestStaircaseFixtureIsActuallyAnUptrend(t *testing.T) {
+	// Guards the fixture itself: if a change to the swing finder stops seeing
+	// these turns, every test below would pass by testing nothing.
+	got, tops, bots := ClassifyTrendStructure(staircaseUp(8))
+	if got != StructUptrend {
+		t.Fatalf("fixture classifies as %v with %d tops / %d bots, want HH-HL uptrend",
+			got, len(tops), len(bots))
+	}
+	if regimeWantsMomentum(syntheticUptrendPullback()) {
+		t.Error("a monotonic ramp has no swing structure and must NOT read as a trend")
+	}
+}
+
+func TestRegimeWantsMomentumReadsStructure(t *testing.T) {
+	if !regimeWantsMomentum(staircaseUp(8)) {
+		t.Error("a confirmed HH-HL series must select StructMomentum")
+	}
+	if regimeWantsMomentum(choppyRange(90)) {
+		t.Error("a rangebound series must fall back to MR")
+	}
+	// Degenerate input must not select the momentum path by accident.
+	if regimeWantsMomentum(nil) {
+		t.Error("empty input must not select StructMomentum")
+	}
+}
+
+func TestStructMomentumRegimeDisabledByDefault(t *testing.T) {
+	if StructMomentumRegime {
+		t.Fatal("StructMomentumRegime must default to false")
+	}
+}
+
+// The anti-inert check. A flag whose output is byte-identical in both
+// positions does nothing, and a backtest arm built on it reports a difference
+// that is really noise — this is how a false +10R survived in flipbt.
+//
+// BTC is NOT on the strategyFor allowlist, so the ONLY thing that can route it
+// to StructMomentum is the regime selector. Same candles, same symbol, both
+// positions of the flag: the dispatch has to actually move.
+func TestStructMomentumRegimeChangesDispatch(t *testing.T) {
+	in := Inputs{Symbol: market.BTCUSDT, Timeframe: "1h", Candles: staircaseUp(8)}
+
+	if strategyFor(market.BTCUSDT, "1h") != StrategyMR {
+		t.Fatal("precondition: BTC 1h must be an MR symbol, or this test proves nothing")
+	}
+
+	base := Evaluate(in)
+
+	StructMomentumRegime = true
+	defer func() { StructMomentumRegime = false }()
+	gated := Evaluate(in)
+
+	if base.Side == gated.Side && base.Score == gated.Score &&
+		base.MRScore == gated.MRScore && base.MomentumScore == gated.MomentumScore {
+		t.Fatalf("StructMomentumRegime is inert on a trending series: "+
+			"both arms returned side=%v score=%v mr=%v mom=%v",
+			base.Side, base.Score, base.MRScore, base.MomentumScore)
+	}
+	// The MR body reports an MR component; StructMomentum reports none by
+	// contract (MRScore = 0, MomentumScore = Score).
+	if gated.MRScore != 0 {
+		t.Errorf("gated arm returned MRScore=%v — it did not take the StructMomentum path", gated.MRScore)
+	}
+}
+
+// On a rangebound series the selector must choose MR, so the flag is a no-op
+// there. Without this, "the flag changes something" could be satisfied by a
+// selector that just always says momentum.
+func TestStructMomentumRegimeLeavesRangeboundOnMR(t *testing.T) {
+	in := Inputs{Symbol: market.BTCUSDT, Timeframe: "1h", Candles: choppyRange(120)}
+	base := Evaluate(in)
+
+	StructMomentumRegime = true
+	defer func() { StructMomentumRegime = false }()
+	gated := Evaluate(in)
+
+	if base.Side != gated.Side || base.Score != gated.Score {
+		t.Errorf("selector diverted a rangebound series off MR: base %v/%v vs gated %v/%v",
+			base.Side, base.Score, gated.Side, gated.Score)
+	}
+}
+
+// StructMomentumOff is the all-MR baseline every arm is measured against. If a
+// selector could override it, the baseline would silently stop being one.
+func TestStructMomentumOffBeatsTheRegimeSelector(t *testing.T) {
+	in := Inputs{Symbol: market.SOLUSDT, Timeframe: "1h", Candles: staircaseUp(8)}
+
+	StructMomentumOff = true
+	StructMomentumRegime = true
+	defer func() { StructMomentumOff, StructMomentumRegime = false, false }()
+
+	got := Evaluate(in)
+
+	StructMomentumOff, StructMomentumRegime = true, false
+	want := Evaluate(in)
+
+	if got.Side != want.Side || got.Score != want.Score || got.MomentumScore != want.MomentumScore {
+		t.Errorf("regime selector escaped StructMomentumOff: %v/%v vs baseline %v/%v",
+			got.Side, got.Score, want.Side, want.Score)
+	}
+}
