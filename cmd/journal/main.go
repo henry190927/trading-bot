@@ -161,10 +161,8 @@ func cmdClose(args []string) error {
 		return fmt.Errorf("exit_price: %w", err)
 	}
 	notes := strings.Join(args[3:], " ")
-	switch outcome {
-	case "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated":
-	default:
-		return fmt.Errorf("outcome must be tp1|tp2|stop|manual|timeout|no-fill|liquidated, got %q", outcome)
+	if !journal.IsCloseOutcome(outcome) {
+		return fmt.Errorf("outcome must be %s, got %q", journal.OutcomeList(journal.CloseOutcomes), outcome)
 	}
 
 	trades, err := journal.ReadAll("")

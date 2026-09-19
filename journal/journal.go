@@ -208,6 +208,48 @@ func (t Trade) IsNoFill() bool { return t.Outcome == "no-fill" }
 // budgeted. With no stop, HasR already keeps it out of every R statistic.
 func (t Trade) IsLiquidated() bool { return t.Outcome == "liquidated" }
 
+// The outcome vocabulary, in one place. It used to be four copies of the same
+// switch — the web close handler, the web edit handler, ApplyUpdate and the
+// cmd/journal CLI — and they had already drifted: the two CLI-side copies
+// rejected "no-fill" months after the web started writing it, so a row the
+// journal itself had produced could not be edited from a terminal.
+//
+// Two lists, because closing a trade and editing an old one are different
+// questions. CloseOutcomes is what a trade may be closed AS today.
+// LegacyOutcomes exist in rows already on disk and must round-trip, but are
+// not offered as a choice: a validator that rejects a value the CSV already
+// contains turns every edit of that row into a silent reclassification.
+var CloseOutcomes = []string{"tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated"}
+
+// LegacyOutcomes: "win" predates the tp1/tp2/manual split and survives on
+// rows #53 (XAU, +0.67R) and #54 (ETH, no R). It says a trade made money and
+// nothing about how it was exited, which is why it was replaced rather than
+// kept — but rewriting history to tidy the vocabulary would be inventing an
+// exit mechanism that was never recorded.
+var LegacyOutcomes = []string{"win"}
+
+func inList(v string, list []string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// IsCloseOutcome reports whether a trade may be CLOSED as o.
+func IsCloseOutcome(o string) bool { return inList(o, CloseOutcomes) }
+
+// IsLegacyOutcome reports an outcome kept only so existing rows survive an edit.
+func IsLegacyOutcome(o string) bool { return inList(o, LegacyOutcomes) }
+
+// IsEditOutcome reports whether o may be SAVED on an existing row — every
+// close outcome plus the legacy ones.
+func IsEditOutcome(o string) bool { return IsCloseOutcome(o) || IsLegacyOutcome(o) }
+
+// OutcomeList renders the accepted values for an error message.
+func OutcomeList(list []string) string { return strings.Join(list, "|") }
+
 // IsPending reports whether the trade has been recorded but its entry
 // price hasn't been touched yet — i.e. position never opened on the
 // exchange. Distinct from IsOpen (still in the not-yet-closed bucket).
@@ -488,10 +530,9 @@ func ApplyUpdate(t *Trade, field, value string) error {
 		t.ExitPrice = v
 	case "outcome":
 		v := strings.ToLower(value)
-		switch v {
-		case "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated":
-		default:
-			return fmt.Errorf("outcome must be tp1|tp2|stop|manual|timeout|no-fill|liquidated, got %q", value)
+		// ApplyUpdate edits an EXISTING row, so legacy values are accepted.
+		if !IsEditOutcome(v) {
+			return fmt.Errorf("outcome must be %s, got %q", OutcomeList(CloseOutcomes), value)
 		}
 		t.Outcome = v
 	case "close_notes", "close-notes":

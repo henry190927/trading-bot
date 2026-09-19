@@ -483,3 +483,47 @@ func TestLiquidatedIsNeverAWin(t *testing.T) {
 		}
 	}
 }
+
+// "win" predates the tp1/tp2/manual split and still sits on rows #53 and #54.
+// It must survive an edit and must not be offered as a new close: a validator
+// that rejects a value the CSV already holds turns every save of that row into
+// a silent reclassification, and the two lists are the only thing keeping
+// those requirements apart.
+func TestLegacyWinOutcomeEditableButNotClosable(t *testing.T) {
+	if IsCloseOutcome("win") {
+		t.Error("`win` must not be offered as a new close outcome")
+	}
+	if !IsEditOutcome("win") {
+		t.Error("`win` must survive an edit — rows #53/#54 already carry it")
+	}
+	if !IsLegacyOutcome("win") {
+		t.Error("`win` should be declared legacy")
+	}
+
+	var tr Trade
+	if err := ApplyUpdate(&tr, "outcome", "win"); err != nil {
+		t.Fatalf("ApplyUpdate could not preserve a legacy outcome: %v", err)
+	}
+	if tr.Outcome != "win" {
+		t.Errorf("Outcome = %q, want win", tr.Outcome)
+	}
+}
+
+// Every current outcome must be BOTH closable and editable, or a row written
+// by one path becomes uneditable by another — the no-fill trap that this
+// consolidation exists to remove.
+func TestEveryCloseOutcomeIsAlsoEditable(t *testing.T) {
+	for _, o := range CloseOutcomes {
+		if !IsEditOutcome(o) {
+			t.Errorf("%q can be written but not edited", o)
+		}
+		if IsLegacyOutcome(o) {
+			t.Errorf("%q is in both the current and legacy lists", o)
+		}
+	}
+	for _, bad := range []string{"", "blown-up", "WIN", "Stop", "liquidate"} {
+		if IsEditOutcome(bad) {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}

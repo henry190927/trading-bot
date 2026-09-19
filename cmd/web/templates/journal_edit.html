@@ -160,6 +160,11 @@
       <option value="timeout" {{if eq $o "timeout"}}selected{{end}}>Timeout</option>
       <option value="no-fill" {{if eq $o "no-fill"}}selected{{end}}>No-fill (0R)</option>
       <option value="liquidated" {{if eq $o "liquidated"}}selected{{end}}>Liquidated</option>
+      {{/* Legacy, pre tp1/tp2/manual split. Rendered ONLY when the row already
+           carries it: without the option the select would fall back to another
+           value and Save would rewrite history; with it always present it would
+           become a choice again. */}}
+      {{if eq $o "win"}}<option value="win" selected>Win (legacy — no exit mechanism recorded)</option>{{end}}
     </select>
   </div>
 
