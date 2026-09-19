@@ -45,6 +45,20 @@ const (
 	SUIUSDT  Symbol = "SUI-USDT"
 	HYPEUSDT Symbol = "HYPE-USDT"
 	NEARUSDT Symbol = "NEAR-USDT"
+
+	// XRP added 2026-09-19, after a real position was opened on it on 09-18
+	// and the tooling could not see it: /ops/fills iterates uiSymbols, XRP was
+	// not on the list, so the trade was invisible until the income ledger was
+	// read by hand. The naked-position guard was never blind to it —
+	// orphanCycle enumerates AllPositions and falls back to the raw contract
+	// code — but a symbol that can hold a position and cannot be reconciled is
+	// half-supported, which is worse than unsupported.
+	//
+	// NOT in All(), same discipline as every other forward-log symbol, and NOT
+	// in signal.strategyFor: XRP therefore runs the MR engine by default.
+	// StructMomentum's alt expansion (XRP included) is still BLOCKED — one pass
+	// in six tested pairs. Adding a contract code is not adding a strategy.
+	XRPUSDT Symbol = "XRP-USDT"
 )
 
 func (s Symbol) IsMetal() bool {

@@ -21,6 +21,7 @@ var autoSymbols = map[string]market.Symbol{
 	"SNDK": market.SNDKUSDT, "NVDA": market.NVDAUSDT,
 	"SPCX": market.SPCXUSDT, "MSTR": market.MSTRUSDT, "APP": market.APPUSDT,
 	"SOL": market.SOLUSDT, "LINK": market.LINKUSDT, "SUI": market.SUIUSDT, "NEAR": market.NEARUSDT, "HYPE": market.HYPEUSDT,
+	"XRP": market.XRPUSDT,
 }
 
 type autoState struct {

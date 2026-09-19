@@ -25,7 +25,7 @@ var shortToSym = map[string]Symbol{
 	"SNDK": SNDKUSDT, "NVDA": NVDAUSDT, "SPCX": SPCXUSDT,
 	"MSTR": MSTRUSDT, "APP": APPUSDT,
 	"SOL": SOLUSDT, "LINK": LINKUSDT, "SUI": SUIUSDT,
-	"HYPE": HYPEUSDT, "NEAR": NEARUSDT,
+	"HYPE": HYPEUSDT, "NEAR": NEARUSDT, "XRP": XRPUSDT,
 }
 
 var symToShort = func() map[Symbol]string {

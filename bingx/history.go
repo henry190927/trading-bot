@@ -86,13 +86,26 @@ func (c *Client) OrderHistory(ctx context.Context, sym market.Symbol, start, end
 	return nil, fmt.Errorf("no fill history: %v", errs)
 }
 
-// parseHistory copes with the two shapes BingX uses — {"orders":[...]} and
-// {"fill_orders":[...]} — plus a bare array, and with numbers arriving as
-// either JSON numbers or strings.
+// parseHistory copes with the THREE shapes BingX uses — {"orders":[...]},
+// {"fill_orders":[...]} and {"fill_history_orders":[...]} — plus a bare array,
+// and with numbers arriving as either JSON numbers or strings.
+//
+// The third was missing until 2026-09-19, which meant /trade/fillHistory —
+// the endpoint named after this very feature — had never parsed once. It only
+// went unnoticed because /trade/allOrders answers for some symbols, so BTC,
+// XAU, XAG and SUI reported "no fill history" while their trades sat in a
+// payload this function threw away as an unrecognised shape.
+//
+// That shape is also the only TRADE-level one: a single order is reported once
+// per execution, so the 0.0615 BTC entry of 2026-09-17 arrives as three rows
+// (0.0100 + 0.0452 + 0.0063) sharing one orderId. Rows are therefore folded by
+// orderId — see foldByOrder — or every partial fill would be counted as its
+// own trade and the fees summed over phantom orders.
 func parseHistory(raw json.RawMessage, source string) ([]FilledOrder, error) {
 	var envelope struct {
-		Orders     []json.RawMessage `json:"orders"`
-		FillOrders []json.RawMessage `json:"fill_orders"`
+		Orders            []json.RawMessage `json:"orders"`
+		FillOrders        []json.RawMessage `json:"fill_orders"`
+		FillHistoryOrders []json.RawMessage `json:"fill_history_orders"`
 	}
 	rows := []json.RawMessage(nil)
 	if err := json.Unmarshal(raw, &envelope); err == nil {
@@ -101,6 +114,8 @@ func parseHistory(raw json.RawMessage, source string) ([]FilledOrder, error) {
 			rows = envelope.Orders
 		case len(envelope.FillOrders) > 0:
 			rows = envelope.FillOrders
+		case len(envelope.FillHistoryOrders) > 0:
+			rows = envelope.FillHistoryOrders
 		}
 	}
 	if rows == nil {
@@ -111,6 +126,7 @@ func parseHistory(raw json.RawMessage, source string) ([]FilledOrder, error) {
 	}
 
 	out := make([]FilledOrder, 0, len(rows))
+	quotes := make([]float64, 0, len(rows))
 	for _, r := range rows {
 		var o struct {
 			OrderID      json.Number `json:"orderId"`
@@ -129,6 +145,14 @@ func parseHistory(raw json.RawMessage, source string) ([]FilledOrder, error) {
 			UpdateTime   json.Number `json:"updateTime"`
 			Time         json.Number `json:"time"`
 			FilledTime   string      `json:"filledTime"`
+
+			// fill_history_orders spells the same facts differently: qty
+			// rather than executedQty, a bare price rather than avgPrice,
+			// realisedPNL rather than profit, and quoteQty — which is what
+			// makes a volume-weighted average possible across partial fills.
+			Qty         json.Number `json:"qty"`
+			QuoteQty    json.Number `json:"quoteQty"`
+			RealisedPNL json.Number `json:"realisedPNL"`
 		}
 		if err := json.Unmarshal(r, &o); err != nil {
 			continue
@@ -137,9 +161,22 @@ func parseHistory(raw json.RawMessage, source string) ([]FilledOrder, error) {
 		if qty == 0 {
 			qty = num(o.OrigQty)
 		}
+		if qty == 0 {
+			qty = num(o.Qty)
+		}
 		fee := num(o.Commission)
 		if fee == 0 {
 			fee = num(o.Fee)
+		}
+		profit := num(o.Profit)
+		if profit == 0 {
+			profit = num(o.RealisedPNL)
+		}
+		// avgPrice is absent on the trade-level shape; each row carries the
+		// price it executed at, which IS the average for that row.
+		avg := num(o.AvgPrice)
+		if avg == 0 {
+			avg = num(o.Price)
 		}
 		ts := num(o.UpdateTime)
 		if ts == 0 {
@@ -148,10 +185,11 @@ func parseHistory(raw json.RawMessage, source string) ([]FilledOrder, error) {
 		f := FilledOrder{
 			OrderID: o.OrderID.String(), Symbol: o.Symbol, Side: o.Side,
 			PositionSide: o.PositionSide, Type: o.Type,
-			AvgPrice: num(o.AvgPrice), Price: num(o.Price), Quantity: qty,
-			ProfitUSDT: num(o.Profit), FeeUSDT: fee, Status: o.Status,
+			AvgPrice: avg, Price: num(o.Price), Quantity: qty,
+			ProfitUSDT: profit, FeeUSDT: fee, Status: o.Status,
 			Source: source,
 		}
+		quote := num(o.QuoteQty)
 		if ts > 0 {
 			f.Time = time.UnixMilli(int64(ts))
 		} else if o.FilledTime != "" {
@@ -162,9 +200,71 @@ func parseHistory(raw json.RawMessage, source string) ([]FilledOrder, error) {
 		// Only rows that actually executed are useful for a journal.
 		if f.Quantity > 0 && f.AvgPrice > 0 {
 			out = append(out, f)
+			quotes = append(quotes, quote)
 		}
 	}
-	return out, nil
+	return foldByOrder(out, quotes), nil
+}
+
+// foldByOrder collapses partial executions of one order into a single
+// FilledOrder, preserving input order of first appearance.
+//
+// Only the trade-level shape splits an order across rows, but folding runs
+// unconditionally: on an order-level payload each orderId appears once and
+// this is the identity, which is cheaper than asking the caller to know which
+// shape answered. An empty orderId cannot be grouped safely — two unrelated
+// rows would merge — so those pass through untouched.
+//
+// Quantity, fee and realised PnL add. The price becomes the volume-weighted
+// average via quoteQty when the payload supplies it, and otherwise stays the
+// first row's — averaging prices unweighted across unequal fills would quietly
+// misreport the entry a journal is reconciled against. Time takes the LAST
+// execution: that is when the order was actually done.
+func foldByOrder(in []FilledOrder, quotes []float64) []FilledOrder {
+	type acc struct {
+		idx   int
+		quote float64
+	}
+	seen := make(map[string]*acc, len(in))
+	out := make([]FilledOrder, 0, len(in))
+	for i, f := range in {
+		q := 0.0
+		if i < len(quotes) {
+			q = quotes[i]
+		}
+		if f.OrderID == "" {
+			out = append(out, f)
+			continue
+		}
+		a, ok := seen[f.OrderID]
+		if !ok {
+			out = append(out, f)
+			seen[f.OrderID] = &acc{idx: len(out) - 1, quote: q}
+			continue
+		}
+		p := &out[a.idx]
+		p.Quantity += f.Quantity
+		p.FeeUSDT += f.FeeUSDT
+		p.ProfitUSDT += f.ProfitUSDT
+		a.quote += q
+		if f.Time.After(p.Time) {
+			p.Time = f.Time
+		}
+		// A row that reports a type/status when the first did not is still
+		// information about the same order.
+		if p.Type == "" {
+			p.Type = f.Type
+		}
+		if p.Status == "" {
+			p.Status = f.Status
+		}
+	}
+	for _, a := range seen {
+		if a.quote > 0 && out[a.idx].Quantity > 0 {
+			out[a.idx].AvgPrice = a.quote / out[a.idx].Quantity
+		}
+	}
+	return out
 }
 
 func num(n json.Number) float64 {

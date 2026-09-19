@@ -1186,6 +1186,10 @@ var qtyPrecision = map[string]int{
 	"BTC": 4, "ETH": 2, "XAU": 4, "XAG": 4, "SNDK": 5, "NVDA": 3,
 	// From cmd/contracts (quantityPrecision), 2026-09-04.
 	"SPCX": 5, "MSTR": 3, "APP": 3,
+	// XRP trades in whole units — quantityPrecision 0, tradeMinQuantity 2,
+	// from cmd/contracts 2026-09-19. A fractional size is rejected outright,
+	// so the 4-decimal fallback would have been wrong in the unsafe direction.
+	"XRP": 0,
 }
 
 func floorTo(v float64, decimals int) float64 {
@@ -3573,14 +3577,14 @@ func techSideStr(s signal.Side) string {
 // then the forward-log symbols (stock synthetics + crypto-alt StructMomentum
 // candidates). NOT the same as market.All() — the forward-log ones stay out of
 // the daemon scan + ntfy until live data clears the ship-gate.
-var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SPCX", "MSTR", "APP", "SOL", "LINK", "SUI", "HYPE", "NEAR"}
+var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SPCX", "MSTR", "APP", "SOL", "LINK", "SUI", "HYPE", "NEAR", "XRP"}
 
 // Forward-log groups shown as separate labelled sections on the Scan dashboard
 // (each scanned via scanOne, none in market.All()). Stocks get the fundamental
 // overlay; alts run their assigned strategy (StructMomentum for SOL/LINK/SUI/
 // HYPE per strategyFor, MR for NEAR).
 var fwdStockSymbols = []string{"SNDK", "NVDA", "SPCX", "MSTR", "APP"}
-var fwdAltSymbols = []string{"SOL", "LINK", "SUI", "HYPE", "NEAR"}
+var fwdAltSymbols = []string{"SOL", "LINK", "SUI", "HYPE", "NEAR", "XRP"}
 
 func defaultStr(v, fallback string) string {
 	if v == "" {
