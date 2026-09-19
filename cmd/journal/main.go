@@ -162,9 +162,9 @@ func cmdClose(args []string) error {
 	}
 	notes := strings.Join(args[3:], " ")
 	switch outcome {
-	case "tp1", "tp2", "stop", "manual", "timeout":
+	case "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated":
 	default:
-		return fmt.Errorf("outcome must be tp1|tp2|stop|manual|timeout, got %q", outcome)
+		return fmt.Errorf("outcome must be tp1|tp2|stop|manual|timeout|no-fill|liquidated, got %q", outcome)
 	}
 
 	trades, err := journal.ReadAll("")
@@ -336,6 +336,8 @@ func cmdList(args []string) error {
 			statCol = ansi.BoldG
 		case "stop", "manual":
 			statCol = ansi.Red
+		case "liquidated":
+			statCol = ansi.BoldR
 		case "open":
 			statCol = ansi.Yellow
 		}

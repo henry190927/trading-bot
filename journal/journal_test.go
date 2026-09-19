@@ -401,3 +401,85 @@ func TestStoplessTradeWritesBlankR(t *testing.T) {
 		t.Errorf("with-stop row round-tripped to HasR=%v R=%v", back[1].HasR(), back[1].RRealized)
 	}
 }
+
+// A liquidation is its own outcome because the two it would otherwise be filed
+// under are the two whose statistics matter most: "stop" answers "are my stops
+// any good", and "manual" is the discretionary-exit bucket this account's edge
+// lives in. A forced close belongs in neither.
+func TestLiquidatedIsItsOwnOutcome(t *testing.T) {
+	liq := Trade{Outcome: "liquidated"}
+	if !liq.IsLiquidated() {
+		t.Error("IsLiquidated() false on a liquidated trade")
+	}
+	for _, o := range []string{"stop", "manual", "tp1", "tp2", "timeout", "no-fill", ""} {
+		if (Trade{Outcome: o}).IsLiquidated() {
+			t.Errorf("IsLiquidated() true for %q", o)
+		}
+	}
+	if liq.IsNoFill() {
+		t.Error("a liquidation is not a no-fill — the position very much existed")
+	}
+}
+
+func TestApplyUpdateAcceptsLiquidatedOutcome(t *testing.T) {
+	var tr Trade
+	if err := ApplyUpdate(&tr, "outcome", "liquidated"); err != nil {
+		t.Fatalf("ApplyUpdate(outcome, liquidated): %v", err)
+	}
+	if tr.Outcome != "liquidated" {
+		t.Errorf("Outcome = %q", tr.Outcome)
+	}
+	if err := ApplyUpdate(&tr, "outcome", "blown-up"); err == nil {
+		t.Error("an unknown outcome must still be rejected")
+	}
+}
+
+// R is deliberately NOT special-cased. A liquidation with a planned stop means
+// the loss ran PAST the budgeted risk, and the honest figure is worse than -1R
+// — flooring it at -1 would hide exactly the thing that makes a liquidation
+// different from a stop.
+func TestLiquidatedWithAStopReportsWorseThanMinusOneR(t *testing.T) {
+	// NEAR #82's shape: short 3.50, stop 3.59 (R = 0.09), but taken out at
+	// 3.80 instead of at the stop.
+	tr := Trade{Symbol: "NEAR", Side: "short", Entry: 3.50, Stop: 3.59, Outcome: "liquidated"}
+	if !tr.HasR() {
+		t.Fatal("a planned stop means R is defined")
+	}
+	got := RealizedR(tr, 3.80)
+	if got >= -1 {
+		t.Errorf("RealizedR = %v, want worse than -1R — a liquidation overran the planned risk", got)
+	}
+	// (3.50-3.80)/0.09
+	if want := -3.3333333; got < want-1e-6 || got > want+1e-6 {
+		t.Errorf("RealizedR = %v, want %v", got, want)
+	}
+}
+
+// The common case in this account: no stop was ever planned, so there is no
+// risk to measure the loss against and HasR keeps the row out of every R
+// statistic. #78-#86 are eight such rows worth -454u that move the book -1.03R.
+func TestLiquidatedWithoutAStopHasNoR(t *testing.T) {
+	tr := Trade{Symbol: "NEAR", Side: "short", Entry: 3.535, Stop: 0, Outcome: "liquidated"}
+	if tr.HasR() {
+		t.Fatal("no stop means no R baseline")
+	}
+	if got := RealizedR(tr, 3.677); got != 0 {
+		t.Errorf("RealizedR = %v, want 0 (undefined, and the CSV column stays blank)", got)
+	}
+}
+
+// Whatever else it is, it is never a win. Win-rate counts RRealized > 0.
+func TestLiquidatedIsNeverAWin(t *testing.T) {
+	for _, tr := range []Trade{
+		{Side: "short", Entry: 3.50, Stop: 3.59, Outcome: "liquidated"},
+		{Side: "long", Entry: 100, Stop: 95, Outcome: "liquidated"},
+	} {
+		exit := tr.Entry * 1.2
+		if tr.Side == "long" {
+			exit = tr.Entry * 0.8
+		}
+		if r := RealizedR(tr, exit); r > 0 {
+			t.Errorf("%s liquidation scored +%v R", tr.Side, r)
+		}
+	}
+}

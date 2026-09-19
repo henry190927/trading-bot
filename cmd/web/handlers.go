@@ -1675,9 +1675,9 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 	}
 
 	switch outcome {
-	case "tp1", "tp2", "stop", "manual", "timeout", "no-fill":
+	case "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated":
 	default:
-		rerender("outcome must be tp1, tp2, stop, manual, timeout, or no-fill")
+		rerender("outcome must be tp1, tp2, stop, manual, timeout, no-fill, or liquidated")
 		return
 	}
 	// no-fill: plan never triggered, so exit_price is irrelevant and R is
@@ -1856,7 +1856,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	exitStr := strings.TrimSpace(c.PostForm("exit_price"))
 	if !closedAt.IsZero() {
 		switch outcome {
-		case "tp1", "tp2", "stop", "manual", "timeout", "no-fill":
+		case "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated":
 		default:
 			rerender("outcome required when closed_at is set")
 			return

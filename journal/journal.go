@@ -78,7 +78,7 @@ type Trade struct {
 	Anchor     string
 	OpenNotes  string
 	ExitPrice  float64
-	Outcome    string // "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "" if open
+	Outcome    string // "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated", "" if open
 	RRealized  float64
 	CloseNotes string
 	// FilledAt is the time the entry price was first reached after the
@@ -191,6 +191,22 @@ func (t Trade) IsOpen() bool { return t.ClosedAt.IsZero() }
 // discipline tracking (signal-to-fill ratio) without affecting WR/R
 // stats. R should be exactly 0 for no-fills.
 func (t Trade) IsNoFill() bool { return t.Outcome == "no-fill" }
+
+// IsLiquidated reports a position the exchange closed because margin ran out.
+//
+// Distinct from "stop" and from "manual", and the distinction is the point.
+// It is not "stop": a liquidation happens when there is no protective order to
+// hit, so filing it there corrupts the one statistic that answers "are my
+// stops any good". It is not "manual" either: that bucket is the discretionary
+// exit, which is where this account's edge actually lives (+0.744R mean over
+// 31 trades as of 2026-09-08), and a forced close is the opposite of a
+// decision. Two of the three 2026-09 blowups ended this way and both would
+// otherwise have been filed as discretionary.
+//
+// R is NOT special-cased. With a planned stop, RealizedR gives a figure worse
+// than -1R, which is exactly right — the loss exceeded the risk that was
+// budgeted. With no stop, HasR already keeps it out of every R statistic.
+func (t Trade) IsLiquidated() bool { return t.Outcome == "liquidated" }
 
 // IsPending reports whether the trade has been recorded but its entry
 // price hasn't been touched yet — i.e. position never opened on the
@@ -473,9 +489,9 @@ func ApplyUpdate(t *Trade, field, value string) error {
 	case "outcome":
 		v := strings.ToLower(value)
 		switch v {
-		case "tp1", "tp2", "stop", "manual", "timeout":
+		case "tp1", "tp2", "stop", "manual", "timeout", "no-fill", "liquidated":
 		default:
-			return fmt.Errorf("outcome must be tp1|tp2|stop|manual|timeout, got %q", value)
+			return fmt.Errorf("outcome must be tp1|tp2|stop|manual|timeout|no-fill|liquidated, got %q", value)
 		}
 		t.Outcome = v
 	case "close_notes", "close-notes":

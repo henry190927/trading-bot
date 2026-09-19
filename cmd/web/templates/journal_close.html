@@ -68,6 +68,7 @@
       <option value="manual" {{if eq .Outcome "manual"}}selected{{end}}>Closed manually</option>
       <option value="timeout" {{if eq .Outcome "timeout"}}selected{{end}}>Timed out / cancelled</option>
       <option value="no-fill" {{if eq .Outcome "no-fill"}}selected{{end}}>No-fill (entry not triggered, 0R)</option>
+      <option value="liquidated" {{if eq .Outcome "liquidated"}}selected{{end}}>Liquidated (forced close — not a stop, not a decision)</option>
     </select>
   </div>
 
