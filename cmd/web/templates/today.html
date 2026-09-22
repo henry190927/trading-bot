@@ -162,7 +162,8 @@
   // Fallbacks when the CDN image 404s or is blocked. 🚀 is already HYPE's, so
   // SpaceX takes the satellite rather than duplicating it.
   var EMOJI = { BTC:'₿', ETH:'Ξ', SOL:'◎', LINK:'🔗', SUI:'🌊', HYPE:'🚀', NEAR:'Ⓝ', XAU:'🥇', XAG:'🥈',
-                SNDK:'💾', NVDA:'🟩', SPCX:'🛰', MSTR:'Ⓜ', APP:'📲' };
+                SNDK:'💾', NVDA:'🟩', SPCX:'🛰', MSTR:'Ⓜ', APP:'📲',
+                XRP:'✕', UNI:'🦄', AKE:'🎮' };
   var cat = 'all', last = [];
   // Fixed decimal count, not just a maximum: maximumFractionDigits alone drops
   // trailing zeros, so 77175.80 rendered "77,175.8" and 77175.75 rendered
@@ -186,8 +187,11 @@
   //   MSTR   /coins/MSTR3.png       carries a "3" that is not derivable from
   //                                 the ticker at all
   //   APP    /stocks/logo/APP.svg   different PATH and different EXTENSION
+  //   AKE    /coins/akedo-AKE.png   the COIN NAME hyphen-joined to the ticker,
+  //                                 added 2026-09-22; the default coincap path
+  //                                 404s for it
   //
-  // Three symbols, three shapes, none inferable — so the map is the structure
+  // Four symbols, four shapes, none inferable — so the map is the structure
   // and the patterns are just the fallback for symbols that happen to fit.
   // Each URL here was verified to return 200 with an image content-type
   // before being added; a wrong one degrades silently to the emoji via
@@ -195,7 +199,8 @@
   var ICON_URL = {
     SPCX: 'https://cdn.coinglasscdn.com/static/img/coins/spcx.png',
     MSTR: 'https://cdn.coinglasscdn.com/static/img/coins/MSTR3.png',
-    APP:  'https://cdn.coinglasscdn.com/static/img/stocks/logo/APP.svg'
+    APP:  'https://cdn.coinglasscdn.com/static/img/stocks/logo/APP.svg',
+    AKE:  'https://cdn.coinglasscdn.com/static/img/coins/akedo-AKE.png'
   };
   function iconURL(sym){
     if (ICON_URL[sym]) return ICON_URL[sym];
