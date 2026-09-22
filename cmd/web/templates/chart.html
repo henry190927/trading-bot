@@ -3251,17 +3251,81 @@
         if (window.toast) window.toast(currentSym() + ' ' + currentTF() + ' 載入失敗:' + msg, 'err');
     }
 
+    // F4 — optimistic draw from a per-(symbol,TF) memo.
+    //
+    // The server round trip went from 2,501ms to 186ms in c2d8591, which is
+    // the floor for a cold symbol. It is not the floor for a symbol already
+    // looked at this session: that payload was already on the client and got
+    // thrown away, so switching back re-paid the full trip to redraw something
+    // identical. This paints the remembered frame immediately and reconciles
+    // when the network answers, which is the only remaining way to make a
+    // switch feel instant rather than fast.
+    //
+    // Deliberately NOT a server cache: the 2s light=1 poll that feeds the live
+    // price line shares /api/chart/data, so caching there would either stale
+    // the price line or need a second code path. This memo only ever holds the
+    // full limit=INIT_BARS payload; the light poll is a different call site and
+    // never reads or writes it.
+    var payloadMemo = (function () {
+        var MAX = 8;                 // symbol x TF combinations worth holding
+        var m = new Map();           // key -> {body, at}
+        function key(sym, tf) { return sym + '|' + tf; }
+        // One bar of staleness, floor 60s, cap 15m. A remembered frame is only
+        // painted while it is still the SAME bar the server would return, so
+        // the optimistic paint can be wrong about the last candle's shape but
+        // never about which candle is last. Anything older waits for the wire.
+        function maxAgeMs(tf) {
+            var n = parseInt(tf, 10) || 1;
+            var unit = String(tf).replace(/[0-9]/g, '');
+            var mins = unit === 'h' ? n * 60 : unit === 'd' ? n * 1440 : n;
+            return Math.min(Math.max(mins * 60000, 60000), 900000);
+        }
+        return {
+            get: function (sym, tf) {
+                var e = m.get(key(sym, tf));
+                if (!e) return null;
+                if (Date.now() - e.at > maxAgeMs(tf)) return null;
+                return e.body;
+            },
+            put: function (sym, tf, body) {
+                var k = key(sym, tf);
+                m.delete(k);                       // re-insert so iteration order is LRU
+                m.set(k, { body: body, at: Date.now() });
+                while (m.size > MAX) { m.delete(m.keys().next().value); }
+            }
+        };
+    })();
+
+    // Monotonic request token. Without it a slow response for the symbol you
+    // just left overwrites the one you switched to — the chart shows A while
+    // the dropdown says B, with nothing on screen admitting it. The old code
+    // had no guard at all; the memo makes fast switching pleasant enough to
+    // hit that race routinely.
+    var loadSeq = 0;
+
     function load() {
-        linerEl.textContent = 'Loading ' + currentSym() + ' ' + currentTF() + '…';
+        var sym = currentSym(), tf = currentTF();
+        var seq = ++loadSeq;
+
+        var cached = payloadMemo.get(sym, tf);
+        if (cached) {
+            applyChart(cached);
+            applyHeader(cached);
+            linerEl.textContent = sym + ' ' + tf + ' · 更新中…';
+        } else {
+            linerEl.textContent = 'Loading ' + sym + ' ' + tf + '…';
+        }
         loadBias();
         loadTickers();
-        fetch('/api/chart/data?symbol=' + encodeURIComponent(currentSym()) + '&tf=' + encodeURIComponent(currentTF()) + '&limit=' + INIT_BARS)
+        fetch('/api/chart/data?symbol=' + encodeURIComponent(sym) + '&tf=' + encodeURIComponent(tf) + '&limit=' + INIT_BARS)
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
+                if (seq !== loadSeq) { return; }   // a newer switch owns the chart now
                 if (!res.ok) {
                     showLoadError(res.body.error || 'load failed');
                     return;
                 }
+                payloadMemo.put(sym, tf, res.body);
                 // applyChart FIRST — populates allCandles + all series
                 // data. applyHeader is downstream: its 24h-stats calc
                 // reads allCandles, and it also updates the symbol
@@ -3274,6 +3338,7 @@
                 applyHeader(res.body);
             })
             .catch(function (e) {
+                if (seq !== loadSeq) { return; }
                 showLoadError('network: ' + e.message);
             });
     }
