@@ -370,6 +370,39 @@ func sideZH(side string) string {
 // safety daemon and the per-trade path works for journaled trades. Cost is one
 // AllPositions call per poll — the thing the old early return was avoiding,
 // and worth it.
+// guardCoverage splits open journal trades into the ones bracketCycle will
+// actually watch (claimed) and the ones that merely HAVE a row (journalled).
+//
+// These used to be the same set, and the difference is a hole. bracketCycle
+// skips `t.Stop <= 0`, while orphanCycle treated any open row as covered — so
+// a journalled position with no analysis stop was claimed by one guard and
+// refused by the other, and nothing watched it.
+//
+// That combination is not hypothetical, it is the default: d182cfe (2026-09-16)
+// deliberately let the journal record a position taken WITHOUT a stop, on the
+// grounds that it is "the state most worth recording". Recording it then
+// silenced the only alarm covering it. Two correct changes, one hole.
+//
+// claimed is now gated on Stop > 0 to match bracketCycle exactly. journalled
+// stays broad, and only picks the wording: a row that exists but is uncovered
+// is a different message from one nobody wrote down, and telling the user
+// "NOT IN JOURNAL" about a trade they just journalled trains them to ignore
+// the alert.
+func guardCoverage(trades []journal.Trade) (claimed, journalled map[string]bool) {
+	claimed, journalled = map[string]bool{}, map[string]bool{}
+	for _, t := range trades {
+		if !t.IsOpen() || t.IsNoFill() {
+			continue
+		}
+		key := strings.ToUpper(t.Symbol) + "|" + strings.ToLower(t.Side)
+		journalled[key] = true
+		if t.Stop > 0 { // the same filter bracketCycle applies
+			claimed[key] = true
+		}
+	}
+	return claimed, journalled
+}
+
 func orphanCycle(ctx context.Context, client *bingx.Client, n *notify.Ntfy, state map[string]*bracketState) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -386,14 +419,11 @@ func orphanCycle(ctx context.Context, client *bingx.Client, n *notify.Ntfy, stat
 	// Journal used ONLY to exclude. A read failure must not silence the scan:
 	// with no exclusions every position looks like an orphan, which
 	// over-reports rather than under-reports — the safe direction here.
-	claimed := map[string]bool{}
+	var claimed, journalled map[string]bool
 	if trades, jerr := journal.ReadAll(""); jerr == nil {
-		for _, t := range trades {
-			if t.IsOpen() && !t.IsNoFill() {
-				claimed[strings.ToUpper(t.Symbol)+"|"+strings.ToLower(t.Side)] = true
-			}
-		}
+		claimed, journalled = guardCoverage(trades)
 	} else {
+		claimed, journalled = map[string]bool{}, map[string]bool{}
 		log.Printf("bracket/orphan: journal unreadable, treating every position as unclaimed: %v", jerr)
 	}
 
@@ -445,11 +475,17 @@ func orphanCycle(ctx context.Context, client *bingx.Client, n *notify.Ntfy, stat
 			continue
 		}
 		notional := p.Notional()
-		log.Printf("bracket/orphan: %s %s NAKED and NOT IN JOURNAL — qty %g @ %g (notional %.0fu, %dx %s)",
-			short, p.Side, p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode)
-		push(ctx, n, fmt.Sprintf("🚨 %s %s 裸倉(未記錄在 journal)", short, sideZH(p.Side)),
-			fmt.Sprintf("倉位 %g @ %g\n名目 %.0fu · %dx · %s\n交易所沒有任何保護性停損\n\n這張單不在 journal 裡,所以 /ops/verify 的逐筆檢查看不到它",
-				p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode), "rotating_light")
+		why, whyZH := "NOT IN JOURNAL", "未記錄在 journal"
+		tail := "這張單不在 journal 裡,所以 /ops/verify 的逐筆檢查看不到它"
+		if journalled[key] {
+			why, whyZH = "journalled with NO analysis stop", "已記錄但沒有分析停損"
+			tail = "journal 有這筆,但 stop = 0,所以逐筆守衛會跳過它 —— 這裡是它唯一的監控"
+		}
+		log.Printf("bracket/orphan: %s %s NAKED and %s — qty %g @ %g (notional %.0fu, %dx %s)",
+			short, p.Side, why, p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode)
+		push(ctx, n, fmt.Sprintf("🚨 %s %s 裸倉(%s)", short, sideZH(p.Side), whyZH),
+			fmt.Sprintf("倉位 %g @ %g\n名目 %.0fu · %dx · %s\n交易所沒有任何保護性停損\n\n%s",
+				p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode, tail), "rotating_light")
 		st.alerted, st.lastNagged = true, time.Now()
 	}
 
