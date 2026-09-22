@@ -1190,6 +1190,9 @@ var qtyPrecision = map[string]int{
 	// from cmd/contracts 2026-09-19. A fractional size is rejected outright,
 	// so the 4-decimal fallback would have been wrong in the unsafe direction.
 	"XRP": 0,
+	// Whole units for both; AKE additionally has a 38-unit minimum order, so a
+	// scale-out leg below that is rejected outright. cmd/contracts 2026-09-22.
+	"AKE": 0, "UNI": 0,
 }
 
 func floorTo(v float64, decimals int) float64 {
@@ -2877,11 +2880,21 @@ func shortVerdictTag(v string) string {
 // templateFuncs exposes formatting helpers to the templates.
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
+		// Four decimals is right for everything quoted at or above 1, and
+		// wrong below it: AKE quotes to SIX and rendered 0.054028 as "0.0540",
+		// so two distinct prices displayed as one. Sub-1 values get the full
+		// six with trailing zeros trimmed, which leaves every existing display
+		// byte-identical (0.805100 -> "0.8051") and stops the truncation.
 		"fmtPrice": func(v float64) string {
 			if v == 0 {
 				return "-"
 			}
-			return fmt.Sprintf("%.4f", v)
+			if math.Abs(v) >= 1 {
+				return fmt.Sprintf("%.4f", v)
+			}
+			s := strconv.FormatFloat(v, 'f', 6, 64)
+			s = strings.TrimRight(s, "0")
+			return strings.TrimSuffix(s, ".")
 		},
 		"fmtPct": func(v float64) string {
 			return fmt.Sprintf("%+.4f%%", v*100)
@@ -3577,14 +3590,14 @@ func techSideStr(s signal.Side) string {
 // then the forward-log symbols (stock synthetics + crypto-alt StructMomentum
 // candidates). NOT the same as market.All() — the forward-log ones stay out of
 // the daemon scan + ntfy until live data clears the ship-gate.
-var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SPCX", "MSTR", "APP", "SOL", "LINK", "SUI", "HYPE", "NEAR", "XRP"}
+var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SPCX", "MSTR", "APP", "SOL", "LINK", "SUI", "HYPE", "NEAR", "XRP", "AKE", "UNI"}
 
 // Forward-log groups shown as separate labelled sections on the Scan dashboard
 // (each scanned via scanOne, none in market.All()). Stocks get the fundamental
 // overlay; alts run their assigned strategy (StructMomentum for SOL/LINK/SUI/
 // HYPE per strategyFor, MR for NEAR).
 var fwdStockSymbols = []string{"SNDK", "NVDA", "SPCX", "MSTR", "APP"}
-var fwdAltSymbols = []string{"SOL", "LINK", "SUI", "HYPE", "NEAR", "XRP"}
+var fwdAltSymbols = []string{"SOL", "LINK", "SUI", "HYPE", "NEAR", "XRP", "AKE", "UNI"}
 
 func defaultStr(v, fallback string) string {
 	if v == "" {

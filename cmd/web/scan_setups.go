@@ -269,7 +269,7 @@ func webScanSymbol(short string) (market.Symbol, bool) {
 		"SNDK": market.SNDKUSDT, "NVDA": market.NVDAUSDT,
 		"SPCX": market.SPCXUSDT, "MSTR": market.MSTRUSDT, "APP": market.APPUSDT,
 		"SOL": market.SOLUSDT, "LINK": market.LINKUSDT, "SUI": market.SUIUSDT, "NEAR": market.NEARUSDT, "HYPE": market.HYPEUSDT,
-		"XRP": market.XRPUSDT,
+		"XRP": market.XRPUSDT, "AKE": market.AKEUSDT, "UNI": market.UNIUSDT,
 	}
 	sym, ok := m[short]
 	return sym, ok

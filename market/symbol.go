@@ -59,6 +59,22 @@ const (
 	// StructMomentum's alt expansion (XRP included) is still BLOCKED — one pass
 	// in six tested pairs. Adding a contract code is not adding a strategy.
 	XRPUSDT Symbol = "XRP-USDT"
+
+	// Added 2026-09-22, same discipline as XRP: traded, so reconcilable.
+	// AKE was held 2026-09-19 (+34.49u all-in) and was invisible to every
+	// tool until /ops/fills started enumerating from the account ledger —
+	// journal row #88 names it as free text and could not resolve to a
+	// contract, so it could not be verified or protected. A symbol that can
+	// hold a position and cannot be looked up is half-supported.
+	//
+	// AKE quotes to SIX decimals and its minimum order is 38 units, both well
+	// outside the range the other contracts occupy; UNI is ordinary. Both
+	// trade in whole units (quantityPrecision 0), read off cmd/contracts.
+	//
+	// Neither is in All() and neither is in signal.strategyFor, so both run
+	// the MR engine. StructMomentum's alt expansion stays BLOCKED.
+	AKEUSDT Symbol = "AKE-USDT"
+	UNIUSDT Symbol = "UNI-USDT"
 )
 
 func (s Symbol) IsMetal() bool {

@@ -255,3 +255,43 @@ func TestScaleOutFullFirstLegLeavesNoRemainder(t *testing.T) {
 		t.Errorf("remainder after a 100%% first leg = %v, want <= 0 so TP2 is skipped", got)
 	}
 }
+
+// AKE and UNI both trade in whole units. The 4-decimal fallback in lotPrec
+// would have been wrong in the direction that gets an order rejected.
+func TestLotPrecForNewAltSymbols(t *testing.T) {
+	for _, sym := range []string{"AKE", "UNI", "XRP"} {
+		if got := lotPrec(sym); got != 0 {
+			t.Errorf("lotPrec(%s) = %d, want 0 (whole units, per cmd/contracts)", sym, got)
+		}
+		// A fractional partial must floor away entirely rather than round up
+		// into a size the exchange refuses.
+		if got := partialQty(sym, 101, 50); got != 50 {
+			t.Errorf("partialQty(%s, 101, 50%%) = %v, want 50", sym, got)
+		}
+	}
+}
+
+// fmtPrice rendered AKE's 0.054028 as "0.0540", so two distinct prices showed
+// as one number on the verify card and in the journal. Widening the sub-1
+// branch must not disturb anything already displayed.
+func TestFmtPriceKeepsPrecisionBelowOne(t *testing.T) {
+	f := templateFuncs()["fmtPrice"].(func(float64) string)
+	cases := []struct {
+		in   float64
+		want string
+	}{
+		{0, "-"},
+		{86048.5, "86048.5000"}, // >= 1 path untouched
+		{1.5174, "1.5174"},
+		{0.8051, "0.8051"},     // was "0.8051" before the change
+		{0.6878, "0.6878"},     // was "0.6878"
+		{0.054028, "0.054028"}, // was "0.0540" — the bug
+		{0.061924, "0.061924"},
+		{0.5, "0.5"},
+	}
+	for _, c := range cases {
+		if got := f(c.in); got != c.want {
+			t.Errorf("fmtPrice(%v) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
