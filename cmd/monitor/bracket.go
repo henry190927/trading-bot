@@ -78,6 +78,13 @@ type bracketState struct {
 	alerted    bool   // an unprotected alarm is currently outstanding
 	placedID   string // the stop this loop last placed, for the log
 	failures   int
+
+	// firstSeen / nags drive the escalating message. Without them every push
+	// is identical and the tray stops being read — see naked_alert.go.
+	// Cleared with the rest of the entry when the position goes away, so a
+	// reopened one starts its clock again rather than inheriting a stale age.
+	firstSeen time.Time
+	nags      int
 }
 
 func runBracketGuard(ctx context.Context, client *bingx.Client) {
@@ -466,27 +473,50 @@ func orphanCycle(ctx context.Context, client *bingx.Client, n *notify.Ntfy, stat
 		}
 		if protected {
 			if st.alerted {
-				log.Printf("bracket/orphan: %s %s — RESOLVED, a protective stop is now live", short, p.Side)
+				log.Printf("bracket/orphan: %s %s — RESOLVED after %s and %d alerts, a protective stop is now live",
+					short, p.Side, shortDur(time.Since(st.firstSeen)), st.nags)
 				st.alerted = false
 			}
+			// Reset the clock: a position protected, then stripped again, is a
+			// new exposure and should not report the older one's age.
+			st.firstSeen, st.nags = time.Time{}, 0
 			continue
 		}
 		if st.alerted && time.Since(st.lastNagged) < bracketRenagEvery {
 			continue
 		}
-		notional := p.Notional()
-		why, whyZH := "NOT IN JOURNAL", "未記錄在 journal"
-		tail := "這張單不在 journal 裡,所以 /ops/verify 的逐筆檢查看不到它"
-		if journalled[key] {
-			why, whyZH = "journalled with NO analysis stop", "已記錄但沒有分析停損"
-			tail = "journal 有這筆,但 stop = 0,所以逐筆守衛會跳過它 —— 這裡是它唯一的監控"
+		now := time.Now()
+		if st.firstSeen.IsZero() {
+			st.firstSeen = now
 		}
-		log.Printf("bracket/orphan: %s %s NAKED and %s — qty %g @ %g (notional %.0fu, %dx %s)",
-			short, p.Side, why, p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode)
-		push(ctx, n, fmt.Sprintf("🚨 %s %s 裸倉(%s)", short, sideZH(p.Side), whyZH),
-			fmt.Sprintf("倉位 %g @ %g\n名目 %.0fu · %dx · %s\n交易所沒有任何保護性停損\n\n%s",
-				p.Quantity, p.EntryPrice, notional, p.Leverage, p.MarginMode, tail), "rotating_light")
-		st.alerted, st.lastNagged = true, time.Now()
+		st.nags++
+
+		// Secondary reads, best effort. They feed the lines that make one push
+		// differ from the last, but an alarm withheld because a mark price
+		// timed out would be strictly worse than an alarm missing a line.
+		var mark, equity float64
+		if fr, ferr := client.FundingRate(ctx, p.Symbol); ferr == nil {
+			mark = fr.MarkPrice
+		}
+		if bal, berr := client.AccountBalance(ctx); berr == nil && bal.Equity != nil {
+			equity = *bal.Equity
+		}
+
+		a := nakedAlert{
+			Short: short, Side: p.Side, Qty: p.Quantity, Entry: p.EntryPrice,
+			Mark: mark, Leverage: p.Leverage, MarginMode: p.MarginMode,
+			Equity: equity, Naked: now.Sub(st.firstSeen), Nag: st.nags,
+			Journalled: journalled[key],
+		}
+		why := "NOT IN JOURNAL"
+		if a.Journalled {
+			why = "journalled with NO analysis stop"
+		}
+		log.Printf("bracket/orphan: %s %s NAKED and %s — qty %g @ %g (notional %.0fu, %dx %s) naked %s nag #%d",
+			short, p.Side, why, p.Quantity, p.EntryPrice, a.notional(), p.Leverage, p.MarginMode,
+			shortDur(a.Naked), a.Nag)
+		push(ctx, n, a.Title(), a.Body(), "rotating_light")
+		st.alerted, st.lastNagged = true, now
 	}
 
 	// Drop state for positions that no longer exist, so a reopened one cannot
