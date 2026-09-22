@@ -43,8 +43,8 @@ func BuildSummary(sig Signal, diag DiagnoseView) string {
 // (validator imports signal; signal can't import validator). Callers
 // translate from validator.Result.
 type DiagnoseView struct {
-	Has          bool   // false when no validator result is available
-	Side         Side   // validator's recommended side
+	Has          bool // false when no validator result is available
+	Side         Side // validator's recommended side
 	Total        float64
 	TotalMR      float64
 	TotalMOM     float64

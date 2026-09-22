@@ -53,7 +53,19 @@ func EvalAutoTrigger(ctx context.Context, client *bingx.Client, sym market.Symbo
 	case "range-edge":
 		return evalRangeEdge(ctx, client, sym, r)
 	case "engine":
-		return evalEngine(ctx, client, sym, r)
+		// Whatever strategyFor says this (symbol, TF) is — MR for most,
+		// StructMomentum for the allowlisted alts.
+		return evalEngine(ctx, client, sym, r, signal.StrategyUnset)
+	case "struct-momentum":
+		// Explicitly the trend-continuation strategy, allowlist or not.
+		//
+		// It was already REACHABLE before this, but only by accident: an
+		// "engine" rule on a symbol strategyFor happened to agree with. The
+		// book had one continuation-capable rule out of seventeen and nothing
+		// in autotrade.json said which one — you had to cross-reference the
+		// allowlist in Go source to find out it was SOL 1h. A rule names a
+		// (symbol, strategy, TF) triple; the strategy should be one of them.
+		return evalEngine(ctx, client, sym, r, signal.StrategyStructMomentum)
 	case "sweep-reject":
 		return evalSweepReject(ctx, client, sym, r)
 	case "htf-snr":
@@ -175,7 +187,7 @@ func autoMinScore() int {
 	return 3
 }
 
-func evalEngine(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule) Trigger {
+func evalEngine(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule, force signal.StrategyKind) Trigger {
 	tf := market.Timeframe(r.TF)
 	candles, err := client.Klines(ctx, sym, tf, 300)
 	if err != nil || len(candles) < 50 {
@@ -196,6 +208,7 @@ func evalEngine(ctx context.Context, client *bingx.Client, sym market.Symbol, r 
 	}
 	s := signal.Evaluate(signal.Inputs{
 		Symbol: sym, Timeframe: tf, Candles: candles, Ctx: sigCtx, Bias: bias, LiveMarkPrice: markPrice,
+		ForceStrategy: force,
 	})
 	if s.Side == signal.Flat || s.Plan.Entry <= 0 || s.Plan.StopLoss <= 0 {
 		return Trigger{}

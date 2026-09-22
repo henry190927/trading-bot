@@ -17,19 +17,19 @@ func mkC(high, low, close float64) market.Candle {
 // idx11-12 stay below the high; the caller supplies the terminal bar.
 func upStructure(lastHigh, lastLow, lastClose float64) []market.Candle {
 	cs := []market.Candle{
-		mkC(105, 100, 102), // 0
-		mkC(104, 99, 101),  // 1
-		mkC(103, 98, 100),  // 2
-		mkC(102, 97, 99),   // 3
-		mkC(101, 96, 98),   // 4
-		mkC(100, 95, 97),   // 5
-		mkC(99, 94, 96),    // 6
-		mkC(98, 93, 95),    // 7  <- swing low (L=93)
-		mkC(101, 95, 100),  // 8
-		mkC(104, 97, 103),  // 9
-		mkC(112, 100, 110), // 10 <- swing high (H=112)
-		mkC(108, 99, 105),  // 11
-		mkC(107, 100, 104), // 12
+		mkC(105, 100, 102),                // 0
+		mkC(104, 99, 101),                 // 1
+		mkC(103, 98, 100),                 // 2
+		mkC(102, 97, 99),                  // 3
+		mkC(101, 96, 98),                  // 4
+		mkC(100, 95, 97),                  // 5
+		mkC(99, 94, 96),                   // 6
+		mkC(98, 93, 95),                   // 7  <- swing low (L=93)
+		mkC(101, 95, 100),                 // 8
+		mkC(104, 97, 103),                 // 9
+		mkC(112, 100, 110),                // 10 <- swing high (H=112)
+		mkC(108, 99, 105),                 // 11
+		mkC(107, 100, 104),                // 12
 		mkC(lastHigh, lastLow, lastClose), // 13 terminal bar
 	}
 	return cs

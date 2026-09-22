@@ -9,6 +9,7 @@ package autotrade
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"strings"
 )
@@ -75,7 +76,39 @@ func Load() Config {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return Default()
 	}
+	for _, name := range c.UnknownStrategies() {
+		log.Printf("autotrade: rule names unknown strategy %q — it will never fire. Known: %s",
+			name, strings.Join(KnownStrategies, " "))
+	}
 	return c
+}
+
+// KnownStrategies is every value autostrat.EvalAutoTrigger dispatches on. A
+// rule naming anything else falls through that switch to an empty Trigger, so
+// it loads, renders on the /ops panel, and silently never fires — which looks
+// exactly like a rule whose trigger conditions have not been met.
+//
+// Kept here rather than in autostrat because autostrat imports autotrade; a
+// test in autostrat pins the two lists together so adding a case there without
+// adding it here fails the build gate rather than the next hand-edit.
+var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "struct-momentum"}
+
+// UnknownStrategies returns the rule strategy names this build cannot execute.
+func (c Config) UnknownStrategies() []string {
+	known := map[string]bool{}
+	for _, k := range KnownStrategies {
+		known[k] = true
+	}
+	seen, out := map[string]bool{}, []string(nil)
+	for _, r := range c.Rules {
+		n := strings.TrimSpace(r.Strategy)
+		if n == "" || known[n] || seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out
 }
 
 // LiveArmed reports whether REAL orders are permitted: config master on, paper

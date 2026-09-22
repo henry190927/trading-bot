@@ -15,7 +15,7 @@ func buildTestCandles(endUTC time.Time, n int) []market.Candle {
 	out := make([]market.Candle, n)
 	base := 100.0
 	for i := 0; i < n; i++ {
-		close := endUTC.Add(time.Duration(-(n-1-i)) * time.Hour)
+		close := endUTC.Add(time.Duration(-(n - 1 - i)) * time.Hour)
 		open := close.Add(-time.Hour)
 		p := base + float64(i%7) - 3 // oscillate ±3, no randomness
 		out[i] = market.Candle{

@@ -11,9 +11,18 @@ import (
 type StrategyKind int
 
 const (
+	// StrategyUnset is the zero value and means "decide from the allowlist".
+	//
+	// It exists so Inputs.ForceStrategy can be omitted. Without it StrategyMR
+	// would be 0, an unset field would read as an explicit demand for MR, and
+	// every caller that never heard of the override would silently start
+	// forcing it — including the daemon scan, which must keep honouring
+	// strategyFor. A zero value that means something is a zero value that
+	// happens by accident.
+	StrategyUnset StrategyKind = iota
 	// StrategyMR is the original mean-reversion + confluence engine (the
 	// entire body of Evaluate below the dispatch). Default for every symbol.
-	StrategyMR StrategyKind = iota
+	StrategyMR
 	// StrategyStructMomentum is the trend/structure-aligned strategy:
 	// BOS-continuation retrace into the 樞紐區. Better fit for trend-driven
 	// alts where mean-reversion fights the move. See
@@ -222,8 +231,11 @@ func StrategyFor(sym market.Symbol, tf market.Timeframe) StrategyKind {
 
 // String renders the strategy for tagging/display.
 func (k StrategyKind) String() string {
-	if k == StrategyStructMomentum {
+	switch k {
+	case StrategyStructMomentum:
 		return "struct-momentum"
+	case StrategyUnset:
+		return "auto"
 	}
 	return "mr"
 }

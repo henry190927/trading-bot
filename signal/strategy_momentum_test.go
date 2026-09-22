@@ -274,3 +274,61 @@ func TestStructMomentumOffBeatsTheRegimeSelector(t *testing.T) {
 			got.Side, got.Score, want.Side, want.Score)
 	}
 }
+
+// ForceStrategy lets an autotrade rule name its strategy instead of inheriting
+// whatever strategyFor decided for the symbol. BTC is NOT on the allowlist, so
+// only the override can route it to StructMomentum.
+func TestForceStrategyOverridesTheAllowlist(t *testing.T) {
+	cs := staircaseUp(8)
+	if strategyFor(market.BTCUSDT, "1h") != StrategyMR {
+		t.Fatal("precondition: BTC 1h must be MR, or this proves nothing")
+	}
+
+	auto := Evaluate(Inputs{Symbol: market.BTCUSDT, Timeframe: "1h", Candles: cs})
+	forced := Evaluate(Inputs{Symbol: market.BTCUSDT, Timeframe: "1h", Candles: cs,
+		ForceStrategy: StrategyStructMomentum})
+
+	if auto.Side == forced.Side && auto.Score == forced.Score && auto.MRScore == forced.MRScore {
+		t.Fatalf("ForceStrategy is inert: both returned side=%v score=%v mr=%v",
+			auto.Side, auto.Score, auto.MRScore)
+	}
+	if forced.MRScore != 0 {
+		t.Errorf("forced arm returned MRScore=%v — it did not take the StructMomentum path", forced.MRScore)
+	}
+}
+
+// The zero value must mean "ask the allowlist", not "force MR". StrategyMR
+// used to be iota 0, so an omitted field would have silently forced MR on
+// every caller that never heard of the override — including the daemon scan,
+// which has to keep honouring strategyFor.
+func TestForceStrategyZeroValueDefersToTheAllowlist(t *testing.T) {
+	if StrategyUnset != 0 {
+		t.Fatal("StrategyUnset must be the zero value or an omitted ForceStrategy means something")
+	}
+	if StrategyMR == StrategyUnset || StrategyStructMomentum == StrategyUnset {
+		t.Fatal("StrategyUnset must be distinct from both real strategies")
+	}
+	cs := staircaseUp(8)
+	in := Inputs{Symbol: market.SOLUSDT, Timeframe: "1h", Candles: cs} // SOL 1h IS on the allowlist
+	omitted := Evaluate(in)
+	in.ForceStrategy = StrategyUnset
+	explicit := Evaluate(in)
+	if omitted.Side != explicit.Side || omitted.Score != explicit.Score {
+		t.Error("an omitted ForceStrategy must behave exactly like StrategyUnset")
+	}
+	// And it must still be SM, because the allowlist says so.
+	if omitted.MRScore != 0 {
+		t.Errorf("SOL 1h should still run StructMomentum via the allowlist, got MRScore=%v", omitted.MRScore)
+	}
+}
+
+// Forcing MR must be expressible too, or the override is half a feature.
+func TestForceStrategyCanPinMROnAnSMSymbol(t *testing.T) {
+	cs := staircaseUp(8)
+	sm := Evaluate(Inputs{Symbol: market.SOLUSDT, Timeframe: "1h", Candles: cs})
+	mr := Evaluate(Inputs{Symbol: market.SOLUSDT, Timeframe: "1h", Candles: cs,
+		ForceStrategy: StrategyMR})
+	if sm.Side == mr.Side && sm.Score == mr.Score && sm.MRScore == mr.MRScore {
+		t.Fatal("ForceStrategy: StrategyMR is inert on an allowlisted SM symbol")
+	}
+}

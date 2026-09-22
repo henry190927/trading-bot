@@ -126,11 +126,11 @@ func FindSwingPoints(candles []market.Candle, strength int, cap int) []SwingPoin
 type StructEventKind int
 
 const (
-	EvNone StructEventKind = iota
-	EvBOSUp        // close broke above the last swing high (up-leg continuation)
-	EvBOSDown      // close broke below the last swing low (down-leg continuation)
-	EvCHoCHUp      // in a down-leg, close broke above the last swing high (bullish shift)
-	EvCHoCHDown    // in an up-leg, close broke below the last swing low (bearish shift)
+	EvNone      StructEventKind = iota
+	EvBOSUp                     // close broke above the last swing high (up-leg continuation)
+	EvBOSDown                   // close broke below the last swing low (down-leg continuation)
+	EvCHoCHUp                   // in a down-leg, close broke above the last swing high (bullish shift)
+	EvCHoCHDown                 // in an up-leg, close broke below the last swing low (bearish shift)
 )
 
 func (k StructEventKind) String() string {

@@ -86,6 +86,28 @@ type Inputs struct {
 	Trades    []market.Trade // optional, for CVD divergence
 	Ctx       Context        // optional perp context
 
+	// ForceStrategy overrides the per-symbol allowlist for THIS call only.
+	//
+	// The allowlist answers "is this symbol a momentum symbol?", which is the
+	// right question for the daemon scan and the wrong one for an autotrade
+	// rule: a rule names a (symbol, strategy, TF) triple explicitly, and until
+	// now the only way to get StructMomentum was to name a symbol strategyFor
+	// already agreed with. The autotrade book therefore had exactly one
+	// continuation-capable rule out of seventeen, by accident rather than
+	// design — SOL engine 1h, which is momentum only because strategyFor says
+	// so, and nothing in autotrade.json says it.
+	//
+	// Per-call rather than a global: StructMomentumEnabled exists for A/B runs
+	// and flipping it from a daemon goroutine would change what every other
+	// goroutine computes mid-scan.
+	//
+	// It does NOT bypass anything. Evaluate runs the macro and earnings
+	// blackout gates before it reaches the dispatch, so a forced call is gated
+	// exactly like an ordinary one — the reason this is a field here instead
+	// of an exported evaluateStructMomentum, which would skip both.
+	// StructMomentumOff still wins, so the all-MR A/B baseline stays real.
+	ForceStrategy StrategyKind
+
 	// Bias is the higher-timeframe directional bias (Long/Short/Flat).
 	// When non-Flat, signals against this direction are suppressed.
 	// Compute with signal.Bias(higherTfCandles).
@@ -208,6 +230,9 @@ func Evaluate(in Inputs) Signal {
 	// StructMomentumOff wins over both the force-on flag and the allowlist —
 	// see its doc comment for why an SM-vs-MR A/B is inert without it.
 	useSM := StructMomentumEnabled || strategyFor(in.Symbol, in.Timeframe) == StrategyStructMomentum
+	if in.ForceStrategy != StrategyUnset {
+		useSM = in.ForceStrategy == StrategyStructMomentum
+	}
 	if StructMomentumRegime {
 		// Replaces the per-symbol question with a per-bar one — see
 		// StructMomentumRegime for why the allowlist cannot express it.
