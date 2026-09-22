@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/henry190927/trading-bot/market"
 )
 
 func (s *server) handleOpsFills(c *gin.Context) {
@@ -31,16 +32,6 @@ func (s *server) handleOpsFills(c *gin.Context) {
 			hours = n
 		}
 	}
-	// Default to every symbol the UI knows rather than requiring one: the
-	// caller reconciling a journal usually wants "what did I actually do",
-	// not one instrument at a time.
-	var want []string
-	if q := strings.TrimSpace(c.Query("symbol")); q != "" {
-		want = strings.Split(strings.ToUpper(q), ",")
-	} else {
-		want = uiSymbols
-	}
-
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
 	defer cancel()
 	end := time.Now()
@@ -49,11 +40,49 @@ func (s *server) handleOpsFills(c *gin.Context) {
 	tpe := time.FixedZone("Asia/Taipei", 8*3600)
 	rows := []gin.H{}
 	problems := []string{}
-	for _, short := range want {
-		sym, err := resolveWebSymbol(strings.TrimSpace(short))
-		if err != nil {
-			problems = append(problems, short+": "+err.Error())
-			continue
+
+	// WHICH symbols to ask about comes from the ACCOUNT, not from a list the
+	// UI happens to know. Iterating uiSymbols made two real trades invisible
+	// inside three days — XRP on 2026-09-18 and AKE on 2026-09-19 — and
+	// neither was a missing entry so much as the wrong direction of
+	// enumeration: a hardcoded roster is a guess about the past, and this
+	// endpoint exists precisely for the trades nobody remembered to expect.
+	// Same inversion exchangeOrphans applies to positions.
+	//
+	// ?symbol= still wins, for pulling one instrument deliberately.
+	var want []market.Symbol
+	discovery := "account income ledger"
+	if q := strings.TrimSpace(c.Query("symbol")); q != "" {
+		discovery = "explicit ?symbol="
+		for _, short := range strings.Split(strings.ToUpper(q), ",") {
+			sym, err := resolveWebSymbol(strings.TrimSpace(short))
+			if err != nil {
+				problems = append(problems, short+": "+err.Error())
+				continue
+			}
+			want = append(want, sym)
+		}
+	} else if syms, err := s.client.TradedSymbols(ctx, start, end); err == nil {
+		want = syms
+	} else {
+		// Falling back is right — an unreadable ledger must not render as "no
+		// trades" — but the caller has to know the list went back to being a
+		// guess, because that is exactly when a symbol goes missing again.
+		discovery = "FALLBACK to uiSymbols — ledger unreadable"
+		problems = append(problems, "income ledger: "+err.Error())
+		for _, short := range uiSymbols {
+			if sym, rerr := resolveWebSymbol(short); rerr == nil {
+				want = append(want, sym)
+			}
+		}
+	}
+
+	for _, sym := range want {
+		// A contract with no short name is still a contract that traded; the
+		// raw code labels it rather than dropping the row.
+		short := market.Short(sym)
+		if short == "" {
+			short = string(sym)
 		}
 		fills, err := s.client.OrderHistory(ctx, sym, start, end)
 		if err != nil {
@@ -73,8 +102,18 @@ func (s *server) handleOpsFills(c *gin.Context) {
 			})
 		}
 	}
+	labels := make([]string, 0, len(want))
+	for _, sym := range want {
+		if sh := market.Short(sym); sh != "" {
+			labels = append(labels, sh)
+		} else {
+			labels = append(labels, string(sym))
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"fills": rows, "n": len(rows),
+		"discovery":   discovery,
+		"queried":     labels,
 		"windowHours": hours,
 		"fromTPE":     start.In(tpe).Format("2006-01-02 15:04"),
 		"toTPE":       end.In(tpe).Format("2006-01-02 15:04"),
