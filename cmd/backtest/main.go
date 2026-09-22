@@ -24,7 +24,7 @@ func main() {
 	useBias := flag.Bool("bias", false, "enable MTF bias filter (off by default — backtest shows it hurts mean-reversion edge)")
 	days := flag.Int("days", 60, "history window in days")
 	threshold := flag.Int("min-score", 3, "minimum confluence score to take a trade")
-	maxHold := flag.Int("hold", 24, "max bars to hold before timing out")
+	maxHold := flag.Int("hold", 24, "max bars to hold before timing out. A/B'd 2026-09-22 over 8/12/24/48/72 x 60/90/120d x BTC/ETH/XAU/XAG/SOL: 18 of 20 gate runs FAIL against the 24 default, which therefore stays. The two passes are SOL 1h at 48 and 72 — adjacent params, and netR rises monotonically there from 24 upward in all three windows, which is mechanism-consistent because SOL 1h runs StructMomentum and a momentum strategy wants room to run. NOT shipped: 2 passes out of 20 comparisons is what noise looks like, and a per-(symbol,TF) hold needs its own confirmation window first.")
 	feeBps := flag.Float64("fee-bps", 6, "round-trip fee in basis points (BingX maker 4, mixed 6, taker 10)")
 	sweepOnly := flag.Bool("sweep-only", false, "skip trades whose entry isn't anchored to a liquidity sweep")
 	stopRefine := flag.Bool("stop-refine", false, "enable widening stops past obstacles (HVN/equal levels). default off — backtest shows it hurts net R within 24-bar hold")

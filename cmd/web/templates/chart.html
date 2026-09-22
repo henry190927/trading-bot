@@ -3296,6 +3296,52 @@
         };
     })();
 
+    // F5 — warm the memo for starred symbols while the tab is idle.
+    //
+    // F4 makes the SECOND visit to a symbol instant. This makes the first one
+    // instant too, for the handful the desk actually rotates between. It only
+    // ever writes to payloadMemo — a prefetch must never touch the chart, or a
+    // response landing mid-interaction would redraw a symbol nobody asked for.
+    //
+    // Serialised, not parallel. The VPS has two vCPUs and a limit=400 payload
+    // is the expensive call on it; four at once while the user is panning would
+    // slow down the thing this exists to speed up. One at a time, only while
+    // the tab is visible, only on idle, and only for the current timeframe,
+    // which is the only one a switch would need.
+    var prefetchDone = false;
+    function prefetchFavourites() {
+        if (prefetchDone) return;
+        prefetchDone = true;
+        if (typeof favs === 'undefined') return;
+
+        var tf = currentTF(), here = currentSym();
+        var list = Object.keys(favs).filter(function (k) {
+            return favs[k] && k !== here && !payloadMemo.get(k, tf);
+        }).slice(0, 4);          // payloadMemo holds 8; leave room for browsing
+        if (!list.length) return;
+
+        var i = 0;
+        function next() {
+            if (i >= list.length) return;
+            if (document.hidden) { setTimeout(next, 5000); return; }
+            var sym = list[i++];
+            fetch('/api/chart/data?symbol=' + encodeURIComponent(sym) + '&tf=' + encodeURIComponent(tf) + '&limit=' + INIT_BARS)
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (body) {
+                    // A failed prefetch is a non-event: the switch simply pays
+                    // the round trip it would have paid anyway.
+                    if (body && !body.error) payloadMemo.put(sym, tf, body);
+                })
+                .catch(function () { /* best effort, by design */ })
+                .then(next);
+        }
+        if (window.requestIdleCallback) {
+            requestIdleCallback(next, { timeout: 4000 });
+        } else {
+            setTimeout(next, 1500);
+        }
+    }
+
     // Monotonic request token. Without it a slow response for the symbol you
     // just left overwrites the one you switched to — the chart shows A while
     // the dropdown says B, with nothing on screen admitting it. The old code
@@ -3336,6 +3382,7 @@
                 // that only refreshing the page cleared.
                 applyChart(res.body);
                 applyHeader(res.body);
+                prefetchFavourites();
             })
             .catch(function (e) {
                 if (seq !== loadSeq) { return; }
