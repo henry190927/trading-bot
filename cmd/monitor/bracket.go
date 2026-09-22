@@ -521,9 +521,22 @@ func orphanCycle(ctx context.Context, client *bingx.Client, n *notify.Ntfy, stat
 
 	// Drop state for positions that no longer exist, so a reopened one cannot
 	// inherit a stale nag timer.
-	for k := range state {
-		if !live[k] {
-			delete(state, k)
+	//
+	// A position that was ALARMING and is now gone gets a closing line first.
+	// Without it the only evidence is that the pushes stopped, and silence is
+	// indistinguishable from three different outcomes: the stop went on (which
+	// logs RESOLVED), the position closed (which logged nothing), or this loop
+	// died. The third is the one worth knowing about, and it looked exactly
+	// like the second — XRP closed 2026-09-22 18:06:45 after 8 alerts and the
+	// log says nothing about it at all.
+	for k, st := range state {
+		if live[k] {
+			continue
 		}
+		if st.alerted {
+			log.Printf("bracket/orphan: %s — CLOSED, position gone after %s and %d alerts (no stop was ever attached)",
+				k, shortDur(time.Since(st.firstSeen)), st.nags)
+		}
+		delete(state, k)
 	}
 }
