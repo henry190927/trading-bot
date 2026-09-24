@@ -146,6 +146,11 @@
       <a href="?since=2026-09-23">09-23 起(剪枝後)</a> ·
       <a href="?">全部</a>
       <br><span class="cs-dim">日誌從不刪減 —— 這只是讀取時的篩選,換回「全部」就看得到原本的數字。</span>
+      {{if .CapBlocked}}
+      <br><span class="cs-dim">已套用 caps:另有 <b>{{.CapBlocked}}</b> 筆 fire 被上限擋下(同標的同向 / 同時倉數 / 保證金 / 日虧熔斷),
+      不計入任何數字 —— 執行器當下也不會開它們。這是拿<b>今天</b>的 caps 回放整段歷史,不是當時實際跑的設定。
+      {{range $k, $v := .CapReasons}}<br>&nbsp;&nbsp;· {{$k}} × {{$v}}{{end}}</span>
+      {{end}}
     </p>
     {{if .Fires}}
     <div class="dt-scroll">

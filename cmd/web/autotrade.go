@@ -185,7 +185,11 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// portfolio views — and dedup is history-dependent (a dropped fire frees
 	// the slot and resets the cooldown), so the two passes disagreed about the
 	// same recent fires, not just about how many they covered.
-	positions := autotrade.DedupFires(oldest, 6, cooldown, time.Hour, resolve)
+	// Caps applied, via the executor's own CheckCaps — see autotrade.ReplayWithCaps.
+	// DedupFires only enforced one-position-per-rule, so three ETH rules firing
+	// the same bar on the same side produced three positions where the live
+	// MaxSameSymbolSide=1 admits one.
+	positions, capBlocked := autotrade.ReplayWithCaps(oldest, cfg, 6, cooldown, time.Hour, resolve)
 	statTrades, statUnscoreable := rTradesFromPositions(positions)
 	statOpenR, statOpenN := openUnrealR(positions)
 
@@ -251,6 +255,8 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"Fires":       rows,
 		"PageSize":    autotradePageSize,
 		"Since":       sinceLabel,
+		"CapBlocked":  len(capBlocked),
+		"CapReasons":  blockedReasons(capBlocked),
 		"FiresRead":   len(fires),
 		"Sum":         sum,
 		"Equity":      buildEquityCurve(statTrades),
@@ -282,6 +288,23 @@ func reverseNormalised(fires []autotrade.PaperFire) []autotrade.PaperFire {
 			}
 		}
 		out[len(fires)-1-i] = f
+	}
+	return out
+}
+
+// blockedReasons folds the caps refusals into "reason → count" for the panel.
+// Which cap did the blocking matters: same-symbol-side is a concentration
+// decision the desk made on purpose, whereas the concurrency or margin ceiling
+// biting would mean the book is simply too small for its rule count — a
+// different problem with a different fix.
+func blockedReasons(bs []autotrade.Blocked) map[string]int {
+	out := map[string]int{}
+	for _, b := range bs {
+		k := b.Reason
+		if i := strings.Index(k, ":"); i > 0 {
+			k = k[:i] // "max-same-symbol-side: BTC long ..." → "max-same-symbol-side"
+		}
+		out[k]++
 	}
 	return out
 }
