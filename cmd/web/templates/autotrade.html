@@ -132,6 +132,13 @@
 
   <div class="stats-card">
     <h2 class="section-title">Positions <span class="section-meta">一倉一單 · newest first · ＋N = 收合的每小時重複進場</span></h2>
+    {{if ge .FiresShown .FiresCap}}
+    <p class="glossary-hint" style="margin:.1rem 0 .5rem">
+      ⓘ 表格只列<b>最近 {{.FiresCap}} 筆</b>(共讀入 {{.FiresRead}} 筆 fire) ——
+      上方的 net R、breakdown、曲線和日曆<b>全部讀滿 {{.FiresRead}} 筆</b>,不受這個上限影響。
+      表格最舊的一列不是資料的起點。
+    </p>
+    {{end}}
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">

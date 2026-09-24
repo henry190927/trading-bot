@@ -220,11 +220,19 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"MaxSameSide": cfg.MaxSameSymbolSide,
 		"Rules":       cfg.Rules,
 		"Fires":       rows,
-		"Sum":         sum,
-		"Equity":      buildEquityCurve(statTrades),
-		"Histogram":   buildRHistogram(statTrades),
-		"Calendar":    buildDailyCalendar(statTrades, 42),
-		"StatN":       len(statTrades),
+		// The table is capped and the page never said so: a reader saw it end
+		// on 09-15 and concluded the data stopped there, while the breakdown
+		// directly above claimed 137 positions. Same display-vs-reality shape
+		// this file was already fixed for once — a subset that does not
+		// announce itself is indistinguishable from the whole.
+		"FiresShown": len(rows),
+		"FiresRead":  len(fires),
+		"FiresCap":   autotradeDisplayRows,
+		"Sum":        sum,
+		"Equity":     buildEquityCurve(statTrades),
+		"Histogram":  buildRHistogram(statTrades),
+		"Calendar":   buildDailyCalendar(statTrades, 42),
+		"StatN":      len(statTrades),
 		// perfPanels labels its distribution panel with .ClosedCount.
 		"ClosedCount":     len(statTrades),
 		"StatUnscoreable": statUnscoreable,
