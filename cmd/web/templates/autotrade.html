@@ -132,13 +132,6 @@
 
   <div class="stats-card">
     <h2 class="section-title">Positions <span class="section-meta">一倉一單 · newest first · ＋N = 收合的每小時重複進場</span></h2>
-    {{if ge .FiresShown .FiresCap}}
-    <p class="glossary-hint" style="margin:.1rem 0 .5rem">
-      ⓘ 表格只列<b>最近 {{.FiresCap}} 筆</b>(共讀入 {{.FiresRead}} 筆 fire) ——
-      上方的 net R、breakdown、曲線和日曆<b>全部讀滿 {{.FiresRead}} 筆</b>,不受這個上限影響。
-      表格最舊的一列不是資料的起點。
-    </p>
-    {{end}}
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">
@@ -163,6 +156,11 @@
       </tbody>
     </table>
     </div>
+    <div id="at-pager" class="at-pager" data-size="{{.PageSize}}" hidden>
+      <button type="button" id="at-prev" class="at-pg">‹ 前一頁</button>
+      <span id="at-pglabel" class="cs-dim"></span>
+      <button type="button" id="at-next" class="at-pg">後一頁 ›</button>
+    </div>
     {{else}}
     <p class="empty">還沒有 fire —— 規則在跑,等 symbol 碰到箱邊(底/頂三分)才會進場。全在箱中間時不動。</p>
     {{end}}
@@ -175,6 +173,46 @@
   // horizontal scroll position of the fires table is preserved — a full reload
   // used to snap the table back to the leftmost column mid-read. Only runs while
   // the tab is visible.
+  (function () {
+    // Pagination for the fires table.
+    //
+    // Client-side on purpose: every row is already in the DOM (rendering them
+    // all costs nothing — liveFor memoises per symbol), so paging is a
+    // visibility toggle with no round trip and no new endpoint. It replaces a
+    // 60-row cap that silently made the table look like the end of the data.
+    //
+    // It MUST survive the 10s soft refresh below, which replaces the tbody's
+    // innerHTML wholesale: the fresh rows arrive all-visible, so applyPaging
+    // is re-run after every swap and the page index is kept outside the DOM.
+    var atPage = 0;
+    window.atApplyPaging = function () {
+      var pager = document.getElementById('at-pager');
+      var body = document.getElementById('at-fires-body');
+      if (!pager || !body) return;
+      var size = parseInt(pager.dataset.size, 10) || 50;
+      var rows = body.querySelectorAll(':scope > tr');
+      var pages = Math.max(1, Math.ceil(rows.length / size));
+      // The log grows and shrinks; clamp rather than showing an empty page.
+      if (atPage >= pages) atPage = pages - 1;
+      if (atPage < 0) atPage = 0;
+      var from = atPage * size;
+      var to = Math.min(from + size, rows.length);
+      for (var i = 0; i < rows.length; i++) rows[i].hidden = (i < from || i >= to);
+      pager.hidden = rows.length <= size;
+      var lbl = document.getElementById('at-pglabel');
+      if (lbl) lbl.textContent = (rows.length ? (from + 1) : 0) + '–' + to + ' / ' + rows.length + ' 筆';
+      var prev = document.getElementById('at-prev'), next = document.getElementById('at-next');
+      if (prev) prev.disabled = atPage === 0;
+      if (next) next.disabled = atPage >= pages - 1;
+    };
+    (function () {
+      var prev = document.getElementById('at-prev'), next = document.getElementById('at-next');
+      if (prev) prev.addEventListener('click', function () { atPage--; window.atApplyPaging(); });
+      if (next) next.addEventListener('click', function () { atPage++; window.atApplyPaging(); });
+      window.atApplyPaging();
+    })();
+  })();
+
   (function () {
     var PERIOD = 10, left = PERIOD;
     function softRefresh() {
@@ -191,6 +229,8 @@
             if (a && b && a.innerHTML !== b.innerHTML) a.innerHTML = b.innerHTML;
           }
           swap('at-fires-body');
+          // Fresh rows arrive with no hidden flags — re-apply the current page.
+          if (window.atApplyPaging) window.atApplyPaging();
           swap('at-pnl-grid');
           var u = document.getElementById('at-updated'), fu = doc.getElementById('at-updated');
           if (u && fu) u.textContent = fu.textContent;

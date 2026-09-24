@@ -18,11 +18,20 @@ import (
 // (paper=false + AUTOTRADE_ENABLED) stay env/config-side by design — no toggle here
 // (real-money arming shouldn't be a fumble-able UI button).
 // autotradeLogDepth is how far back every number on /ops/autotrade reads —
-// the same depth cmd/monitor's executor uses. autotradeDisplayRows caps the
-// fires TABLE only; it must never bound the arithmetic.
+// the same depth cmd/monitor's executor uses.
+//
+// The table used to be capped at 60 rows on top of that. The cap was correct
+// arithmetic-wise (it never bounded the stats) and wrong as a display: 60 rows
+// happened to end on 09-15, nothing said so, and the breakdown directly above
+// claimed 137 positions — so the table read as "the data stops here". Every row
+// is rendered now and the page is paginated instead, which answers the same
+// problem without a caption explaining itself.
+//
+// Rendering every row is free: liveFor memoises per symbol, so the price
+// lookups cost one call per distinct symbol regardless of row count.
 const (
-	autotradeLogDepth    = 500
-	autotradeDisplayRows = 60
+	autotradeLogDepth = 500
+	autotradePageSize = 50
 )
 
 func (s *server) handleOpsAutotrade(c *gin.Context) {
@@ -173,12 +182,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	for i := len(positions) - 1; i >= 0; i-- { // newest-first for display
 		p := positions[i]
 		f, out := p.Fire, p.Outcome
-		// Every position counts toward the summary; only the newest
-		// autotradeDisplayRows of them become table rows.
 		outs = append(outs, out)
-		if len(rows) >= autotradeDisplayRows {
-			continue
-		}
 		cur := liveFor(f.Symbol, tfFor(f))
 		curUp := (f.Side == "long" && cur >= f.Entry) || (f.Side == "short" && cur <= f.Entry)
 		rows = append(rows, fireRow{
@@ -220,19 +224,12 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"MaxSameSide": cfg.MaxSameSymbolSide,
 		"Rules":       cfg.Rules,
 		"Fires":       rows,
-		// The table is capped and the page never said so: a reader saw it end
-		// on 09-15 and concluded the data stopped there, while the breakdown
-		// directly above claimed 137 positions. Same display-vs-reality shape
-		// this file was already fixed for once — a subset that does not
-		// announce itself is indistinguishable from the whole.
-		"FiresShown": len(rows),
-		"FiresRead":  len(fires),
-		"FiresCap":   autotradeDisplayRows,
-		"Sum":        sum,
-		"Equity":     buildEquityCurve(statTrades),
-		"Histogram":  buildRHistogram(statTrades),
-		"Calendar":   buildDailyCalendar(statTrades, 42),
-		"StatN":      len(statTrades),
+		"PageSize":    autotradePageSize,
+		"Sum":         sum,
+		"Equity":      buildEquityCurve(statTrades),
+		"Histogram":   buildRHistogram(statTrades),
+		"Calendar":    buildDailyCalendar(statTrades, 42),
+		"StatN":       len(statTrades),
 		// perfPanels labels its distribution panel with .ClosedCount.
 		"ClosedCount":     len(statTrades),
 		"StatUnscoreable": statUnscoreable,

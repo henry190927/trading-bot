@@ -5490,6 +5490,18 @@ main { overflow-x: hidden; }
     .dt th, .setups-table th { top: 0; }
 }
 .dt tbody tr:hover, .setups-table tbody tr:hover { background: var(--row-hover); }
+
+/* /ops/autotrade fires-table pager. Paging toggles the `hidden` attribute on
+   rows; a bare <tr> has no display rule here so the UA default applies, but
+   four other components in this file needed an explicit [hidden] rule, which
+   means a class setting display has beaten the attribute before. Cheap
+   insurance against a later `.dt tbody tr { display: table-row }`. */
+.dt tbody tr[hidden] { display: none !important; }
+.at-pager { display: flex; align-items: center; gap: .6rem; margin: .5rem 0 .1rem; font-size: .78rem; }
+.at-pg { padding: .25rem .6rem; font: inherit; font-size: .75rem; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); }
+.at-pg:hover:not(:disabled) { border-color: var(--text-dim); }
+.at-pg:disabled { opacity: .35; cursor: default; }
 .dt td.cs-dim, .setups-table td.cs-dim { color: var(--text-dim); }
 .setups-table .dir-neutral { color: var(--text-dim); }
 /* Numeric cell helper: mono + tabular + right-aligned. */
