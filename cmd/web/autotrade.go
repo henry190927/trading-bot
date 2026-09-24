@@ -49,6 +49,31 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// belongs at render time, not in the arithmetic.
 	fires := autotrade.ReadFires(autotradeLogDepth)
 
+	// ?since=YYYY-MM-DD (TPE) narrows EVERY number on the page, not just the
+	// table — a filter that moved the rows while leaving the totals alone
+	// would be the display-vs-reality shape this file keeps being fixed for.
+	//
+	// A read-time filter rather than pruning the log. The raw fires are the
+	// only record: once a row is deleted nothing can be re-derived from it,
+	// including the finding that a period you suspected was distorted actually
+	// was not — which is what happened when the caps-change worry was checked
+	// and came back clean. Dropping periods that look bad is also selective
+	// sampling, and a netR computed that way is positive by construction.
+	since := strings.TrimSpace(c.Query("since"))
+	sinceLabel := ""
+	if since != "" {
+		if t, err := time.ParseInLocation("2006-01-02", since, tpe); err == nil {
+			kept := make([]autotrade.PaperFire, 0, len(fires))
+			for _, f := range fires {
+				if !f.Time.Before(t) {
+					kept = append(kept, f)
+				}
+			}
+			fires = kept
+			sinceLabel = since
+		}
+	}
+
 	// Resolve each fire's timeframe: prefer the stored TF, else the matching
 	// rule for that symbol, else 1h. Then fetch one kline set per (symbol,TF)
 	// group and replay every fire in it — a handful of API calls, not one per fire.
@@ -225,6 +250,8 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"Rules":       cfg.Rules,
 		"Fires":       rows,
 		"PageSize":    autotradePageSize,
+		"Since":       sinceLabel,
+		"FiresRead":   len(fires),
 		"Sum":         sum,
 		"Equity":      buildEquityCurve(statTrades),
 		"Histogram":   buildRHistogram(statTrades),

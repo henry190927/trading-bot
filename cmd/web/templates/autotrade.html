@@ -132,6 +132,21 @@
 
   <div class="stats-card">
     <h2 class="section-title">Positions <span class="section-meta">一倉一單 · newest first · ＋N = 收合的每小時重複進場</span></h2>
+    <p class="glossary-hint" style="margin:.1rem 0 .6rem">
+      {{if .Since}}
+      <b style="color:var(--yellow)">⏳ 只計 {{.Since}} 之後</b>（{{.FiresRead}} 筆 fire）——
+      <b>本頁每一個數字</b>都跟著這個區間走,不只表格。
+      {{else}}
+      區間：<b>全部</b>（{{.FiresRead}} 筆 fire）。
+      {{end}}
+      分期：
+      <a href="?since=2026-08-28">08-28 起</a> ·
+      <a href="?since=2026-09-02">09-02 起</a> ·
+      <a href="?since=2026-09-04">09-04 起</a> ·
+      <a href="?since=2026-09-23">09-23 起(剪枝後)</a> ·
+      <a href="?">全部</a>
+      <br><span class="cs-dim">日誌從不刪減 —— 這只是讀取時的篩選,換回「全部」就看得到原本的數字。</span>
+    </p>
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">
