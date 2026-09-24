@@ -58,6 +58,14 @@ func main() {
 	// --symbols vets candidates without touching the default universe. Codes
 	// may be short names or raw contract codes, so an equity synthetic
 	// (NCSKSPCX2USD-USDT) can be A/B'd before it is added anywhere.
+	//
+	// Resolution goes through market.Resolve, the canonical table. It used to
+	// append "-USDT", which is right for the native perps and wrong for every
+	// synthetic: `-symbols APP` became APP-USDT and 404'd when the contract is
+	// NCSKAPP2USD-USDT, and XAU would have become XAU-USDT rather than
+	// NCCOGOLD2USD-USDT — while this flag's own help text promised short names
+	// worked. The reverse mapping was NCSK-specific too, so a metals code came
+	// back labelled with its raw string.
 	if strings.TrimSpace(*symbols) != "" {
 		syms = syms[:0]
 		for _, tok := range strings.Split(*symbols, ",") {
@@ -65,17 +73,24 @@ func main() {
 			if tok == "" {
 				continue
 			}
-			code := tok
-			short := tok
-			if !strings.Contains(tok, "-USDT") {
-				code = tok + "-USDT"
-			} else if i := strings.Index(tok, "2USD-USDT"); i > 4 {
-				short = strings.TrimPrefix(tok[:i], "NCSK")
+			sym, ok := market.Resolve(tok)
+			if !ok {
+				// Not a known short name, so treat it as a raw contract code:
+				// the point of this flag is vetting an instrument BEFORE it
+				// earns a roster entry.
+				sym = market.Symbol(tok)
+				if !strings.Contains(tok, "-USDT") && !strings.Contains(tok, "-USDC") {
+					sym = market.Symbol(tok + "-USDT")
+				}
+			}
+			short := market.Short(sym)
+			if short == "" {
+				short = string(sym)
 			}
 			syms = append(syms, struct {
 				short string
 				sym   market.Symbol
-			}{short, market.Symbol(code)})
+			}{short, sym})
 		}
 	}
 
