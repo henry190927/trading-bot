@@ -44,6 +44,8 @@ func main() {
 	// that bucket (60d SOL: gated n=40 vs openbt mixed n=20). A bucket split
 	// does not transfer to a strategy change under a one-position constraint.
 	symbols := flag.String("symbols", "", "comma-separated symbols to test instead of the default universe; accepts short names (BTC) or raw contract codes (NCSKSPCX2USD-USDT)")
+	amd := flag.Bool("amd", false, "VARIANT (吸籌/操縱/派發): sweep the ASIAN-SESSION RANGE boundary instead of any EQH/EQL pool, and only inside the London→NY window. Everything else — stop, R multiple, dedup, scoring — is identical to the baseline, so the A/B isolates the session anchoring. See amd.go.")
+	amdRangeTP := flag.Bool("amd-range-tp", false, "with --amd: take profit at the OPPOSITE edge of the Asian range instead of a fixed R multiple (falls back to R when that edge is nearer than 1R)")
 	openGate := flag.Bool("open-gate", false, "A/B (c): only fire when entry sits BETWEEN the daily and weekly open (the \"mixed\" bucket cmd/openbt found best). Suppresses fires beyond BOTH opens.")
 	flag.Parse()
 
@@ -94,7 +96,14 @@ func main() {
 		}
 	}
 
-	fmt.Printf("=== sweep-reject A/B · %dd · %s · tol %.2f%% · stop=sweep+%.2fATR · TP %.1fR ===\n", *days, *tfStr, *tol, *bufATR, *rMult)
+	mode := "sweep-reject (pools)"
+	if *amd {
+		mode = "AMD (Asian range, London→NY sweep window)"
+		if *amdRangeTP {
+			mode += " · TP=opposite edge"
+		}
+	}
+	fmt.Printf("=== %s · %dd · %s · tol %.2f%% · stop=sweep+%.2fATR · TP %.1fR ===\n", mode, *days, *tfStr, *tol, *bufATR, *rMult)
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
 	var aggR float64
 	var aggN int
@@ -106,7 +115,12 @@ func main() {
 			continue
 		}
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
-		fires := genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult, *liqTP, *openGate)
+		var fires []autotrade.PaperFire
+		if *amd {
+			fires = genAMDFires(cs, atr, s.short, *bufATR, *rMult, *amdRangeTP)
+		} else {
+			fires = genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult, *liqTP, *openGate)
+		}
 		positions := autotrade.DedupFires(fires, 6, 6, time.Hour, func(f autotrade.PaperFire) autotrade.Outcome {
 			return autotrade.EvaluateFire(f, cs, 6)
 		})
