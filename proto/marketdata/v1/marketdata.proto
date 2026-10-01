@@ -1,0 +1,59 @@
+// MarketData exposes the mark-price feed the web process already maintains.
+//
+// It is deliberately read-only and deliberately small: two RPCs, one unary and
+// one server-streaming, both served from the SAME in-process ticker hub that
+// feeds /api/stream/tickers (cmd/web/stream.go). A gRPC caller and an SSE
+// browser tab therefore see the same numbers from the same upstream
+// connection — gRPC is a second TRANSPORT, not a second data path.
+syntax = "proto3";
+
+package tradingbot.marketdata.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/henry190927/trading-bot/proto/marketdata/v1;marketdatav1";
+
+service MarketData {
+  // GetMarkPrice returns the newest mark price for one symbol.
+  //
+  // Errors: INVALID_ARGUMENT (empty symbol), NOT_FOUND (symbol is not in the
+  // hub's universe), UNAVAILABLE (symbol known but no price yet),
+  // DEADLINE_EXCEEDED (hub had no snapshot before the deadline).
+  rpc GetMarkPrice(GetMarkPriceRequest) returns (GetMarkPriceResponse);
+
+  // StreamMarkPrices pushes a MarkPrice every time that symbol's price
+  // changes. The stream ends when the client cancels, when the deadline
+  // expires, or when the server drains for shutdown (UNAVAILABLE).
+  rpc StreamMarkPrices(StreamMarkPricesRequest) returns (stream MarkPrice);
+}
+
+message GetMarkPriceRequest {
+  // Short ticker as the UI uses it: "BTC", "ETH", "XAU". Case-insensitive.
+  string symbol = 1;
+}
+
+// Wrapped rather than returning MarkPrice directly so a later field (the
+// upstream health the hub already tracks, say) is an additive change.
+message GetMarkPriceResponse {
+  MarkPrice price = 1;
+}
+
+message StreamMarkPricesRequest {
+  // Symbols to follow. EMPTY MEANS ALL symbols the hub carries.
+  repeated string symbols = 1;
+}
+
+message MarkPrice {
+  string symbol = 1;
+  double price = 2;
+
+  // true  = the price came off the exchange mark-price websocket (~1 Hz).
+  // false = websocket has not delivered this symbol yet, so the value is the
+  //         30s REST snapshot. The hub degrades per-symbol, so this is a
+  //         per-symbol fact, not a connection-wide one.
+  bool live = 3;
+
+  // Server time at which this value was fanned out. The hub does not carry an
+  // exchange timestamp, so this is NOT exchange time — see docs/grpc.md.
+  google.protobuf.Timestamp as_of = 4;
+}

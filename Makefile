@@ -20,6 +20,13 @@ SHELL    := /bin/bash
 GO       := go
 SERVE_BIN := /tmp/trading-serve
 LOG      := $(HOME)/trading.log
+# gRPC MarketData (see docs/grpc.md). GRPC_BIND is read by cmd/web at
+# startup; unset there means the gRPC listener is simply not created.
+GRPC_BIND ?= 127.0.0.1:9090
+PROTO_DIR := proto
+PROTO_SRC := marketdata/v1/marketdata.proto
+# protoc plugins install into GOPATH/bin, which is not always on PATH.
+GOBIN     := $(shell $(GO) env GOPATH)/bin
 
 
 # VPS deployment target. Three ways to set, in priority order:
@@ -42,7 +49,7 @@ SCP         := scp -i $(ORACLE_KEY)
 %:
 	@:
 
-.PHONY: test test-race vet lint check help analyze validate serve serve-bg stop logs backtest build deploy deploy-all deploy-web ssh remote-status remote-logs jopen jclose jlist jstats jupdate jdelete janchors tconfig tstart tstop trestart web-status web-logs web-restart deploy-monitor monitor-status monitor-logs monitor-restart
+.PHONY: proto proto-tools grpc grpc-probe test test-race vet lint check help analyze validate serve serve-bg stop logs backtest build deploy deploy-all deploy-web ssh remote-status remote-logs jopen jclose jlist jstats jupdate jdelete janchors tconfig tstart tstop trestart web-status web-logs web-restart deploy-monitor monitor-status monitor-logs monitor-restart
 
 help:
 	@echo "trading — Makefile commands"
@@ -58,6 +65,12 @@ help:
 	@echo "  make logs                                 Tail $(LOG) (Ctrl+C to exit)"
 	@echo "  make backtest [DAYS] [TF]                 Run backtest (default 60d 1h)"
 	@echo "  make build                                Rebuild the serve binary"
+	@echo
+	@echo "gRPC MarketData (docs/grpc.md):"
+	@echo "  make proto-tools                          Install protoc-gen-go + protoc-gen-go-grpc"
+	@echo "  make proto                                Regenerate proto/marketdata/v1/*.pb.go"
+	@echo "  make grpc [BIND]                          Run cmd/web with the gRPC listener on (default $(GRPC_BIND))"
+	@echo "  make grpc-probe [BIND]                    grpcurl smoke test of both RPCs against a running server"
 	@echo
 	@echo "Trade journal (use on VPS for centralized records):"
 	@echo "  make jopen SYM SIDE ENTRY STOP TP1 TP2 ANCHOR TF [NOTES] Record a newly opened position"
@@ -146,6 +159,48 @@ backtest:
 	if [ -z "$$DAYS" ]; then DAYS=60; fi; \
 	if [ -z "$$TF" ]; then TF=1h; fi; \
 	$(GO) run ./cmd/backtest -tf=$$TF -days=$$DAYS -fee-bps=6 -sweep-only
+
+# ---- gRPC MarketData ------------------------------------------------------
+# Generated .pb.go files are COMMITTED, so neither a build nor CI needs protoc.
+# These targets are only for the day the .proto changes.
+
+proto-tools:
+	@echo "▶ installing protoc plugins into $(GOBIN)..."
+	@$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+	@$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+	@echo "✅ $$($(GOBIN)/protoc-gen-go --version), $$($(GOBIN)/protoc-gen-go-grpc --version)"
+	@command -v protoc >/dev/null || echo "⚠ protoc itself is missing — brew install protobuf"
+
+proto:
+	@command -v protoc >/dev/null || { echo "protoc not found — brew install protobuf"; exit 2; }
+	@test -x $(GOBIN)/protoc-gen-go || { echo "protoc-gen-go not found — make proto-tools"; exit 2; }
+	@test -x $(GOBIN)/protoc-gen-go-grpc || { echo "protoc-gen-go-grpc not found — make proto-tools"; exit 2; }
+	@PATH="$(GOBIN):$$PATH" protoc \
+		--proto_path=$(PROTO_DIR) \
+		--go_out=$(PROTO_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(PROTO_DIR) --go-grpc_opt=paths=source_relative \
+		$(PROTO_SRC)
+	@$(GO) build ./$(PROTO_DIR)/... && echo "✅ regenerated $(PROTO_DIR)/marketdata/v1/*.pb.go"
+
+# ---- grpc: run the web process with the gRPC listener on. Optional [BIND].
+grpc:
+	@BIND=$(word 2,$(MAKECMDGOALS)); \
+	if [ -z "$$BIND" ]; then BIND=$(GRPC_BIND); fi; \
+	echo "▶ cmd/web with GRPC_BIND=$$BIND (HTTP still on WEB_BIND / :8080)"; \
+	GRPC_BIND=$$BIND $(GO) run ./cmd/web
+
+# ---- grpc-probe: prove both RPCs over the wire. Needs a server already up.
+# Uses server reflection, so no .proto file is passed.
+grpc-probe:
+	@command -v grpcurl >/dev/null || { echo "grpcurl not found — brew install grpcurl"; exit 2; }
+	@BIND=$(word 2,$(MAKECMDGOALS)); \
+	if [ -z "$$BIND" ]; then BIND=$(GRPC_BIND); fi; \
+	echo "▶ list:"; \
+	grpcurl -plaintext $$BIND list tradingbot.marketdata.v1.MarketData; \
+	echo "▶ GetMarkPrice BTC:"; \
+	grpcurl -plaintext -d '{"symbol":"BTC"}' $$BIND tradingbot.marketdata.v1.MarketData/GetMarkPrice; \
+	echo "▶ StreamMarkPrices BTC,ETH (first 3 messages):"; \
+	grpcurl -plaintext -d '{"symbols":["BTC","ETH"]}' $$BIND tradingbot.marketdata.v1.MarketData/StreamMarkPrices | head -24
 
 # ---- quality gates -------------------------------------------------------
 # `test-race` is the one that earns its keep. 13 goroutine start points live

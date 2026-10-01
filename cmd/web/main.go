@@ -229,6 +229,11 @@ func main() {
 		}()
 	}
 
+	// gRPC MarketData, opt-in via GRPC_BIND and fed by the SAME hub the SSE
+	// stream uses — see cmd/web/grpc.go and docs/grpc.md. Unset = no listener,
+	// no signal handler, nothing changes.
+	startGRPC(srv.hub)
+
 	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
 	if err := r.Run(bind); err != nil {
 		log.Fatalf("server: %v", err)

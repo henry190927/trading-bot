@@ -27,11 +27,12 @@ flowchart TB
         ntfy["ntfy push<br/>(iOS app)"]
         safari["Safari → web UI<br/>(Tailscale-only, no auth)"]
         terminal["Terminal / SSH<br/>(26 CLIs)"]
-        claude["Claude Desktop<br/>→ cmd/mcp"]
+        claude["Claude Desktop<br/>→ cmd/mcp (JSON-RPC 2.0)"]
+        grpcc["grpcurl / service client<br/>→ gRPC :9090"]
     end
 
     subgraph VPS["☁️ Oracle Cloud Always Free VM ($0/mo)"]
-        web["trading-web<br/>Gin + html/template"]
+        web["trading-web<br/>Gin + html/template<br/>SSE · gRPC MarketData"]
         monitor["trading-monitor<br/>zone alerts · autoexec<br/>bracket guard · macro warn"]
         engine["trading-bot<br/>engine daemon (1h)"]
         store[("flat files, env-overridable paths<br/>journal.csv (v9, 30 col)<br/>zones · autotrade · setups")]
@@ -66,6 +67,7 @@ flowchart TB
     monitor -->|"zone fade · naked position · macro blackout"| ntfysh
     ntfysh --> ntfy
     safari -->|"HTTPS over Tailscale 100.x"| web
+    grpcc -->|"gRPC/HTTP2 — same hub as SSE"| web
     terminal -->|SSH/22| engine
     claude -.->|scp'd journal copy| store
     detect --> ab
@@ -78,6 +80,9 @@ These are the choices that came out of building, breaking, and fixing the system
 
 | Decision | Why this not that |
 |---|---|
+| **gRPC server lives *inside* `cmd/web`, not its own binary** | `tickerHub` owns the single BingX mark-price websocket **per process**. A separate `cmd/grpc` could not attach to it — it would open a second websocket and a second REST poller, so "what is BTC right now" would have two answers that drift. "Reuse the hub" and "separate process" are mutually exclusive here, so the gRPC listener is opt-in via `GRPC_BIND` inside the web process (unset = no listener, no signal handler, zero behavior change). gRPC is a second **transport**, not a second data path. |
+| **`Drain()` before `GracefulStop()`, not `GracefulStop()` alone** | `GracefulStop` waits for in-flight RPCs to finish — but `StreamMarkPrices` only ends when the *client* leaves, so one healthy subscriber blocks shutdown **forever**. Two phases instead: close a drain channel so every stream returns `UNAVAILABLE` (the code gRPC clients retry on), then `GracefulStop` to flush in-flight unaries and GOAWAY. Still bounded at 15s then hard `Stop()` — a shutdown that can hang is one systemd will `SIGKILL` anyway. `Stop()` alone would cut frames mid-write; on a long-lived feed that is the whole difference. |
+| **Browser keeps SSE; gRPC is for services** | Browsers cannot speak gRPC without `grpc-web` plus a proxy, so moving the UI would add a hop to serve a client that was already well served. Both read the same hub, so an SSE tab and a gRPC consumer are guaranteed to see the same number from the same upstream connection. |
 | **Sweep close-confirmed invalidation, not just wick-pierced** | The original sweep detector fired on wick-pierce, then never re-evaluated. Backtest revealed it kept emitting LONG signals during the XAG −2.4% dump on 2026-05-27 (stale sweep from earlier bar). Fix: kill the sweep the moment any later candle closes through the swept level in the wrong direction. Result: aggregate **netR +10.91R → +19.97R (+83%)** across 60d on 1h. |
 | **HVN / Volume Profile as display-only, NOT a vote** | Intuition said "trade with the chip zone" — but backtest showed enforcing HVN as a confluence vote dropped net edge by diluting score thresholds with marginal setups (BTC −1R, Silver −5.8R). Kept HVN computed and surfaced as `·` lines for trader judgment; engine doesn't vote on it. The discipline of "let the backtest decide" beat the discipline of "trust the intuition." |
 | **MTF bias filter behind an opt-in flag (`-bias`)** | Same story: backtest showed enforcing higher-TF MACD direction hurt ETH mean-reversion edge (+6.5R → −2.4R). Made it opt-in for experimentation rather than removing it entirely — preserves the ability to A/B with future data. |
@@ -111,6 +116,7 @@ These are the choices that came out of building, breaking, and fixing the system
 |---|---|
 | Language | **Go 1.22** (single binary deploy, easy cross-compile to ARM/AMD64) |
 | Web framework | Gin + `html/template` (server-side render, no JS framework) |
+| Service API | **gRPC** (protobuf + HTTP/2) — unary + server-streaming, reflection on; see [`docs/grpc.md`](docs/grpc.md) |
 | Persistence | CSV (auto-migrated v1→v9, 30 cols) |
 | Push | ntfy.sh (free) |
 | Notifier | Pluggable `Notifier` interface (stdout / macOS Notification Center / ntfy) with `Multi` fan-out |
@@ -146,6 +152,37 @@ make logs                           # tail ~/trading-bot.log
 make backtest                       # 60d 1h replay with fee model
 make backtest 30 15m                # 30d at 15m
 ```
+
+### gRPC MarketData
+
+The same live mark-price hub that feeds the browser's SSE stream is also exposed
+over gRPC — one unary RPC and one server-streaming RPC. Full design notes and the
+decisions behind them (zh-TW): [`docs/grpc.md`](docs/grpc.md).
+
+```bash
+make grpc                           # run cmd/web with the gRPC listener (127.0.0.1:9090)
+make grpc-probe                     # grpcurl smoke test of both RPCs
+make proto                          # regenerate *.pb.go (only when the .proto changes)
+```
+
+```bash
+# Reflection is on, so no .proto file is needed on the client:
+grpcurl -plaintext 127.0.0.1:9090 list
+
+# Unary
+grpcurl -plaintext -d '{"symbol":"BTC"}' 127.0.0.1:9090 \
+  tradingbot.marketdata.v1.MarketData/GetMarkPrice
+
+# Server-streaming — a new frame each time a price changes
+grpcurl -plaintext -d '{"symbols":["BTC","ETH"]}' 127.0.0.1:9090 \
+  tradingbot.marketdata.v1.MarketData/StreamMarkPrices
+```
+
+Generated `.pb.go` files are committed, so neither a normal build nor CI needs
+`protoc`. `GRPC_BIND` unset means the listener is never created — the HTTP/SSE
+surface is byte-for-byte unchanged.
+
+---
 
 > Supported timeframes: `1m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `1d`. Best edge per the cross-TF backtest below: **1h** (highest 60d gain) and **4h** (only TF positive on all 3 windows). Avoid `15m` and `30m` for live trading — backtest shows fee drag dominates the edge at those scales.
 
