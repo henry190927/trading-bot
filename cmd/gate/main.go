@@ -33,8 +33,9 @@ import (
 
 func main() {
 	name := flag.String("name", "arm", "label for the arm under test")
-	armS := flag.String("arm", "", `arm windows: "days netR trades[, ...]"`)
+	armS := flag.String("arm", "", `arm windows: "days netR trades[, ...]". Repeat a days value to supply JITTER readings of that window (take them by shifting -end-offset a day or two, NOT by changing the length): they collapse to a median, and a criterion that holds for the median but not for every reading makes the verdict UNDECIDED.`)
 	baseS := flag.String("base", "", `baseline windows, same format; omit for an absolute-only judgement`)
+	bucketS := flag.String("buckets", "", `DISJOINT buckets: "endOffsetDays netR trades[, ...]". The nested 60/90/120d windows share most of their data, so one strong month reads as three confirmations; these do not overlap and the gate downgrades a PASS to UNDECIDED when dropping the best one wipes the total out.`)
 	minTrades := flag.Int("min-trades", 0, "override the sample-size floor (0 = package default)")
 	minRPT := flag.Float64("min-r-per-trade", 0, "override the absolute median R/trade floor")
 	flag.Parse()
@@ -64,6 +65,15 @@ func main() {
 	if len(arm.Windows) == 0 {
 		fmt.Fprintln(os.Stderr, "no windows given; see --help")
 		os.Exit(2)
+	}
+
+	if strings.TrimSpace(*bucketS) != "" {
+		bs, berr := parse(*bucketS)
+		if berr != nil {
+			fmt.Fprintf(os.Stderr, "buckets: %v\n", berr)
+			os.Exit(2)
+		}
+		arm.Buckets = bs
 	}
 
 	var base *shipgate.Arm

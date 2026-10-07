@@ -22,6 +22,7 @@ package shipgate
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 )
@@ -44,9 +45,26 @@ func (w Window) RPerTrade() float64 {
 }
 
 // Arm is one candidate: a strategy or variant on one (symbol, timeframe).
+//
+// Windows are the practiced 60/90/120d runs and they are NESTED — the 60d sits
+// inside the 90d sits inside the 120d. Buckets are DISJOINT periods covering
+// the same history, and they exist because the nested windows cannot tell a
+// durable edge from one good month. A month that happens to be strong appears
+// in all three windows at once and reads as three confirmations.
 type Arm struct {
 	Name    string
 	Windows []Window
+
+	// Repeated Days values in EITHER slice are jitter readings of the same
+	// window, taken by shifting the window's end by a day or two. They
+	// collapse to a median, and a criterion that holds for the median but
+	// not for every reading is reported as fragile rather than as a pass.
+	//
+	// Buckets are disjoint periods in any order, each Window's Days field
+	// carrying the END OFFSET in days rather than a length (so a 30-day
+	// bucket ending 90 days ago is Days: 90). Optional; supply them and the
+	// breadth test runs.
+	Buckets []Window
 }
 
 // Result is the tri-state verdict.
@@ -89,6 +107,38 @@ type Criteria struct {
 	// supplied baseline in every window. Only applies when a baseline is
 	// given; a brand-new strategy has none.
 	RequireBeatBaselineEveryWindow bool
+
+	// RequireBucketBreadth downgrades a PASS to UNDECIDED when the disjoint
+	// buckets show the whole result came from one of them — specifically when
+	// removing the single best bucket takes the total to zero or below.
+	//
+	// UNDECIDED and not FAIL on purpose. One good period plus noise is not
+	// evidence that an edge exists, but it is not evidence that it does not
+	// either, and the existing semantics for "the data cannot settle this"
+	// is UNDECIDED (see MinTradesPerWindow). A FAIL would read as "this rule
+	// loses money", which is a different and unsupported claim.
+	RequireBucketBreadth bool
+
+	// MinBuckets is how many disjoint buckets the breadth test needs. Below
+	// it the test is skipped with a note rather than guessed at.
+	MinBuckets int
+
+	// RequireSignRobust downgrades a PASS to UNDECIDED when a window clears
+	// MinNetRPerWindow at its median but not at every jitter reading.
+	//
+	// This is the sharpest available test because it is the gate's OWN
+	// criterion, not an invented tolerance: if shifting the window by a day
+	// moves netR across zero, then "netR is positive in every window" is a
+	// statement about when the backtest was run.
+	RequireSignRobust bool
+
+	// MinBucketTrades is the sample floor for the MEDIAN bucket. A disjoint
+	// bucket is a quarter the span of the longest window, so a low-frequency
+	// rule can land three trades in one and the drop-best test then measures
+	// noise rather than concentration — and would flag nearly everything.
+	// Median rather than minimum: one thin bucket among healthy ones does not
+	// invalidate the comparison.
+	MinBucketTrades int
 }
 
 // Default is the gate as it should have been all along.
@@ -118,6 +168,10 @@ func Default() Criteria {
 		MinNetRPerWindow:               0,
 		MinRPerTradeMedian:             0,
 		RequireBeatBaselineEveryWindow: true,
+		RequireSignRobust:              true,
+		RequireBucketBreadth:           true,
+		MinBuckets:                     4,
+		MinBucketTrades:                8,
 	}
 }
 
@@ -132,12 +186,48 @@ type Verdict struct {
 	MedRPT    float64
 	Windows   int
 	MinTrades int
+
+	// Jittered is true when any window carried more than one reading.
+	Jittered bool
+
+	// Fragile lists windows whose verdict depends on where the window ends.
+	Fragile []string
+
+	spread  map[int]span
+	bSpread map[int]span
+
+	// Breadth, set only when buckets were supplied and numerous enough.
+	Buckets      int
+	BucketTotal  float64 // summed netR across the disjoint buckets
+	BestBucketR  float64 // the single strongest bucket
+	DropBestR    float64 // BucketTotal − BestBucketR
+	Concentrated bool    // DropBestR <= 0: one bucket carries the result
 }
 
 func (v Verdict) String() string {
 	s := fmt.Sprintf("%-9s %-28s medR/t %+0.3f  min-n %d", v.Result, v.Arm, v.MedRPT, v.MinTrades)
 	if len(v.Reasons) > 0 {
 		s += "  — " + strings.Join(v.Reasons, "; ")
+	}
+	if v.Jittered {
+		var parts []string
+		for _, d := range sortedKeys(v.spread) {
+			sp := v.spread[d]
+			if sp.N > 1 {
+				parts = append(parts, fmt.Sprintf("%dd %+.2f..%+.2f", d, sp.Lo, sp.Hi))
+			}
+		}
+		if len(parts) > 0 {
+			s += "\n           jitter: " + strings.Join(parts, " · ")
+		}
+	}
+	if v.Buckets > 0 {
+		flag := "spread"
+		if v.Concentrated {
+			flag = "CONCENTRATED"
+		}
+		s += fmt.Sprintf("\n           breadth: %d buckets, total %+.2f, best %+.2f, without it %+.2f — %s",
+			v.Buckets, v.BucketTotal, v.BestBucketR, v.DropBestR, flag)
 	}
 	for _, n := range v.Notes {
 		s += "\n           note: " + n
@@ -151,7 +241,20 @@ func (v Verdict) String() string {
 // has not failed, it has not been measured, and reporting FAIL there would
 // retire a strategy on noise.
 func Evaluate(arm Arm, baseline *Arm, c Criteria) Verdict {
+	// Jitter readings collapse before anything is judged, so every criterion
+	// below sees one figure per window and the spread is kept to one side for
+	// the robustness test.
+	windows, spread := collapse(arm.Windows)
+	buckets, bSpread := collapse(arm.Buckets)
+	arm.Windows, arm.Buckets = windows, buckets
+
 	v := Verdict{Arm: arm.Name, Windows: len(arm.Windows)}
+	for _, sp := range spread {
+		if sp.N > 1 {
+			v.Jittered = true
+		}
+	}
+	v.spread, v.bSpread = spread, bSpread
 
 	if len(arm.Windows) < c.MinWindows {
 		v.Result = Undecided
@@ -224,12 +327,170 @@ func Evaluate(arm Arm, baseline *Arm, c Criteria) Verdict {
 		}
 	}
 
-	if len(v.Reasons) == 0 {
-		v.Result = Pass
-	} else {
+	// ── robustness to where the window ends ─────────────────────────────
+	if c.RequireSignRobust {
+		for _, w := range arm.Windows {
+			sp, ok := spread[w.Days]
+			if !ok || sp.N < 2 {
+				continue
+			}
+			// Only interesting when the median clears the bar and a reading
+			// does not: that is a PASS that depends on the run date.
+			if w.NetR > c.MinNetRPerWindow && sp.Lo <= c.MinNetRPerWindow {
+				v.Fragile = append(v.Fragile,
+					fmt.Sprintf("%dd spans %+.2f..%+.2f across %d readings", w.Days, sp.Lo, sp.Hi, sp.N))
+			}
+		}
+	}
+
+	// ── breadth over disjoint buckets ────────────────────────────────────
+	// Runs regardless of the verdict so the table always shows WHERE the R
+	// came from, but it can only change a PASS. A FAIL is already decided,
+	// and concentration is not a second reason to reject it.
+	if c.RequireBucketBreadth {
+		switch {
+		case len(arm.Buckets) == 0:
+			v.Notes = append(v.Notes, "no disjoint buckets supplied — breadth untested, so a PASS here rests on nested windows that share most of their data")
+		case len(arm.Buckets) < c.MinBuckets:
+			v.Notes = append(v.Notes,
+				fmt.Sprintf("only %d disjoint bucket(s), need %d — breadth untested", len(arm.Buckets), c.MinBuckets))
+		default:
+			var bt []float64
+			for _, b := range arm.Buckets {
+				bt = append(bt, float64(b.Trades))
+			}
+			if med := median(bt); med < float64(c.MinBucketTrades) {
+				v.Notes = append(v.Notes,
+					fmt.Sprintf("median bucket holds %.0f trades (below %d) — breadth untested, the buckets are too thin to tell concentration from noise",
+						med, c.MinBucketTrades))
+				break
+			}
+			v.Buckets = len(arm.Buckets)
+			best := math.Inf(-1)
+			for _, b := range arm.Buckets {
+				v.BucketTotal += b.NetR
+				if b.NetR > best {
+					best = b.NetR
+				}
+			}
+			v.BestBucketR = best
+			v.DropBestR = v.BucketTotal - best
+			v.Concentrated = v.DropBestR <= 0
+
+			// The concentration call moved on its own once, so it only
+			// counts when it survives the bucket jitter. Lo and Hi are
+			// deliberately pessimistic — the readings are correlated and
+			// never all land at an extreme together — which means the call
+			// is kept only where it is robust to more than really happens.
+			if agree, tested := concentrationHolds(arm.Buckets, bSpread, v.Concentrated); tested && !agree {
+				v.Notes = append(v.Notes,
+					"the concentration call flips within the bucket jitter — breadth left untested rather than decided on a reading")
+				v.Concentrated = false
+			}
+		}
+	}
+
+	switch {
+	case len(v.Reasons) > 0:
 		v.Result = Fail
+	case len(v.Fragile) > 0:
+		v.Result = Undecided
+		v.Reasons = append(v.Reasons,
+			fmt.Sprintf("passes at the median but not at every window end — %s", strings.Join(v.Fragile, "; ")))
+	case v.Concentrated:
+		v.Result = Undecided
+		v.Reasons = append(v.Reasons,
+			fmt.Sprintf("passes the windows, but %d disjoint buckets total %+.2fR and drop to %+.2fR without the best one — the edge is one period, not a trend",
+				v.Buckets, v.BucketTotal, v.DropBestR))
+	default:
+		v.Result = Pass
 	}
 	return v
+}
+
+// concentrationHolds re-runs the drop-the-best test with every bucket at the
+// bottom of its jitter range and again at the top. tested is false when no
+// bucket carried more than one reading.
+func concentrationHolds(bs []Window, sp map[int]span, want bool) (agree, tested bool) {
+	at := func(pick func(span) float64) bool {
+		var total, best float64
+		best = math.Inf(-1)
+		for _, b := range bs {
+			r := b.NetR
+			if s, ok := sp[b.Days]; ok && s.N > 1 {
+				r = pick(s)
+			}
+			total += r
+			if r > best {
+				best = r
+			}
+		}
+		return total-best <= 0
+	}
+	for _, b := range bs {
+		if s, ok := sp[b.Days]; ok && s.N > 1 {
+			tested = true
+			break
+		}
+	}
+	if !tested {
+		return true, false
+	}
+	lo := at(func(s span) float64 { return s.Lo })
+	hi := at(func(s span) float64 { return s.Hi })
+	return lo == want && hi == want, true
+}
+
+// span is the min and max of a window's jitter readings.
+type span struct {
+	Lo, Hi float64
+	N      int
+}
+
+// collapse groups windows sharing a Days label into one, using the MEDIAN of
+// the readings rather than the mean: a single re-sequenced run should not drag
+// the figure the gate judges on.
+func sortedKeys(m map[int]span) []int {
+	out := make([]int, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Ints(out)
+	return out
+}
+
+func collapse(ws []Window) ([]Window, map[int]span) {
+	byDays := map[int][]Window{}
+	var order []int
+	for _, w := range ws {
+		if _, seen := byDays[w.Days]; !seen {
+			order = append(order, w.Days)
+		}
+		byDays[w.Days] = append(byDays[w.Days], w)
+	}
+	sort.Ints(order)
+
+	out := make([]Window, 0, len(order))
+	sp := map[int]span{}
+	for _, d := range order {
+		g := byDays[d]
+		var rs, ts, wrs []float64
+		lo, hi := g[0].NetR, g[0].NetR
+		for _, w := range g {
+			rs = append(rs, w.NetR)
+			ts = append(ts, float64(w.Trades))
+			wrs = append(wrs, w.WinRate)
+			if w.NetR < lo {
+				lo = w.NetR
+			}
+			if w.NetR > hi {
+				hi = w.NetR
+			}
+		}
+		out = append(out, Window{Days: d, NetR: median(rs), Trades: int(median(ts)), WinRate: median(wrs)})
+		sp[d] = span{Lo: lo, Hi: hi, N: len(g)}
+	}
+	return out, sp
 }
 
 func median(v []float64) float64 {
