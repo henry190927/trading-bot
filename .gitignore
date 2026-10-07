@@ -88,3 +88,7 @@ go.work.sum
 /shadowbt
 /confirmbt
 /breakbt
+
+# Read-only snapshots pulled off the VPS when SSH is down — these are the
+# rendered journal, so they hold the same personal trade data journal.csv does.
+backups/
