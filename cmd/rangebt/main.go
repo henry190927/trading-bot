@@ -106,11 +106,12 @@ func main() {
 	stopPct := flag.Float64("stop-pct", 0.5, "stop buffer beyond box edge (%)")
 	volThresh := flag.Float64("vol-thresh", 1.2, "ATR%% ceiling for the vol gate")
 	concTest := flag.Bool("conc-test", false, "A/B max-concurrent 1 vs 2 vs 3 on baseline (relax one-position)")
+	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
 	tf := market.Timeframe(*tfStr)
-	end := time.Now().UTC()
+	end := time.Now().UTC().AddDate(0, 0, -*endOff)
 	start := end.AddDate(0, 0, -*days)
 
 	syms := []struct {

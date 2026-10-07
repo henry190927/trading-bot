@@ -63,11 +63,12 @@ func main() {
 	rMult := flag.Float64("r", 2.0, "take-profit as R multiple of the stop distance")
 	window := flag.Int("window", 12, "how many bars back the BREAK may have happened for a retest to still count as the first flip test")
 	minTouch := flag.Int("min-touch", 2, "minimum touches for a pool to qualify (3+ = only the strong pools)")
+	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
 	tf := market.Timeframe(*tfStr)
-	end := time.Now().UTC()
+	end := time.Now().UTC().AddDate(0, 0, -*endOff)
 	start := end.AddDate(0, 0, -*days)
 	syms := []struct {
 		short string

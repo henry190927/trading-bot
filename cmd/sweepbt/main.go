@@ -47,11 +47,12 @@ func main() {
 	amd := flag.Bool("amd", false, "VARIANT (吸籌/操縱/派發): sweep the ASIAN-SESSION RANGE boundary instead of any EQH/EQL pool, and only inside the London→NY window. Everything else — stop, R multiple, dedup, scoring — is identical to the baseline, so the A/B isolates the session anchoring. See amd.go.")
 	amdRangeTP := flag.Bool("amd-range-tp", false, "with --amd: take profit at the OPPOSITE edge of the Asian range instead of a fixed R multiple (falls back to R when that edge is nearer than 1R)")
 	openGate := flag.Bool("open-gate", false, "A/B (c): only fire when entry sits BETWEEN the daily and weekly open (the \"mixed\" bucket cmd/openbt found best). Suppresses fires beyond BOTH opens.")
+	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
 	tf := market.Timeframe(*tfStr)
-	end := time.Now().UTC()
+	end := time.Now().UTC().AddDate(0, 0, -*endOff)
 	start := end.AddDate(0, 0, -*days)
 	syms := []struct {
 		short string

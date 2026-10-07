@@ -48,13 +48,14 @@ func main() {
 	rMult := flag.Float64("r", 2.0, "take-profit as an R multiple")
 	side := flag.String("side", "auto", "long | short | auto")
 	symbols := flag.String("symbols", "", "comma-separated symbols; short names or raw contract codes")
+	endOff := flag.Int("end-offset", 0, "end the window N days before now, so -days 30 -end-offset 30 is a DISJOINT bucket; nested windows cannot localise a decay in time")
 	flag.Parse()
 
 	config.LoadDotEnv()
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
 	tf := market.Timeframe(*tfStr)
 	htf := autostrat.EngineBiasTF(tf)
-	end := time.Now().UTC()
+	end := time.Now().UTC().AddDate(0, 0, -*endOff)
 	start := end.AddDate(0, 0, -*days)
 
 	syms := []struct {
@@ -86,8 +87,8 @@ func main() {
 		}
 	}
 
-	fmt.Printf("=== htf-snr A/B · %dd · base %s · HTF %s · strength %d · tol %.2f%% · stop=wick+%.2fATR · TP %.1fR · side %s ===\n",
-		*days, tf, htf, *strength, *tolPct, *bufATR, *rMult, *side)
+	fmt.Printf("=== htf-snr A/B · %dd ending -%dd · base %s · HTF %s · strength %d · tol %.2f%% · stop=wick+%.2fATR · TP %.1fR · side %s ===\n",
+		*days, *endOff, tf, htf, *strength, *tolPct, *bufATR, *rMult, *side)
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
 
 	var aggR float64

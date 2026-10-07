@@ -51,6 +51,7 @@ func main() {
 	useFunding := flag.Bool("funding", true, "fetch per-symbol funding-rate history and pass to engine via Context. Activates annotateContextWarnings' crowd warnings (display-only; they do not change trade selection). Default ON (matches shipped engine behavior). NOTE: this does NOT activate applyFundingContrarianVote — that vote was reverted 2026-06-08 after its own A/B and is unwired; see the note at its call site in signal/engine.go.")
 	smRegime := flag.Bool("sm-regime", false, "STRATEGY: pick MR vs StructMomentum PER BAR from the measured N 字 structure (confirmed HH-HL/LH-LL -> SM, neutral -> MR) instead of from the per-symbol allowlist. This is the conditional arm: run it against BOTH --no-struct-momentum (all MR) and --struct-momentum (all SM) over 60/90/120d and gate per window. Mutually exclusive with both.")
 	noFundingVote := flag.Bool("no-funding-vote", false, "disable signal.FundingContrarianVoteEnabled — the contrarian +1/+2 vote stays off even when --funding is on. A/B switch for the pre-2026-06-08 baseline.")
+	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
 	flag.Parse()
 	if *structMomentum && *noStructMomentum {
 		fmt.Fprintln(os.Stderr, "--struct-momentum and --no-struct-momentum are mutually exclusive: one forces StructMomentum on, the other forces it off. Pick the arm you mean.")
@@ -109,7 +110,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 240*time.Second)
 	defer cancel()
 
-	end := time.Now()
+	end := time.Now().AddDate(0, 0, -*endOff)
 	start := end.AddDate(0, 0, -*days)
 
 	opts := backtest.Options{
