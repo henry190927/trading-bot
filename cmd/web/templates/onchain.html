@@ -350,20 +350,20 @@
         if (!r.DumpSignals || r.DumpSignals.length === 0) {
             html += '<p class="hint">No top-holder → CEX transfers detected in the lookback window. This is common; absence is not confirmation of anything, just no red flag from this signal.</p>';
         } else {
-            html += '<table class="onchain-table dump-table"><thead><tr>';
-            html += '<th>#</th><th>From holder</th><th>→ Exchange</th><th>Amount</th><th>When</th><th>Tx</th>';
+            html += '<div class="dt-scroll"><table class="dt dt--compact"><thead><tr>';
+            html += '<th>#</th><th>From holder</th><th>→ Exchange</th><th class="num">Amount</th><th>When</th><th>Tx</th>';
             html += '</tr></thead><tbody>';
             r.DumpSignals.forEach(function (d) {
                 html += '<tr>';
                 html += '<td>' + d.HolderRank + '</td>';
                 html += '<td><a href="' + explorerAddr(chain, d.FromAddress) + '" target="_blank" rel="noopener">' + truncAddr(d.FromAddress) + '</a></td>';
                 html += '<td class="dump-cex">🔴 ' + esc(d.ToExchange) + '</td>';
-                html += '<td class="mono">' + fmtBalance(d.AmountTokens) + ' ' + esc(r.Symbol) + '</td>';
+                html += '<td class="num">' + fmtBalance(d.AmountTokens) + ' ' + esc(r.Symbol) + '</td>';
                 html += '<td>' + fmtWhen(d.Timestamp) + '</td>';
                 html += '<td><a href="' + explorerTx(chain, d.TxHash) + '" target="_blank" rel="noopener">↗</a></td>';
                 html += '</tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
         }
         html += '</section>';
 
@@ -373,8 +373,8 @@
         if (!r.Holders || r.Holders.length === 0) {
             html += '<p class="hint">No holders returned (Moralis quota / provider error).</p>';
         } else {
-            html += '<table class="onchain-table holder-table"><thead><tr>';
-            html += '<th>#</th><th>Address</th><th>Balance</th><th>% Supply</th><th>Label</th>';
+            html += '<div class="dt-scroll"><table class="dt dt--compact"><thead><tr>';
+            html += '<th>#</th><th>Address</th><th class="num">Balance</th><th class="num">% Supply</th><th>Label</th>';
             html += '</tr></thead><tbody>';
             r.Holders.forEach(function (h) {
                 var rowCls = '';
@@ -383,12 +383,12 @@
                 html += '<tr' + rowCls + '>';
                 html += '<td>' + h.Rank + '</td>';
                 html += '<td><a href="' + explorerAddr(chain, h.Address) + '" target="_blank" rel="noopener">' + truncAddr(h.Address) + '</a></td>';
-                html += '<td class="mono">' + fmtBalance(h.Balance) + '</td>';
-                html += '<td class="mono">' + (h.PctSupply ? h.PctSupply.toFixed(2) + '%' : '—') + '</td>';
+                html += '<td class="num">' + fmtBalance(h.Balance) + '</td>';
+                html += '<td class="num">' + (h.PctSupply ? h.PctSupply.toFixed(2) + '%' : '—') + '</td>';
                 html += '<td>' + esc(h.Label || (h.IsContract ? '[contract]' : '')) + '</td>';
                 html += '</tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
         }
         html += '</section>';
 

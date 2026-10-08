@@ -2429,32 +2429,10 @@ footer {
 .onchain-block { margin-bottom: 1.5rem; }
 .onchain-block h2 { font-size: 1rem; margin: 0 0 0.5rem; }
 
-.onchain-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-}
-.onchain-table th, .onchain-table td {
-    padding: 0.35rem 0.5rem;
-    border-bottom: 1px solid var(--border);
-    text-align: left;
-    vertical-align: middle;
-}
-.onchain-table th {
-    background: rgba(255,255,255,0.04);
-    font-weight: 600;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-dim);
-}
-.onchain-table td.mono { font-family: ui-monospace, monospace; }
-.onchain-table a { color: var(--blue); text-decoration: none; }
-.onchain-table a:hover { text-decoration: underline; }
-
-.dump-table .dump-cex { color: var(--red); font-weight: 600; }
-.dump-table tr:hover  { background: rgba(255,255,255,0.03); }
+/* Dump + holder tables are .dt.dt--compact; only the page's cell semantics live here. */
+.onchain-block .dt a { color: var(--blue); text-decoration: none; }
+.onchain-block .dt a:hover { text-decoration: underline; }
+.dt .dump-cex { color: var(--red); font-weight: 600; }
 
 .holder-cex      { background: rgba(255, 90, 95, 0.08); }
 .holder-cex td   { color: var(--red); }
@@ -5094,6 +5072,10 @@ footer {
 .ops-ntfy-state.off { color: var(--yellow); }
 .ops-ntfy-note { margin-top: 0.3rem; line-height: 1.4; }
 
+.dt td.oi-armed { color: var(--yellow); font-weight: 600; }
+.dt td.oi-crowded { color: var(--yellow); }
+.dt td.oi-read { text-align: left; white-space: normal; min-width: 12rem; color: var(--text-dim); }
+.dt td.oi-read.oi-armed { color: var(--yellow); }
 .ops-health-loops { margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
 .ops-loops-title {
     font-size: var(--fs-xs); color: var(--text-dim); font-weight: 700;
@@ -5472,24 +5454,25 @@ main { overflow-x: hidden; }
 }
 
 /* -------- /setups forward-log table -------- */
-/* Canonical data table (.dt). .setups-table shares the spec so every existing
-   board (setups/fundamentals/tw) gets the upgrade with no template churn:
-   roomier tokenized cells, sticky dim-caps header, row hover. */
-.dt, .setups-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
-.dt th, .dt td, .setups-table th, .setups-table td { padding: var(--sp-2) var(--sp-3); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+/* Canonical data table (.dt) — the ONLY data-table class. Variants are
+   modifiers on it (.dt--numeric/--matrix/--compact/--lg/--cards, below), never
+   standalone table classes: roomier tokenized cells, sticky dim-caps header,
+   row hover. */
+.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+.dt th, .dt td { padding: var(--sp-2) var(--sp-3); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 /* Sticky column header. top:0 on desktop (left-sidebar layout = NO top bar);
    the old top:52px was for the retired horizontal topnav and left the header
    floating 52px below the viewport (the "跑版" on setups / stock boards).
    On mobile a compact .topbar-mobile (~48px) sits at top:0, so tuck below it. */
-.dt th, .setups-table th { color: var(--text-dim); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.dt th { color: var(--text-dim); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--surface); z-index: 1; }
 /* On mobile .dt-scroll is a scroll container (overflow-x:auto → overflow-y
    computes to auto), so sticky `top` is relative to THAT box, not the page —
    a 48px offset floats the header down over the first rows (跑版). top:0 sticks
    it to the container top, aligned with the table. */
 @media (max-width: 1023.98px) {
-    .dt th, .setups-table th { top: 0; }
+    .dt th { top: 0; }
 }
-.dt tbody tr:hover, .setups-table tbody tr:hover { background: var(--row-hover); }
+.dt tbody tr:hover { background: var(--row-hover); }
 
 /* /ops/autotrade fires-table pager. Paging toggles the `hidden` attribute on
    rows; a bare <tr> has no display rule here so the UA default applies, but
@@ -5502,12 +5485,39 @@ main { overflow-x: hidden; }
   border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); }
 .at-pg:hover:not(:disabled) { border-color: var(--text-dim); }
 .at-pg:disabled { opacity: .35; cursor: default; }
-.dt td.cs-dim, .setups-table td.cs-dim { color: var(--text-dim); }
-.setups-table .dir-neutral { color: var(--text-dim); }
+.dt td.cs-dim { color: var(--text-dim); }
+.dt .dir-neutral { color: var(--text-dim); }
 /* Numeric cell helper: mono + tabular + right-aligned. */
-.dt .num, .setups-table .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.dt .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
 /* One horizontal-scroll strategy for wide tables. */
 .dt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Signed-value cells (fundamentals/tw/setups slice). These classes were in the
+   markup but only ever styled under other parents, so the boards rendered them
+   uncoloured. */
+.dt .r-pos { color: var(--green); }
+.dt .r-neg { color: var(--red); }
+.dt .r-zero { color: var(--text-dim); }
+
+/* .dt modifiers — compose, e.g. class="dt dt--numeric dt--cards".
+   --numeric  figures board: every column right-aligned, label column left.
+   --matrix   cross-tab: cells centred under their headers, row-head column
+              left and bold.
+   --compact  secondary table inside a card (ops OI, onchain): tighter cells,
+              one step smaller type.
+   --lg       headline table (home market overview): one step larger type.
+   --cards    ≤640px rows collapse to labelled cards (needs td[data-label];
+              see "Data-board mobile card-view"). */
+.dt--numeric th, .dt--numeric td { text-align: right; }
+.dt--numeric th:first-child, .dt--numeric td:first-child { text-align: left; }
+.dt--matrix th, .dt--matrix td { text-align: center; }
+.dt--matrix th:first-child, .dt--matrix td:first-child { text-align: left; }
+.dt--matrix td:first-child { font-weight: 600; }
+.dt--compact { font-size: var(--fs-sm); }
+.dt--compact th, .dt--compact td { padding: var(--sp-1) var(--sp-2); }
+.dt--lg { font-size: var(--fs-md); }
+.dt--lg th, .dt--lg td { padding: calc((var(--sp-2) + var(--sp-3)) / 2) var(--sp-3); }
+/* Free-text trailing column on a numeric board: reads left-to-right. */
+.dt th.fund-note, .dt td.fund-note { text-align: left; }
 .outcome-badge { padding: 1px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
 .oc-open    { color: var(--yellow); background: var(--yellow-bg); }
 .oc-win     { color: var(--green);  background: var(--green-bg); }
@@ -5578,13 +5588,6 @@ main { overflow-x: hidden; }
     z-index: 50;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
-
-/* setups regime slice table */
-/* Matrix cells are centered; center the headers too so col2/col3 line up
-   with their values (the .setups-table th default is left → misaligned). */
-.slice-table td, .slice-table th { text-align: center; }
-.slice-table th:first-child, .slice-table .slice-rowhead { text-align: left; }
-.slice-table .slice-rowhead { font-weight: 600; white-space: nowrap; }
 
 /* -------- i18n CSS-based language toggle (long/formatted content) -------- */
 :root:not([data-lang="zh"]) .i18n-zh { display: none; }
@@ -5810,8 +5813,6 @@ main { overflow-x: hidden; }
 .fund-hold{background:var(--wash-yellow);color:var(--yellow)}
 .fund-avoid{background:var(--wash-red);color:var(--red)}
 .fund-unknown{background:var(--wash-dim);color:var(--text-dim)}
-.fund-table td,.fund-table th{white-space:nowrap;text-align:right}
-.fund-table td:first-child,.fund-table th:first-child{text-align:left}
 .fund-note{color:var(--text-dim);font-size:var(--fs-sm);text-align:left;white-space:normal;max-width:22rem}
 .fund-counts{display:flex;gap:var(--sp-4);flex-wrap:wrap;margin:var(--sp-1) 0 var(--sp-3);font-size:var(--fs-md)}
 .fund-counts b{font-variant-numeric:tabular-nums}
@@ -6024,7 +6025,7 @@ body { font-size: 15px; letter-spacing: -0.005em; }
 
 /* Data tables — rounded container feel via the scroll wrapper. */
 .dt-scroll { border: 1px solid var(--border); border-radius: var(--r-md); }
-.dt-scroll .setups-table th:first-child, .dt-scroll .dt th:first-child { border-top-left-radius: var(--r-md); }
+.dt-scroll .dt th:first-child { border-top-left-radius: var(--r-md); }
 
 /* Chart cards inherit the rounder/softer look too. */
 .chart-header, .chart-struct-panel, .chart-one-liner, .chart-side { border-radius: var(--r-md); }
@@ -6190,18 +6191,18 @@ body { font-size: 15px; letter-spacing: -0.005em; }
 .cmdk-h { color: var(--text-dim); font-size: var(--fs-xs); }
 
 /* =====================================================================
-   Data-board mobile card-view — fundamentals / tw wide tables (.fund-table)
+   Data-board mobile card-view — fundamentals / tw wide tables (.dt--cards)
    collapse to stacked cards on phones. Standard data-label pattern: thead
    hidden, each row → a card, each cell shows its column via ::before. Scoped
-   to .fund-table so setups / other .dt tables are untouched.
+   to .dt--cards so setups / other .dt tables are untouched.
    ===================================================================== */
 .fund-cell-name { display: none; }  /* desktop: TW name lives in its own column */
 
 @media (max-width: 640px) {
-    .dt-scroll:has(.fund-table) { border: none; overflow: visible; }
-    .fund-table thead { display: none; }
-    .fund-table, .fund-table tbody { display: block; width: 100%; }
-    .fund-table tr {
+    .dt-scroll:has(.dt--cards) { border: none; overflow: visible; }
+    .dt--cards thead { display: none; }
+    .dt--cards, .dt--cards tbody { display: block; width: 100%; }
+    .dt--cards tr {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 2px var(--sp-3);
@@ -6211,7 +6212,7 @@ body { font-size: 15px; letter-spacing: -0.005em; }
         border-radius: var(--r-md);
         background: var(--surface);
     }
-    .fund-table td {
+    .dt--cards td {
         display: flex;
         justify-content: space-between;
         align-items: baseline;
@@ -6221,7 +6222,7 @@ body { font-size: 15px; letter-spacing: -0.005em; }
         white-space: normal;
         font-size: var(--fs-sm);
     }
-    .fund-table td::before {
+    .dt--cards td::before {
         content: attr(data-label);
         color: var(--text-dim);
         font-size: var(--fs-xs);
@@ -6229,9 +6230,9 @@ body { font-size: 15px; letter-spacing: -0.005em; }
         letter-spacing: .04em;
         flex: 0 0 auto;
     }
-    .fund-table td[colspan] { grid-column: 1 / -1; }
+    .dt--cards td[colspan] { grid-column: 1 / -1; }
     /* Symbol = card header: full width, bigger, no label prefix */
-    .fund-table td.fund-cell-sym {
+    .dt--cards td.fund-cell-sym {
         grid-column: 1 / -1;
         font-size: var(--fs-lg);
         padding-bottom: var(--sp-1);
@@ -6239,16 +6240,16 @@ body { font-size: 15px; letter-spacing: -0.005em; }
         border-bottom: 1px solid var(--border);
         justify-content: flex-start;
     }
-    .fund-table td.fund-cell-sym::before { display: none; }
-    .fund-table .fund-cell-name {
+    .dt--cards td.fund-cell-sym::before { display: none; }
+    .dt--cards .fund-cell-name {
         display: inline; margin-left: var(--sp-2);
         color: var(--text-dim); font-weight: 400; font-size: var(--fs-sm);
     }
-    .fund-table td.fund-cell-nametd { display: none; }  /* TW name folded into header */
+    .dt--cards td.fund-cell-nametd { display: none; }  /* TW name folded into header */
     /* Rating + Note span the full card width */
-    .fund-table td[data-label="Rating"],
-    .fund-table td.fund-note { grid-column: 1 / -1; justify-content: flex-start; }
-    .fund-table td.fund-note::before { margin-right: var(--sp-2); }
+    .dt--cards td[data-label="Rating"],
+    .dt--cards td.fund-note { grid-column: 1 / -1; justify-content: flex-start; }
+    .dt--cards td.fund-note::before { margin-right: var(--sp-2); }
 }
 
 /* =====================================================================
@@ -6346,18 +6347,15 @@ select:focus-visible, textarea:focus-visible, summary:focus-visible,
 /* Compact: tighten canonical data tables (biggest density win). Scoped to
    tables so cards/forms keep their comfortable spacing. */
 html[data-density="compact"] .dt th,
-html[data-density="compact"] .dt td,
-html[data-density="compact"] .setups-table th,
-html[data-density="compact"] .setups-table td {
+html[data-density="compact"] .dt td {
     padding: 1px var(--sp-2);
 }
-html[data-density="compact"] .dt,
-html[data-density="compact"] .setups-table {
+html[data-density="compact"] .dt {
     font-size: var(--fs-xs);
 }
 /* Never compact the mobile card-view (it needs the roominess to read). */
 @media (max-width: 640px) {
-    html[data-density="compact"] .fund-table td { padding: 2px 0; font-size: var(--fs-sm); }
+    html[data-density="compact"] .dt--cards td { padding: 2px 0; font-size: var(--fs-sm); }
 }
 
 /* =====================================================================
@@ -6612,12 +6610,12 @@ html[data-density="compact"] .setups-table {
 
    Solid rgba only, no color-mix() — iOS Safari < 16.4 renders nothing for it
    (feedback-css-color-mix). Tokens are per-theme, so this follows the theme. */
-.mkt-table td.mkt-px {
+.dt td.mkt-px {
   position: relative;
   font-variant-numeric: tabular-nums; /* digits keep their column so a tick doesn't shift the cell */
   border-radius: 5px;
 }
-.mkt-table td.mkt-px .mkt-px-val {
+.dt td.mkt-px .mkt-px-val {
   position: relative;
   transition: color .5s cubic-bezier(.22,.61,.36,1);
 }
@@ -6643,15 +6641,15 @@ html[data-density="compact"] .setups-table {
   100% { color: var(--text); }
 }
 
-.mkt-table td.mkt-px.flash-up   { animation: mkt-tick-up   1.15s cubic-bezier(.22,.61,.36,1) both; }
-.mkt-table td.mkt-px.flash-down { animation: mkt-tick-down 1.15s cubic-bezier(.22,.61,.36,1) both; }
-.mkt-table td.mkt-px.flash-up   .mkt-px-val { animation: mkt-tick-text-up   1.15s cubic-bezier(.22,.61,.36,1) both; }
-.mkt-table td.mkt-px.flash-down .mkt-px-val { animation: mkt-tick-text-down 1.15s cubic-bezier(.22,.61,.36,1) both; }
+.dt td.mkt-px.flash-up   { animation: mkt-tick-up   1.15s cubic-bezier(.22,.61,.36,1) both; }
+.dt td.mkt-px.flash-down { animation: mkt-tick-down 1.15s cubic-bezier(.22,.61,.36,1) both; }
+.dt td.mkt-px.flash-up   .mkt-px-val { animation: mkt-tick-text-up   1.15s cubic-bezier(.22,.61,.36,1) both; }
+.dt td.mkt-px.flash-down .mkt-px-val { animation: mkt-tick-text-down 1.15s cubic-bezier(.22,.61,.36,1) both; }
 
 /* A hairline on the leading edge gives the flash a direction to come from,
    which is most of why the Coinglass version reads as motion rather than a
    blink. Sits on a pseudo-element so it can't disturb the cell's layout. */
-.mkt-table td.mkt-px::before {
+.dt td.mkt-px::before {
   content: ""; position: absolute; left: 0; top: 12%; bottom: 12%; width: 2px;
   border-radius: 2px; background: transparent; opacity: 0;
 }
@@ -6660,8 +6658,8 @@ html[data-density="compact"] .setups-table {
   12%  { opacity: 1; transform: scaleY(1); }
   100% { opacity: 0; transform: scaleY(1); }
 }
-.mkt-table td.mkt-px.flash-up::before   { background: var(--green); animation: mkt-tick-edge 1.15s ease-out both; }
-.mkt-table td.mkt-px.flash-down::before { background: var(--red);   animation: mkt-tick-edge 1.15s ease-out both; }
+.dt td.mkt-px.flash-up::before   { background: var(--green); animation: mkt-tick-edge 1.15s ease-out both; }
+.dt td.mkt-px.flash-down::before { background: var(--red);   animation: mkt-tick-edge 1.15s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
   /* Reduced motion means no MOVEMENT — it does not mean no colour change, and
@@ -6678,13 +6676,13 @@ html[data-density="compact"] .setups-table {
      transform: scaleY. So that is the one thing removed here; the background
      fade and the digit colour ramp are kept, because a cross-fade is not
      motion and it is the whole signal. */
-  .mkt-table td.mkt-px::before,
-  .mkt-table td.mkt-px.flash-up::before,
-  .mkt-table td.mkt-px.flash-down::before { display: none; animation: none; }
+  .dt td.mkt-px::before,
+  .dt td.mkt-px.flash-up::before,
+  .dt td.mkt-px.flash-down::before { display: none; animation: none; }
 }
 
-.mkt-table td.up, .mkt-table th.up { color: var(--green); }
-.mkt-table td.down { color: var(--red); }
+.dt td.up { color: var(--green); }
+.dt td.down { color: var(--red); }
 .mkt-sym { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); text-decoration: none; }
 .mkt-sym:hover { color: var(--blue); }
 .mkt-ico { width: 1.3em; text-align: center; opacity: .9; }
@@ -6693,9 +6691,6 @@ html[data-density="compact"] .setups-table {
 /* market-overview: push down + larger, more readable text */
 .market-overview { margin-top: 2.5rem; }
 .mkt-title { font-size: 1.25rem; }
-.mkt-table { font-size: 1rem; }
-.mkt-table th, .mkt-table td { padding: .6rem .8rem; }
-.mkt-table .mkt-sym b { font-size: 1.02rem; }
 .mkt-logo { width: 22px; height: 22px; }
 .mkt-ico { font-size: 1.15rem; }
 .mkt-tab { font-size: .92rem; padding: .32rem .85rem; }

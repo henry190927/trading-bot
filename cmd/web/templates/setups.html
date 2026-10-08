@@ -42,20 +42,20 @@
   <div class="stats-card">
     <h2 data-i18n="setups.slice">Engine × Regime 命中率切片</h2>
     <div class="dt-scroll">
-    <table class="setups-table slice-table">
+    <table class="dt dt--matrix">
       <thead>
         <tr><th>engine ＼ regime</th><th data-i18n="setups.r_neutral">neutral 拉鋸</th><th data-i18n="setups.r_trend">趨勢 (HH-HL / LH-LL)</th></tr>
       </thead>
       <tbody>
-        <tr><td class="slice-rowhead">✅ 同意<span class="cs-dim"> (engine=方向)</span></td>
+        <tr><td>✅ 同意<span class="cs-dim"> (engine=方向)</span></td>
           <td>{{with index $.Regime "agree" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
           <td>{{with index $.Regime "agree" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
         </tr>
-        <tr><td class="slice-rowhead">⚔️ 衝突<span class="cs-dim"> (engine 相反)</span></td>
+        <tr><td>⚔️ 衝突<span class="cs-dim"> (engine 相反)</span></td>
           <td>{{with index $.Regime "against" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
           <td>{{with index $.Regime "against" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
         </tr>
-        <tr><td class="slice-rowhead">➖ 中性<span class="cs-dim"> (engine FLAT)</span></td>
+        <tr><td>➖ 中性<span class="cs-dim"> (engine FLAT)</span></td>
           <td>{{with index $.Regime "flat" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
           <td>{{with index $.Regime "flat" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
         </tr>
@@ -69,7 +69,7 @@
 
   {{if .Setups}}
   <div class="dt-scroll">
-    <table class="setups-table" data-tablekit data-page="50">
+    <table class="dt" data-tablekit data-page="50">
       <thead>
         <tr>
           <th>#</th><th>time</th><th>sym/tf</th><th>dir</th><th>lean</th><th>trend</th>
