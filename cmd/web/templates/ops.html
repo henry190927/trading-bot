@@ -721,11 +721,11 @@
                 }
             }
             return '<tr><td>' + r.short + '</td>'
-                 + '<td class="cs-dim">' + oiFmtNotional(r.oi) + '</td>'
-                 + '<td class="' + dCls + '">' + dTxt + '</td>'
-                 + '<td class="' + pCls + '">' + pTxt + '</td>'
-                 + '<td class="' + fCls + '">' + fTxt + '</td>'
-                 + '<td class="cs-dim">' + bnTxt + '</td>'
+                 + '<td class="cs-dim num">' + oiFmtNotional(r.oi) + '</td>'
+                 + '<td class="' + dCls + ' num">' + dTxt + '</td>'
+                 + '<td class="' + pCls + ' num">' + pTxt + '</td>'
+                 + '<td class="' + fCls + ' num">' + fTxt + '</td>'
+                 + '<td class="cs-dim num">' + bnTxt + '</td>'
                  + '<td class="' + wCls + '">' + wTxt + '</td>'
                  + '<td class="' + readCls + '">' + readTxt + '</td></tr>';
         }).join('');

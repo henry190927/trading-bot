@@ -48,6 +48,7 @@
 :root {
     --cjk:  "PingFang TC","PingFang SC","Microsoft JhengHei","Noto Sans TC","Hiragino Sans GB",system-ui,sans-serif;
     --mono: "SF Mono",ui-monospace,"Cascadia Code","Menlo",monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", var(--cjk);
 
     /* ---- UI overhaul Phase 0: scale + semantic layer (theme-agnostic) ----
        All new components draw from these so values stop being invented ad-hoc.
@@ -89,7 +90,7 @@
 html { -webkit-text-size-adjust: 100%; }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", var(--cjk);
+    font-family: var(--sans);
     background: var(--bg);
     color: var(--text);
     font-size: 16px;
@@ -5458,13 +5459,31 @@ main { overflow-x: hidden; }
    modifiers on it (.dt--numeric/--matrix/--compact/--lg/--cards, below), never
    standalone table classes: roomier tokenized cells, sticky dim-caps header,
    row hover. */
-.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+.dt {
+    width: 100%; border-collapse: collapse; font-size: var(--fs-base); font-variant-numeric: tabular-nums;
+    /* Header rule. A sticky <th>'s border scrolls away under border-collapse,
+       so the rule is an inset shadow, which travels with the cell. */
+    --dt-rule: rgba(var(--text-dim-rgb), .35);
+    --dt-zebra: rgba(var(--text-dim-rgb), .06);
+    --dt-hover: rgba(var(--text-dim-rgb), .12);
+    /* --dt-bg (opaque surface under the table) is NOT set here so a page can
+       override it from an ancestor: it backs the sticky first column on phones.
+       Usages fall back to --surface, which is what .stats-card paints. */
+}
 .dt th, .dt td { padding: var(--sp-2) var(--sp-3); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 /* Sticky column header. top:0 on desktop (left-sidebar layout = NO top bar);
    the old top:52px was for the retired horizontal topnav and left the header
    floating 52px below the viewport (the "跑版" on setups / stock boards).
    On mobile a compact .topbar-mobile (~48px) sits at top:0, so tuck below it. */
-.dt th { color: var(--text-dim); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.dt th {
+    color: var(--text-dim); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    position: sticky; top: 0; z-index: 2;
+    /* Tinted band over an opaque base: rows scrolling under a sticky header
+       must not show through, and the tint stays a token (no color-mix). */
+    background: linear-gradient(var(--th-bg), var(--th-bg)) var(--surface);
+    border-bottom-color: transparent;
+    box-shadow: inset 0 -1px 0 var(--dt-rule);
+}
 /* On mobile .dt-scroll is a scroll container (overflow-x:auto → overflow-y
    computes to auto), so sticky `top` is relative to THAT box, not the page —
    a 48px offset floats the header down over the first rows (跑版). top:0 sticks
@@ -5472,7 +5491,15 @@ main { overflow-x: hidden; }
 @media (max-width: 1023.98px) {
     .dt th { top: 0; }
 }
-.dt tbody tr:hover { background: var(--row-hover); }
+/* Zebra at zero specificity (:where) so any row-state class (.holder-cex,
+   the --cards card surface) still wins over it. Paging keeps parity: pages are
+   contiguous runs of an even size. */
+:where(.dt tbody tr:nth-child(even)) { background: var(--dt-zebra); }
+.dt tbody tr { transition: background-color var(--t-fast) ease; }
+.dt tbody tr:hover { background: var(--dt-hover); }
+/* Row-locator tick: on a 18-column table the hovered row's start is the
+   thing the eye loses. Inset shadow, so no layout shift. */
+.dt tbody tr:hover > td:first-child { box-shadow: inset 2px 0 0 var(--blue); }
 
 /* /ops/autotrade fires-table pager. Paging toggles the `hidden` attribute on
    rows; a bare <tr> has no display rule here so the UA default applies, but
@@ -5516,8 +5543,36 @@ main { overflow-x: hidden; }
 .dt--compact th, .dt--compact td { padding: var(--sp-1) var(--sp-2); }
 .dt--lg { font-size: var(--fs-md); }
 .dt--lg th, .dt--lg td { padding: calc((var(--sp-2) + var(--sp-3)) / 2) var(--sp-3); }
-/* Free-text trailing column on a numeric board: reads left-to-right. */
-.dt th.fund-note, .dt td.fund-note { text-align: left; }
+/* Text columns on a numeric board (TW name, trailing note) read left-to-right. */
+.dt th.fund-note, .dt td.fund-note,
+.dt th.fund-cell-nametd, .dt td.fund-cell-nametd { text-align: left; }
+
+/* Phones: the first column (symbol / id) stays pinned while a wide table
+   scrolls sideways inside .dt-scroll, so a row never loses its name. Pinned
+   cells need an opaque background, so the zebra / hover tint is re-layered
+   over --dt-bg rather than inherited from the <tr>. Not for --cards (those
+   tables stop being tables at this width). */
+@media (max-width: 640px) {
+    .dt:not(.dt--cards) th:first-child,
+    .dt:not(.dt--cards) td:first-child {
+        position: sticky; left: 0; z-index: 1;
+        background: var(--dt-bg, var(--surface));
+        box-shadow: inset -1px 0 0 var(--border);
+    }
+    .dt:not(.dt--cards) th:first-child {
+        z-index: 3;
+        background: linear-gradient(var(--th-bg), var(--th-bg)) var(--surface);
+        box-shadow: inset -1px 0 0 var(--border), inset 0 -1px 0 var(--dt-rule);
+    }
+    .dt:not(.dt--cards) tbody tr:nth-child(even) > td:first-child {
+        background: linear-gradient(var(--dt-zebra), var(--dt-zebra)) var(--dt-bg, var(--surface));
+    }
+    .dt:not(.dt--cards) tbody tr:hover > td:first-child {
+        background: linear-gradient(var(--dt-hover), var(--dt-hover)) var(--dt-bg, var(--surface));
+        box-shadow: inset 2px 0 0 var(--blue), inset -1px 0 0 var(--border);
+    }
+    .dt--cards tbody tr:hover > td:first-child { box-shadow: none; }
+}
 .outcome-badge { padding: 1px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
 .oc-open    { color: var(--yellow); background: var(--yellow-bg); }
 .oc-win     { color: var(--green);  background: var(--green-bg); }
@@ -6224,6 +6279,7 @@ body { font-size: 15px; letter-spacing: -0.005em; }
     }
     .dt--cards td::before {
         content: attr(data-label);
+        font-family: var(--sans);  /* label stays prose even when the value is .num (mono) */
         color: var(--text-dim);
         font-size: var(--fs-xs);
         text-transform: uppercase;
@@ -6689,7 +6745,7 @@ html[data-density="compact"] .dt {
 .mkt-logo { width: 18px; height: 18px; border-radius: 50%; vertical-align: middle; }
 
 /* market-overview: push down + larger, more readable text */
-.market-overview { margin-top: 2.5rem; }
+.market-overview { margin-top: 2.5rem; --dt-bg: var(--bg); }
 .mkt-title { font-size: 1.25rem; }
 .mkt-logo { width: 22px; height: 22px; }
 .mkt-ico { font-size: 1.15rem; }

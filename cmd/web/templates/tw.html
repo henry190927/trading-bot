@@ -57,7 +57,7 @@
       <thead>
         <tr>
           <th><span class="i18n-en">Code</span><span class="i18n-zh">代號</span></th>
-          <th><span class="i18n-en">Name</span><span class="i18n-zh">名稱</span></th>
+          <th class="fund-cell-nametd"><span class="i18n-en">Name</span><span class="i18n-zh">名稱</span></th>
           <th><span class="i18n-en">Rating</span><span class="i18n-zh">評級</span></th>
           <th>Quality</th><th>Valuation</th>
           <th>P/E</th><th>P/B</th>
@@ -73,13 +73,13 @@
           <td class="fund-cell-sym"><strong>{{.Code}}</strong> <span class="fund-cell-name">{{.Name}}</span></td>
           <td data-label="Name" class="fund-cell-nametd">{{.Name}}</td>
           <td data-label="Rating"><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if .HighYield}} <span class="tw-yield">高股息</span>{{end}}</td>
-          <td data-label="Quality" class="{{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
-          <td data-label="Valuation" class="{{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
-          <td data-label="P/E">{{if .PE}}{{printf "%.1f" .PE}}{{else}}—{{end}}</td>
-          <td data-label="P/B">{{if .PB}}{{printf "%.2f" .PB}}{{else}}—{{end}}</td>
-          <td data-label="Yield" class="{{if ge .DividendYield 4.0}}r-pos{{end}}">{{printf "%.1f" .DividendYield}}%</td>
-          <td data-label="Rev YoY" class="{{if ge .RevYoYPct 10.0}}r-pos{{else if lt .RevYoYPct 0.0}}r-neg{{end}}">{{printf "%.0f" .RevYoYPct}}%</td>
-          <td data-label="Gross M">{{printf "%.0f" .GrossMarginPct}}%</td>
+          <td data-label="Quality" class="num {{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
+          <td data-label="Valuation" class="num {{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
+          <td data-label="P/E" class="num">{{if .PE}}{{printf "%.1f" .PE}}{{else}}—{{end}}</td>
+          <td data-label="P/B" class="num">{{if .PB}}{{printf "%.2f" .PB}}{{else}}—{{end}}</td>
+          <td data-label="Yield" class="num {{if ge .DividendYield 4.0}}r-pos{{end}}">{{printf "%.1f" .DividendYield}}%</td>
+          <td data-label="Rev YoY" class="num {{if ge .RevYoYPct 10.0}}r-pos{{else if lt .RevYoYPct 0.0}}r-neg{{end}}">{{printf "%.0f" .RevYoYPct}}%</td>
+          <td data-label="Gross M" class="num">{{printf "%.0f" .GrossMarginPct}}%</td>
           <td data-label="Note" class="fund-note">{{.Note}}</td>
         </tr>
         {{end}}
