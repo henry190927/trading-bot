@@ -56,7 +56,7 @@
     --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
     --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
     --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px; --fs-md: 15px;
-    --fs-lg: 18px; --fs-xl: 24px; --fs-2xl: 34px;
+    --fs-lg: 18px; --fs-xl: 24px; --fs-2xl: 34px; --fs-3xl: 40px; /* 3xl: hero figures only (score, portfolio R) */
     --lh-tight: 1.25; --lh-base: 1.5;
     --r-sm: 6px; --r-md: 12px; --r-lg: 18px; --r-pill: 999px;
     --shadow-1: 0 1px 2px rgba(0,0,0,.3);
@@ -93,7 +93,7 @@ body {
     font-family: var(--sans);
     background: var(--bg);
     color: var(--text);
-    font-size: 16px;
+    font-size: var(--fs-md);
     line-height: 1.5;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
@@ -112,7 +112,7 @@ body {
 .brand {
     font-weight: 600;
     color: var(--cyan);
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
 }
 .tf-picker {
     flex: 1;
@@ -129,7 +129,7 @@ body {
     border-radius: 6px;
     color: var(--text-dim);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     min-width: 44px;
     min-height: 36px;
     line-height: 1.5;
@@ -143,7 +143,7 @@ body {
 }
 .updated {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
@@ -198,20 +198,20 @@ main {
 }
 .sym {
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     color: var(--cyan);
     min-width: 3em;
 }
 .price-wrap {
     color: var(--text-dim);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 
 .side-badge {
     padding: 2px 8px;
     border-radius: 4px;
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     letter-spacing: 0.02em;
 }
 .side-long { color: var(--green); background: var(--green-bg); }
@@ -221,7 +221,7 @@ main {
 .score {
     padding: 2px 8px;
     border-radius: 4px;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     font-family: ui-monospace, "SF Mono", monospace;
 }
 .score.score-good { color: var(--green); background: var(--green-bg); font-weight: 600; }
@@ -244,7 +244,7 @@ main {
     padding: 0 0.4rem;
     border-radius: 0.25rem;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     margin-right: 0.3rem;
 }
 .diag-axis-mr  { color: var(--mr);       background: var(--mr-bg); }
@@ -259,7 +259,7 @@ main {
     display: inline-block;
     padding: 0 0.35rem;
     border-radius: 0.2rem;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -279,7 +279,7 @@ main {
 button.copy-btn.score {
     min-height: 0;
     min-width: 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     border-radius: 4px;
     padding: 2px 8px;
 }
@@ -295,7 +295,7 @@ button.copy-btn.diag-score-axis.diag-axis-mom {
     min-height: 0;
     min-width: 0;
     padding: 1px 6px;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     border-radius: 0.25rem;
     border: 1px solid transparent;
 }
@@ -305,7 +305,7 @@ button.copy-btn.diag-score, button.copy-btn.ot-ratio {
     min-height: 0;
     min-width: 0;
     padding: 1px 6px;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 600;
 }
 button.copy-btn.poc-drift {
@@ -321,7 +321,7 @@ button.copy-btn.poc-drift {
     background: var(--surface-2);
     border-left: 3px solid var(--blue);
     border-radius: 0 4px 4px 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     line-height: 1.4;
     display: flex;
     align-items: center;
@@ -333,7 +333,7 @@ button.copy-btn.poc-drift {
     background: transparent;
     border: 1px solid var(--blue);
     color: var(--blue);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     padding: 2px 8px;
     border-radius: 4px;
@@ -349,7 +349,7 @@ button.copy-btn.poc-drift {
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     line-height: 1.5;
 }
 .ai-result.hidden { display: none; }
@@ -360,7 +360,7 @@ button.copy-btn.poc-drift {
     padding-top: 0.4rem;
     border-top: 1px dashed var(--border);
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
 }
 .validate-actions {
     display: flex;
@@ -370,7 +370,7 @@ button.copy-btn.poc-drift {
     margin: 0.6rem 0;
 }
 .ai-analyze-validate {
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     padding: 6px 14px;
 }
 /* AI Analyze button inside the score-card — sits below the MR/MOM
@@ -382,7 +382,7 @@ button.copy-btn.poc-drift {
     align-items: center;
     margin-top: 0.6rem;
     padding: 4px 12px;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     background: transparent;
     border: 1px solid var(--blue);
@@ -414,7 +414,7 @@ button.copy-btn.poc-drift {
     background: transparent;
     border: 0;
     color: var(--blue);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     padding: 3px 12px;
     cursor: pointer;
@@ -431,7 +431,7 @@ button.copy-btn.poc-drift {
     padding: 0.4rem 0.6rem;
     border-radius: 4px;
     overflow-x: auto;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
 }
 
 /* "copy row" — single-tap whole-line snapshot for pasting into trade notes.
@@ -441,7 +441,7 @@ button.copy-btn.copy-row {
     min-height: 0;
     min-width: 0;
     padding: 2px 8px;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -462,7 +462,7 @@ button.copy-btn.copy-row:hover {
     gap: 1rem;
     flex-wrap: wrap;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     margin: 0.5rem 0;
     font-variant-numeric: tabular-nums;
 }
@@ -484,24 +484,24 @@ button.copy-btn.copy-row:hover {
 }
 .hvn-row .label, .va-row .label {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .va-row .va-sep {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
 }
 .va-row .va-edge {
     border-color: rgba(192, 132, 252, 0.5);  /* match chart VA color */
     color: #c084fc;
 }
 .hvn-row .label {
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     color: var(--text-dim);
     margin-right: 0.25rem;
 }
 
 .reason {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     margin: 0.2rem 0;
     padding-left: 0.5rem;
     font-variant-numeric: tabular-nums;
@@ -533,7 +533,7 @@ button.copy-btn.copy-row:hover {
     gap: 0.5rem;
     margin-bottom: 0.5rem;
     flex-wrap: wrap;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .plan-head .ord {
     font-weight: 600;
@@ -555,12 +555,12 @@ button.copy-btn.copy-row:hover {
 }
 .plan-grid .lbl {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .plan-note {
     margin-top: 0.5rem;
     color: var(--yellow);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 
 /* Click-to-copy button — the centerpiece of mobile UX. */
@@ -571,7 +571,7 @@ button.copy-btn.copy-row:hover {
     padding: 4px 10px;
     border-radius: 6px;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-variant-numeric: tabular-nums;
     cursor: pointer;
     min-height: 32px;
@@ -588,8 +588,8 @@ button.copy-btn.copy-row:hover {
     color: var(--bg);
     border-color: var(--green);
 }
-.copy-btn.big { font-size: 1.05rem; padding: 6px 14px; font-weight: 600; }
-.copy-btn.small { padding: 3px 7px; font-size: 0.85rem; min-height: 26px; }
+.copy-btn.big { font-size: var(--fs-lg); padding: 6px 14px; font-weight: 600; }
+.copy-btn.small { padding: 3px 7px; font-size: var(--fs-base); min-height: 26px; }
 .copy-btn.stop { color: var(--red); }
 .copy-btn.stop:active { background: var(--red); color: #0f0b07; }
 .copy-btn.tp { color: var(--green); }
@@ -599,7 +599,7 @@ footer {
     text-align: center;
     padding: 1.5rem 1rem 2rem;
     color: var(--text-dim);
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
 }
 
 /* -------- top nav (multi-page) -------- */
@@ -614,7 +614,7 @@ footer {
     text-decoration: none;
     padding: 0.4rem 0.7rem;
     border-radius: 6px;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     min-height: 36px;
     line-height: 1.5;
 }
@@ -666,7 +666,7 @@ footer {
     margin-bottom: 1rem;
 }
 .stats-card h2 {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     color: var(--text-dim);
     margin-bottom: 0.5rem;
     text-transform: uppercase;
@@ -685,14 +685,14 @@ footer {
 }
 .stats-grid .lbl {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;   /* keep every label 1 line so values align across the row */
 }
 .stats-grid .val {
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     font-variant-numeric: tabular-nums;
 }
 .val.r-pos { color: var(--green); }
@@ -735,7 +735,7 @@ footer {
     border: 1px solid var(--yellow);
     border-radius: 4px;
     padding: 1px 6px;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -755,12 +755,12 @@ footer {
     gap: 0.5rem;
     flex-wrap: wrap;
     margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .trade-id {
     color: var(--text-dim);
     font-family: ui-monospace, monospace;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .trade-head .sym {
     font-weight: 700;
@@ -770,7 +770,7 @@ footer {
     background: var(--surface-2);
     padding: 1px 6px;
     border-radius: 3px;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     color: var(--text-dim);
     font-family: ui-monospace, monospace;
 }
@@ -778,12 +778,12 @@ footer {
     background: var(--surface-2);
     padding: 1px 6px;
     border-radius: 3px;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     color: var(--blue);
     font-family: ui-monospace, monospace;
 }
 .trade-status {
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     padding: 1px 6px;
     border-radius: 3px;
     background: var(--surface-2);
@@ -799,7 +799,7 @@ footer {
 .trade-r {
     font-family: ui-monospace, "SF Mono", monospace;
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
 }
 .trade-r.r-pos { color: var(--green); }
 .trade-r.r-neg { color: var(--red); }
@@ -817,21 +817,21 @@ footer {
 }
 .trade-prices .lbl {
     color: var(--text-dim);
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
 
 .trade-times {
     color: var(--text-dim);
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     font-variant-numeric: tabular-nums;
     margin: 0.4rem 0;
 }
 .trade-times .lbl {
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
 }
 .trade-times .lbl.pending { color: var(--yellow); }
 .trade-times .time-pending {
@@ -842,14 +842,14 @@ footer {
 
 .trade-anchor {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     font-style: italic;
     margin: 0.3rem 0;
 }
 .trade-anchor span { color: var(--cyan); font-style: normal; }
 .trade-ctx {
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     margin: 0.2rem 0;
     word-break: break-all;
 }
@@ -858,11 +858,11 @@ footer {
     padding: 1px 5px;
     border-radius: 3px;
     color: var(--text);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
 }
 .trade-note {
     color: var(--text);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     background: var(--surface-2);
     padding: 0.4rem 0.6rem;
     border-radius: 4px;
@@ -872,7 +872,7 @@ footer {
 
 /* -------- forms -------- */
 .page-title {
-    font-size: 1.2rem;
+    font-size: var(--fs-lg);
     font-weight: 600;
     color: var(--cyan);
     margin-bottom: 1rem;
@@ -884,14 +884,14 @@ footer {
     border-radius: 6px;
     padding: 0.6rem 0.8rem;
     margin-bottom: 1rem;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
 }
 /* TP1 flash banner — shown once on /journal after /journal/open. */
 .tp1-flash {
     border-radius: 6px;
     padding: 0.65rem 0.85rem;
     margin-bottom: 1rem;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     border: 1px solid var(--border);
 }
 .tp1-ok    { background: var(--green-bg); color: var(--green); border-color: var(--green); }
@@ -908,7 +908,7 @@ footer {
     border-radius: 6px;
     padding: 0.7rem 0.9rem;
     margin-bottom: 1rem;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     line-height: 1.4;
 }
 .macro-banner .hint { color: inherit; opacity: 0.85; }
@@ -955,7 +955,7 @@ footer {
     border-radius: 4px;
     padding: 3px 10px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     cursor: pointer;
 }
 .chart-tf-pills .tf-pill.active {
@@ -1362,7 +1362,7 @@ footer {
     color: var(--text-dim);
     border: 0;
     padding: 3px 10px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-family: ui-monospace, "SF Mono", monospace;
     cursor: pointer;
     line-height: 1.4;
@@ -1439,7 +1439,7 @@ footer {
 .glossary-hint {
     margin: var(--sp-3) 0 0;
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     padding-top: 0.6rem;
     border-top: 1px dashed var(--border);
 }
@@ -1780,7 +1780,7 @@ footer {
     z-index: 2;
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     padding: 1px 6px;
     background: rgba(var(--bg-rgb),0.72);
     border: 1px solid var(--border);
@@ -1964,7 +1964,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 3px;
     padding: 2px 8px;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     font-family: ui-monospace, "SF Mono", monospace;
     cursor: pointer;
     transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
@@ -2030,7 +2030,7 @@ footer {
 }
 .modal-head h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     color: var(--text);
 }
 .modal-x {
@@ -2371,7 +2371,7 @@ footer {
 /* On-chain lookup page — /onchain */
 .page-hint {
     color: var(--text-dim);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     line-height: 1.5;
     max-width: 720px;
     margin-bottom: 1rem;
@@ -2390,7 +2390,7 @@ footer {
     padding: 0.6rem 0.9rem;
     border-radius: 4px;
     margin: 0.8rem 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .onchain-status.hidden { display: none; }
 .onchain-status-loading { background: rgba(var(--blue-rgb),0.10); color: var(--blue); border: 1px solid var(--blue); }
@@ -2404,14 +2404,14 @@ footer {
     border-radius: 6px;
     margin-bottom: 1rem;
 }
-.onchain-title { font-size: 1.1rem; font-weight: 700; }
+.onchain-title { font-size: var(--fs-lg); font-weight: 700; }
 .onchain-ticker { color: var(--text-dim); font-weight: 400; }
 .onchain-meta {
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     margin-top: 0.4rem;
 }
 .onchain-meta a { color: var(--blue); }
@@ -2423,12 +2423,12 @@ footer {
     padding: 0.5rem 0.8rem;
     border-radius: 4px;
     margin-bottom: 1rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .onchain-partial-errors ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
 
 .onchain-block { margin-bottom: 1.5rem; }
-.onchain-block h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+.onchain-block h2 { font-size: var(--fs-md); margin: 0 0 0.5rem; }
 
 /* Dump + holder tables are .dt.dt--compact; only the page's cell semantics live here. */
 .onchain-block .dt a { color: var(--blue); text-decoration: none; }
@@ -2459,10 +2459,10 @@ footer {
 }
 .tradeable-banner-title {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     color: var(--green);
 }
-.tradeable-banner .hint { color: var(--text-dim); font-size: 0.8rem; }
+.tradeable-banner .hint { color: var(--text-dim); font-size: var(--fs-base); }
 .tradeable-list {
     display: flex;
     flex-direction: column;
@@ -2481,7 +2481,7 @@ footer {
     text-decoration: none;
     color: var(--text);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     transition: background 100ms ease, border-color 100ms ease;
 }
 .tradeable-chip:hover {
@@ -2494,9 +2494,9 @@ footer {
 .tradeable-chip .tb-side   { font-weight: 700; }
 .tradeable-chip.tradeable-long  .tb-side { color: var(--green); }
 .tradeable-chip.tradeable-short .tb-side { color: var(--red); }
-.tradeable-chip .tb-score  { color: var(--text-dim); font-size: 0.8rem; }
+.tradeable-chip .tb-score  { color: var(--text-dim); font-size: var(--fs-base); }
 .tradeable-chip .tb-ratio  { color: var(--blue); }
-.tradeable-chip .tb-anchor { color: var(--text-dim); font-size: 0.78rem; font-style: italic; }
+.tradeable-chip .tb-anchor { color: var(--text-dim); font-size: var(--fs-sm); font-style: italic; }
 
 /* Small count badge in the Symbol scan section title */
 .tradeable-count-badge {
@@ -2507,7 +2507,7 @@ footer {
     color: var(--green);
     border: 1px solid var(--green);
     border-radius: 10px;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
 }
 
@@ -2520,7 +2520,7 @@ footer {
     border: 1px solid var(--blue);
     border-radius: 6px;
     padding: 0.35rem 0.7rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     cursor: pointer;
     font: inherit;
     font-weight: 500;
@@ -2534,7 +2534,7 @@ footer {
     background: var(--info-bg);
     border: 1px solid var(--blue);
     border-radius: 8px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     line-height: 1.5;
 }
 .ai-analysis-header {
@@ -2546,12 +2546,12 @@ footer {
     border-bottom: 1px dashed var(--border);
 }
 .ai-analysis-header strong { color: var(--blue); }
-.ai-meta { color: var(--text-dim); font-size: 0.78rem; flex: 1; }
+.ai-meta { color: var(--text-dim); font-size: var(--fs-sm); flex: 1; }
 .ai-close-btn {
     background: none;
     color: var(--text-dim);
     border: none;
-    font-size: 1.2rem;
+    font-size: var(--fs-lg);
     cursor: pointer;
     padding: 0 0.3rem;
     line-height: 1;
@@ -2562,14 +2562,14 @@ footer {
 .ai-analysis-body h2, .ai-analysis-body h3, .ai-analysis-body h4 {
     margin: 0.7rem 0 0.3rem;
     color: var(--blue);
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
 }
 .ai-analysis-body pre {
     background: rgba(0,0,0,0.4);
     padding: 0.5rem 0.7rem;
     border-radius: 4px;
     overflow-x: auto;
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
 }
 .ai-analysis-body code {
     background: rgba(255,255,255,0.08);
@@ -2581,7 +2581,7 @@ footer {
 .ai-md-table {
     border-collapse: collapse;
     margin: 0.5rem 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     width: 100%;
 }
 .ai-md-table th, .ai-md-table td {
@@ -2598,10 +2598,10 @@ footer {
    collapse naturally through browser margin logic — no <br>s. */
 .ai-body p,
 .ai-analysis-body p    { margin: 0.4rem 0; }
-.ai-body h2, .ai-analysis-body h2 { margin: 0.7rem 0 0.3rem; font-size: 1.1rem; }
-.ai-body h3, .ai-analysis-body h3 { margin: 0.6rem 0 0.3rem; font-size: 1.0rem; }
-.ai-body h4, .ai-analysis-body h4 { margin: 0.5rem 0 0.25rem; font-size: 0.95rem; }
-.ai-body h5, .ai-analysis-body h5 { margin: 0.4rem 0 0.2rem; font-size: 0.9rem; }
+.ai-body h2, .ai-analysis-body h2 { margin: 0.7rem 0 0.3rem; font-size: var(--fs-lg); }
+.ai-body h3, .ai-analysis-body h3 { margin: 0.6rem 0 0.3rem; font-size: var(--fs-md); }
+.ai-body h4, .ai-analysis-body h4 { margin: 0.5rem 0 0.25rem; font-size: var(--fs-md); }
+.ai-body h5, .ai-analysis-body h5 { margin: 0.4rem 0 0.2rem; font-size: var(--fs-md); }
 .ai-md-list {
     margin: 0.3rem 0;
     padding-left: 1.3rem;
@@ -2619,7 +2619,7 @@ footer {
     padding-top: 0.4rem;
     border-top: 1px dashed var(--border);
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-style: italic;
 }
 
@@ -2632,7 +2632,7 @@ footer {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.35rem 1rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .pnl-row { display: flex; justify-content: space-between; gap: 0.5rem; }
 .pnl-label { color: var(--text-dim); }
@@ -2644,7 +2644,7 @@ footer {
     margin-top: 0.4rem;
     padding-top: 0.4rem;
     border-top: 1px dashed var(--border);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
     line-height: 1.4;
 }
@@ -2656,7 +2656,7 @@ footer {
     border-radius: 6px;
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.85rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .field-info code {
     background: rgba(255,255,255,0.06);
@@ -2689,7 +2689,7 @@ footer {
 }
 .bingx-block legend {
     padding: 0 0.4rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     color: var(--text-dim);
 }
 
@@ -2716,7 +2716,7 @@ footer {
 }
 .modal-dialog h3 {
     margin: 0 0 0.6rem;
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
 }
 .modal-warn {
     background: var(--yellow-bg);
@@ -2725,12 +2725,12 @@ footer {
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
     margin: 0 0 0.8rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .modal-dialog ul {
     margin: 0 0 1rem;
     padding-left: 1.2rem;
-    font-size: 0.92rem;
+    font-size: var(--fs-md);
     line-height: 1.6;
 }
 .modal-dialog li {
@@ -2774,13 +2774,13 @@ footer {
 }
 .field label {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 .field .hint {
     color: var(--text-dim);
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     text-transform: none;
     letter-spacing: 0;
     font-style: italic;
@@ -2795,7 +2795,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.6rem 0.7rem;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     font-variant-numeric: tabular-nums;
     min-height: 44px;
@@ -2846,7 +2846,7 @@ footer {
     flex: 1;
     border-radius: 6px;
     padding: 0.7rem 1rem;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     font-weight: 600;
     text-align: center;
     cursor: pointer;
@@ -2877,7 +2877,7 @@ footer {
     flex: 0 0 auto;
     padding: 0.5rem 1rem;
     min-height: 40px;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
 }
 
 /* Record-trade button on dashboard plan cards */
@@ -2888,7 +2888,7 @@ footer {
     padding: 4px 10px;
     border-radius: 4px;
     text-decoration: none;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     white-space: nowrap;
     min-height: 28px;
@@ -2910,7 +2910,7 @@ footer {
     border-radius: 5px;
     text-decoration: none;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     min-height: 36px;
     display: inline-flex;
     align-items: center;
@@ -2940,24 +2940,24 @@ footer {
 }
 .trade-summary .row.times {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .trade-summary .lbl {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 .trade-summary .sym {
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: var(--fs-lg);
     color: var(--cyan);
 }
 .trade-summary .tf {
     background: var(--surface-2);
     padding: 1px 6px;
     border-radius: 3px;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     color: var(--text-dim);
     font-family: ui-monospace, monospace;
 }
@@ -2965,7 +2965,7 @@ footer {
     background: var(--surface-2);
     padding: 1px 6px;
     border-radius: 3px;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     color: var(--blue);
     font-family: ui-monospace, monospace;
 }
@@ -2988,7 +2988,7 @@ footer {
     border-radius: 5px;
     text-decoration: none;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     min-height: 36px;
     display: inline-flex;
     align-items: center;
@@ -2997,7 +2997,7 @@ footer {
 
 .form-section {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin: 1.2rem 0 0.4rem 0;
@@ -3010,7 +3010,7 @@ footer {
     text-transform: none;
     letter-spacing: 0;
     font-style: italic;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 0.4rem;
 }
 
@@ -3029,7 +3029,7 @@ footer {
     border: 1px solid var(--red);
     border-radius: 6px;
     padding: 0.6rem 1.2rem;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 600;
     cursor: pointer;
     min-height: 44px;
@@ -3049,7 +3049,7 @@ footer {
 .partials-helper > summary {
     cursor: pointer;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     list-style: none;
     user-select: none;
 }
@@ -3068,7 +3068,7 @@ footer {
 .partials-helper .hint {
     color: var(--text-dim);
     font-style: italic;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 0.3rem;
 }
 
@@ -3091,7 +3091,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 5px;
     padding: 0.5rem 0.6rem;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     font-variant-numeric: tabular-nums;
     min-height: 40px;
@@ -3103,7 +3103,7 @@ footer {
     color: var(--text-dim);
     border-radius: 5px;
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     line-height: 1;
     font-family: inherit;
 }
@@ -3119,7 +3119,7 @@ footer {
     border: 1px solid var(--blue);
     border-radius: 5px;
     padding: 0.35rem 0.8rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
@@ -3133,7 +3133,7 @@ footer {
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     color: var(--text-dim);
 }
 .partials-summary:empty { display: none; }
@@ -3143,7 +3143,7 @@ footer {
 }
 .partials-warn {
     color: var(--yellow);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 0.3rem;
 }
 .btn-apply-partials {
@@ -3152,7 +3152,7 @@ footer {
     border: none;
     border-radius: 5px;
     padding: 0.35rem 0.7rem;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
@@ -3180,11 +3180,11 @@ footer {
     align-items: center;
     gap: 0.3rem;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .market-row {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -3213,7 +3213,7 @@ footer {
 
 .score-num {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 2.5rem;
+    font-size: var(--fs-3xl);
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -3226,14 +3226,14 @@ footer {
 
 .score-out {
     color: var(--text-dim);
-    font-size: 1rem;
+    font-size: var(--fs-md);
     font-weight: 400;
     margin-left: 0.2rem;
 }
 .verdict-text {
     color: var(--text);
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     flex: 1;
 }
 
@@ -3251,7 +3251,7 @@ footer {
 }
 .validate-block h2 {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin: 0 0 0.6rem 0;
@@ -3263,7 +3263,7 @@ footer {
     text-transform: none;
     letter-spacing: 0;
     font-style: italic;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 0.4rem;
 }
 
@@ -3272,11 +3272,11 @@ footer {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .kv-row .lbl {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
@@ -3288,7 +3288,7 @@ footer {
 }
 .reasons li {
     padding: 0.2rem 0;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
     line-height: 1.4;
 }
 .reason-plus { color: var(--green); }
@@ -3300,7 +3300,7 @@ footer {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem 0.8rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .plan-grid > div {
     display: flex;
@@ -3310,7 +3310,7 @@ footer {
 }
 .plan-grid .lbl {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     min-width: 38px;
@@ -3321,7 +3321,7 @@ footer {
 }
 .diff-small {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     font-variant-numeric: tabular-nums;
 }
@@ -3330,7 +3330,7 @@ footer {
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
 }
 .proximity li {
     padding: 0.25rem 0;
@@ -3347,7 +3347,7 @@ footer {
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
 }
 .factors li {
     padding: 0.35rem 0.5rem;
@@ -3380,7 +3380,7 @@ footer {
 .factor-detail {
     grid-area: detail;
     color: var(--text-dim);
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
 }
 
 .validate-footer-actions {
@@ -3404,7 +3404,7 @@ footer {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .diagnose-row.verdict-strong  { border-left-color: var(--green); }
 .diagnose-row.verdict-take    { border-left-color: var(--green); }
@@ -3414,7 +3414,7 @@ footer {
 
 .diag-label {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -3422,7 +3422,7 @@ footer {
     padding: 0.1rem 0.4rem;
     border-radius: 3px;
     font-weight: 700;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
 }
 .diag-score {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
@@ -3443,7 +3443,7 @@ footer {
     margin-left: auto;
     color: var(--blue);
     text-decoration: none;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     padding: 0 0.3rem;
 }
 .diag-link:active { opacity: 0.7; }
@@ -3453,7 +3453,7 @@ footer {
     margin-top: 0.2rem;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
 }
 .diag-flag.knife {
@@ -3496,7 +3496,7 @@ footer {
     border: none;
     color: var(--text-dim);
     font-family: inherit;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     padding: 4px 10px;
     border-radius: 4px;
@@ -3520,7 +3520,7 @@ footer {
     width: 26px;
     height: 26px;
     padding: 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     line-height: 1;
     cursor: pointer;
     display: inline-flex;
@@ -3534,13 +3534,13 @@ footer {
 .close-ref {
     margin-left: 0.4rem;
     color: var(--text-dim);
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     font-style: italic;
     white-space: nowrap;
 }
 .close-ref .copy-btn {
     font-style: normal;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     padding: 0.05rem 0.3rem;
     margin-left: 0.15rem;
 }
@@ -3570,14 +3570,14 @@ footer {
 }
 .pf-hero-label {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: 600;
 }
 .pf-hero-r {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 2.6rem;
+    font-size: var(--fs-3xl);
     font-weight: 700;
     line-height: 1.05;
     margin: 0.2rem 0 0.6rem;
@@ -3587,7 +3587,7 @@ footer {
 .pf-hero-r.r-neg  { color: var(--red); }
 .pf-hero-r.r-zero { color: var(--text); }
 .pf-hero-unit {
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     color: var(--text-dim);
     margin-left: 0.25rem;
     font-weight: 600;
@@ -3602,14 +3602,14 @@ footer {
     border: 1px solid var(--border);
     border-radius: 999px;
     padding: 0.25rem 0.6rem;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
 }
 .pf-hero-pill .lbl {
     color: var(--text-dim);
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
@@ -3638,14 +3638,14 @@ footer {
 }
 .pf-period-label {
     color: var(--text-dim);
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-weight: 600;
 }
 .pf-period-r {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 1.2rem;
+    font-size: var(--fs-lg);
     font-weight: 700;
     margin: 0.15rem 0;
     font-variant-numeric: tabular-nums;
@@ -3655,7 +3655,7 @@ footer {
 .pf-period-r.r-zero { color: var(--text-dim); }
 .pf-period-n {
     color: var(--text-dim);
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
 }
 
 /* Portfolio sections — visual containers */
@@ -3672,7 +3672,7 @@ footer {
     align-items: center;
     gap: 0.5rem;
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 700;
     margin: 0 0 0.7rem 0;
     letter-spacing: 0.02em;
@@ -3689,7 +3689,7 @@ footer {
 .pf-section-dot.equity   { background: var(--green); }
 .pf-section-meta {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-weight: 500;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     margin-left: 0.3rem;
@@ -3701,7 +3701,7 @@ footer {
     padding: 0.3rem 0.7rem;
     border-radius: 5px;
     text-decoration: none;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
 }
 .pf-section-action:active { opacity: 0.8; }
@@ -3722,7 +3722,7 @@ footer {
 }
 .pf-group-title {
     color: var(--text-dim);
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     font-weight: 700;
@@ -3760,7 +3760,7 @@ footer {
     border: none;
     color: var(--text-dim);
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     padding: 0.5rem 0.6rem;
     border-radius: 7px;
@@ -3801,14 +3801,14 @@ footer {
 }
 .pf-equity-stat .lbl {
     color: var(--text-dim);
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-weight: 600;
 }
 .pf-equity-stat strong {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     font-variant-numeric: tabular-nums;
     margin-top: 0.1rem;
 }
@@ -3838,7 +3838,7 @@ footer {
     display: flex;
     justify-content: space-between;
     margin-top: 0.3rem;
-    font-size: 0.66rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
 }
@@ -3857,7 +3857,7 @@ footer {
     gap: 4px;
     width: 100%;
     color: var(--text-dim);
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     text-align: center;
@@ -3910,7 +3910,7 @@ footer {
 .cal2-cell.empty .cal2-day {
     color: var(--text-dim);
     opacity: 0.45;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
 }
 .cal2-cell.pos {
     /* Solid rgba fallback first; Safari < 16.4 ignores the color-mix line
@@ -3934,13 +3934,13 @@ footer {
     outline-offset: -1px;
 }
 .cal2-day {
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text);
     opacity: 0.78;
     font-weight: 500;
 }
 .cal2-r {
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: var(--text);
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
@@ -3953,7 +3953,7 @@ footer {
     justify-content: center;
     gap: 4px;
     margin-top: 0.55rem;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
 }
 .cal2-legend-end {
@@ -4003,7 +4003,7 @@ footer {
     color: var(--text-dim);
     text-decoration: none;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     font-weight: 600;
 }
 .pf-page-num:hover, .pf-page-arrow:not(.disabled):hover {
@@ -4028,7 +4028,7 @@ footer {
     font-weight: 400;
     text-transform: none;
     letter-spacing: 0;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 0.4rem;
 }
 
@@ -4046,7 +4046,7 @@ footer {
     min-width: 0;
 }
 .hist-count {
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     line-height: 1;
@@ -4071,7 +4071,7 @@ footer {
 .hist-bar.pos { background: var(--green); }
 .hist-bar.neg { background: var(--red); }
 .hist-label {
-    font-size: 0.62rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     margin-top: 2px;
@@ -4113,7 +4113,7 @@ footer {
 .cal-cell.empty .cal-day {
     color: var(--text-dim);
     opacity: 0.5;
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
 }
 .cal-cell.pos {
     background: color-mix(in srgb, var(--green) var(--intensity, 0%), var(--bg));
@@ -4128,12 +4128,12 @@ footer {
     border-width: 2px;
 }
 .cal-day {
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
     color: var(--text);
     opacity: 0.85;
 }
 .cal-r {
-    font-size: 0.66rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     color: var(--text);
 }
@@ -4148,7 +4148,7 @@ footer {
     align-items: center;
     gap: 4px;
     margin-top: 0.6rem;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     justify-content: center;
 }
@@ -4183,7 +4183,7 @@ footer {
     align-items: center;
     gap: 0.5rem;
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 700;
     letter-spacing: 0.02em;
     margin: 0 0 0.6rem 0;
@@ -4212,14 +4212,14 @@ footer {
     color: var(--text-dim);
     border-radius: 999px;
     padding: 1px 8px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
 }
 .section-meta {
     margin-left: auto;
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-weight: 500;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
 }
@@ -4240,25 +4240,25 @@ footer {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
     margin-bottom: 0.5rem;
 }
 .ot-id {
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
 }
 .ot-tf {
     background: var(--surface-2);
     padding: 1px 6px;
     border-radius: 3px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
 }
 .ot-elapsed {
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-style: italic;
 }
 .ot-r {
@@ -4266,7 +4266,7 @@ footer {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
 }
 .ot-r.r-pos  { color: var(--green); }
 .ot-r.r-neg  { color: var(--red); }
@@ -4309,7 +4309,7 @@ footer {
 .ot-bar-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
 }
@@ -4321,12 +4321,12 @@ footer {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem 0.8rem;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
     margin: 0.4rem 0;
 }
 .ot-prices .copy-btn.small {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     padding: 0.05rem 0.35rem;
     margin-left: 0.15rem;
 }
@@ -4336,7 +4336,7 @@ footer {
     background: var(--surface-2);
     padding: 0.35rem 0.6rem;
     border-radius: 5px;
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
     margin: 0.4rem 0;
     border-left: 3px solid var(--border);
 }
@@ -4359,7 +4359,7 @@ footer {
     margin-left: 0.4rem;
     padding: 0.1rem 0.4rem;
     border-radius: 3px;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
 }
 .ot-flag.knife {
@@ -4406,7 +4406,7 @@ footer {
     margin: 0.35rem 0 0;
     padding: 0.32rem 0.55rem;
     border-radius: 5px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-variant-numeric: tabular-nums;
     color: var(--text-dim);
     background: rgba(var(--text-dim-rgb), 0.10);
@@ -4444,7 +4444,7 @@ footer {
     border: 1px solid var(--yellow);
     border-radius: 4px;
     padding: 1px 6px;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     letter-spacing: 0.05em;
     animation: pulse-pending 1.6s ease-in-out infinite;
@@ -4459,7 +4459,7 @@ footer {
     background: var(--surface-2);
     border: 1px dashed rgba(var(--yellow-rgb), 0.4);
     border-radius: 6px;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     color: var(--text-dim);
     font-variant-numeric: tabular-nums;
 }
@@ -4472,7 +4472,7 @@ footer {
 /* POC-drift chip in the symbol-card meta row. Color follows trend
    direction; bolder border when stacked (POC50>POC100>POC200). */
 .poc-drift {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     padding: 1px 6px;
     border-radius: 4px;
     border: 1px solid var(--border);
@@ -4497,7 +4497,7 @@ footer {
     font-family: ui-serif, Georgia, serif;
     font-style: italic;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     line-height: 1;
     cursor: pointer;
     display: inline-flex;
@@ -4550,7 +4550,7 @@ footer {
 .legend-modal-title {
     color: var(--text);
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: var(--fs-lg);
     margin-right: auto;
 }
 .legend-modal-close {
@@ -4560,7 +4560,7 @@ footer {
     border-radius: 5px;
     padding: 0.25rem 0.55rem;
     font-family: inherit;
-    font-size: 1.2rem;
+    font-size: var(--fs-lg);
     line-height: 1;
     cursor: pointer;
     min-height: 32px;
@@ -4572,12 +4572,12 @@ footer {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     color: var(--text);
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
     line-height: 1.5;
 }
 .legend-modal-body h3 {
     color: var(--cyan);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin: 1rem 0 0.4rem;
@@ -4602,7 +4602,7 @@ footer {
     padding: 0.4rem 0.45rem;
     vertical-align: middle;
     border-bottom: 1px solid var(--border);
-    font-size: 0.84rem;
+    font-size: var(--fs-base);
     line-height: 1.45;
 }
 .legend-modal-body .legend-table tr:last-child td { border-bottom: none; }
@@ -4626,7 +4626,7 @@ footer {
     font-weight: 700;
     color: var(--text);
     margin-top: 0.7rem;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
     line-height: 1.35;
     flex-wrap: wrap;
 }
@@ -4635,7 +4635,7 @@ footer {
     margin: 0.2rem 0 0 0;
     padding-left: 0;
     color: var(--text-dim);
-    font-size: 0.83rem;
+    font-size: var(--fs-base);
     line-height: 1.55;
 }
 .legend-modal-body .legend-dl dt b,
@@ -4645,12 +4645,12 @@ footer {
     background: var(--surface-2);
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
 }
 .legend-modal-body .lg-meta {
     font-weight: 400;
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
 }
 
 .lg-swatch {
@@ -4692,7 +4692,7 @@ footer {
     border: 1px solid var(--border);
     background: rgba(var(--bg-rgb), 0.85);
     color: var(--text-dim);
-    font-size: 14px;
+    font-size: var(--fs-md);
     line-height: 1;
     cursor: pointer;
     display: flex;
@@ -4744,7 +4744,7 @@ footer {
     color: var(--text);
     font-weight: 700;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     margin-right: auto;
 }
 .chart-modal-close {
@@ -4754,7 +4754,7 @@ footer {
     border-radius: 5px;
     padding: 0.25rem 0.55rem;
     font-family: inherit;
-    font-size: 1.15rem;
+    font-size: var(--fs-lg);
     line-height: 1;
     cursor: pointer;
     min-height: 32px;
@@ -4781,7 +4781,7 @@ footer {
 .ot-actions .btn-edit {
     flex: 1;
     text-align: center;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     padding: 0.4rem 0.6rem;
     min-height: 32px;
 }
@@ -4794,7 +4794,7 @@ footer {
     border-radius: 4px;
     padding: 1px 5px;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
 }
 
@@ -4813,7 +4813,7 @@ footer {
     border-radius: 4px;
     padding: 1px 5px;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     white-space: nowrap;
     cursor: help;
@@ -4849,7 +4849,7 @@ footer {
     align-items: baseline;
     gap: 0.55rem;
     margin: 0 0 0.5rem 0;
-    font-size: 0.98rem;
+    font-size: var(--fs-md);
     color: var(--text);
 }
 .ops-svc-name {
@@ -4858,20 +4858,20 @@ footer {
 }
 .ops-svc-tag {
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-weight: 500;
     font-style: italic;
 }
 .ops-hint {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-top: 0.4rem;
 }
 .ops-hint code {
     background: var(--surface-2);
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
 }
 
 /* Inline TF picker — used in the Validate form. Pill buttons that
@@ -4894,7 +4894,7 @@ footer {
     border-radius: 6px;
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
     cursor: pointer;
     user-select: none;
     transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
@@ -4927,7 +4927,7 @@ footer {
     border-radius: 8px;
     padding: 0.55rem 0.75rem;
     color: var(--yellow);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     margin: 0.5rem 0 1rem;
 }
 .ops-mutex-warn.hidden { display: none; }
@@ -4935,7 +4935,7 @@ footer {
     background: var(--surface-2);
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
 }
 
 /* Monitor TF multi-select — checkbox grid */
@@ -4956,7 +4956,7 @@ footer {
     cursor: pointer;
     user-select: none;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .ops-tf-check input[type="checkbox"] {
     accent-color: var(--blue);
@@ -4988,7 +4988,7 @@ footer {
     border-radius: 5px;
     padding: 0.35rem 0.7rem;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
     cursor: pointer;
 }
 .ops-log-tab.active {
@@ -5050,7 +5050,7 @@ footer {
 .ops-hsvc-name { font-weight: 700; }
 .ops-hsvc-state {
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;
+    font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.03em;
 }
 .ops-hsvc-state.on   { color: var(--green); }
 .ops-hsvc-state.off  { color: var(--text-dim); }
@@ -5092,13 +5092,13 @@ footer {
 .ops-state-label {
     font-weight: 700;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     letter-spacing: 0.04em;
 }
 
 .ops-config-pill {
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     background: var(--surface-2);
     padding: 0.2rem 0.5rem;
     border-radius: 999px;
@@ -5116,7 +5116,7 @@ footer {
     color: var(--yellow);
     border: 1px solid var(--yellow);
     border-radius: 5px;
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
 }
 
 .ops-actions {
@@ -5131,7 +5131,7 @@ footer {
     color: var(--text);
     font-family: inherit;
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     padding: 0.8rem 0.5rem;
     border-radius: 8px;
     cursor: pointer;
@@ -5188,7 +5188,7 @@ footer {
 }
 .ops-block h2 {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin: 0 0 0.6rem 0;
@@ -5200,7 +5200,7 @@ footer {
     text-transform: none;
     letter-spacing: 0;
     font-style: italic;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 0.3rem;
 }
 
@@ -5209,7 +5209,7 @@ footer {
     align-items: center;
     gap: 0.6rem;
     margin-bottom: 0.5rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
 }
 .ops-checkbox {
     color: var(--text-dim);
@@ -5224,7 +5224,7 @@ footer {
 
 .ops-log-status {
     margin-left: auto;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
 }
@@ -5239,7 +5239,7 @@ footer {
     height: 55vh;
     overflow-y: auto;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     line-height: 1.45;
     color: var(--text-dim);
     -webkit-overflow-scrolling: touch;
@@ -5265,7 +5265,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.55rem 0.9rem;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
     font-weight: 600;
     box-shadow: 0 6px 18px rgba(0,0,0,0.5);
     z-index: 10;
@@ -5321,8 +5321,8 @@ footer {
 /* Calendar text scales down on narrow phones since each cell shrinks
    with the container. */
 @media (max-width: 480px) {
-    .cal2-day { font-size: 0.62rem; }
-    .cal2-r   { font-size: 0.66rem; }
+    .cal2-day { font-size: var(--fs-xs); }
+    .cal2-r   { font-size: var(--fs-xs); }
 }
 
 /* Defensive: nothing in main content should force horizontal scroll. */
@@ -5338,7 +5338,7 @@ main { overflow-x: hidden; }
     border-radius: 6px;
     padding: 4px 10px;
     font-family: var(--mono);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     line-height: 1.4;
     white-space: nowrap;
     cursor: pointer;
@@ -5507,8 +5507,8 @@ main { overflow-x: hidden; }
    means a class setting display has beaten the attribute before. Cheap
    insurance against a later `.dt tbody tr { display: table-row }`. */
 .dt tbody tr[hidden] { display: none !important; }
-.at-pager { display: flex; align-items: center; gap: .6rem; margin: .5rem 0 .1rem; font-size: .78rem; }
-.at-pg { padding: .25rem .6rem; font: inherit; font-size: .75rem; cursor: pointer;
+.at-pager { display: flex; align-items: center; gap: .6rem; margin: .5rem 0 .1rem; font-size: var(--fs-sm); }
+.at-pg { padding: .25rem .6rem; font: inherit; font-size: var(--fs-sm); cursor: pointer;
   border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); }
 .at-pg:hover:not(:disabled) { border-color: var(--text-dim); }
 .at-pg:disabled { opacity: .35; cursor: default; }
@@ -5573,12 +5573,12 @@ main { overflow-x: hidden; }
     }
     .dt--cards tbody tr:hover > td:first-child { box-shadow: none; }
 }
-.outcome-badge { padding: 1px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+.outcome-badge { padding: 1px 7px; border-radius: 4px; font-size: var(--fs-sm); font-weight: 600; }
 .oc-open    { color: var(--yellow); background: var(--yellow-bg); }
 .oc-win     { color: var(--green);  background: var(--green-bg); }
 .oc-loss   { color: var(--red);    background: var(--red-bg); }
 .oc-expired { color: var(--text-dim); background: var(--surface-2); }
-.setup-del { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; }
+.setup-del { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; font-size: var(--fs-md); }
 .setup-del:hover { color: var(--red); }
 
 /* /chart struct-panel "記 setup" button */
@@ -5616,7 +5616,7 @@ main { overflow-x: hidden; }
 .oc-skip { color: var(--text-dim); background: var(--surface-2); border: 1px dashed var(--border); }
 .setup-actions { display: flex; gap: 0.4rem; align-items: center; }
 .setup-actions form { display: inline; }
-.setup-skip { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 4px; padding: 1px 7px; font-size: 0.72rem; cursor: pointer; }
+.setup-skip { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 4px; padding: 1px 7px; font-size: var(--fs-sm); cursor: pointer; }
 .setup-skip:hover { color: var(--yellow); border-color: var(--yellow); }
 
 /* -------- language toggle (injected by /static/i18n.js) -------- */
@@ -5628,7 +5628,7 @@ main { overflow-x: hidden; }
     border-radius: 6px;
     padding: 4px 9px;
     font-family: var(--cjk);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     line-height: 1.4;
     white-space: nowrap;
     cursor: pointer;
@@ -5650,8 +5650,8 @@ main { overflow-x: hidden; }
 
 /* -------- /tips — expandable trading-tip cards -------- */
 .tips-main { max-width: 720px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
-.tips-h1 { font-size: 1.5rem; font-weight: 700; color: var(--text); display: flex; flex-direction: column; }
-.tips-h1 .tips-sub { font-size: 0.85rem; font-weight: 400; color: var(--text-dim); margin-top: 0.25rem; }
+.tips-h1 { font-size: var(--fs-xl); font-weight: 700; color: var(--text); display: flex; flex-direction: column; }
+.tips-h1 .tips-sub { font-size: var(--fs-base); font-weight: 400; color: var(--text-dim); margin-top: 0.25rem; }
 .tip-card {
     margin-top: 1.1rem;
     border: 1px solid var(--border);
@@ -5665,11 +5665,15 @@ main { overflow-x: hidden; }
 .tip-card:hover  { border-color: var(--blue); }
 .tip-summary {
     list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.7rem;
-    padding: 0.9rem 1rem; font-size: 1.05rem; font-weight: 600; color: var(--text);
+    padding: 0.9rem 1rem; font-size: var(--fs-lg); font-weight: 600; color: var(--text);
     -webkit-tap-highlight-color: transparent;
 }
 .tip-summary::-webkit-details-marker { display: none; }
-.tip-icon { font-size: 1.5rem; line-height: 1; flex: 0 0 auto; }
+/* Phones: card titles drop one step (lg → md). At lg, a 340px card wraps most
+   titles to a third line; weight 600 still carries the hierarchy over the
+   md body steps, which are only visible once the card is open anyway. */
+@media (max-width: 640px) { .tip-summary { font-size: var(--fs-md); } }
+.tip-icon { font-size: var(--fs-xl); line-height: 1; flex: 0 0 auto; }
 .tip-title { flex: 1; }
 .tip-title em { color: var(--blue); font-style: normal; }
 .tip-chevron { color: var(--text-dim); transition: transform 200ms ease; flex: 0 0 auto; }
@@ -5678,16 +5682,16 @@ main { overflow-x: hidden; }
 .tip-steps { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin: 0; padding: 0; counter-reset: tip; }
 .tip-step {
     padding: 0.6rem 0.8rem; border-radius: 8px; border-left: 4px solid var(--border);
-    background: rgba(var(--text-dim-rgb), 0.06); font-size: 0.9rem; line-height: 1.55; color: var(--text);
+    background: rgba(var(--text-dim-rgb), 0.06); font-size: var(--fs-md); line-height: 1.55; color: var(--text);
 }
 .tip-step b { color: var(--text); }
 .step-trend   { border-left-color: var(--green);  background: linear-gradient(90deg, var(--green-bg), transparent 72%); }
 .step-neutral { border-left-color: var(--yellow); background: linear-gradient(90deg, var(--yellow-bg), transparent 72%); }
 .step-agree   { border-left-color: var(--blue);   background: linear-gradient(90deg, rgba(var(--blue-rgb),0.12), transparent 72%); }
 .step-clash   { border-left-color: var(--red);    background: linear-gradient(90deg, var(--red-bg), transparent 72%); }
-.tip-foot { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px dashed var(--border); font-size: 0.82rem; color: var(--text-dim); }
+.tip-foot { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px dashed var(--border); font-size: var(--fs-base); color: var(--text-dim); }
 .tip-foot b { color: var(--text); }
-.tips-more { margin-top: 1.2rem; color: var(--text-dim); font-size: 0.85rem; text-align: center; font-style: italic; }
+.tips-more { margin-top: 1.2rem; color: var(--text-dim); font-size: var(--fs-base); text-align: center; font-style: italic; }
 
 /* ── Multi-TF bias table (/chart, top-right overlay) ────────────────
    Per-symbol composite vote {N-struct, POC regime, engine} per TF,
@@ -5807,16 +5811,16 @@ main { overflow-x: hidden; }
 /* ── Zone-fade alert card (/ops) ────────────────────────────────────── */
 #ops-zone-refresh { padding: .2rem .55rem; margin-left: .4rem; }
 .ops-zone-armed { margin-top: .5rem; display: flex; flex-direction: column; gap: 4px; }
-.ops-zone-hint { color: var(--text-dim); font-size: .82rem; font-style: italic; }
+.ops-zone-hint { color: var(--text-dim); font-size: var(--fs-base); font-style: italic; }
 .ops-zone-row {
   display: grid; grid-template-columns: 6.5em 3.5em 9em 6.5em 1fr; align-items: baseline;
-  gap: .5rem; padding: .3rem .5rem; border-radius: 6px; font-size: .82rem;
+  gap: .5rem; padding: .3rem .5rem; border-radius: 6px; font-size: var(--fs-base);
   background: rgba(255,255,255,0.03); border-left: 3px solid rgba(255,255,255,0.15);
 }
 .ops-zone-row .z-sym { font-weight: 700; }
-.ops-zone-row .z-dir { text-transform: uppercase; font-weight: 600; font-size: .72rem; }
+.ops-zone-row .z-dir { text-transform: uppercase; font-weight: 600; font-size: var(--fs-sm); }
 .ops-zone-row .z-band { font-variant-numeric: tabular-nums; }
-.ops-zone-row .z-note { color: var(--text-dim); font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops-zone-row .z-note { color: var(--text-dim); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ops-zone-row.z-short { border-left-color: #ef5350; }
 .ops-zone-row.z-short .z-dir { color: #ef5350; }
 .ops-zone-row.z-long  { border-left-color: #26a69a; }
@@ -5825,7 +5829,7 @@ main { overflow-x: hidden; }
 /* Trigger rule per row — a touch band and a close-confirmed band are not the
    same alert, so the list has to say which one is armed. */
 .ops-zone-row .z-trig {
-  font-size: .7rem; font-weight: 600; letter-spacing: .02em; text-align: center;
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: .02em; text-align: center;
   padding: .05rem .3rem; border-radius: 4px; color: var(--text-dim);
   background: rgba(255,255,255,0.06);
 }
@@ -5846,11 +5850,11 @@ main { overflow-x: hidden; }
 .ops-zone-autorow { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
 .ops-zone-autorow input { width: auto; }
 .ops-zone-logwrap { margin-top: .8rem; }
-.ops-zone-logbar { display: flex; align-items: center; justify-content: space-between; font-size: .8rem; color: var(--text-dim); }
+.ops-zone-logbar { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-base); color: var(--text-dim); }
 .ops-zone-log {
   margin-top: .35rem; max-height: 200px; overflow: auto;
   background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 6px; padding: .5rem .6rem; font-size: .72rem; line-height: 1.5;
+  border-radius: 6px; padding: .5rem .6rem; font-size: var(--fs-sm); line-height: 1.5;
   white-space: pre-wrap; word-break: break-word;
 }
 
@@ -6032,7 +6036,7 @@ main { overflow-x: hidden; }
     --surface-2: #1c222c;
 }
 
-body { font-size: 15px; letter-spacing: -0.005em; }
+body { font-size: var(--fs-md); letter-spacing: -0.005em; }
 
 /* Cards — the workhorse. Rounder, roomier, soft elevation. */
 .stats-card,
@@ -6384,7 +6388,7 @@ select:focus-visible, textarea:focus-visible, summary:focus-visible,
     border-radius: 6px;
     padding: 4px 10px;
     font-family: var(--mono);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     line-height: 1.4;
     white-space: nowrap;
     cursor: pointer;
@@ -6600,9 +6604,9 @@ html[data-density="compact"] .dt {
 
 /* ── Market overview table (dashboard) ────────────────────────────── */
 .market-overview .mkt-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .6rem; }
-.mkt-title { margin: 0; font-size: 1.05rem; }
+.mkt-title { margin: 0; font-size: var(--fs-lg); }
 .mkt-tabs { display: flex; gap: .3rem; flex-wrap: wrap; }
-.mkt-tab { padding: .25rem .7rem; border: 1px solid var(--chip-border); background: var(--chip); color: var(--text-dim); border-radius: 999px; cursor: pointer; font-size: .85rem; }
+.mkt-tab { padding: .25rem .7rem; border: 1px solid var(--chip-border); background: var(--chip); color: var(--text-dim); border-radius: 999px; cursor: pointer; font-size: var(--fs-base); }
 .mkt-tab.active { color: var(--text); border-color: var(--blue); background: rgba(var(--blue-rgb), .12); }
 /* Ticker-strip tick flash. Lighter than the home table's (no travelling
    edge, lower alpha): the strip is chrome sitting above the chart, so the
@@ -6624,7 +6628,7 @@ html[data-density="compact"] .dt {
    shown struck through rather than hidden. */
 .cal-cat.cat-speech { background: rgba(var(--red-rgb), 0.18); color: var(--red); border-color: var(--red); }
 .cal-speech-tag { color: var(--red); font-weight: 700; }
-.cal-feed-impact { color: var(--text-dim); text-decoration: line-through; font-size: .74rem; }
+.cal-feed-impact { color: var(--text-dim); text-decoration: line-through; font-size: var(--fs-sm); }
 
 /* ── Price fan-out stats (/ops health card) ──────────────────────────── */
 .ops-stream-grid {
@@ -6636,8 +6640,8 @@ html[data-density="compact"] .dt {
   padding: .35rem .5rem; border-radius: 6px;
   background: rgba(255,255,255,0.03); border-left: 3px solid var(--border);
 }
-.ops-stream-cell .lbl { font-size: .7rem; color: var(--text-dim); letter-spacing: .02em; }
-.ops-stream-cell .val { font-size: .9rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ops-stream-cell .lbl { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .02em; }
+.ops-stream-cell .val { font-size: var(--fs-md); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ops-stream-cell.ok   { border-left-color: var(--green); }
 .ops-stream-cell.warn { border-left-color: #d8a657; }
 .ops-stream-cell.warn .val { color: #d8a657; }
@@ -6649,7 +6653,7 @@ html[data-density="compact"] .dt {
    instead of being truncated inside a metric cell. */
 .ops-stream-cell.ops-stream-err { grid-column: 1 / -1; }
 .ops-stream-cell.ops-stream-err .val {
-  font-size: .78rem; font-weight: 500; white-space: normal;
+  font-size: var(--fs-sm); font-weight: 500; white-space: normal;
   word-break: break-word; font-variant-numeric: normal;
 }
 
@@ -6746,10 +6750,10 @@ html[data-density="compact"] .dt {
 
 /* market-overview: push down + larger, more readable text */
 .market-overview { margin-top: 2.5rem; --dt-bg: var(--bg); }
-.mkt-title { font-size: 1.25rem; }
+.mkt-title { font-size: var(--fs-lg); }
 .mkt-logo { width: 22px; height: 22px; }
-.mkt-ico { font-size: 1.15rem; }
-.mkt-tab { font-size: .92rem; padding: .32rem .85rem; }
+.mkt-ico { font-size: var(--fs-lg); }
+.mkt-tab { font-size: var(--fs-md); padding: .32rem .85rem; }
 .cal-cat.cat-data { background: rgba(var(--blue-rgb), .15); color: var(--blue); }
 
 /* Released figure vs forecast on /calendar. Colour carries the SURPRISE, not
@@ -6757,7 +6761,7 @@ html[data-density="compact"] .dt {
    "above forecast", and which way the tape takes it is not this table's claim
    to make. */
 .cal-act { font-variant-numeric: tabular-nums; }
-.cal-surp { font-size: 0.68rem; padding: 0 4px; border-radius: 3px; white-space: nowrap; }
+.cal-surp { font-size: var(--fs-xs); padding: 0 4px; border-radius: 3px; white-space: nowrap; }
 .cal-hot { color: var(--red); }
 .cal-cool { color: var(--green); }
 .cal-inline { color: var(--text-dim); }
