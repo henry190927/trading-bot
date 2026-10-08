@@ -35,21 +35,21 @@
 <main>
 
 {{if .MacroActive}}
-  <div class="macro-banner macro-active" role="alert">
+  <div class="banner banner--danger" role="alert">
     <strong>⛔ MACRO BLACKOUT ACTIVE</strong> — {{.MacroActive.Name}}
     <span class="hint">(window {{.MacroActive.BeforeMinutes}}min before / {{.MacroActive.AfterMinutes}}min after; signals suppressed)</span>
   </div>
 {{else if .MacroUpcoming}}
-  <div class="macro-banner macro-upcoming" role="status">
+  <div class="banner banner--warn" role="status">
     ⚠ Upcoming macro release: <strong>{{.MacroUpcoming.Name}}</strong>
     <span class="hint">— blackout starts in {{fmtElapsed .MacroUpcomingIn}}</span>
   </div>
 {{end}}
 
 {{if .Tradeable}}
-<section class="tradeable-banner" role="status" aria-label="tradeable signals on this timeframe">
-  <div class="tradeable-banner-head">
-    <span class="tradeable-banner-title">⚡ Tradeable signals</span>
+<section class="banner banner--rail b-green" role="status" aria-label="tradeable signals on this timeframe">
+  <div class="banner-head">
+    <span class="banner-title">⚡ Tradeable signals</span>
     <span class="hint">TF {{.TF}} · engine score ≥ {{.MinTradeable}} · tap a row to jump to its card</span>
   </div>
   <div class="tradeable-list">
@@ -78,11 +78,11 @@
       <div class="ot-head">
         <span class="ot-id">#{{.Trade.ID}}</span>
         <span class="sym">{{.Trade.Symbol}}</span>
-        <span class="{{sideClassStr .Trade.Side}} side-badge">{{sideStr .Trade.Side}}</span>
+        <span class="badge badge--lg {{sideClassStr .Trade.Side}}">{{sideStr .Trade.Side}}</span>
         {{if .Trade.Leverage}}<span class="lev-tag">{{.Trade.Leverage}}×</span>{{end}}
         <span class="ot-tf">{{or .Trade.TF "—"}}</span>
         {{if .Trade.IsPending}}
-          <span class="ot-pending-badge">PENDING</span>
+          <span class="badge badge--outline badge--caps badge--pulse b-yellow">PENDING</span>
           <span class="ot-elapsed" title="time since the plan was recorded">⏳ {{fmtElapsed .PendingSince}}</span>
         {{else}}
           <span class="ot-elapsed" title="time since fill">{{fmtElapsed .TimeElapsed}}</span>
@@ -126,15 +126,15 @@
                   class="copy-btn copy-row"
                   data-copy="#{{.Trade.ID}} {{.Trade.Symbol}} {{or .Trade.TF "—"}} {{sideStr .Trade.Side}} entry {{fmtPrice .Trade.Entry}} mark {{fmtPrice .MarkPrice}} R {{fmtSigned1 .CurrentR}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}} MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}} ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100 {{verdictShort .Diagnose.Verdict}}"
                   title="copy whole-row snapshot for trade notes (id · symbol · TF · side · entry · mark · R · diagnose)">copy row</button>
-          {{if .Diagnose.AtVAH}}<span class="ot-flag va">at VAH</span>
-          {{else if .Diagnose.AtVAL}}<span class="ot-flag va">at VAL</span>
-          {{else if .Diagnose.OutsideVAUp}}<span class="ot-flag va-out">above VA</span>
-          {{else if .Diagnose.OutsideVADn}}<span class="ot-flag va-out">below VA</span>
-          {{else if .Diagnose.InsideVA}}<span class="ot-flag va-in">inside VA</span>{{end}}
-          {{if isPOCRising .Diagnose.POCMig.Trend}}<span class="ot-flag poc-rising">POC ↗</span>
-          {{else if isPOCFalling .Diagnose.POCMig.Trend}}<span class="ot-flag poc-falling">POC ↘</span>{{end}}
-          {{if .Diagnose.RecentFlashBarBearish}}<span class="ot-flag knife">⚠ falling knife</span>{{end}}
-          {{if .Diagnose.RecentFlashBarBullish}}<span class="ot-flag squeeze">⚠ blow-off risk</span>{{end}}
+          {{if .Diagnose.AtVAH}}<span class="badge badge--outline va">at VAH</span>
+          {{else if .Diagnose.AtVAL}}<span class="badge badge--outline va">at VAL</span>
+          {{else if .Diagnose.OutsideVAUp}}<span class="badge badge--outline va-out">above VA</span>
+          {{else if .Diagnose.OutsideVADn}}<span class="badge badge--outline va-out">below VA</span>
+          {{else if .Diagnose.InsideVA}}<span class="badge badge--outline va-in">inside VA</span>{{end}}
+          {{if isPOCRising .Diagnose.POCMig.Trend}}<span class="badge badge--outline poc-rising">POC ↗</span>
+          {{else if isPOCFalling .Diagnose.POCMig.Trend}}<span class="badge badge--outline poc-falling">POC ↘</span>{{end}}
+          {{if .Diagnose.RecentFlashBarBearish}}<span class="badge badge--outline knife">⚠ falling knife</span>{{end}}
+          {{if .Diagnose.RecentFlashBarBullish}}<span class="badge badge--outline squeeze">⚠ blow-off risk</span>{{end}}
         </div>
         {{if .HasDiff}}
           <div class="ot-diff diff-{{or .DiffClass "flat"}}" title="how the validator picture has shifted since you committed">
@@ -157,7 +157,7 @@
     Symbol scan
     <button type="button" class="info-btn" aria-label="legend" title="What do these chips and lines mean?">i</button>
     <span class="section-meta">{{.TF}}</span>
-    {{if .Tradeable}}<span class="tradeable-count-badge" title="tradeable signals on this TF">{{len .Tradeable}} tradeable</span>{{end}}
+    {{if .Tradeable}}<span class="badge badge--outline b-green" title="tradeable signals on this TF">{{len .Tradeable}} tradeable</span>{{end}}
     <div class="chart-style-toggle" role="group" aria-label="chart style">
       <button type="button" class="cs-btn" data-mode="line" aria-pressed="false">Line</button>
       <button type="button" class="cs-btn active" data-mode="candle" aria-pressed="true">Candles</button>
@@ -188,7 +188,7 @@
           </span>
         {{end}}
       </span>
-      <span class="{{sideClass .Signal.Side}} side-badge">{{sideText .Signal.Side}}</span>
+      <span class="badge badge--lg {{sideClass .Signal.Side}}">{{sideText .Signal.Side}}</span>
       <button type="button" class="copy-btn score score-mr" data-copy="MR {{.Signal.MRScore}}" title="mean-reversion votes (RSI / BOLL / Fib / sweep / divergence / MACD) — tap to copy">MR {{.Signal.MRScore}}</button>
       <button type="button" class="copy-btn score score-mom" data-copy="MOM {{.Signal.MomentumScore}}" title="momentum votes (volume anomaly / structure / time-of-day / double-pattern) — tap to copy">MOM {{.Signal.MomentumScore}}</button>
       <button type="button" class="copy-btn score {{scoreClass .Signal.Score $.MinTradeable}}" data-copy="total {{.Signal.Score}}" title="total = MR + MOM — tap to copy">total {{.Signal.Score}}</button>

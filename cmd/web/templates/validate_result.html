@@ -22,7 +22,7 @@
 <section class="validate-header">
   <div class="validate-head-row">
     <span class="sym">{{.Short}}</span>
-    <span class="{{sideClassStr (sideStr $r.Side.String)}} side-badge">{{sideStr $r.Side.String}}</span>
+    <span class="badge badge--lg {{sideClassStr (sideStr $r.Side.String)}}">{{sideStr $r.Side.String}}</span>
     <span class="tf">{{$r.Timeframe}}</span>
     <span class="entry-tag">entry <button class="copy-btn" data-copy="{{fmtPrice $r.Entry}}">{{fmtPrice $r.Entry}}</button></span>
   </div>
@@ -55,7 +55,7 @@
   <h2>Engine state</h2>
   <div class="kv-row">
     <span class="lbl">side</span>
-    <span class="{{sideClassStr (sideStr $r.EngineSide.String)}} side-badge">{{sideStr $r.EngineSide.String}}</span>
+    <span class="badge badge--lg {{sideClassStr (sideStr $r.EngineSide.String)}}">{{sideStr $r.EngineSide.String}}</span>
     <span class="lbl">score</span>
     <span class="score-tag">{{$r.EngineScore}}</span>
     <span class="lbl">breakdown</span>
@@ -78,7 +78,7 @@
 <section class="validate-block">
   <h2>Engine's own plan <span class="hint">(compare with yours)</span></h2>
   <div class="plan-grid">
-    <div><span class="lbl">side</span> <span class="{{sideClassStr (sideStr $r.EngineSide.String)}} side-badge">{{sideStr $r.EngineSide.String}}</span></div>
+    <div><span class="lbl">side</span> <span class="badge badge--lg {{sideClassStr (sideStr $r.EngineSide.String)}}">{{sideStr $r.EngineSide.String}}</span></div>
     <div><span class="lbl">anchor</span> <span>{{$r.EnginePlan.Anchor}}</span></div>
     <div><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice $r.EnginePlan.Entry}}">{{fmtPrice $r.EnginePlan.Entry}}</button>
       <span class="diff-small">{{pctDiff $r.Entry $r.EnginePlan.Entry}} vs yours</span></div>

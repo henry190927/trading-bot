@@ -27,7 +27,7 @@
 <section class="trade-summary">
   <div class="row">
     <span class="sym">{{.Trade.Symbol}}</span>
-    <span class="{{sideClassStr .Trade.Side}} side-badge">{{sideStr .Trade.Side}}</span>
+    <span class="badge badge--lg {{sideClassStr .Trade.Side}}">{{sideStr .Trade.Side}}</span>
     <span class="tf">{{or .Trade.TF "—"}}</span>
     {{if .Trade.Score}}<span class="score-tag">score {{.Trade.Score}}</span>{{end}}
   </div>

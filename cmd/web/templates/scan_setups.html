@@ -23,8 +23,8 @@
   </h1>
 
   <div class="stats-card">
-    {{if .Recorded}}<div class="cal-banner next">✓ <span class="i18n-en">Recorded setup</span><span class="i18n-zh">已記錄 setup</span> #{{.Recorded}} → <a href="/setups">/setups</a></div>{{end}}
-    {{if .RecErr}}<div class="cal-banner active">⚠ <span class="i18n-en">record failed</span><span class="i18n-zh">記錄失敗</span></div>{{end}}
+    {{if .Recorded}}<div class="banner banner--ok">✓ <span class="i18n-en">Recorded setup</span><span class="i18n-zh">已記錄 setup</span> #{{.Recorded}} → <a href="/setups">/setups</a></div>{{end}}
+    {{if .RecErr}}<div class="banner banner--danger">⚠ <span class="i18n-en">record failed</span><span class="i18n-zh">記錄失敗</span></div>{{end}}
     <div class="at-state">
       <span class="badge {{if .FiringN}}b-green{{else}}b-dim{{end}}">{{.FiringN}} <span class="i18n-en">armed &amp; firing</span><span class="i18n-zh">上膛且觸發</span></span>
       <span class="badge b-dim">{{.Watching}} <span class="i18n-en">rules armed</span><span class="i18n-zh">規則上膛中</span></span>

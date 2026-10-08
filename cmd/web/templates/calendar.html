@@ -26,17 +26,17 @@
 
   <div class="stats-card">
     {{if .ActiveName}}
-    <div class="cal-banner active">⛔ <span class="i18n-en">BLACKOUT ACTIVE</span><span class="i18n-zh">目前 BLACKOUT 中</span> — {{.ActiveName}} <span class="i18n-en">(engine signals suppressed)</span><span class="i18n-zh">(引擎訊號已停)</span></div>
+    <div class="banner banner--danger">⛔ <span class="i18n-en">BLACKOUT ACTIVE</span><span class="i18n-zh">目前 BLACKOUT 中</span> — {{.ActiveName}} <span class="i18n-en">(engine signals suppressed)</span><span class="i18n-zh">(引擎訊號已停)</span></div>
     {{end}}
     {{if .NextName}}
-    <div class="cal-banner next">▶ <span class="i18n-en">Next</span><span class="i18n-zh">下一個</span>: <strong>{{.NextName}}</strong> — {{.NextWhen}} (Asia/Taipei) · {{.NextDays}}d</div>
+    <div class="banner banner--ok">▶ <span class="i18n-en">Next</span><span class="i18n-zh">下一個</span>: <strong>{{.NextName}}</strong> — {{.NextWhen}} (Asia/Taipei) · {{.NextDays}}d</div>
     {{end}}
 
     {{range .Months}}
       <div class="cal-month">{{.Label}}</div>
       {{range .Events}}
       <div class="cal-row is-{{.Status}}">
-        <span class="cal-cat cat-{{.Cat}}">{{.Cat}}</span>
+        <span class="badge badge--caps cat-{{.Cat}}">{{.Cat}}</span>
         <span class="cal-when">{{.WhenUTC}}<br><span style="opacity:.7">{{.WhenTPE}} TPE</span></span>
         <span class="cal-name">{{.Name}}</span>
         {{if .Speaker}}
@@ -49,7 +49,7 @@
         {{else}}
         <span class="cal-win">blackout {{.Window}}</span>
         {{end}}
-        <span class="cal-status st-{{.Status}}">{{if eq .Status "upcoming"}}{{.Days}}d{{else}}{{.Status}}{{end}}</span>
+        <span class="badge st-{{.Status}}">{{if eq .Status "upcoming"}}{{.Days}}d{{else}}{{.Status}}{{end}}</span>
       </div>
       {{end}}
     {{end}}

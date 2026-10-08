@@ -47,7 +47,7 @@
     <div class="fund-downgrades">
       <div class="fund-dg-title">⚠ <span class="i18n-en">Downgrades since last scan — consider selling</span><span class="i18n-zh">上次掃描以來降級 —— 考慮賣出</span></div>
       {{range .Downgrades}}
-        <span class="fund-dg-item"><strong>{{.Symbol}}</strong> <span class="fund-badge fund-{{.PrevLabel}}">{{.PrevLabel}}</span> → <span class="fund-badge fund-{{.Label}}">{{.Label}}</span></span>
+        <span class="fund-dg-item"><strong>{{.Symbol}}</strong> <span class="badge fund-{{.PrevLabel}}">{{.PrevLabel}}</span> → <span class="badge fund-{{.Label}}">{{.Label}}</span></span>
       {{end}}
     </div>
     {{end}}
@@ -91,7 +91,7 @@
           {{if .Err}}
             <td colspan="11" class="cs-dim">{{.Err}}</td>
           {{else}}
-            <td data-label="Rating"><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if .Rich}} <span class="fund-badge fund-avoid" title="strong quality but very expensive — trim / sell into strength">rich</span>{{end}}{{if eq .Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
+            <td data-label="Rating"><span class="badge fund-{{.Label}}">{{.Label}}</span>{{if .Rich}} <span class="badge fund-avoid" title="strong quality but very expensive — trim / sell into strength">rich</span>{{end}}{{if eq .Confidence "low"}}<span class="cs-dim"> ?</span>{{end}}</td>
             <td data-label="Quality" class="num {{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
             <td data-label="Valuation" class="num {{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
             <td data-label="g/p/b" class="num cs-dim">{{printf "%.0f" .Growth}}/{{printf "%.0f" .Profitability}}/{{printf "%.0f" .BalanceSheet}}</td>

@@ -112,7 +112,7 @@
       <div class="trade-head">
         <span class="trade-id">#{{.ID}}</span>
         <span class="sym">{{.Symbol}}</span>
-        <span class="{{sideClassStr .Side}} side-badge">{{sideStr .Side}}</span>
+        <span class="badge badge--lg {{sideClassStr .Side}}">{{sideStr .Side}}</span>
         <span class="tf">{{or .TF "—"}}</span>
         {{if .Score}}<span class="score-tag">score {{.Score}}</span>{{end}}
         {{if .Leverage}}<span class="lev-tag">{{.Leverage}}×</span>{{end}}

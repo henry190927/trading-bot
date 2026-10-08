@@ -47,7 +47,7 @@
         <li><b>Rating</b> — buy = <span class="i18n-en">solid quality at a fair price</span><span class="i18n-zh">品質不錯且估值合理</span> · hold = <span class="i18n-en">keep, don't add</span><span class="i18n-zh">續抱、別加碼</span> · avoid = <span class="i18n-en">weak quality (value-trap)</span><span class="i18n-zh">品質弱(價值陷阱)</span>. <span class="i18n-en">Spot buy-hold, not a trade signal.</span><span class="i18n-zh">現貨買賣、非交易訊號。</span></li>
         <li><b>Quality (0-100)</b> — <span class="i18n-en">revenue YoY growth + gross margin (thinner than US — no ROE/debt from free TWSE data → lower confidence).</span><span class="i18n-zh">月營收 YoY + 毛利率(比美股薄 —— 免費 TWSE 沒 ROE/負債 → 信心較低)。</span></li>
         <li><b>Valuation (0-100)</b> — <span class="i18n-en">HIGHER = cheaper (P/E + P/B). TW bands are set cheaper than US.</span><span class="i18n-zh">越高越便宜(P/E+P/B)。台股 band 設得比美股低。</span></li>
-        <li><b><span class="tw-yield">高股息</span></b> — <span class="i18n-en">dividend yield ≥ 4% (存股-friendly).</span><span class="i18n-zh">殖利率 ≥ 4%(適合存股)。</span></li>
+        <li><b><span class="badge b-blue">高股息</span></b> — <span class="i18n-en">dividend yield ≥ 4% (存股-friendly).</span><span class="i18n-zh">殖利率 ≥ 4%(適合存股)。</span></li>
         <li><span class="i18n-en">⚠ Caveats: financials/insurers excluded (different statements); small-caps are noisy (Q100 off a tiny base); quality is a 2-factor proxy. A screen, not gospel.</span><span class="i18n-zh">⚠ 限制:已排除金融保險(損益表不同);小型股雜訊大(低基期 Q100);品質只有雙因子。是篩選、非聖旨。</span></li>
       </ul>
     </details>
@@ -72,7 +72,7 @@
         <tr>
           <td class="fund-cell-sym"><strong>{{.Code}}</strong> <span class="fund-cell-name">{{.Name}}</span></td>
           <td data-label="Name" class="fund-cell-nametd">{{.Name}}</td>
-          <td data-label="Rating"><span class="fund-badge fund-{{.Label}}">{{.Label}}</span>{{if .HighYield}} <span class="tw-yield">高股息</span>{{end}}</td>
+          <td data-label="Rating"><span class="badge fund-{{.Label}}">{{.Label}}</span>{{if .HighYield}} <span class="badge b-blue">高股息</span>{{end}}</td>
           <td data-label="Quality" class="num {{if ge .Quality 60.0}}r-pos{{else if lt .Quality 40.0}}r-neg{{else}}r-zero{{end}}">{{printf "%.0f" .Quality}}</td>
           <td data-label="Valuation" class="num {{if ge .Valuation 40.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .Valuation}}</td>
           <td data-label="P/E" class="num">{{if .PE}}{{printf "%.1f" .PE}}{{else}}—{{end}}</td>

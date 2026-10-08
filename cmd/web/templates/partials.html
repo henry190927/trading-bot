@@ -185,20 +185,20 @@
     <span class="pf-section-meta">{{len .Equity.Points}}{{if gt (len .Equity.Points) 1}} points{{end}}</span>
   </h2>
 
-  <div class="pf-equity-stats">
-    <div class="pf-equity-stat">
-      <span class="lbl">current</span>
-      <strong class="{{rClass .Equity.CurrentR}}">{{fmtR .Equity.CurrentR}}R</strong>
+  <div class="pf-equity-stats tile-row">
+    <div class="tile">
+      <span class="tile-label">current</span>
+      <strong class="tile-val {{rClass .Equity.CurrentR}}">{{fmtR .Equity.CurrentR}}R</strong>
     </div>
-    <div class="pf-equity-stat">
-      <span class="lbl">peak</span>
-      <strong class="r-pos">{{fmtR .Equity.PeakR}}R</strong>
+    <div class="tile">
+      <span class="tile-label">peak</span>
+      <strong class="tile-val r-pos">{{fmtR .Equity.PeakR}}R</strong>
     </div>
-    <div class="pf-equity-stat">
-      <span class="lbl">drawdown</span>
+    <div class="tile">
+      <span class="tile-label">drawdown</span>
       {{/* Drawdown is a positive MAGNITUDE, so the sign is written here.
            fmtR adds its own "+", which produced "−+1.00R". */}}
-      <strong class="{{if gt .Equity.Drawdown 0.0}}r-neg{{else}}r-zero{{end}}">{{if gt .Equity.Drawdown 0.0}}−{{end}}{{printf "%.2f" .Equity.Drawdown}}R</strong>
+      <strong class="tile-val {{if gt .Equity.Drawdown 0.0}}r-neg{{else}}r-zero{{end}}">{{if gt .Equity.Drawdown 0.0}}−{{end}}{{printf "%.2f" .Equity.Drawdown}}R</strong>
     </div>
   </div>
 

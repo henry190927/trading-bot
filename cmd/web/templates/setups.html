@@ -21,16 +21,16 @@
     <h2>N字 setup forward-log
       <button type="button" id="setups-refresh" class="ai-analyze-btn" style="margin-left:.6rem" data-i18n="setups.refill">↻ 回填 outcome</button>
     </h2>
-    <div class="stats-grid">
-      <div><span class="lbl" data-i18n="setups.total">Total</span><span class="val">{{.Stats.Total}}</span></div>
-      <div><span class="lbl" data-i18n="setups.open">Open</span><span class="val">{{.Stats.Open}}</span></div>
-      <div><span class="lbl" data-i18n="setups.win">Win ✓</span><span class="val r-pos">{{.Stats.Win}}</span></div>
-      <div><span class="lbl" data-i18n="setups.loss">Loss ✗</span><span class="val r-neg">{{.Stats.Loss}}</span></div>
-      <div><span class="lbl" data-i18n="setups.expired">Expired</span><span class="val r-zero">{{.Stats.Expired}}</span></div>
-      <div><span class="lbl" data-i18n="setups.skip">Skip</span><span class="val r-zero">{{.Stats.Skip}}</span></div>
-      <div><span class="lbl" data-i18n="setups.hitrate">Hit-rate</span><span class="val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
-      <div><span class="lbl">Real hit-rate</span><span class="val {{if lt .Stats.RealHitRate .Stats.HitRate}}r-neg{{else}}r-pos{{end}}">{{printf "%.0f" .Stats.RealHitRate}}%</span></div>
-      <div><span class="lbl">no-fill</span><span class="val r-zero">{{.Stats.RealNoFill}}</span></div>
+    <div class="tile-row">
+      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.total">Total</span><span class="tile-val">{{.Stats.Total}}</span></div>
+      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.open">Open</span><span class="tile-val">{{.Stats.Open}}</span></div>
+      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.win">Win ✓</span><span class="tile-val r-pos">{{.Stats.Win}}</span></div>
+      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.loss">Loss ✗</span><span class="tile-val r-neg">{{.Stats.Loss}}</span></div>
+      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.expired">Expired</span><span class="tile-val r-zero">{{.Stats.Expired}}</span></div>
+      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.skip">Skip</span><span class="tile-val r-zero">{{.Stats.Skip}}</span></div>
+      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.hitrate">Hit-rate</span><span class="tile-val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
+      <div class="tile tile--flat"><span class="tile-label">Real hit-rate</span><span class="tile-val {{if lt .Stats.RealHitRate .Stats.HitRate}}r-neg{{else}}r-pos{{end}}">{{printf "%.0f" .Stats.RealHitRate}}%</span></div>
+      <div class="tile tile--flat"><span class="tile-label">no-fill</span><span class="tile-val r-zero">{{.Stats.RealNoFill}}</span></div>
     </div>
     <p class="glossary-hint">
       <b>Hit-rate</b>(收盤判定)= 讀盤方向對不對:Win = 收破 target;Loss = 收破 stop;Expired = 20 根未觸;Skip = 你決定不進。
@@ -95,14 +95,14 @@
           <td class="cs-dim">{{.EngineSide}} {{.EngineScore}}</td>
           <td>
             {{if eq .Strategy "struct-momentum"}}
-              <span class="outcome-badge oc-{{if .StratFire}}win{{else}}skip{{end}}" title="StructMomentum {{if .StratFire}}fired ({{.StratSide}}) — valid SM data point{{else}}did NOT fire (regime sat out / not in-zone) — NOT an SM data point{{end}}">SM{{if .StratFire}} ✓{{else}} —{{end}}</span>
+              <span class="badge oc-{{if .StratFire}}win{{else}}skip{{end}}" title="StructMomentum {{if .StratFire}}fired ({{.StratSide}}) — valid SM data point{{else}}did NOT fire (regime sat out / not in-zone) — NOT an SM data point{{end}}">SM{{if .StratFire}} ✓{{else}} —{{end}}</span>
             {{else if eq .Strategy "mr"}}
               <span class="cs-dim" title="mean-reversion engine{{if .StratFire}} fired ({{.StratSide}}){{end}}">MR{{if .StratFire}} ✓{{end}}</span>
             {{else}}<span class="cs-dim">—</span>{{end}}
           </td>
           <td>{{if .Opened}}✓{{else}}—{{end}}</td>
-          <td style="opacity:.4"><span class="outcome-badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}" style="font-size:.85em">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
-          <td>{{if .RealOutcome}}<span class="outcome-badge oc-{{.RealOutcome}}"><b>{{.RealOutcome}}</b>{{if .RealBars}} · {{.RealBars}}b{{end}}</span>{{if and .Outcome (ne .Outcome .RealOutcome)}} <span class="oc-gap" title="outcome≠real:讀盤對但執行會不同">⚠</span>{{end}}{{else}}<span class="cs-dim">—</span>{{end}}</td>
+          <td style="opacity:.4"><span class="badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}" style="font-size:.85em">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
+          <td>{{if .RealOutcome}}<span class="badge oc-{{.RealOutcome}}"><b>{{.RealOutcome}}</b>{{if .RealBars}} · {{.RealBars}}b{{end}}</span>{{if and .Outcome (ne .Outcome .RealOutcome)}} <span class="oc-gap" title="outcome≠real:讀盤對但執行會不同">⚠</span>{{end}}{{else}}<span class="cs-dim">—</span>{{end}}</td>
           <td class="setup-actions">
             {{if not .Outcome}}<form method="post" action="/setups/{{.ID}}/skip"><button class="setup-skip" title="標記不進 skip">skip</button></form>{{end}}
             <form method="post" action="/setups/{{.ID}}/delete" onsubmit="return confirm('刪除 setup #{{.ID}}?')"><button class="setup-del" title="delete">✕</button></form>
