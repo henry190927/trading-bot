@@ -2400,6 +2400,14 @@
         bannerActText.textContent = act.text;
         bannerActNote.textContent = act.note;
 
+        function syncFactorMore(el) {
+            var btn = el.querySelector('.factor-more');
+            if (!btn) return;
+            var open = el.classList.contains('is-open');
+            btn.textContent = open ? '▴' : '+' + btn.dataset.hidden;
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.setAttribute('aria-label', open ? 'show fewer factors' : 'show ' + btn.dataset.hidden + ' more factors');
+        }
         // Top scoring factors — the bullet reasons behind the /100 number.
         var facEl = document.getElementById('chart-factors');
         if (facEl) {
@@ -2423,6 +2431,29 @@
                 chip.appendChild(nm);
                 facEl.appendChild(chip);
             });
+            // Phones/tablets (panel above the plot): CSS shows the first two
+            // chips; this button reveals the rest. The open state lives on
+            // #chart-factors itself, which survives this innerHTML reset on
+            // every refresh, and is remembered like the side-panel toggle.
+            if (!facEl.dataset.moreBound) {
+                facEl.dataset.moreBound = '1';
+                try { if (localStorage.getItem('chart-factors-open') === '1') facEl.classList.add('is-open'); } catch (e) {}
+                facEl.addEventListener('click', function (ev) {
+                    if (!ev.target.closest('.factor-more')) return;
+                    var open = facEl.classList.toggle('is-open');
+                    try { localStorage.setItem('chart-factors-open', open ? '1' : '0'); } catch (e) {}
+                    syncFactorMore(facEl);
+                });
+            }
+            var nChips = facEl.querySelectorAll('.factor-chip').length;
+            if (nChips > 2) {
+                var more = document.createElement('button');
+                more.type = 'button';
+                more.className = 'factor-more';
+                more.dataset.hidden = String(nChips - 2);
+                facEl.appendChild(more);
+                syncFactorMore(facEl);
+            }
         }
 
         // Live-market context chips (funding + OI). Historical OI is

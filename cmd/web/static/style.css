@@ -1470,6 +1470,21 @@ footer {
     border-top: 1px solid var(--border);
 }
 .chart-factors:empty { display: none; }
+/* Phones/tablets: the panel sits ABOVE the plot (2026-09-12), so every chip
+   row pushes the chart down. Show the top two (the list is already ranked)
+   and a +N button; chart.html remembers the open state. Desktop keeps all. */
+.factor-more { display: none; }
+@media (max-width: 1024px) {
+    .chart-factors:not(.is-open) > .factor-chip:nth-child(n+3) { display: none; }
+    .factor-more {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 44px; min-height: 32px; padding: 0 var(--sp-2);
+        font: inherit; font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600;
+        color: var(--text-dim); background: transparent;
+        border: 1px dashed var(--border); border-radius: var(--r-sm); cursor: pointer;
+    }
+    .factor-more:hover { color: var(--text); border-color: var(--text-dim); }
+}
 .factor-chip {
     font-family: ui-monospace, "SF Mono", monospace;
     font-size: var(--fs-sm);
