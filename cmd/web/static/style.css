@@ -207,16 +207,6 @@ main {
     font-size: var(--fs-md);
 }
 
-/* /chart only: its JS sets className = 'side-badge ' + sideClass(...).
-   Every other page uses .badge.badge--lg; this goes when Phase 2 reworks
-   the chart panel. */
-.side-badge {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    font-size: var(--fs-base);
-    letter-spacing: 0.02em;
-}
 .side-long { color: var(--green); background: var(--green-bg); }
 .side-short { color: var(--red); background: var(--red-bg); }
 .side-flat { color: var(--text-dim); background: var(--surface-2); }
@@ -897,7 +887,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 4px 8px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     font-family: ui-monospace, "SF Mono", monospace;
     font-weight: 700;
 }
@@ -926,7 +916,7 @@ footer {
 }
 .chart-verdict {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     font-weight: 600;
 }
 /* Score + Action banner at top of /chart — mirrors reference screenshot's
@@ -949,24 +939,24 @@ footer {
 .chart-banner-score  { flex: 0 0 auto; text-align: right; min-width: 160px; display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
 .chart-banner-label {
     color: var(--text-dim);
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-weight: 600;
 }
 .chart-banner-action-text {
     color: var(--text);
-    font-size: 1.15rem;
+    font-size: var(--fs-lg);
     font-weight: 700;
     line-height: 1.3;
 }
 .chart-banner-note {
     color: var(--text-dim);
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     font-family: ui-monospace, "SF Mono", monospace;
 }
 .chart-banner-score-num {
-    font-size: 2.2rem;
+    font-size: var(--fs-2xl);
     font-weight: 700;
     line-height: 1;
     color: var(--text);
@@ -977,13 +967,13 @@ footer {
 .chart-banner.band-neutral .chart-banner-score-num { color: var(--yellow); }
 .chart-banner.band-avoid   .chart-banner-score-num { color: var(--red); }
 .chart-banner-score-band {
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     font-weight: 700;
     color: var(--text-dim);
     letter-spacing: 0.04em;
 }
 .chart-banner-score-tf {
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
     font-family: ui-monospace, monospace;
 }
@@ -1000,7 +990,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 10px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
 }
 .ctx-chip.ctx-warn-soft {
@@ -1049,13 +1039,13 @@ footer {
     align-items: center;
     gap: 0.5rem;
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 600;
 }
 .chart-header-symrow #chart-header-tf {
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     padding: 1px 6px;
     border: 1px solid var(--border);
     border-radius: 3px;
@@ -1068,7 +1058,7 @@ footer {
 }
 .chart-header-price {
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 2.1rem;
+    font-size: var(--fs-2xl);
     font-weight: 700;
     color: var(--text);
     line-height: 1.05;
@@ -1076,7 +1066,7 @@ footer {
 }
 .chart-header-change {
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 600;
     color: var(--text-dim);
 }
@@ -1087,7 +1077,7 @@ footer {
     flex-wrap: wrap;
     gap: 0.9rem;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
 }
 .chart-header-stats em {
@@ -1109,8 +1099,8 @@ footer {
     text-align: right;
     align-items: flex-end;
 }
-.chart-header .chart-banner-action-text { font-size: 0.95rem; }
-.chart-header .chart-banner-score-num   { font-size: 1.6rem; }
+.chart-header .chart-banner-action-text { font-size: var(--fs-md); }
+.chart-header .chart-banner-score-num   { font-size: var(--fs-xl); }
 /* Verdict-band coloring on the right tile (no dedicated .chart-banner
    wrapper anymore — apply the band class to .chart-header instead). */
 .chart-header.band-strong  { border-left: 3px solid var(--green); }
@@ -1135,7 +1125,7 @@ footer {
 }
 .chart-layers-label {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-weight: 600;
@@ -1153,7 +1143,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 3px;
     padding: 2px 8px;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     font-family: ui-monospace, "SF Mono", monospace;
     cursor: pointer;
     transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
@@ -1188,7 +1178,7 @@ footer {
     padding: 0 4px;
     background: rgba(255,255,255,0.06);
     border-radius: 3px;
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     letter-spacing: 0.02em;
 }
@@ -1204,7 +1194,7 @@ footer {
     margin-left: 2px;
     background: rgba(255,255,255,0.10);
     border-radius: 8px;
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     line-height: 1.5;
 }
@@ -1234,7 +1224,7 @@ footer {
     text-align: left;
     padding: 4px 10px;
     width: 100%;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
 }
 
 .chart-layers-actions { margin-left: auto; }
@@ -1245,7 +1235,7 @@ footer {
     border-radius: 3px;
     padding: 2px 6px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
 }
 .chart-tz-select:hover { border-color: var(--blue); }
@@ -1257,7 +1247,7 @@ footer {
     margin-left: 4px;
     background: rgba(255,255,255,0.08);
     border-radius: 8px;
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
     color: var(--text-dim);
     line-height: 1.5;
 }
@@ -1277,7 +1267,7 @@ footer {
     background: var(--surface);
 }
 .layer-chip.layer-info {
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     padding: 1px 8px;
 }
 
@@ -1333,7 +1323,7 @@ footer {
     background: var(--surface-2);
     border-left: 2px solid var(--blue);
     border-radius: 0 4px 4px 0;
-    font-size: 0.82rem;
+    font-size: var(--fs-base);
     line-height: 1.55;
     color: var(--text);
 }
@@ -1376,14 +1366,14 @@ footer {
     border-radius: 3px;
     padding: 2px 8px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     color: var(--text);
     white-space: nowrap;
 }
 .glossary-list dd {
     margin: 0;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     line-height: 1.5;
 }
 .glossary-list dd b { color: var(--text); font-weight: 600; }
@@ -1454,7 +1444,7 @@ footer {
 
 .chart-one-liner {
     color: var(--text);
-    font-size: 0.9rem;
+    font-size: var(--fs-base);  /* not md: 15px in the 340px panel wraps the long verdict sentence to an extra line (measured +25px) */
     padding: 0.4rem 0.6rem;
     background: var(--surface-2);
     border-left: 3px solid var(--blue);
@@ -1482,7 +1472,7 @@ footer {
 .chart-factors:empty { display: none; }
 .factor-chip {
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     padding: 2px 7px;
     border-radius: 3px;
     white-space: nowrap;
@@ -1497,7 +1487,7 @@ footer {
     color: #fa5252;
     border-color: rgba(224, 49, 49, 0.35);
 }
-.score-votes { opacity: 0.7; font-size: 0.8rem; }
+.score-votes { opacity: 0.7; font-size: var(--fs-base); }
 .chart-wrap {
     position: relative;
     width: 100%;
@@ -1542,7 +1532,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 4px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
     pointer-events: none;
     backdrop-filter: blur(4px);
@@ -1556,7 +1546,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 2px;
     color: var(--text-dim);
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
 }
 .chart-ohlc .ohlc-kv em {
     font-style: normal;
@@ -1597,7 +1587,7 @@ footer {
     border: 1px solid transparent;
     border-radius: 4px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     line-height: 1;
     cursor: pointer;
     padding: 0;
@@ -1666,7 +1656,7 @@ footer {
     justify-content: flex-start;
     padding: 6px 10px;
     gap: 8px;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     color: var(--text);
 }
 .draw-btn-menuitem .draw-menuitem-label {
@@ -1764,7 +1754,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 4px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--text);
     /* Container is see-through to mouse events. Otherwise hovering
        the marker moves the cursor OUT of LWC's plot area from LWC's
@@ -1854,7 +1844,7 @@ footer {
     padding: 2px 6px;
     border-radius: 3px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     white-space: nowrap;
     line-height: 1.2;
     color: #fff;
@@ -1880,7 +1870,7 @@ footer {
 .chart-labels-right .chart-poc-label { left: auto; right: 0; }
 
 .chart-poc-label-sub {
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
     opacity: 0.9;
 }
 
@@ -1946,7 +1936,7 @@ footer {
     border-radius: 3px;
     width: 20px;
     height: 20px;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
@@ -1991,7 +1981,7 @@ footer {
     background: transparent;
     border: 0;
     color: var(--text-dim);
-    font-size: 1.4rem;
+    font-size: var(--fs-xl);
     line-height: 1;
     cursor: pointer;
     padding: 0 4px;
@@ -2003,13 +1993,13 @@ footer {
     align-items: center;
     gap: 0.6rem;
     margin-bottom: 0.7rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
 }
 .quick-row label {
     color: var(--text-dim);
     min-width: 60px;
     text-transform: uppercase;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     letter-spacing: 0.06em;
     font-weight: 600;
 }
@@ -2022,7 +2012,7 @@ footer {
     padding: 0.35rem 0.5rem;
     color: var(--text);
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
 }
 .quick-row input:focus,
 .quick-row textarea:focus {
@@ -2030,7 +2020,7 @@ footer {
     border-color: var(--blue);
 }
 .quick-row textarea {
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     resize: vertical;
     min-height: 3.6em;
     line-height: 1.4;
@@ -2059,7 +2049,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 4px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
     line-height: 1.5;
 }
@@ -2073,7 +2063,7 @@ footer {
 .quick-pnl-row:last-child { grid-template-columns: max-content 1fr; }
 .quick-pnl-label {
     color: var(--text-dim);
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
@@ -2083,7 +2073,7 @@ footer {
 .quick-tf {
     color: var(--text-dim);
     font-family: ui-monospace, monospace;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     padding: 1px 6px;
     border: 1px solid var(--border);
     border-radius: 3px;
@@ -2095,7 +2085,7 @@ footer {
     border: 1px solid var(--border);
     border-radius: 3px;
     padding: 4px 14px;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     font-weight: 700;
     cursor: pointer;
     font-family: ui-monospace, monospace;
@@ -2119,7 +2109,7 @@ footer {
 .quick-go {
     flex: 1;
     padding: 0.55rem 0.8rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     font-weight: 600;
     border-radius: 4px;
     border: 1px solid var(--border);
@@ -2143,7 +2133,7 @@ footer {
 .quick-hint {
     margin: 0.8rem 0 0;
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     text-align: center;
 }
 .quick-hint-link {
@@ -2169,7 +2159,7 @@ footer {
     border: 0;
     padding: 4px 14px;
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
     line-height: 1.4;
 }
@@ -2192,7 +2182,7 @@ footer {
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: 6px;
-    font-size: 0.85rem;
+    font-size: var(--fs-base);
     color: var(--text);
     line-height: 1.5;
 }
@@ -2212,7 +2202,7 @@ footer {
 .qr-header.band-avoid   { border-color: var(--red);    }
 .qr-score {
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 1.6rem;
+    font-size: var(--fs-xl);
     font-weight: 700;
     line-height: 1;
 }
@@ -2229,11 +2219,11 @@ footer {
     margin-left: auto;
     color: var(--text-dim);
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
 }
 .qr-sub {
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-family: ui-monospace, "SF Mono", monospace;
     margin-bottom: 0.2rem;
 }
@@ -2241,7 +2231,7 @@ footer {
     margin: 0.4rem 0 0;
     padding-left: 1.1rem;
     color: var(--text);
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
 }
 .qr-reasons li { margin: 0.15rem 0; }
 .qr-ok  { color: var(--green); font-weight: 600; }
@@ -2270,7 +2260,7 @@ footer {
     pointer-events: none;
     padding: 0.25rem 0.45rem;
     border-radius: 4px;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     line-height: 1.35;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
@@ -2286,7 +2276,7 @@ footer {
     gap: 0.8rem;
     margin-top: 0.4rem;
     padding: 0.3rem 0.6rem;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--text-dim);
 }
 .chart-legend-item { display: inline-flex; gap: 0.35rem; align-items: center; }
@@ -2308,7 +2298,7 @@ footer {
     display: inline-block;
     width: 14px;
     text-align: center;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     line-height: 1;
     margin-right: 0.15rem;
 }
@@ -2318,7 +2308,7 @@ footer {
     border: 1px solid var(--blue);
     border-radius: 3px;
     padding: 2px 8px;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
 }
 
@@ -5171,7 +5161,7 @@ footer {
 /* Status capsules: never let "falling knife" / "blow-off risk" / lev /
    side / score wrap mid-word. They flow inline and the parent's natural
    wrap moves the whole capsule to the next line as one unit. */
-.badge, .diag-flag, .lev-tag, .acct-lev-tag, .kill-tag, .side-badge, .score,
+.badge, .diag-flag, .lev-tag, .acct-lev-tag, .kill-tag, .score,
 .ot-tf, .ot-id, .ot-elapsed, .ot-r {
     white-space: nowrap;
     overflow-wrap: normal;
@@ -5227,7 +5217,7 @@ main { overflow-x: hidden; }
     border: 1px solid var(--border);
     border-left: 3px solid var(--blue);
     border-radius: 0 6px 6px 0;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     position: relative;
 }
 .chart-struct-panel.hidden { display: none; }
@@ -5246,7 +5236,7 @@ main { overflow-x: hidden; }
     border: 1px solid var(--border);
     border-left: 3px solid #7048e8;
     border-radius: 0 6px 6px 0;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
 }
 .chart-hvn-panel.hidden { display: none; }
 .chart-hvn-panel .cs-kv em { color: var(--text-dim); font-style: normal; margin-right: 0.35rem; }
@@ -5274,7 +5264,7 @@ main { overflow-x: hidden; }
 .chart-struct-panel .cs-kv em {
     font-style: normal;
     color: var(--text-dim);
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-family: -apple-system, system-ui, sans-serif;
@@ -5289,7 +5279,7 @@ main { overflow-x: hidden; }
     height: 22px;
     line-height: 1;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     flex: 0 0 auto;
 }
 .chart-struct-panel .cs-info-btn:hover { border-color: var(--blue); }
@@ -5299,7 +5289,7 @@ main { overflow-x: hidden; }
     padding-top: 0.4rem;
     border-top: 1px dashed var(--border);
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     line-height: 1.55;
 }
 .chart-struct-panel .cs-info.hidden { display: none; }
@@ -5551,7 +5541,7 @@ main { overflow-x: hidden; }
     color: var(--blue);
     border-radius: 5px;
     padding: 3px 10px;
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     cursor: pointer;
     flex: 0 0 auto;
@@ -5565,7 +5555,7 @@ main { overflow-x: hidden; }
 .chart-one-liner .cs-record-btn {
     flex: 0 0 auto;
     padding: 3px 12px;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     border-radius: 6px;
     background: rgba(77, 171, 247, 0.12); /* solid fallback before color-mix (iOS Safari <16.4) */
     background: color-mix(in srgb, var(--blue) 12%, transparent);
@@ -5666,7 +5656,7 @@ main { overflow-x: hidden; }
   display: flex; flex-direction: column; gap: 3px;
   width: 100%;
   padding: 0.4rem 0.7rem;
-  font-size: .7rem;
+  font-size: var(--fs-xs);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-left: 3px solid var(--cyan);
@@ -5730,7 +5720,7 @@ main { overflow-x: hidden; }
     background: var(--bg-elev);
     color: var(--text-dim);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     font-variant-numeric: tabular-nums;
     cursor: pointer;
     line-height: 1;
@@ -5744,7 +5734,7 @@ main { overflow-x: hidden; }
     margin: -0.15rem 0.05rem -0.15rem -0.2rem;
     color: var(--text-dim);
     opacity: 0.45;
-    font-size: 0.8rem;
+    font-size: var(--fs-base);
     line-height: 1;
     cursor: pointer;
 }
@@ -5761,9 +5751,9 @@ main { overflow-x: hidden; }
 .chart-ticker-item.is-active {
   border-color: rgba(88,166,255,0.6); background: rgba(88,166,255,0.12);
 }
-.chart-ticker-item .tk-sym { font-weight: 700; font-size: .82rem; }
-.chart-ticker-item .tk-px { font-size: .82rem; font-variant-numeric: tabular-nums; }
-.chart-ticker-item .tk-chg { font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart-ticker-item .tk-sym { font-weight: 700; font-size: var(--fs-base); }
+.chart-ticker-item .tk-px { font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+.chart-ticker-item .tk-chg { font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .chart-ticker-item .tk-chg.tk-up   { color: #26a69a; }
 .chart-ticker-item .tk-chg.tk-down { color: #ef5350; }
 
@@ -5999,7 +5989,7 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
 .market-toggle a { padding: var(--sp-2) var(--sp-5); }
 
 /* Badges/chips — pill-soft. */
-.side-badge, .score { border-radius: var(--r-pill); }
+.score { border-radius: var(--r-pill); }
 
 /* Topbar — cleaner, a hair taller, soft divider. */
 .topbar { padding: var(--sp-3) clamp(var(--sp-3), 4vw, var(--sp-6)); backdrop-filter: blur(8px); background: rgba(var(--bg-rgb), .82); }
@@ -6368,6 +6358,43 @@ html[data-density="compact"] .dt {
     .chart-controls-end { border-left: 0; padding-left: 0; }
     .chart-controls-end { margin-left: 0; }
 }
+/* Phones: two rows instead of five. Wrapping put the plot ~1.5 screens down
+   (204px of controls above a 460px header). Row 1 is symbol + TF, unchanged.
+   Row 2 is the indicator menus and actions as ONE sideways-scrolling strip,
+   with AI pinned at its end.
+   The strip is overflow-x:auto, which clips anything absolutely positioned
+   inside it — the category flyouts were exactly that. So on phones the
+   flyouts become fixed bottom sheets: they escape the strip's clipping, sit
+   under the thumb, and the outside-click close in chart.html still works
+   because the sheet stays a DOM child of its .layer-menu-wrap. Nothing
+   between the sheet and the viewport may set transform/filter/mask, or
+   `fixed` falls back to the strip. */
+@media (max-width: 640px) {
+    .chart-controls { gap: var(--sp-2); }
+    .chart-controls > .chart-toolbar { flex: 1 0 100%; }
+    .chart-controls > .chart-layers {
+        flex: 1 1 0; min-width: 0;
+        flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none;
+        gap: var(--sp-2);
+    }
+    .chart-controls > .chart-layers::-webkit-scrollbar { display: none; }
+    .chart-controls > .chart-layers > *,
+    .chart-layers-actions > * { flex: none; }
+    .chart-layers-label { display: none; }
+    .chart-layers-actions { display: inline-flex; gap: var(--sp-2); margin-left: 0; }
+    .chart-controls-end { flex: none; }
+
+    .layer-menu {
+        position: fixed; top: auto; left: var(--sp-2); right: var(--sp-2);
+        bottom: calc(var(--sp-2) + env(safe-area-inset-bottom));
+        max-height: 60vh; overflow-y: auto; overscroll-behavior: contain;
+        display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-1);
+        padding: var(--sp-2); border-radius: var(--r-md);
+        box-shadow: var(--shadow-2); z-index: 60;
+    }
+    .layer-menu .layer-chip-menuitem { min-height: 44px; }
+}
 
 /* =====================================================================
    tablekit — sortable headers + pager (tablekit.js). Applied to the
@@ -6693,17 +6720,17 @@ html[data-density="compact"] .dt {
    a market direction: "longs building" and "shorts building" are both past
    the same +2% bar and which way the tape takes it is not this row's claim. */
 .tf-bias-oi { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline;
-    font-size: 0.68rem; font-variant-numeric: tabular-nums;
+    font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
     padding: 2px 6px; border-radius: 4px; margin-top: 4px;
     background: var(--wash-dim); color: var(--text-dim); cursor: help; }
 .tf-bias-oi.oi-armed { background: var(--wash-yellow); color: var(--yellow); font-weight: 700; }
 .tf-bias-oi.oi-unwind { color: var(--text); }
-.tf-bias-oi .oi-verdict { font-size: 0.64rem; opacity: 0.95; }
+.tf-bias-oi .oi-verdict { font-size: var(--fs-xs); opacity: 0.95; }
 
 /* Binance cross-reference line under the chart's OI row. Deliberately quieter
    than the BingX row above it: it informs, it is not the book an order fills
    against. */
-.tf-bias-bn { font-size: 0.64rem; font-variant-numeric: tabular-nums;
+.tf-bias-bn { font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
     padding: 1px 6px; margin-top: 2px; border-radius: 4px;
     background: var(--wash-dim); color: var(--text-dim); cursor: help;
     border-left: 2px solid var(--border); }

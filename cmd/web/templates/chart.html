@@ -229,7 +229,7 @@
     <div class="chart-header-left">
       <div class="chart-header-symrow">
         <span class="chart-header-sym" id="chart-header-sym">{{.Symbol}}-USDT</span>
-        <span class="side-badge side-flat" id="chart-side">—</span>
+        <span class="badge badge--lg side-flat" id="chart-side">—</span>
         <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
       </div>
       <div class="chart-header-price-row">
@@ -2362,7 +2362,7 @@
         applyLivePriceLine(currentPrice, lastCandle);
         apply24hStats(currentPrice, data.candles);
 
-        sideEl.className = 'side-badge ' + sideClass(sig.side);
+        sideEl.className = 'badge badge--lg ' + sideClass(sig.side);
         sideEl.textContent = sig.side || '—';
         // Phase-1 unified score: MR/MOM sub-scores now show the /100 weighted
         // sub-totals (validator), not the System-A integer vote counts. The
