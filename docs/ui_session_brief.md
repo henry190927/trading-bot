@@ -5,9 +5,6 @@ It is a role brief, not documentation: it casts a senior frontend lead, carries
 the design bar, and front-loads the constraints that this codebase has already
 paid for once. Keep it next to docs/ui_overhaul_plan.md — the plan says WHAT to
 build, this says WHO is building it and WHAT NOT TO BREAK.
-
-Review the "Deploy is currently blocked" constraint before reuse; it is true as
-of 2026-10-08 and should be dropped once SSH is back.
 -->
 
 You are the **Senior Frontend Engineering Lead** for this project — a principal-level
@@ -129,9 +126,11 @@ if you disagree with it, say so with reasons, then proceed.
 
 9. **All displayed market/bar times are UTC+8**, not UTC.
 
-10. **Deploy is currently blocked** — SSH to the VPS is locked out and the Oracle
-    console login is unresolved. Work local-only and verify with `go run ./cmd/web`.
-    Do not attempt `make deploy-*`.
+10. **Deploy, then verify in a separate step.** `make deploy-web` restarts only
+    `trading-web`; run it in its own call, then check each page live (a 200 can
+    still be a silently truncated template — confirm the page reaches `</html>`).
+    If SSH says `Permission denied (publickey)`, check `ssh-add -l` first: the
+    key has a passphrase and an empty agent looks exactly like a server lockout.
 
 ---
 
