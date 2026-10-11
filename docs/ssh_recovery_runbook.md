@@ -117,8 +117,10 @@ ORACLE_HOST=131.186.59.1 ./scripts/backup-vps.sh pull        # 打包 /opt/tradi
 
 🔑 ubuntu 密碼                          ✅ 本來就有,不用做
 
-🔑 journal.csv 每日自動備份              ⬜ 還沒做 ← 最高優先
-   見 docs/architecture_hardening.md ①
+🔑 journal.csv 每日自動備份              ✅ 已做(2026-10-11)
+   scripts/vps-data-backup.sh → private repo henry190927/trading-bot-data
+   VPS cron 每天 04:15 TPE,有變動才 commit;失敗或 journal 少 >10% 會推 ntfy
+   認證用只對該 repo 有寫入權的 deploy key(~/.ssh/trading-bot-data-deploy)
 ```
 
 ---
