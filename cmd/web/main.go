@@ -33,6 +33,11 @@ import (
 //go:embed templates/*.html static
 var assets embed.FS
 
+// readyMaxAgeSec is how stale the hub's last broadcast may be before /readyz
+// reports not-ready. Generous on purpose: the hub refreshes far more often, so
+// crossing this means something is actually wrong, not that we were unlucky.
+const readyMaxAgeSec = 120
+
 func main() {
 	config.LoadDotEnv()
 
@@ -189,8 +194,49 @@ func main() {
 	r.POST("/ops/stop", srv.handleOpsStop)
 	r.POST("/ops/restart", srv.handleOpsRestart)
 	r.POST("/ops/config", srv.handleOpsConfig)
+	// ── Kubernetes probes ──────────────────────────────────────────────
+	//
+	// /health is LIVENESS: "is this process still able to answer?" It must NOT
+	// consult BingX, the hub, or anything else that can fail on its own. A
+	// liveness probe that checks a dependency turns someone else's outage into
+	// our own CrashLoopBackOff — restarting this pod cannot fix their service,
+	// and every pod restarting at once is the worst thing to do while an
+	// upstream is recovering.
 	r.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok %s\n", time.Now().Format(time.RFC3339))
+	})
+
+	// /readyz is READINESS: "can I serve useful traffic right now?" Failing it
+	// takes this pod out of the Service endpoints WITHOUT restarting it, so
+	// traffic moves to a healthy replica and comes back when we recover. This
+	// is the right place to look at dependencies.
+	//
+	// ⚠️ The hub is LAZY: subscribe() starts its loops on the first subscriber
+	// and stops them when the last one leaves, so hub.Running means "someone is
+	// watching the SSE stream right now", NOT "this service is healthy". Gating
+	// readiness on it deadlocks:
+	//
+	//   no subscribers -> Running=false -> not ready -> kubelet sends no traffic
+	//     -> no subscribers ever arrive -> never ready
+	//
+	// Readiness asks "CAN I serve?", not "am I serving?". A freshly started pod
+	// with zero traffic is ready — it just has not been asked yet. So the
+	// staleness check only applies while the hub is actually running: an idle
+	// hub is a normal state, a running hub with old data is not.
+	//
+	// ⚠️ The status code is the whole contract — kubelet reads 2xx/3xx as pass
+	// and everything else as fail. A 200 carrying {"ready": false} reads as
+	// healthy.
+	r.GET("/readyz", func(c *gin.Context) {
+		s := srv.hub.stats()
+		if s.Running && s.LastAgeSec >= 0 && s.LastAgeSec > readyMaxAgeSec {
+			c.String(http.StatusServiceUnavailable,
+				"not ready: hub running but last broadcast %ds ago (max %ds)\n",
+				s.LastAgeSec, readyMaxAgeSec)
+			return
+		}
+		c.String(http.StatusOK, "ready hub_running=%v last_age=%ds ws_up=%v live=%d/%d\n",
+			s.Running, s.LastAgeSec, s.WSUp, s.WSLiveSyms, s.WSTotalSyms)
 	})
 
 	// Load the earnings-blackout calendar (F3) and hot-reload it every 10min so

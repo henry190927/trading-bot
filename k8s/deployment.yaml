@@ -1,0 +1,166 @@
+# trading-web on Kubernetes
+#
+# ⚠️ 這是【練習與展示】用的清單。生產環境刻意【沒有】跑在 K8s 上 ——
+#    三個 Go 執行檔、一台機器、單人使用,單節點叢集是淨成本。
+#    理由寫在 docs/architecture_hardening.md §③。
+#
+#    這份存在的價值是:證明我理解 probe / resource / GOMEMLIMIT 在解什麼問題。
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-web
+  labels:
+    app: trading-web
+spec:
+  # ⚠️ 1,不是 3。這個服務會寫 journal.csv、跑背景 daemon ——
+  #    多副本會互相覆寫,而且每個副本都會各自連交易所 websocket。
+  #    要能水平擴展,得先把狀態外部化(DB)、把寫入路徑抽出去。
+  #    「能不能加副本」是架構問題,不是把數字改大就好。
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: trading-web
+
+  strategy:
+    # 單副本 + RollingUpdate 預設會先起新的再殺舊的,但兩個都會連 websocket
+    # 並嘗試寫同一份狀態。Recreate = 先殺乾淨再起新的,短暫斷線換取不重疊。
+    type: Recreate
+
+  template:
+    metadata:
+      labels:
+        app: trading-web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+
+      containers:
+        - name: web
+          image: trading-web:scratch
+          imagePullPolicy: IfNotPresent   # 本機 minikube 用,不要去 registry 拉
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true   # scratch 本來就幾乎是空的,順手鎖死
+            capabilities:
+              drop: ["ALL"]
+
+          env:
+            - name: WEB_BIND
+              value: ":8080"
+
+            # ══════════ Go 在容器裡的兩個坑 ══════════
+            #
+            # 🔴 坑 1:GOMEMLIMIT
+            #
+            # Go 的 GC 用 GOGC(預設 100)決定何時回收 —— 讓 heap 長到上次的
+            # 兩倍才收。它【看不到 cgroup 的記憶體上限】。
+            #
+            # 後果:limits.memory=256Mi 時,Go 可能讓 heap 長過 256Mi
+            #   → kernel OOM-kill 這個 process
+            #   → K8s 重啟 → 看起來像無來由的 CrashLoopBackOff
+            #   → 而且 Go 這邊【不會有任何錯誤訊息】,因為是被 SIGKILL 的
+            #
+            # GOMEMLIMIT(Go 1.19+)給 runtime 一個軟上限,逼近時 GC 變積極。
+            # 設在 limits.memory 的 ~80%,留空間給 goroutine 堆疊和 runtime 結構
+            # (那些不算在 heap 裡,但算在 cgroup 裡)。
+            - name: GOMEMLIMIT
+              value: "200MiB"            # limits.memory 256Mi 的 78%
+
+            # 🔴 坑 2:GOMAXPROCS
+            #
+            # Go 啟動時讀「主機有幾顆 CPU」,不是「我的 CPU limit 是多少」。
+            # 主機 10 核 + limits.cpu=500m → Go 還是開 10 個 P
+            #   → 過度的 context switch
+            #   → GC 的背景 worker 數量也跟著算錯
+            #   → 被 cgroup throttle 時延遲會很難看
+            #
+            # 手動設,或用 go.uber.org/automaxprocs(import _ 就會自己讀 cgroup)。
+            - name: GOMAXPROCS
+              value: "1"                 # 對齊下面的 limits.cpu
+
+          resources:
+            # requests = 排程器用來找節點的「保證值」
+            # limits   = 硬上限,CPU 超過會被 throttle,記憶體超過會被 OOM-kill
+            #
+            # ⚠️ CPU 和記憶體的超限行為不一樣:
+            #    CPU 超限  → 變慢(throttle),程式還活著
+            #    記憶體超限 → 直接 SIGKILL,沒有優雅關閉、沒有 log
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+          # ══════════ 三種探針 ══════════
+          #
+          # startup:啟動期間【接管】liveness,通過後才交棒。
+          #   沒有它的話,啟動慢的服務會在開機途中被 liveness 殺掉 → 無限重啟。
+          #   failureThreshold × periodSeconds = 允許的最長啟動時間 = 30 × 2 = 60s
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+
+          # liveness:「我卡死了嗎?」失敗 → 殺掉容器重啟。
+          #   🔴 絕對不可以檢查外部相依 —— 否則別人的故障會變成你的 CrashLoopBackOff。
+          #   所以這裡用 /health(只回 200,不碰任何相依)。
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3          # 連續 3 次才重啟,避免單次抖動就殺
+
+          # readiness:「我現在能服務流量嗎?」失敗 → 從 Service 端點移除,【不重啟】。
+          #   這裡才是檢查相依的地方。/readyz 會看 hub 的資料新鮮度。
+          #   恢復之後會自動加回去。
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2          # 比 liveness 敏感:先停流量,保守再重啟
+
+          volumeMounts:
+            # readOnlyRootFilesystem: true 之後,任何要寫的地方都得明確掛出來
+            - name: state
+              mountPath: /opt/trading
+
+      volumes:
+        # ⚠️ emptyDir 隨 pod 消滅 —— 這只適合【展示】。
+        #    真的要保留狀態得用 PersistentVolumeClaim,
+        #    而那又會把 Deployment 推向 StatefulSet(單寫入者語意)。
+        - name: state
+          emptyDir: {}
+
+      # 收到 SIGTERM 後給多久優雅關閉。預設 30s。
+      # 這個服務有 SSE 長連線和 gRPC 串流,需要時間讓它們收尾。
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trading-web
+spec:
+  type: ClusterIP
+  selector:
+    app: trading-web      # ⭐ 靠 label 找 pod,不是靠名字
+  ports:
+    - name: http
+      port: 80            # Service 對外的 port
+      targetPort: http    # 指向容器的具名 port(8080)

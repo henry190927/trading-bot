@@ -1,0 +1,15 @@
+# build context 越小,build 越快、快取越準
+.git
+.github
+*.md
+docs/
+career/
+.env
+.env.*
+Makefile.local
+bin/
+dist/
+*_test.go
+testdata/
+**/*.log
+.DS_Store
