@@ -38,7 +38,7 @@ flowchart TB
         store[("flat files, env-overridable paths<br/>journal.csv (v9, 30 col)<br/>zones · autotrade · setups")]
     end
 
-    subgraph Core["🧠 Importable packages — 31 pkg / 47k lines / 62 test files"]
+    subgraph Core["🧠 Importable packages — 62 pkg / 55k lines / 78 test files"]
         datain["DATA IN<br/>bingx (REST+WS) · market · twse · onchain<br/>econcal · earnings · fundamental · macro · dxy"]
         math["PURE MATH<br/>indicator — RSI · BOLL · MACD · ATR · HVN/POC"]
         detect["DETECTION<br/>signal — confluence votes · N字 BOS/CHoCH · EQH/EQL pools<br/>analyzer · zone · session (cash-open bar)"]
@@ -83,6 +83,7 @@ These are the choices that came out of building, breaking, and fixing the system
 | **gRPC server lives *inside* `cmd/web`, not its own binary** | `tickerHub` owns the single BingX mark-price websocket **per process**. A separate `cmd/grpc` could not attach to it — it would open a second websocket and a second REST poller, so "what is BTC right now" would have two answers that drift. "Reuse the hub" and "separate process" are mutually exclusive here, so the gRPC listener is opt-in via `GRPC_BIND` inside the web process (unset = no listener, no signal handler, zero behavior change). gRPC is a second **transport**, not a second data path. |
 | **`Drain()` before `GracefulStop()`, not `GracefulStop()` alone** | `GracefulStop` waits for in-flight RPCs to finish — but `StreamMarkPrices` only ends when the *client* leaves, so one healthy subscriber blocks shutdown **forever**. Two phases instead: close a drain channel so every stream returns `UNAVAILABLE` (the code gRPC clients retry on), then `GracefulStop` to flush in-flight unaries and GOAWAY. Still bounded at 15s then hard `Stop()` — a shutdown that can hang is one systemd will `SIGKILL` anyway. `Stop()` alone would cut frames mid-write; on a long-lived feed that is the whole difference. |
 | **Browser keeps SSE; gRPC is for services** | Browsers cannot speak gRPC without `grpc-web` plus a proxy, so moving the UI would add a hop to serve a client that was already well served. Both read the same hub, so an SSE tab and a gRPC consumer are guaranteed to see the same number from the same upstream connection. |
+| **Containerized, but production deliberately does not run Kubernetes** | The image earns its place: a multi-stage build to `FROM scratch` lands at **27 MB** — static binary, no shell, no libc, with the CA bundle copied in from the builder. That last part is not optional and not obvious: an image without it still answers `/health` with 200 and still serves `/api/tickers`, while every outbound TLS call fails `x509: certificate signed by unknown authority` and the economic calendar silently degrades to embedded data. Cheap rebuilds are the actual goal, and the image delivers that. Kubernetes is a separate question with a different answer: three binaries on one host, one operator, no autoscaling and no rolling-update requirement — a single-node cluster adds a control plane, etcd and a CNI to maintain and returns none of what it exists for. The manifests in [`k8s/`](k8s/) are there to pin down probe semantics, not to be deployed. `/health` is **liveness** and must never consult a dependency — a liveness probe that checks BingX converts their outage into our `CrashLoopBackOff`, verified by pointing it at a 404 and watching `RESTARTS` climb 0→1→2 every ~32s. `/readyz` is **readiness**, which may. The first `/readyz` gated on `hub.Running` and deadlocked: the hub is lazy, so `Running` means *someone is watching the SSE stream*, not *this service is healthy* — no traffic meant never ready meant no traffic. Readiness asks whether we **can** serve, not whether we **are**. |
 | **Sweep close-confirmed invalidation, not just wick-pierced** | The original sweep detector fired on wick-pierce, then never re-evaluated. Backtest revealed it kept emitting LONG signals during the XAG −2.4% dump on 2026-05-27 (stale sweep from earlier bar). Fix: kill the sweep the moment any later candle closes through the swept level in the wrong direction. Result: aggregate **netR +10.91R → +19.97R (+83%)** across 60d on 1h. |
 | **HVN / Volume Profile as display-only, NOT a vote** | Intuition said "trade with the chip zone" — but backtest showed enforcing HVN as a confluence vote dropped net edge by diluting score thresholds with marginal setups (BTC −1R, Silver −5.8R). Kept HVN computed and surfaced as `·` lines for trader judgment; engine doesn't vote on it. The discipline of "let the backtest decide" beat the discipline of "trust the intuition." |
 | **MTF bias filter behind an opt-in flag (`-bias`)** | Same story: backtest showed enforcing higher-TF MACD direction hurt ETH mean-reversion edge (+6.5R → −2.4R). Made it opt-in for experimentation rather than removing it entirely — preserves the ability to A/B with future data. |
@@ -114,7 +115,7 @@ These are the choices that came out of building, breaking, and fixing the system
 
 | Layer | Choice |
 |---|---|
-| Language | **Go 1.22** (single binary deploy, easy cross-compile to ARM/AMD64) |
+| Language | **Go 1.25** (single binary deploy, easy cross-compile to ARM/AMD64) |
 | Web framework | Gin + `html/template` (server-side render, no JS framework) |
 | Service API | **gRPC** (protobuf + HTTP/2) — unary + server-streaming, reflection on; see [`docs/grpc.md`](docs/grpc.md) |
 | Persistence | CSV (auto-migrated v1→v9, 30 cols) |
@@ -124,6 +125,8 @@ These are the choices that came out of building, breaking, and fixing the system
 | Hosting | Oracle Cloud Always Free (~$0/mo forever) |
 | Process supervision | systemd with `Restart=always` |
 | Embedded assets | `//go:embed` for templates + CSS — single-binary scp deploy |
+| Container | Multi-stage → `FROM scratch`, **27 MB** (`CGO_ENABLED=0`, embedded assets, CA bundle copied in) |
+| Orchestration | systemd in production. Kubernetes manifests in [`k8s/`](k8s/) for probe / resource / `GOMEMLIMIT` semantics — see [`k8s/README.md`](k8s/README.md) |
 
 ### What I'd build next if this were a paid product
 
