@@ -111,6 +111,21 @@ ORACLE_HOST=131.186.59.1 ./scripts/backup-vps.sh pull        # 打包 /opt/tradi
    ssh-add --apple-use-keychain ~/.ssh/oracle-trading.key
    ← SSH 這件事的根因
 
+🔑 ssh 自動從 keychain 載入金鑰          ✅ 已做(2026-10-16)
+   2026-10-16 又發生一次:agent 空了,make deploy-web 被拒。
+   光把 passphrase 存進 keychain 不夠 —— agent 重開機後還是空的,
+   要有 ~/.ssh/config 才會自動載入:
+
+     Host 131.186.59.1 100.79.112.56 trading-bot
+         User ubuntu
+         IdentityFile ~/.ssh/oracle-trading.key
+         UseKeychain yes
+         AddKeysToAgent yes
+
+   驗證方式:ssh-add -D 清空 agent → ssh -o BatchMode=yes 131.186.59.1
+   仍能登入,且登入後 ssh-add -l 看得到金鑰。
+   之後再遇到 Permission denied:先確認這個 config 還在。
+
 🔑 第二把 SSH 金鑰                      ⬜ 還沒做
    ssh-keygen -t ed25519 -f ~/.ssh/vps-backup-key
    把 .pub 加進 authorized_keys(與主金鑰不同機器產)
