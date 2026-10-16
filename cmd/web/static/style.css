@@ -1880,7 +1880,9 @@ footer {
    NOTE: the open-line labels also live on the left (#chart-open-labels), so
    a shelf edge at the same price as an open can sit under it. Occasional, not
    systematic — if it bites, the fix is a cross-layer vertical de-dup, not a
-   magic-number indent. */
+   magic-number indent.
+   `right` is overwritten from JS with the price-scale width so the labels
+   end at the plot edge and never cover the live price pill on the axis. */
 .chart-labels-right { left: 0; right: 4px; }
 .chart-labels-right .chart-poc-label { left: auto; right: 0; }
 

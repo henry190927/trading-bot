@@ -1989,6 +1989,14 @@
         if (!host) return;
         while (host.firstChild) host.removeChild(host.firstChild);
         if (!layerOn('poc-mig') || !lastPOCMig) return;
+        // Stop at the plot edge, not the container edge. The host spans the
+        // whole chart, price axis included, so a right-pinned label sat ON
+        // the axis and covered the live price pill whenever a POC was near
+        // the mark (reported 2026-10-16). The axis column belongs to LWC's
+        // own pills; the scale width changes with the price's digit count,
+        // so it is read on every redraw.
+        var axisW = chart.priceScale('right').width();
+        host.style.right = (axisW > 0 ? axisW + 4 : 4) + 'px';
         var m = lastPOCMig;
         var arrow = m.trend === 'rising' ? '↗' : m.trend === 'falling' ? '↘' : '→';
         var driftStr = (m.driftPct * 100).toFixed(2) + '%';
