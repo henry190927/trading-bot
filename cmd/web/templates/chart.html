@@ -493,7 +493,7 @@
           <dt><span class="glossary-tag">POC migration</span></dt>
           <dd>
             <div class="lang-en">
-              <b>Three POC price lines across nested windows</b> — POC50 (last 50 bars, brightest), POC100 (medium), POC200 (long, faded purple). Each price sits on the right axis in its line colour; the arrow + drift % and the <code>stacked</code> tag (all three strictly monotonic) are in the side-panel summary line.
+              <b>Three POC price lines across nested windows</b> — POC50 (last 50 bars, brightest), POC100 (medium), POC200 (long, faded purple). Each price sits on the right axis in its line colour, tagged POC50 / POC100 / POC200; the arrow + drift % and the <code>stacked</code> tag (all three strictly monotonic) are in the side-panel summary line.
               <p class="glossary-how"><b>Reading:</b>
                 <br>• <b>Rising + stacked (↗ POC50 &gt; POC100 &gt; POC200)</b> — volume-weighted uptrend regime → <span class="dir-long">trade-with-trend LONG</span>, favor pullback longs to the ladder.
                 <br>• <b>Falling + stacked (↘)</b> → mirror → <span class="dir-short">SHORT</span> bias, fade rallies into the ladder.
@@ -502,7 +502,7 @@
               </p>
             </div>
             <div class="lang-zh">
-              <b>三條 POC 水平線（不同視窗）</b> — POC50（最近 50 根、最亮）、POC100（中）、POC200（長、褪色紫）。價格顯示在右側價格軸上，顏色同線色；方向箭頭、漂移 % 和 <code>stacked</code>（三線嚴格單調）標示在側欄的摘要行。
+              <b>三條 POC 水平線（不同視窗）</b> — POC50（最近 50 根、最亮）、POC100（中）、POC200（長、褪色紫）。價格顯示在右側價格軸上，顏色同線色，並標上 POC50 / POC100 / POC200；方向箭頭、漂移 % 和 <code>stacked</code>（三線嚴格單調）標示在側欄的摘要行。
               <p class="glossary-how"><b>方向解讀：</b>
                 <br>• <b>上行且 stacked (↗ POC50 &gt; POC100 &gt; POC200)</b> — 量能加權多頭趨勢 → <span class="dir-long">順勢做多</span>，優先回踩到梯線做多。
                 <br>• <b>下行且 stacked (↘)</b> → 反之 → <span class="dir-short">做空</span>偏好，反彈到梯線做空。
@@ -1969,18 +1969,18 @@
         clearPOCMigLines();
         if (!layerOn('poc-mig') || !lastPOCMig) return;
         var m = lastPOCMig;
-        function push(price, color) {
+        function push(price, color, title) {
             if (!price) return;
             pocMigLines.push(candleSeries.createPriceLine({
                 price: price, color: color,
                 lineWidth: 1, lineStyle: 2,
                 axisLabelVisible: true,
-                title: '',
+                title: title, // short tag beside the pill, like "EQH ·2x"
             }));
         }
-        push(m.short, '#f76707');
-        push(m.med,   '#e599f7');
-        push(m.long,  '#7048e8');
+        push(m.short, '#f76707', 'POC50');
+        push(m.med,   '#e599f7', 'POC100');
+        push(m.long,  '#7048e8', 'POC200');
     }
     function clearPositionLines() {
         positionLines.forEach(function (l) { candleSeries.removePriceLine(l); });
