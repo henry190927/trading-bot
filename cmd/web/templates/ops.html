@@ -770,7 +770,12 @@
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 var el = document.getElementById('ops-zone-log');
-                if (el) el.textContent = (d.lines && d.lines.length) ? d.lines.join('\n') : '(no zone-alert lines yet)';
+                if (!el) return;
+                // An error is shown as an error: rendering it as "no lines yet"
+                // would make a broken read look like a quiet channel.
+                if (d.error) { el.textContent = '⚠ ' + d.error; return; }
+                el.textContent = (d.lines && d.lines.length) ? d.lines.join('\n') : '(no zone-alert events yet)';
+                if (d.skipped) el.textContent += '\n⚠ ' + d.skipped + ' 行無法解析,已略過';
             })
             .catch(function () {});
     }

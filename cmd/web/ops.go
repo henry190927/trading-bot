@@ -305,26 +305,22 @@ func (s *server) handleOpsZoneConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "enabled": cfg.Enabled, "auto": cfg.Auto, "tfs": cfg.TFs})
 }
 
-// handleOpsZoneLogs returns the recent zone-alert log lines (filtered from
-// the trading-monitor journal).
+// handleOpsZoneLogs returns the most recent zone-alert events from the
+// monitor's event log (zone.EventsPath). It used to grep the monitor's
+// journal, which needed the web process in the adm group and only ever saw
+// the last few hundred journal lines.
 func (s *server) handleOpsZoneLogs(c *gin.Context) {
-	// No sudo: the service account is in the adm group, which is what
-	// grants journal access.
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
-	defer cancel()
-	out, _ := exec.CommandContext(ctx, "journalctl", "-u", "trading-monitor",
-		"-n", "300", "--no-pager", "--output=short-iso").CombinedOutput()
-	var lines []string
-	for _, l := range strings.Split(string(out), "\n") {
-		if strings.Contains(l, "zonealert") {
-			// trim the journald prefix noise, keep timestamp + message
-			lines = append(lines, l)
-		}
+	events, skipped, err := zone.RecentEvents(zone.EventsPath(), 40)
+	if err != nil && !os.IsNotExist(err) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-	if len(lines) > 40 {
-		lines = lines[len(lines)-40:]
+	tpe := time.FixedZone("Asia/Taipei", 8*3600)
+	lines := make([]string, 0, len(events))
+	for _, e := range events {
+		lines = append(lines, e.At.In(tpe).Format("01-02 15:04:05")+"  "+e.Text)
 	}
-	c.JSON(http.StatusOK, gin.H{"lines": lines})
+	c.JSON(http.StatusOK, gin.H{"lines": lines, "skipped": skipped})
 }
 
 func (s *server) handleOpsStart(c *gin.Context) {

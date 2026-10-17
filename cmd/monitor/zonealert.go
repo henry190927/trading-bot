@@ -176,8 +176,10 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 			if fault := zone.TriggerFault(z); fault != "" {
 				if !warned[key] {
 					warned[key] = true
-					log.Printf("zonealert: SKIP %s %s %s–%s — %s",
+					msg := fmt.Sprintf("SKIP %s %s %s–%s — %s",
 						short, z.TF, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), fault)
+					log.Printf("zonealert: %s", msg)
+					recordZoneEvent(zone.EventSkip, short, z.TF, msg)
 				}
 				continue
 			}
@@ -206,10 +208,14 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 				title, body, tags := zoneAlertText(z, short, px, bar)
 				if err := n.Push(ctx, title, body, tags); err != nil {
 					log.Printf("zonealert: push failed: %v", err)
+					recordZoneEvent(zone.EventPushFailed, short, z.TF,
+						fmt.Sprintf("push failed %s %s: %v", short, z.TF, err))
 				} else {
-					log.Printf("zonealert: fired %s %s %s–%s dir=%s confirm=%q px=%s close=%s",
+					msg := fmt.Sprintf("fired %s %s %s–%s dir=%s confirm=%q px=%s close=%s",
 						short, z.TF, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi),
 						strings.ToUpper(z.Dir), z.Confirm, zone.FmtPrice(px), zone.FmtPrice(bar.Close))
+					log.Printf("zonealert: %s", msg)
+					recordZoneEvent(zone.EventFired, short, z.TF, msg)
 				}
 			}
 			inside[key] = in
@@ -271,4 +277,14 @@ func zoneAlertText(z zone.Zone, short string, px float64, bar market.Candle) (ti
 	body = fmt.Sprintf("%s %s%s ｜ 現價 %s\n🟡 樞紐區 %s–%s（%s %s）\n%s\n⏱ %s 快照（方向性結構,圖表即時值可能不同）\n→ 判斷 reject / 進場",
 		dirEmoji, short, tfTag, pxStr, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), dirEmoji, dir, z.Note, snap)
 	return title, body, tags
+}
+
+// recordZoneEvent appends to the event log /ops reads (zone.EventsPath). A
+// failed write is logged and dropped: the push has already happened or not,
+// and the journal line above still records it.
+func recordZoneEvent(kind, short, tf, text string) {
+	e := zone.Event{At: time.Now(), Kind: kind, Symbol: short, TF: tf, Text: text}
+	if err := zone.AppendEvent(zone.EventsPath(), e); err != nil {
+		log.Printf("zonealert: event log write failed: %v", err)
+	}
 }
