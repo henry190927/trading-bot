@@ -105,7 +105,7 @@ func runBracketGuard(ctx context.Context, client *bingx.Client) {
 	}
 	var n *notify.Ntfy
 	if topic := os.Getenv("NTFY_TOPIC"); topic != "" {
-		n = notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
+		n = newNtfy(topic)
 	} else {
 		// Still worth running: /ops/verify and the daemon log both surface
 		// the finding. But the whole point is being told while asleep, so

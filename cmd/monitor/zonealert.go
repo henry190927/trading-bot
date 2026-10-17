@@ -28,7 +28,6 @@ import (
 
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/market"
-	"github.com/henry190927/trading-bot/notify"
 	"github.com/henry190927/trading-bot/zone"
 )
 
@@ -101,7 +100,7 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 		hb.Off("zonealert", "NTFY_TOPIC 空白 → 沒啟動")
 		return
 	}
-	n := notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
+	n := newNtfy(topic)
 	inside := map[string]bool{}
 	warned := map[string]bool{} // misconfig log-once, so a bad zone can't spam every 25s
 	cc := newCloseCache(ctx, client)
@@ -130,7 +129,7 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 			hb.SetIdle("zonealert", true, "zone-config.json enabled=false → 每輪短路,不發警報")
 			continue
 		}
-		hb.SetIdle("zonealert", false, zoneReason)
+		markPushIdle("zonealert", zoneReason)
 		if cfg.Auto {
 			tfKey := cfg.TFs
 			if time.Since(lastStruct) >= zoneStructEvery || tfKey != lastTFs {
@@ -206,16 +205,25 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 			if in && !inside[key] {
 				px, _ := livePx(short, sym) // for the push body; 0 if unavailable
 				title, body, tags := zoneAlertText(z, short, px, bar)
-				if err := n.Push(ctx, title, body, tags); err != nil {
-					log.Printf("zonealert: push failed: %v", err)
-					recordZoneEvent(zone.EventPushFailed, short, z.TF,
-						fmt.Sprintf("push failed %s %s: %v", short, z.TF, err))
-				} else {
-					msg := fmt.Sprintf("fired %s %s %s–%s dir=%s confirm=%q px=%s close=%s",
-						short, z.TF, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi),
-						strings.ToUpper(z.Dir), z.Confirm, zone.FmtPrice(px), zone.FmtPrice(bar.Close))
+				msg := fmt.Sprintf("fired %s %s %s–%s dir=%s confirm=%q px=%s close=%s",
+					short, z.TF, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi),
+					strings.ToUpper(z.Dir), z.Confirm, zone.FmtPrice(px), zone.FmtPrice(bar.Close))
+				switch {
+				case pushMuted():
+					// Still a fire: record it, so a muted stretch can be
+					// reviewed afterwards, but say it never reached the phone.
+					msg += " (muted, not pushed)"
 					log.Printf("zonealert: %s", msg)
 					recordZoneEvent(zone.EventFired, short, z.TF, msg)
+				default:
+					if err := n.Push(ctx, title, body, tags); err != nil {
+						log.Printf("zonealert: push failed: %v", err)
+						recordZoneEvent(zone.EventPushFailed, short, z.TF,
+							fmt.Sprintf("push failed %s %s: %v", short, z.TF, err))
+					} else {
+						log.Printf("zonealert: %s", msg)
+						recordZoneEvent(zone.EventFired, short, z.TF, msg)
+					}
 				}
 			}
 			inside[key] = in

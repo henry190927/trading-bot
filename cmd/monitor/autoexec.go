@@ -53,7 +53,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 
 	var n *notify.Ntfy
 	if topic := os.Getenv("NTFY_TOPIC"); topic != "" {
-		n = notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
+		n = newNtfy(topic)
 	}
 	state := map[string]*autoState{}
 	var halt haltState

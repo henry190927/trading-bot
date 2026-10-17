@@ -26,6 +26,12 @@ type Ntfy struct {
 	Server string
 	Topic  string
 	HTTP   *http.Client
+
+	// Muted, when set and returning true, turns Push and Notify into no-ops
+	// that report success. It is consulted on every send, so a runtime mute
+	// (monitorcfg.PushMuted) applies without a restart. Callers that need
+	// to record "fired but not pushed" check it themselves before sending.
+	Muted func() bool
 }
 
 func NewNtfy(server, topic string) *Ntfy {
@@ -43,7 +49,7 @@ func NewNtfy(server, topic string) *Ntfy {
 // don't map to a signal.Signal (e.g. price-zone touches). Same topic/server
 // and high priority as Notify.
 func (n *Ntfy) Push(ctx context.Context, title, body, tags string) error {
-	if n.Topic == "" {
+	if n.Topic == "" || (n.Muted != nil && n.Muted()) {
 		return nil
 	}
 	url := n.Server + "/" + n.Topic
@@ -70,7 +76,7 @@ func (n *Ntfy) Push(ctx context.Context, title, body, tags string) error {
 }
 
 func (n *Ntfy) Notify(ctx context.Context, sig signal.Signal, ctxInfo signal.Context) error {
-	if n.Topic == "" {
+	if n.Topic == "" || (n.Muted != nil && n.Muted()) {
 		return nil
 	}
 	body := formatAlert(sig, ctxInfo)

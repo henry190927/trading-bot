@@ -116,7 +116,7 @@ func main() {
 		notifier.Sinks = append(notifier.Sinks, notify.Mac{})
 	}
 	if topic := os.Getenv("NTFY_TOPIC"); topic != "" {
-		notifier.Sinks = append(notifier.Sinks, notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic))
+		notifier.Sinks = append(notifier.Sinks, newNtfy(topic))
 		log.Printf("ntfy push configured for topic %q", topic)
 	}
 
@@ -128,6 +128,7 @@ func main() {
 	// write lands before the loops below have registered; the next one, 15s
 	// later, lists them.
 	go hb.Run(ctx, heartbeat.Path(), log.Printf)
+	go watchMute(ctx)
 
 	// Earnings-blackout calendar (F3). signal.Evaluate reads earnings.Default()
 	// to gate stock symbols around a report; without this load that gate is a
@@ -210,8 +211,11 @@ func main() {
 	}
 	log.Printf("multi-TF monitor up — TFs=%v min-score=%d min-tfs=%d min-ratio=%s", tfList(monitoredTFs), *minScore, *minTFs, ratioMsg)
 
-	hb.Start("confluence", time.Minute, "多 TF 匯合掃描 · 收盤觸發")
-	if os.Getenv("NTFY_TOPIC") == "" {
+	const confReason = "多 TF 匯合掃描 · 收盤觸發"
+	hb.Start("confluence", time.Minute, confReason)
+	if os.Getenv("NTFY_TOPIC") != "" {
+		trackPushIdle("confluence", confReason)
+	} else {
 		// Still scans and logs; it just has nowhere to push.
 		hb.SetIdle("confluence", true, "NTFY_TOPIC 空白 → 只寫 log,不推播")
 	}

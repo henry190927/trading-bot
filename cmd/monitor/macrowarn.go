@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/henry190927/trading-bot/macro"
-	"github.com/henry190927/trading-bot/notify"
 )
 
 // runMacroWarn pushes an ntfy heads-up BEFORE a macro-event blackout window
@@ -23,7 +22,7 @@ func runMacroWarn(ctx context.Context) {
 		hb.Off("macrowarn", "NTFY_TOPIC 空白 → 沒啟動")
 		return
 	}
-	n := notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
+	n := newNtfy(topic)
 	const lead = 45 * time.Minute
 	alerted := map[string]bool{}
 
@@ -50,7 +49,9 @@ func runMacroWarn(ctx context.Context) {
 	}
 
 	log.Printf("macrowarn: up — %v lead before blackout", lead)
-	hb.Start("macrowarn", 5*time.Minute, "宏觀事件前置提醒 · blackout 前 45 分")
+	const mwReason = "宏觀事件前置提醒 · blackout 前 45 分"
+	hb.Start("macrowarn", 5*time.Minute, mwReason)
+	trackPushIdle("macrowarn", mwReason)
 	check()
 	tick := time.NewTicker(5 * time.Minute)
 	defer tick.Stop()

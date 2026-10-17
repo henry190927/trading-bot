@@ -189,7 +189,6 @@ func main() {
 	r.GET("/ops/zones", srv.handleOpsZones)
 	r.POST("/ops/zone-config", srv.handleOpsZoneConfig)
 	r.GET("/ops/zone-logs", srv.handleOpsZoneLogs)
-	r.POST("/ops/config", srv.handleOpsConfig)
 	// ── Kubernetes probes ──────────────────────────────────────────────
 	//
 	// /health is LIVENESS: "is this process still able to answer?" It must NOT

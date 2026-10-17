@@ -12,11 +12,9 @@
 //     `show` are unprivileged D-Bus queries, so the health card works without
 //     widening the scoped sudoers grant — which matters because trading-web is
 //     NOT in that grant and could not otherwise be reported on.
-//  2. trading-web is REPORT-ONLY. No start/stop/restart is offered for it: it
-//     is the process serving this page, so stopping it from here would kill
-//     the surface holding the button, and it's outside the sudoers scope
-//     anyway. Only the mute toggle restarts a unit, and only trading-monitor,
-//     which the existing scoped grant already covers.
+//  2. Nothing here changes a unit. Service control is an SSH job
+//     (scripts/ops); the mute toggle writes monitorcfg, which the monitor
+//     re-reads on every send, and never touches .env.
 package main
 
 import (
@@ -30,6 +28,7 @@ import (
 
 	"github.com/henry190927/trading-bot/heartbeat"
 	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/monitorcfg"
 	"github.com/henry190927/trading-bot/zone"
 
 	"github.com/gin-gonic/gin"
@@ -197,83 +196,20 @@ func monitorLoops(zoneOnly, ntfyOn, zoneChannelOn, bracketOn, apiKeyOn bool, bra
 	return loops
 }
 
-// ntfyState reports whether push is live, and whether it's live-off because
-// this panel muted it (a stashed NTFY_TOPIC_MUTED) versus never configured.
-// The topic value itself is NEVER returned — presence only, same rule as
-// handleOpsZones.
-func ntfyState() (on, muted bool) {
-	data, err := os.ReadFile(envPath())
-	if err != nil {
-		return false, false
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		switch {
-		case strings.HasPrefix(line, "NTFY_TOPIC="):
-			on = strings.TrimSpace(strings.TrimPrefix(line, "NTFY_TOPIC=")) != ""
-		case strings.HasPrefix(line, "NTFY_TOPIC_MUTED="):
-			muted = strings.TrimSpace(strings.TrimPrefix(line, "NTFY_TOPIC_MUTED=")) != ""
+// ntfyState reports whether push is configured (NTFY_TOPIC present in .env,
+// read-only — the topic value itself is never returned) and whether it is
+// muted at runtime (monitorcfg). err is a config read error: in that case
+// muted is false, matching what the monitor does (it fails open).
+func ntfyState() (on, muted bool, err error) {
+	if data, rerr := os.ReadFile(envPath()); rerr == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "NTFY_TOPIC=") {
+				on = strings.TrimSpace(strings.TrimPrefix(line, "NTFY_TOPIC=")) != ""
+			}
 		}
 	}
-	return on, muted && !on
-}
-
-// toggleNtfyEnv rewrites .env content to mute or unmute push notifications.
-//
-// Muting moves the topic to NTFY_TOPIC_MUTED and blanks NTFY_TOPIC — the
-// monitor reads NTFY_TOPIC, so a blank value disables every push loop, which
-// is exactly the manual workflow this replaces. Stashing the value in the SAME
-// file (rather than a .env.bak alongside it) is the point: the old backup file
-// could be clobbered by an unrelated edit or lost to a deploy, and then the
-// topic was gone.
-//
-// Pure string→string so the rewrite is unit-testable without touching /opt.
-// Returns changed=false when already in the requested state (idempotent).
-func toggleNtfyEnv(content string, mute bool) (out string, changed bool, err error) {
-	lines := strings.Split(content, "\n")
-	var topic, stashed string
-	topicIdx, stashIdx := -1, -1
-	for i, l := range lines {
-		switch {
-		case strings.HasPrefix(l, "NTFY_TOPIC="):
-			topic, topicIdx = strings.TrimSpace(strings.TrimPrefix(l, "NTFY_TOPIC=")), i
-		case strings.HasPrefix(l, "NTFY_TOPIC_MUTED="):
-			stashed, stashIdx = strings.TrimSpace(strings.TrimPrefix(l, "NTFY_TOPIC_MUTED=")), i
-		}
-	}
-
-	if mute {
-		if topic == "" {
-			return content, false, nil // already silent
-		}
-		lines[topicIdx] = "NTFY_TOPIC="
-		if stashIdx >= 0 {
-			lines[stashIdx] = "NTFY_TOPIC_MUTED=" + topic
-		} else {
-			// Keep the stash adjacent to the key it shadows so the file stays
-			// readable when someone opens it over SSH.
-			lines = append(lines[:topicIdx+1],
-				append([]string{"NTFY_TOPIC_MUTED=" + topic}, lines[topicIdx+1:]...)...)
-		}
-		return strings.Join(lines, "\n"), true, nil
-	}
-
-	if topic != "" {
-		return content, false, nil // already pushing
-	}
-	if stashed == "" {
-		return content, false, fmt.Errorf("沒有可還原的 NTFY_TOPIC(沒有 stash) — 請手動設定 .env")
-	}
-	// The stash line always goes away: leaving it behind would let a later
-	// mute resurrect a stale topic if the live one had since been hand-edited.
-	// With no NTFY_TOPIC= line to restore into, the stash line simply becomes
-	// it — which also keeps the key in its original position in the file.
-	if topicIdx >= 0 {
-		lines[topicIdx] = "NTFY_TOPIC=" + stashed
-		lines = append(lines[:stashIdx], lines[stashIdx+1:]...)
-	} else {
-		lines[stashIdx] = "NTFY_TOPIC=" + stashed
-	}
-	return strings.Join(lines, "\n"), true, nil
+	cfg, err := monitorcfg.Read(monitorcfg.Path())
+	return on, cfg.PushMuted, err
 }
 
 // handleOpsServices — GET /ops/services. The health card: unit states, what
@@ -283,7 +219,11 @@ func (s *server) handleOpsServices(c *gin.Context) {
 	for _, u := range reportedServices {
 		svcs = append(svcs, readServiceHealth(u))
 	}
-	on, muted := ntfyState()
+	on, muted, cfgErr := ntfyState()
+	ntfy := gin.H{"on": on, "muted": muted}
+	if cfgErr != nil {
+		ntfy["error"] = cfgErr.Error()
+	}
 	zoneCfg := zone.ReadConfig()
 	// Read from .env, not os.Getenv: this panel reports what the MONITOR
 	// process will do on its next start, and that process reads the file.
@@ -304,7 +244,9 @@ func (s *server) handleOpsServices(c *gin.Context) {
 		}
 	}
 	apiKeyOn := s.client != nil && s.client.APIKey != "" && s.client.APISecret != ""
-	loops := monitorLoops(zoneOnly, on, zoneCfg.Enabled, bracketOn, apiKeyOn, bracketMode)
+	// A muted channel is, for every push-only loop, the same as no channel:
+	// the loop runs but nothing it finds is sent.
+	loops := monitorLoops(zoneOnly, on && !muted, zoneCfg.Enabled, bracketOn, apiKeyOn, bracketMode)
 	monitorActive := false
 	for _, h := range svcs {
 		if h.Unit == "trading-monitor" {
@@ -314,7 +256,7 @@ func (s *server) handleOpsServices(c *gin.Context) {
 	beat, beatErr := heartbeat.Read(heartbeat.Path())
 	c.JSON(http.StatusOK, gin.H{
 		"services":     svcs,
-		"ntfy":         gin.H{"on": on, "muted": muted},
+		"ntfy":         ntfy,
 		"zone_only":    zoneOnly,
 		"zone_channel": gin.H{"enabled": zoneCfg.Enabled, "auto": zoneCfg.Auto, "tfs": zoneCfg.TFs},
 		"loops":        loops,
@@ -332,43 +274,30 @@ func (s *server) handleOpsServices(c *gin.Context) {
 	})
 }
 
-// handleOpsNtfy — POST /ops/ntfy?mute=1|0. Rewrites .env then restarts
-// trading-monitor so the change takes effect (the monitor reads NTFY_TOPIC
-// once at startup when building its notifier sinks — unlike zone config,
-// this one genuinely needs the restart).
+// handleOpsNtfy — POST /ops/ntfy?mute=1|0. Writes monitorcfg.PushMuted; the
+// monitor re-reads it on every send, so nothing is restarted and .env is not
+// touched. Muting keeps every loop running — only the push is skipped.
 func (s *server) handleOpsNtfy(c *gin.Context) {
 	mute := c.PostForm("mute") == "1"
-
-	data, err := os.ReadFile(envPath())
+	path := monitorcfg.Path()
+	cfg, err := monitorcfg.Read(path)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "讀取 .env 失敗: " + err.Error()})
+		// Overwriting a file we could not parse would silently discard
+		// whatever was in it. Make someone look at it first.
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "讀取 monitor-config 失敗,未改動: " + err.Error()})
 		return
 	}
-	out, changed, err := toggleNtfyEnv(string(data), mute)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if !changed {
-		on, muted := ntfyState()
+	if cfg.PushMuted == mute {
+		on, muted, _ := ntfyState()
 		c.JSON(http.StatusOK, gin.H{"ok": true, "changed": false, "on": on, "muted": muted,
 			"note": "已經是目標狀態,沒有改動"})
 		return
 	}
-	// 0600: the file holds exchange + AI credentials. Preserve the mode
-	// explicitly rather than inheriting whatever umask the service runs with.
-	if err := os.WriteFile(envPath(), []byte(out), 0o600); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "寫入 .env 失敗: " + err.Error()})
+	cfg.PushMuted = mute
+	if err := monitorcfg.Write(path, cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "寫入 monitor-config 失敗: " + err.Error()})
 		return
 	}
-	if err := systemctlAction("trading-monitor", "restart"); err != nil {
-		// .env is already written, so report the partial state honestly —
-		// the setting will apply on the monitor's next restart either way.
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": ".env 已更新,但重啟 trading-monitor 失敗: " + err.Error(),
-		})
-		return
-	}
-	on, muted := ntfyState()
+	on, muted, _ := ntfyState()
 	c.JSON(http.StatusOK, gin.H{"ok": true, "changed": true, "on": on, "muted": muted})
 }

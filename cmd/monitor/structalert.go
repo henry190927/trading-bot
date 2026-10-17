@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/henry190927/trading-bot/market"
-	"github.com/henry190927/trading-bot/notify"
 	sig "github.com/henry190927/trading-bot/signal"
 )
 
@@ -27,7 +26,7 @@ func runStructureAlerts(ctx context.Context, client interface {
 		hb.Off("structalert", "NTFY_TOPIC 空白 → 沒啟動")
 		return
 	}
-	n := notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
+	n := newNtfy(topic)
 	tfs := []market.Timeframe{market.TF1h, market.TF4h}
 	last := map[string]string{} // "sym|tf" -> last event signature
 	seeded := false
@@ -92,7 +91,9 @@ func runStructureAlerts(ctx context.Context, client interface {
 	}
 
 	log.Printf("structalert: up — core symbols on 1h/4h (BOS/CHoCH regime flips)")
-	hb.Start("structalert", 3*time.Minute, "結構事件(BOS/CHoCH)警報")
+	const saReason = "結構事件(BOS/CHoCH)警報"
+	hb.Start("structalert", 3*time.Minute, saReason)
+	trackPushIdle("structalert", saReason)
 	check()
 	tick := time.NewTicker(3 * time.Minute)
 	defer tick.Stop()

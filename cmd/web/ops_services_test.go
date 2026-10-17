@@ -1,119 +1,10 @@
 package main
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"time"
 )
-
-// The .env rewrite is the only part of the mute toggle that can silently
-// destroy something (the topic value lives nowhere else once blanked), so
-// every branch is traced by hand against a realistic file shape.
-func TestToggleNtfyEnv(t *testing.T) {
-	const live = "BINGX_API_KEY=abc\nNTFY_TOPIC=uuid-1234\nMONITOR_ZONE_ONLY=1\n"
-	const muted = "BINGX_API_KEY=abc\nNTFY_TOPIC=\nNTFY_TOPIC_MUTED=uuid-1234\nMONITOR_ZONE_ONLY=1\n"
-
-	t.Run("mute stashes the topic in place", func(t *testing.T) {
-		out, changed, err := toggleNtfyEnv(live, true)
-		if err != nil || !changed {
-			t.Fatalf("changed=%v err=%v", changed, err)
-		}
-		if out != muted {
-			t.Fatalf("got:\n%q\nwant:\n%q", out, muted)
-		}
-	})
-
-	t.Run("unmute restores it and drops the stash", func(t *testing.T) {
-		out, changed, err := toggleNtfyEnv(muted, false)
-		if err != nil || !changed {
-			t.Fatalf("changed=%v err=%v", changed, err)
-		}
-		if out != live {
-			t.Fatalf("got:\n%q\nwant:\n%q", out, live)
-		}
-	})
-
-	t.Run("round trip is lossless", func(t *testing.T) {
-		m, _, _ := toggleNtfyEnv(live, true)
-		back, _, err := toggleNtfyEnv(m, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if back != live {
-			t.Fatalf("round trip lost content:\n%q", back)
-		}
-	})
-
-	t.Run("both directions are idempotent", func(t *testing.T) {
-		if _, changed, err := toggleNtfyEnv(muted, true); changed || err != nil {
-			t.Errorf("re-mute: changed=%v err=%v, want no-op", changed, err)
-		}
-		if _, changed, err := toggleNtfyEnv(live, false); changed || err != nil {
-			t.Errorf("re-unmute: changed=%v err=%v, want no-op", changed, err)
-		}
-	})
-
-	t.Run("unmute without a stash refuses rather than inventing a topic", func(t *testing.T) {
-		_, changed, err := toggleNtfyEnv("BINGX_API_KEY=abc\nNTFY_TOPIC=\n", false)
-		if err == nil {
-			t.Fatal("want an error when there is nothing to restore")
-		}
-		if changed {
-			t.Error("must not report a change on failure")
-		}
-	})
-
-	t.Run("no NTFY_TOPIC line at all is silent, not an error", func(t *testing.T) {
-		src := "BINGX_API_KEY=abc\n"
-		out, changed, err := toggleNtfyEnv(src, true)
-		if err != nil || changed || out != src {
-			t.Fatalf("want untouched no-op, got changed=%v err=%v out=%q", changed, err, out)
-		}
-	})
-
-	t.Run("unmute with only a stash line reuses that line", func(t *testing.T) {
-		// The NTFY_TOPIC= line was hand-deleted while muted; the stash is the
-		// only record of the topic, so it becomes the live key.
-		out, changed, err := toggleNtfyEnv("A=1\nNTFY_TOPIC_MUTED=uuid-1234\nB=2\n", false)
-		if err != nil || !changed {
-			t.Fatalf("changed=%v err=%v", changed, err)
-		}
-		if out != "A=1\nNTFY_TOPIC=uuid-1234\nB=2\n" {
-			t.Fatalf("got %q", out)
-		}
-		if strings.Contains(out, "NTFY_TOPIC_MUTED") {
-			t.Error("stash line should be gone")
-		}
-	})
-
-	t.Run("a stale stash is overwritten, not duplicated", func(t *testing.T) {
-		// Muting while an old stash exists must capture the CURRENT topic.
-		out, changed, err := toggleNtfyEnv("NTFY_TOPIC=new-uuid\nNTFY_TOPIC_MUTED=old-uuid\n", true)
-		if err != nil || !changed {
-			t.Fatalf("changed=%v err=%v", changed, err)
-		}
-		if !strings.Contains(out, "NTFY_TOPIC_MUTED=new-uuid") {
-			t.Fatalf("stash not refreshed: %q", out)
-		}
-		if strings.Contains(out, "old-uuid") {
-			t.Errorf("stale topic survived: %q", out)
-		}
-		if strings.Count(out, "NTFY_TOPIC_MUTED=") != 1 {
-			t.Errorf("stash duplicated: %q", out)
-		}
-	})
-
-	t.Run("credentials and other keys are never touched", func(t *testing.T) {
-		src := "BINGX_API_SECRET=s3cret\nNTFY_TOPIC=t\nGEMINI_API_KEY=g\n"
-		out, _, _ := toggleNtfyEnv(src, true)
-		for _, keep := range []string{"BINGX_API_SECRET=s3cret", "GEMINI_API_KEY=g"} {
-			if !strings.Contains(out, keep) {
-				t.Errorf("lost %q from:\n%s", keep, out)
-			}
-		}
-	})
-}
 
 // monitorLoops must mirror cmd/monitor/main.go's gating. The case that
 // actually bites: muting ntfy under MONITOR_ZONE_ONLY=1 leaves autoexec as
@@ -251,43 +142,6 @@ func TestHumanSince(t *testing.T) {
 		if got := humanSince(tc.d); got != tc.want {
 			t.Errorf("humanSince(%v) = %q, want %q", tc.d, got, tc.want)
 		}
-	}
-}
-
-// zoneOnlyActive decides whether /ops refuses to write monitor config and
-// bounce a live daemon for settings the running process cannot consume. Its
-// only input is .env, so drive it through TRADING_ENV_PATH.
-func TestZoneOnlyActive(t *testing.T) {
-	dir := t.TempDir()
-	path := dir + "/.env"
-	t.Setenv("TRADING_ENV_PATH", path)
-
-	for _, tc := range []struct {
-		name, content string
-		want          bool
-	}{
-		{"set to 1", "A=1\nMONITOR_ZONE_ONLY=1\nB=2\n", true},
-		{"set to 0", "MONITOR_ZONE_ONLY=0\n", false},
-		{"blank value", "MONITOR_ZONE_ONLY=\n", false},
-		{"key absent entirely", "A=1\n", false},
-		// A trailing-space value must not read as enabled by accident.
-		{"whitespace around 1", "MONITOR_ZONE_ONLY= 1 \n", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			if got := zoneOnlyActive(); got != tc.want {
-				t.Errorf("zoneOnlyActive() = %v, want %v for %q", got, tc.want, tc.content)
-			}
-		})
-	}
-
-	// An unreadable .env must not claim the gate is active — that would block
-	// config edits on a filesystem hiccup.
-	t.Setenv("TRADING_ENV_PATH", dir+"/does-not-exist")
-	if zoneOnlyActive() {
-		t.Error("missing .env should read false, not true")
 	}
 }
 

@@ -166,49 +166,6 @@
 </section>
 
 <section class="ops-block">
-  <h2>trading-monitor config <span class="hint">(restarts monitor if running)</span></h2>
-  {{if .MonitorZoneOnly}}
-  <div class="ops-warn ops-inert-warn">
-    ⚠ <strong>目前無效</strong> — <code>MONITOR_ZONE_ONLY=1</code>,cmd/monitor 在 confluence 掃描迴圈之前就 return。
-    下面四個參數<strong>只有那個迴圈會讀</strong>,所以修改不會改變任何行為,而 Apply 會白白重啟 monitor
-    (中斷 autoexec / zonealert)。要調這些,先取消 <code>MONITOR_ZONE_ONLY</code>。
-  </div>
-  {{end}}
-  <form id="ops-monitor-config-form" class="trade-form" onsubmit="return false;">
-    <div class="field">
-      <label>Monitored timeframes <span class="hint">(15m is poison per backtest — leave unchecked unless experimenting)</span></label>
-      {{$selectedTFs := .Monitor.MonitorTFs}}
-      <div class="ops-tf-checkboxes">
-        {{range $opt := .MonitorTFOptions}}
-          <label class="ops-tf-check">
-            <input type="checkbox" name="tfs" value="{{$opt}}"
-              {{range $sel := $selectedTFs}}{{if eq $sel $opt}}checked{{end}}{{end}}>
-            <span>{{$opt}}</span>
-          </label>
-        {{end}}
-      </div>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label for="ops-monitor-min-score">min-score (per TF)</label>
-        <input type="number" min="1" max="8" step="1" name="min_score" id="ops-monitor-min-score" value="{{.Monitor.MonitorMinScore}}">
-      </div>
-      <div class="field">
-        <label for="ops-monitor-min-tfs">min-tfs (agreement) <span class="hint">(1 = single-TF alerter)</span></label>
-        <input type="number" min="1" max="5" step="1" name="min_tfs" id="ops-monitor-min-tfs" value="{{.Monitor.MonitorMinTFs}}">
-      </div>
-      <div class="field">
-        <label for="ops-monitor-min-ratio">min-ratio (/10) <span class="hint">(structural fit; 0 disables)</span></label>
-        <input type="number" min="0" max="10" step="0.1" name="min_ratio" id="ops-monitor-min-ratio" value="{{if gt .Monitor.MonitorMinRatio 0.0}}{{printf "%.1f" .Monitor.MonitorMinRatio}}{{else}}0{{end}}">
-      </div>
-    </div>
-    <div class="form-actions">
-      <button type="button" class="btn-primary" id="ops-monitor-apply-config"{{if .MonitorZoneOnly}} disabled title="MONITOR_ZONE_ONLY=1 — 這些參數目前無效"{{end}}>Apply monitor config</button>
-    </div>
-  </form>
-</section>
-
-<section class="ops-block">
   <h2>AI advisor model <span class="hint">(applies to /ai/analyze/* endpoints)</span></h2>
   <div class="field-row">
     <div class="field">
@@ -302,23 +259,26 @@
                  + '</div>';
         }).join('') || '<div class="hint">無資料</div>';
 
-        var on = d.ntfy && d.ntfy.on;
+        var nt = d.ntfy || {};
+        var live = nt.on && !nt.muted;
         var st = document.getElementById('ops-ntfy-state');
-        st.textContent = on ? '🔔 推播開啟' : '🔇 推播靜音';
-        st.className = 'ops-ntfy-state ' + (on ? 'on' : 'off');
+        st.textContent = !nt.on ? '⚪ 推播未設定' : (nt.muted ? '🔇 推播靜音' : '🔔 推播開啟');
+        st.className = 'ops-ntfy-state ' + (live ? 'on' : 'off');
 
         var btn = document.getElementById('ops-ntfy-toggle');
-        btn.textContent = on ? '🔇 靜音' : '🔔 取消靜音';
-        btn.disabled = ntfyBusy || (!on && !(d.ntfy && d.ntfy.muted));
-        btn.dataset.mute = on ? '1' : '0';
+        btn.textContent = nt.muted ? '🔔 取消靜音' : '🔇 靜音';
+        btn.disabled = ntfyBusy || !nt.on;
+        btn.dataset.mute = nt.muted ? '0' : '1';
 
         var note = document.getElementById('ops-ntfy-note');
-        if (!on && !(d.ntfy && d.ntfy.muted)) {
-            note.textContent = 'NTFY_TOPIC 未設定過,面板沒有可還原的值 — 請手動寫入 .env。';
-        } else if (!on) {
-            note.textContent = '靜音中(topic 已暫存於 .env)。autoexec 仍在跑,但 zonealert 等推播迴圈全部停擺。';
+        if (nt.error) {
+            note.textContent = '⚠ monitor-config 讀不到:' + nt.error + ' — monitor 會維持推播開啟。';
+        } else if (!nt.on) {
+            note.textContent = 'NTFY_TOPIC 未設定 — 要在 .env 設定(SSH),網頁不改 .env。';
+        } else if (nt.muted) {
+            note.textContent = '靜音中:所有迴圈照跑、zone 觸發照樣記錄,只是不推到手機。取消靜音立即生效。';
         } else {
-            note.textContent = '靜音會清空 NTFY_TOPIC 並重啟 trading-monitor;topic 會暫存在 .env 內以便還原。';
+            note.textContent = '靜音只跳過推播,不重啟 monitor、不改 .env;迴圈照跑。';
         }
 
         renderLoops(d);
@@ -527,8 +487,8 @@
     document.getElementById('ops-ntfy-toggle').addEventListener('click', function () {
         var mute = this.dataset.mute === '1';
         if (!confirm(mute
-                ? '靜音推播?會清空 NTFY_TOPIC 並重啟 trading-monitor。'
-                : '恢復推播?會還原 NTFY_TOPIC 並重啟 trading-monitor。')) return;
+                ? '靜音推播?迴圈照跑,只是不推到手機(含裸倉警報)。'
+                : '恢復推播?')) return;
         ntfyBusy = true;
         this.disabled = true;
         var body = new URLSearchParams({ mute: mute ? '1' : '0' });
@@ -541,7 +501,7 @@
                 } else if (res.j.changed === false) {
                     showToast(res.j.note || '沒有改動', 'info');
                 } else {
-                    showToast(res.j.on ? '推播已恢復,monitor 已重啟' : '推播已靜音,monitor 已重啟', 'ok');
+                    showToast(res.j.muted ? '推播已靜音' : '推播已恢復', 'ok');
                 }
                 fetchHealth();
                 fetchAll();
@@ -669,10 +629,10 @@
         fetch('/ops/zones')
             .then(function (r) { return r.json(); })
             .then(function (z) {
-                var on = z.enabled && z.ntfy;
+                var on = z.enabled && z.ntfy && !z.muted;
                 var dot = document.querySelector('[data-role="zone-dot"]');
                 if (dot) dot.className = 'ops-state-dot ' + (on ? 'on' : 'off');
-                zSet('zone-label', !z.enabled ? 'DISABLED' : (z.ntfy ? 'ARMED' : 'ntfy unset'));
+                zSet('zone-label', !z.enabled ? 'DISABLED' : (!z.ntfy ? 'ntfy unset' : (z.muted ? 'MUTED' : 'ARMED')));
                 zSet('zone-auto', z.auto ? 'on' : 'off');
                 zSet('zone-tfs', z.tfs || '—');
                 var wrap = document.querySelector('[data-role="zone-armed"]');
@@ -768,42 +728,6 @@
             zoneLogToggle.textContent = 'show';
             if (zoneLogTimer) { clearInterval(zoneLogTimer); zoneLogTimer = null; }
         }
-    });
-
-    // ─── Monitor config apply ─────────────────────────────────────────
-    document.getElementById('ops-monitor-apply-config').addEventListener('click', function (e) {
-        var form = new URLSearchParams();
-        document.querySelectorAll('#ops-monitor-config-form input[name="tfs"]:checked').forEach(function (cb) {
-            form.append('tfs', cb.value);
-        });
-        var score = document.getElementById('ops-monitor-min-score').value;
-        var mtfs = document.getElementById('ops-monitor-min-tfs').value;
-        var mratio = document.getElementById('ops-monitor-min-ratio').value;
-        if (score) form.set('min_score', score);
-        if (mtfs)  form.set('min_tfs', mtfs);
-        // min_ratio: send even when "0" (means: disable). Empty string = don't touch.
-        if (mratio !== '') form.set('min_ratio', mratio);
-        if (!form.toString()) {
-            showToast('nothing to change', 'err');
-            return;
-        }
-        e.target.disabled = true;
-        fetch('/ops/config?service=trading-monitor', {
-            method: 'POST',
-            body: form,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-            .then(function (res) {
-                if (res.ok) {
-                    applyStatus(res.body);
-                    showToast('monitor config applied' + (res.body.active ? ' + restarted' : ''), 'ok');
-                } else {
-                    showToast('monitor config failed: ' + (res.body.error || 'unknown'), 'err');
-                }
-            })
-            .catch(function (err) { showToast('config error: ' + err, 'err'); })
-            .finally(function () { e.target.disabled = false; });
     });
 
     // ─── AI advisor model selector ────────────────────────────────────
