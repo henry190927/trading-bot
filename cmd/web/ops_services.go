@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/henry190927/trading-bot/heartbeat"
 	"github.com/henry190927/trading-bot/macro"
 	"github.com/henry190927/trading-bot/zone"
 
@@ -303,12 +304,23 @@ func (s *server) handleOpsServices(c *gin.Context) {
 		}
 	}
 	apiKeyOn := s.client != nil && s.client.APIKey != "" && s.client.APISecret != ""
+	loops := monitorLoops(zoneOnly, on, zoneCfg.Enabled, bracketOn, apiKeyOn, bracketMode)
+	monitorActive := false
+	for _, h := range svcs {
+		if h.Unit == "trading-monitor" {
+			monitorActive = h.Active
+		}
+	}
+	beat, beatErr := heartbeat.Read(heartbeat.Path())
 	c.JSON(http.StatusOK, gin.H{
 		"services":     svcs,
 		"ntfy":         gin.H{"on": on, "muted": muted},
 		"zone_only":    zoneOnly,
 		"zone_channel": gin.H{"enabled": zoneCfg.Enabled, "auto": zoneCfg.Auto, "tfs": zoneCfg.TFs},
-		"loops":        monitorLoops(zoneOnly, on, zoneCfg.Enabled, bracketOn, apiKeyOn, bracketMode),
+		"loops":        loops,
+		// Self-reported loop state, compared against `loops` above for the
+		// one-day side-by-side (see ops_heartbeat.go).
+		"heartbeat": buildHeartbeatView(beat, beatErr, loops, monitorActive, time.Now()),
 		// Price fan-out. drop_pct is the backpressure signal: broadcast
 		// silently discards a stale pending snapshot for a slow client, which
 		// is correct behaviour but was previously unobservable.

@@ -4947,6 +4947,17 @@ footer {
 .ops-loop code { font-weight: 700; min-width: 6.5em; }
 .ops-loop.off code { color: var(--text-dim); }
 .ops-loop-reason { color: var(--text-dim); font-size: var(--fs-xs); }
+/* Heartbeat side-by-side (temporary, see cmd/web/ops_heartbeat.go). */
+.ops-loop.mismatch { background: var(--wash-yellow); border-radius: 4px; }
+.ops-hb-badge {
+    font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
+    min-width: 6.5em; color: var(--text-dim);
+}
+.ops-hb-badge.hb-run     { color: var(--green); }
+.ops-hb-badge.hb-idle    { color: var(--yellow); }
+.ops-hb-badge.hb-stalled { color: var(--red); }
+.ops-hb-flag { color: var(--yellow); font-weight: 700; }
+.ops-dot-none { visibility: hidden; }
 .ops-state-label {
     font-weight: 700;
     font-family: ui-monospace, "SF Mono", "Menlo", monospace;
