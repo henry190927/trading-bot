@@ -70,8 +70,8 @@ func (s *server) handleTodayPage(c *gin.Context) {
 	openTrades := s.buildOpenTradeCards(ctx, nil)
 
 	// Daemon health.
-	daemons := make([]gin.H, 0, 3)
-	for _, svc := range []string{"trading-bot", "trading-monitor", "trading-web"} {
+	daemons := make([]gin.H, 0, 2)
+	for _, svc := range []string{"trading-monitor", "trading-web"} {
 		st := readDaemonStatus(svc)
 		daemons = append(daemons, gin.H{"name": svc, "active": st.Active, "state": st.State})
 	}

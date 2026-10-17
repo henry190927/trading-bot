@@ -42,18 +42,15 @@ func envPath() string {
 var validTFs = []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"}
 
 // allowedServices is the strict allowlist for any /ops/* action.
-// Sudoers on the VPS is scoped to these two units; anything else
-// would silently fail at the systemctl call but we reject early
-// for a cleaner error.
-var allowedServices = []string{"trading-bot", "trading-monitor"}
+// Sudoers on the VPS is scoped to this unit; anything else would
+// silently fail at the systemctl call but we reject early for a
+// cleaner error.
+var allowedServices = []string{"trading-monitor"}
 
 type opsStatus struct {
-	Service  string `json:"service"`
-	Active   bool   `json:"active"`
-	State    string `json:"state"` // "active" | "inactive" | "failed" | "unknown"
-	TF       string `json:"tf"`
-	MinScore int    `json:"min_score"`
-	EnvOK    bool   `json:"env_ok"` // false if envPath not readable (trading-bot only)
+	Service string `json:"service"`
+	Active  bool   `json:"active"`
+	State   string `json:"state"` // "active" | "inactive" | "failed" | "unknown"
 
 	// Monitor-specific config read from .env. Populated only when
 	// readDaemonStatus("trading-monitor") is called.
@@ -63,10 +60,9 @@ type opsStatus struct {
 	MonitorMinRatio float64  `json:"monitor_min_ratio"` // 0 = disabled (always emitted so UI can distinguish "off" from "unset")
 }
 
-// readDaemonStatus checks the running systemd unit + (for trading-bot)
-// the .env file. The monitor daemon takes its config from the systemd
-// unit's ExecStart flags, so .env-derived fields stay zero for it —
-// the template hardcodes the monitor's defaults.
+// readDaemonStatus checks the running systemd unit + the monitor's
+// MONITOR_* config in .env. Defaults baked into the binary apply when an
+// env var is missing.
 func readDaemonStatus(service string) opsStatus {
 	st := opsStatus{Service: service, State: "unknown"}
 
@@ -83,49 +79,37 @@ func readDaemonStatus(service string) opsStatus {
 	st.State = state
 	st.Active = state == "active"
 
-	// Both services read config from .env. trading-bot uses TRADING_*,
-	// trading-monitor uses MONITOR_*. Defaults baked into the binary
-	// apply when an env var is missing.
+	if service != "trading-monitor" {
+		return st
+	}
 	data, err := os.ReadFile(envPath())
 	if err != nil {
 		return st
 	}
-	st.EnvOK = true
 	for _, line := range strings.Split(string(data), "\n") {
-		switch service {
-		case "trading-bot":
-			switch {
-			case strings.HasPrefix(line, "TRADING_TF="):
-				st.TF = strings.TrimPrefix(line, "TRADING_TF=")
-			case strings.HasPrefix(line, "TRADING_MIN_SCORE="):
-				if v, err := strconv.Atoi(strings.TrimPrefix(line, "TRADING_MIN_SCORE=")); err == nil {
-					st.MinScore = v
+		switch {
+		case strings.HasPrefix(line, "MONITOR_TFS="):
+			raw := strings.TrimPrefix(line, "MONITOR_TFS=")
+			for _, t := range strings.Split(raw, ",") {
+				if t = strings.TrimSpace(t); t != "" {
+					st.MonitorTFs = append(st.MonitorTFs, t)
 				}
 			}
-		case "trading-monitor":
-			switch {
-			case strings.HasPrefix(line, "MONITOR_TFS="):
-				raw := strings.TrimPrefix(line, "MONITOR_TFS=")
-				for _, t := range strings.Split(raw, ",") {
-					if t = strings.TrimSpace(t); t != "" {
-						st.MonitorTFs = append(st.MonitorTFs, t)
-					}
-				}
-			case strings.HasPrefix(line, "MONITOR_MIN_SCORE="):
-				if v, err := strconv.Atoi(strings.TrimPrefix(line, "MONITOR_MIN_SCORE=")); err == nil {
-					st.MonitorMinScore = v
-				}
-			case strings.HasPrefix(line, "MONITOR_MIN_TFS="):
-				if v, err := strconv.Atoi(strings.TrimPrefix(line, "MONITOR_MIN_TFS=")); err == nil {
-					st.MonitorMinTFs = v
-				}
-			case strings.HasPrefix(line, "MONITOR_MIN_RATIO="):
-				if v, err := strconv.ParseFloat(strings.TrimPrefix(line, "MONITOR_MIN_RATIO="), 64); err == nil {
-					st.MonitorMinRatio = v
-				}
+		case strings.HasPrefix(line, "MONITOR_MIN_SCORE="):
+			if v, err := strconv.Atoi(strings.TrimPrefix(line, "MONITOR_MIN_SCORE=")); err == nil {
+				st.MonitorMinScore = v
+			}
+		case strings.HasPrefix(line, "MONITOR_MIN_TFS="):
+			if v, err := strconv.Atoi(strings.TrimPrefix(line, "MONITOR_MIN_TFS=")); err == nil {
+				st.MonitorMinTFs = v
+			}
+		case strings.HasPrefix(line, "MONITOR_MIN_RATIO="):
+			if v, err := strconv.ParseFloat(strings.TrimPrefix(line, "MONITOR_MIN_RATIO="), 64); err == nil {
+				st.MonitorMinRatio = v
 			}
 		}
 	}
+
 	// Fall back to baked-in defaults (matches cmd/monitor's flag defaults)
 	// so the UI shows current values when .env hasn't been touched yet.
 	if service == "trading-monitor" {
@@ -158,42 +142,12 @@ func zoneOnlyActive() bool {
 }
 
 // parseService extracts and validates the ?service= query param.
-// Defaults to trading-bot for backwards compatibility with existing
-// /ops/* calls that don't pass a service.
 func parseService(c *gin.Context) (string, error) {
-	svc := c.DefaultQuery("service", "trading-bot")
+	svc := c.DefaultQuery("service", "trading-monitor")
 	if !contains(allowedServices, svc) {
 		return "", fmt.Errorf("service must be one of: %s", strings.Join(allowedServices, ", "))
 	}
 	return svc, nil
-}
-
-// updateEnvConfig rewrites TRADING_TF and TRADING_MIN_SCORE in the .env file
-// in place. Leaves all other lines untouched. Returns an error if validation
-// fails or the file can't be written.
-func updateEnvConfig(tf string, minScore int) error {
-	if tf != "" && !contains(validTFs, tf) {
-		return fmt.Errorf("invalid tf %q (allowed: %s)", tf, strings.Join(validTFs, ", "))
-	}
-	if minScore != 0 && (minScore < 1 || minScore > 8) {
-		return fmt.Errorf("invalid min_score %d (allowed: 1-8)", minScore)
-	}
-
-	path := envPath()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read env: %w", err)
-	}
-	lines := strings.Split(string(data), "\n")
-	for i, line := range lines {
-		if tf != "" && strings.HasPrefix(line, "TRADING_TF=") {
-			lines[i] = "TRADING_TF=" + tf
-		}
-		if minScore != 0 && strings.HasPrefix(line, "TRADING_MIN_SCORE=") {
-			lines[i] = "TRADING_MIN_SCORE=" + strconv.Itoa(minScore)
-		}
-	}
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
 }
 
 // systemctlAction runs `sudo systemctl <action> <service>`. Both
@@ -240,9 +194,7 @@ func (s *server) handleOpsPage(c *gin.Context) {
 	}
 	c.HTML(http.StatusOK, "ops.html", gin.H{
 		"MonitorZoneOnly":  zoneOnly,
-		"Primary":          readDaemonStatus("trading-bot"),
 		"Monitor":          readDaemonStatus("trading-monitor"),
-		"ValidTFs":         validTFs,
 		"MonitorTFOptions": []string{"5m", "15m", "30m", "1h", "2h", "4h"},
 		"Zone":             zone.ReadConfig(),
 		"ZoneTFList":       zone.ReadConfig().TFList(),
@@ -375,34 +327,11 @@ func (s *server) handleOpsZoneLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"lines": lines})
 }
 
-// siblingOf returns the OTHER service in the trading-bot ↔ trading-monitor pair.
-// Used for the mutual-exclusion gate: at most one of the two can be active.
-func siblingOf(svc string) string {
-	switch svc {
-	case "trading-bot":
-		return "trading-monitor"
-	case "trading-monitor":
-		return "trading-bot"
-	}
-	return ""
-}
-
 func (s *server) handleOpsStart(c *gin.Context) {
 	svc, err := parseService(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-	// Mutex: refuse to start a service while its sibling is running.
-	// User must explicitly stop the running one first — prevents
-	// accidental duplicate notifications and double API spend.
-	if sib := siblingOf(svc); sib != "" {
-		if readDaemonStatus(sib).Active {
-			c.JSON(http.StatusConflict, gin.H{
-				"error": fmt.Sprintf("%s is currently active — stop it first to avoid running both simultaneously", sib),
-			})
-			return
-		}
 	}
 	if err := systemctlAction(svc, "start"); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -432,15 +361,6 @@ func (s *server) handleOpsRestart(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// Same mutex: restart on a stopped service is effectively a start.
-	if sib := siblingOf(svc); sib != "" {
-		if readDaemonStatus(sib).Active {
-			c.JSON(http.StatusConflict, gin.H{
-				"error": fmt.Sprintf("%s is currently active — stop it first before restarting %s", sib, svc),
-			})
-			return
-		}
-	}
 	if err := systemctlAction(svc, "restart"); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -449,53 +369,17 @@ func (s *server) handleOpsRestart(c *gin.Context) {
 	c.JSON(http.StatusOK, readDaemonStatus(svc))
 }
 
-// handleOpsConfig accepts config changes for either daemon and rewrites the
-// .env file, then restarts the affected service so the new values take effect.
-// Routes by ?service= query: trading-bot edits TRADING_TF + TRADING_MIN_SCORE;
-// trading-monitor edits MONITOR_TFS + MONITOR_MIN_SCORE + MONITOR_MIN_TFS + MONITOR_MIN_RATIO.
+// handleOpsConfig accepts monitor config changes and rewrites the .env file,
+// then restarts the monitor so the new values take effect: MONITOR_TFS +
+// MONITOR_MIN_SCORE + MONITOR_MIN_TFS + MONITOR_MIN_RATIO.
 func (s *server) handleOpsConfig(c *gin.Context) {
-	svc := c.DefaultQuery("service", "trading-bot")
+	svc := c.DefaultQuery("service", "trading-monitor")
 	switch svc {
-	case "trading-bot":
-		s.opsConfigBot(c)
 	case "trading-monitor":
 		s.opsConfigMonitor(c)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service"})
 	}
-}
-
-// opsConfigBot — existing TF + min-score editor for the primary daemon.
-func (s *server) opsConfigBot(c *gin.Context) {
-	tf := strings.TrimSpace(c.PostForm("tf"))
-	scoreStr := strings.TrimSpace(c.PostForm("min_score"))
-
-	var score int
-	if scoreStr != "" {
-		v, err := strconv.Atoi(scoreStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "min_score not an integer"})
-			return
-		}
-		score = v
-	}
-	if tf == "" && score == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "nothing to update — provide tf and/or min_score"})
-		return
-	}
-	if err := updateEnvConfig(tf, score); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	st := readDaemonStatus("trading-bot")
-	if st.Active {
-		if err := systemctlAction("trading-bot", "restart"); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "config_saved": true})
-			return
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	c.JSON(http.StatusOK, readDaemonStatus("trading-bot"))
 }
 
 // opsConfigMonitor — monitor-specific config: TFs (multi-checkbox),

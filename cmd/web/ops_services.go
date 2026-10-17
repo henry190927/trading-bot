@@ -36,7 +36,7 @@ import (
 
 // reportedServices are the units the health card covers, in display order.
 // trading-web is included for visibility only (see constraint 2 above).
-var reportedServices = []string{"trading-monitor", "trading-web", "trading-bot"}
+var reportedServices = []string{"trading-monitor", "trading-web"}
 
 type serviceHealth struct {
 	Unit     string `json:"unit"`
@@ -49,7 +49,7 @@ type serviceHealth struct {
 
 // readServiceHealth queries one unit unprivileged. A failing systemctl (unit
 // absent, dbus unavailable) degrades to state "unknown" rather than erroring
-// the whole panel — a missing trading-bot must not hide the monitor's row.
+// the whole panel — one missing unit must not hide the other rows.
 func readServiceHealth(unit string) serviceHealth {
 	h := serviceHealth{Unit: unit, State: "unknown", Enabled: "unknown", ReadOnly: unit == "trading-web"}
 

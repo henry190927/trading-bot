@@ -85,31 +85,6 @@
 </section>
 
 
-<!-- ── Primary daemon: trading-bot ── -->
-<section class="ops-svc-block" data-service="trading-bot">
-  <h2 class="ops-svc-title">
-    <span class="ops-svc-name">trading-bot</span>
-    <span class="ops-svc-tag">primary · 1h alerter</span>
-  </h2>
-  <div class="ops-status-card">
-    <div class="ops-status-row">
-      <span class="ops-state-dot {{if .Primary.Active}}on{{else}}off{{end}}" data-role="state-dot"></span>
-      <span class="ops-state-label" data-role="state-label">{{if .Primary.Active}}ACTIVE{{else}}{{or .Primary.State "unknown"}}{{end}}</span>
-      <span class="ops-state-flex"></span>
-      <span class="ops-config-pill">TF <strong data-role="tf">{{or .Primary.TF "—"}}</strong></span>
-      <span class="ops-config-pill">min-score <strong data-role="score">{{if .Primary.MinScore}}{{.Primary.MinScore}}{{else}}—{{end}}</strong></span>
-    </div>
-    {{if not .Primary.EnvOK}}
-      <div class="ops-warn">⚠ .env not readable at <code>/opt/trading/.env</code> — config edits disabled.</div>
-    {{end}}
-  </div>
-  <div class="ops-actions">
-    <button type="button" class="btn-ops btn-start" data-action="start" data-service="trading-bot">▶ Start</button>
-    <button type="button" class="btn-ops btn-stop" data-action="stop" data-service="trading-bot">■ Stop</button>
-    <button type="button" class="btn-ops btn-restart" data-action="restart" data-service="trading-bot">↻ Restart</button>
-  </div>
-</section>
-
 <!-- ── Secondary daemon: trading-monitor ── -->
 <section class="ops-svc-block" data-service="trading-monitor">
   <h2 class="ops-svc-title">
@@ -194,36 +169,6 @@
   </div>
 </section>
 
-<!-- Mutex banner — shown when the OTHER service is active -->
-<div id="ops-mutex-warn" class="ops-mutex-warn hidden" role="status">
-  ⚠ <span id="ops-mutex-msg">—</span> Only one of <code>trading-bot</code> / <code>trading-monitor</code> can run at a time. Stop the active one first.
-</div>
-
-<section class="ops-block">
-  <h2>trading-bot config <span class="hint">(restarts daemon if running)</span></h2>
-  <form id="ops-config-form" class="trade-form" onsubmit="return false;">
-    <div class="field-row">
-      <div class="field">
-        <label for="ops-tf">Timeframe</label>
-        <select name="tf" id="ops-tf">
-          <option value="">— keep current —</option>
-          {{$cur := .Primary.TF}}
-          {{range .ValidTFs}}
-            <option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>
-          {{end}}
-        </select>
-      </div>
-      <div class="field">
-        <label for="ops-min-score">min-score</label>
-        <input type="number" min="1" max="8" step="1" name="min_score" id="ops-min-score" value="{{if .Primary.MinScore}}{{.Primary.MinScore}}{{end}}" placeholder="—">
-      </div>
-    </div>
-    <div class="form-actions">
-      <button type="button" class="btn-primary" id="ops-apply-config">Apply config</button>
-    </div>
-  </form>
-</section>
-
 <section class="ops-block">
   <h2>trading-monitor config <span class="hint">(restarts monitor if running)</span></h2>
   {{if .MonitorZoneOnly}}
@@ -289,8 +234,7 @@
 <section class="ops-block">
   <h2>Live log <span class="hint">(tailing <code>journalctl -u &lt;service&gt; -f</code>)</span></h2>
   <div class="ops-log-tabs" role="tablist">
-    <button type="button" class="ops-log-tab active" data-log-service="trading-bot">trading-bot</button>
-    <button type="button" class="ops-log-tab" data-log-service="trading-monitor">trading-monitor</button>
+    <button type="button" class="ops-log-tab active" data-log-service="trading-monitor">trading-monitor</button>
   </div>
   <div class="ops-log-controls">
     <label class="ops-checkbox"><input type="checkbox" id="ops-autoscroll" checked> auto-scroll</label>
@@ -322,57 +266,15 @@
         }, 3500);
     }
 
-    // ─── Service state (last known) — drives mutex UI ─────────────────
-    var svcActive = { 'trading-bot': false, 'trading-monitor': false };
-
-    function applyMutexUI() {
-        // Each service's Start (and Restart-when-inactive) button is
-        // disabled when the OTHER service is active. Shows a banner
-        // explaining why.
-        var bot = svcActive['trading-bot'];
-        var mon = svcActive['trading-monitor'];
-        function setBtnState(blockSelector, action, disabled, tooltip) {
-            var btn = document.querySelector(blockSelector + ' [data-action="' + action + '"]');
-            if (!btn) return;
-            btn.disabled = disabled;
-            btn.title = tooltip || '';
-        }
-        setBtnState('.ops-svc-block[data-service="trading-bot"]', 'start', mon, mon ? 'trading-monitor is active — stop it first' : '');
-        setBtnState('.ops-svc-block[data-service="trading-bot"]', 'restart', mon && !bot, mon && !bot ? 'trading-monitor is active' : '');
-        setBtnState('.ops-svc-block[data-service="trading-monitor"]', 'start', bot, bot ? 'trading-bot is active — stop it first' : '');
-        setBtnState('.ops-svc-block[data-service="trading-monitor"]', 'restart', bot && !mon, bot && !mon ? 'trading-bot is active' : '');
-
-        var banner = document.getElementById('ops-mutex-warn');
-        var msg = document.getElementById('ops-mutex-msg');
-        if (bot && mon) {
-            // Shouldn't happen given the server-side mutex, but surface it.
-            msg.textContent = 'BOTH daemons are active.';
-            banner.classList.remove('hidden');
-        } else if (bot) {
-            msg.textContent = 'trading-bot is active.';
-            banner.classList.remove('hidden');
-        } else if (mon) {
-            msg.textContent = 'trading-monitor is active.';
-            banner.classList.remove('hidden');
-        } else {
-            banner.classList.add('hidden');
-        }
-    }
-
     // ─── Status refresh (per service) ──────────────────────────────────
     function applyStatus(s) {
         if (!s) return;
-        svcActive[s.service] = !!s.active;
         var block = document.querySelector('.ops-svc-block[data-service="' + s.service + '"]');
         if (!block) return;
         block.querySelector('[data-role="state-dot"]').className =
             'ops-state-dot ' + (s.active ? 'on' : 'off');
         block.querySelector('[data-role="state-label"]').textContent =
             (s.state || 'unknown').toUpperCase();
-        var tfEl = block.querySelector('[data-role="tf"]');
-        if (tfEl) tfEl.textContent = s.tf || '—';
-        var scoreEl = block.querySelector('[data-role="score"]');
-        if (scoreEl) scoreEl.textContent = s.min_score ? String(s.min_score) : '—';
         // Monitor-specific pills
         var mTFs = block.querySelector('[data-role="monitor-tfs"]');
         if (mTFs && s.monitor_tfs) mTFs.textContent = s.monitor_tfs.join('·');
@@ -385,7 +287,6 @@
             var r = Number(s.monitor_min_ratio || 0);
             mMinRatio.textContent = r > 0 ? r.toFixed(1) : 'off';
         }
-        applyMutexUI();
     }
 
     function fetchStatus(service) {
@@ -395,18 +296,8 @@
             .catch(function () {});
     }
     function fetchAll() {
-        fetchStatus('trading-bot');
         fetchStatus('trading-monitor');
     }
-    // Initial seed from server-rendered state, then live polling.
-    (function seedInitial() {
-        document.querySelectorAll('.ops-svc-block').forEach(function (block) {
-            var svc = block.getAttribute('data-service');
-            var dot = block.querySelector('[data-role="state-dot"]');
-            svcActive[svc] = dot && dot.classList.contains('on');
-        });
-        applyMutexUI();
-    })();
     setInterval(fetchAll, 5000);
 
     // ─── Health card: unit states + monitor loops + ntfy mute ─────────
@@ -924,32 +815,6 @@
             .finally(function () { e.target.disabled = false; });
     });
 
-    // ─── trading-bot Config apply ──────────────────────────────────────
-    document.getElementById('ops-apply-config').addEventListener('click', function (e) {
-        var tf = document.getElementById('ops-tf').value;
-        var score = document.getElementById('ops-min-score').value;
-        var form = new URLSearchParams();
-        if (tf) form.set('tf', tf);
-        if (score) form.set('min_score', score);
-        if (!form.toString()) {
-            showToast('nothing to change', 'err');
-            return;
-        }
-        e.target.disabled = true;
-        fetch('/ops/config?service=trading-bot', { method: 'POST', body: form, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-            .then(function (res) {
-                if (res.ok) {
-                    applyStatus(res.body);
-                    showToast('config applied' + (res.body.active ? ' + restarted' : ''), 'ok');
-                } else {
-                    showToast('config failed: ' + (res.body.error || 'unknown'), 'err');
-                }
-            })
-            .catch(function (err) { showToast('config error: ' + err, 'err'); })
-            .finally(function () { e.target.disabled = false; });
-    });
-
     // ─── SSE live log ─────────────────────────────────────────────────
     var logEl = document.getElementById('ops-log');
     var logStatus = document.getElementById('ops-log-status');
@@ -960,7 +825,7 @@
     });
 
     var es = null;
-    var logService = 'trading-bot';
+    var logService = 'trading-monitor';
     function connectLogs() {
         if (es) es.close();
         logStatus.textContent = 'connecting…';

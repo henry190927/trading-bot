@@ -8,7 +8,7 @@
 set -a; . /opt/trading/.env 2>/dev/null; set +a
 TOPIC="${NTFY_TOPIC}"; SERVER="${NTFY_SERVER:-https://ntfy.sh}"
 [ -z "$TOPIC" ] && exit 0
-SERVICES="trading-bot trading-monitor trading-web"
+SERVICES="trading-monitor trading-web"
 STATE=/opt/trading/.daemon-state
 touch "$STATE"
 
