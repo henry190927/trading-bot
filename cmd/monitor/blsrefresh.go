@@ -93,6 +93,7 @@ func runBLSRefresh(ctx context.Context) {
 		}
 	}
 
+	hb.Start("blsrefresh", blsRefreshTick, "BLS 經濟數據快取更新")
 	refresh()
 	tick := time.NewTicker(blsRefreshTick)
 	defer tick.Stop()
@@ -101,6 +102,7 @@ func runBLSRefresh(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+			hb.Tick("blsrefresh")
 			refresh()
 		}
 	}

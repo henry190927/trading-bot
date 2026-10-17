@@ -57,6 +57,7 @@ func runBinFutRefresh(ctx context.Context) {
 		}
 	}
 
+	hb.Start("binfutrefresh", binfutTick, "Binance 持倉資料快取更新")
 	refresh()
 	tick := time.NewTicker(binfutTick)
 	defer tick.Stop()
@@ -65,6 +66,7 @@ func runBinFutRefresh(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+			hb.Tick("binfutrefresh")
 			refresh()
 		}
 	}

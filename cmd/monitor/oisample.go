@@ -66,6 +66,7 @@ func runOISampler(ctx context.Context, client *bingx.Client) {
 	every := oiSampleInterval()
 	if every == 0 {
 		log.Printf("oisample: OI_SAMPLE_SEC=0 — sampler disabled, OI crowding warnings stay silent")
+		hb.Off("oisample", "OI_SAMPLE_SEC=0 → 沒啟動")
 		return
 	}
 
@@ -88,8 +89,10 @@ func runOISampler(ctx context.Context, client *bingx.Client) {
 	pruneTick := time.NewTicker(6 * time.Hour)
 	defer pruneTick.Stop()
 
+	hb.Start("oisample", every, "未平倉量取樣 → oi.jsonl")
 	cycle := 0
 	for {
+		hb.Tick("oisample")
 		ok, failed := sampleOICycle(ctx, client, shorts)
 		cycle++
 		// Always report failures; report success only hourly. A silent

@@ -90,10 +90,12 @@ type bracketState struct {
 func runBracketGuard(ctx context.Context, client *bingx.Client) {
 	if os.Getenv("MONITOR_BRACKET") == "0" {
 		log.Printf("bracket: MONITOR_BRACKET=0 — naked-position guard disabled")
+		hb.Off("bracket", "MONITOR_BRACKET=0 → 沒啟動")
 		return
 	}
 	if client == nil || client.APIKey == "" || client.APISecret == "" {
 		log.Printf("bracket: BingX API key/secret not configured — naked-position guard disabled")
+		hb.Off("bracket", "BINGX_API_KEY/SECRET 未設 → 沒啟動")
 		return
 	}
 
@@ -117,9 +119,15 @@ func runBracketGuard(ctx context.Context, client *bingx.Client) {
 	// Keyed "SYMBOL|side" because an orphan has no journal id to key on —
 	// that is what makes it an orphan.
 	orphan := map[string]*bracketState{}
+	reason := fmt.Sprintf("裸倉守衛 · 30s · mode=%s", mode)
+	if n == nil {
+		reason += " · NTFY 靜音 → 只有 log"
+	}
+	hb.Start("bracket", bracketPollEvery, reason)
 	tick := time.NewTicker(bracketPollEvery)
 	defer tick.Stop()
 	for {
+		hb.Tick("bracket")
 		bracketCycle(ctx, client, n, mode, state)
 		orphanCycle(ctx, client, n, orphan)
 		select {

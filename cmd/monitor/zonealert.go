@@ -98,6 +98,7 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 	topic := os.Getenv("NTFY_TOPIC")
 	if topic == "" {
 		log.Printf("zonealert: NTFY_TOPIC unset — zone alerts disabled")
+		hb.Off("zonealert", "NTFY_TOPIC 空白 → 沒啟動")
 		return
 	}
 	n := notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
@@ -109,6 +110,8 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 	var lastTFs string
 	log.Printf("zonealert: up — poll %s, config=%s, manual=%s", zonePollEvery, zone.ConfigPath(), zone.Path())
 
+	const zoneReason = "樞紐區/突破警報 · 25s 輪詢現價"
+	hb.Start("zonealert", zonePollEvery, zoneReason)
 	tick := time.NewTicker(zonePollEvery)
 	defer tick.Stop()
 	for {
@@ -121,10 +124,13 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 		// Live config — re-read each cycle so /ops toggles apply without
 		// a restart. Disabled → no fetches, no alerts (loop keeps running
 		// so re-enabling is live too).
+		hb.Tick("zonealert")
 		cfg := zone.ReadConfig()
 		if !cfg.Enabled {
+			hb.SetIdle("zonealert", true, "zone-config.json enabled=false → 每輪短路,不發警報")
 			continue
 		}
+		hb.SetIdle("zonealert", false, zoneReason)
 		if cfg.Auto {
 			tfKey := cfg.TFs
 			if time.Since(lastStruct) >= zoneStructEvery || tfKey != lastTFs {

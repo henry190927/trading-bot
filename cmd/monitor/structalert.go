@@ -24,6 +24,7 @@ func runStructureAlerts(ctx context.Context, client interface {
 	topic := os.Getenv("NTFY_TOPIC")
 	if topic == "" {
 		log.Printf("structalert: NTFY_TOPIC unset — structure alerts disabled")
+		hb.Off("structalert", "NTFY_TOPIC 空白 → 沒啟動")
 		return
 	}
 	n := notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
@@ -91,6 +92,7 @@ func runStructureAlerts(ctx context.Context, client interface {
 	}
 
 	log.Printf("structalert: up — core symbols on 1h/4h (BOS/CHoCH regime flips)")
+	hb.Start("structalert", 3*time.Minute, "結構事件(BOS/CHoCH)警報")
 	check()
 	tick := time.NewTicker(3 * time.Minute)
 	defer tick.Stop()
@@ -99,6 +101,7 @@ func runStructureAlerts(ctx context.Context, client interface {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+			hb.Tick("structalert")
 			check()
 		}
 	}
