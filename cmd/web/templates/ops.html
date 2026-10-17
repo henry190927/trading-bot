@@ -103,11 +103,7 @@
       <span class="ops-config-pill">min-ratio <strong data-role="monitor-minratio">{{if gt .Monitor.MonitorMinRatio 0.0}}{{printf "%.1f" .Monitor.MonitorMinRatio}}{{else}}off{{end}}</strong></span>
     </div>
   </div>
-  <div class="ops-actions">
-    <button type="button" class="btn-ops btn-start" data-action="start" data-service="trading-monitor">▶ Start</button>
-    <button type="button" class="btn-ops btn-stop" data-action="stop" data-service="trading-monitor">■ Stop</button>
-    <button type="button" class="btn-ops btn-restart" data-action="restart" data-service="trading-monitor">↻ Restart</button>
-  </div>
+  <div class="hint">重啟與原始日誌改由 SSH 執行:<code>ops restart monitor</code> · <code>ops logs monitor -f</code></div>
 </section>
 
 <!-- ── Zone-fade alerts (runs inside trading-monitor) ── -->
@@ -130,7 +126,6 @@
   <div class="ops-actions">
     <button type="button" class="btn-ops btn-start" data-zone-action="start">▶ Start</button>
     <button type="button" class="btn-ops btn-stop" data-zone-action="stop">■ Stop</button>
-    <button type="button" class="btn-ops btn-restart" data-zone-action="restart" title="restart trading-monitor">↻ Restart</button>
   </div>
 </section>
 
@@ -232,18 +227,6 @@
   </div>
 </section>
 
-<section class="ops-block">
-  <h2>Live log <span class="hint">(tailing <code>journalctl -u &lt;service&gt; -f</code>)</span></h2>
-  <div class="ops-log-tabs" role="tablist">
-    <button type="button" class="ops-log-tab active" data-log-service="trading-monitor">trading-monitor</button>
-  </div>
-  <div class="ops-log-controls">
-    <label class="ops-checkbox"><input type="checkbox" id="ops-autoscroll" checked> auto-scroll</label>
-    <button type="button" class="btn-secondary" id="ops-clear-log">clear</button>
-    <span id="ops-log-status" class="ops-log-status">connecting…</span>
-  </div>
-  <div id="ops-log" class="ops-log" aria-live="polite" aria-atomic="false"></div>
-</section>
 
 <div id="ops-toast" class="ops-toast hidden" role="status"></div>
 
@@ -728,13 +711,6 @@
             var act = btn.getAttribute('data-zone-action');
             btn.disabled = true;
             var done = function (ok, msg) { btn.disabled = false; showToast(msg, ok ? 'ok' : 'err'); fetchZones(); };
-            if (act === 'restart') {
-                fetch('/ops/restart?service=trading-monitor', { method: 'POST' })
-                    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                    .then(function (res) { done(res.ok, 'zone restart (trading-monitor) ' + (res.ok ? 'ok' : (res.body.error || 'failed'))); })
-                    .catch(function () { done(false, 'restart failed'); });
-                return;
-            }
             var body = new URLSearchParams();
             body.set('enabled', act === 'start' ? '1' : '0');
             fetch('/ops/zone-config', { method: 'POST', body: body })
@@ -794,33 +770,6 @@
         }
     });
 
-    // ─── Lifecycle buttons (per service) ───────────────────────────────
-    document.querySelectorAll('.btn-ops').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var action = btn.getAttribute('data-action');
-            var service = btn.getAttribute('data-service');
-            if (!action || !service) return; // zone buttons / log toggle handled elsewhere
-            btn.disabled = true;
-            var origText = btn.textContent;
-            btn.textContent = '…';
-            fetch('/ops/' + action + '?service=' + service, { method: 'POST' })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                .then(function (res) {
-                    if (res.ok) {
-                        applyStatus(res.body);
-                        showToast(service + ' ' + action + ' ok', 'ok');
-                    } else {
-                        showToast(service + ' ' + action + ' failed: ' + (res.body.error || 'unknown'), 'err');
-                    }
-                })
-                .catch(function (e) { showToast(action + ' failed: ' + e, 'err'); })
-                .finally(function () {
-                    btn.disabled = false;
-                    btn.textContent = origText;
-                });
-        });
-    });
-
     // ─── Monitor config apply ─────────────────────────────────────────
     document.getElementById('ops-monitor-apply-config').addEventListener('click', function (e) {
         var form = new URLSearchParams();
@@ -856,68 +805,6 @@
             .catch(function (err) { showToast('config error: ' + err, 'err'); })
             .finally(function () { e.target.disabled = false; });
     });
-
-    // ─── SSE live log ─────────────────────────────────────────────────
-    var logEl = document.getElementById('ops-log');
-    var logStatus = document.getElementById('ops-log-status');
-    var autoscroll = document.getElementById('ops-autoscroll');
-
-    document.getElementById('ops-clear-log').addEventListener('click', function () {
-        logEl.innerHTML = '';
-    });
-
-    var es = null;
-    var logService = 'trading-monitor';
-    function connectLogs() {
-        if (es) es.close();
-        logStatus.textContent = 'connecting…';
-        es = new EventSource('/ops/logs?service=' + logService);
-        es.onopen = function () { logStatus.textContent = 'streaming ' + logService; logStatus.className = 'ops-log-status ok'; };
-        es.onerror = function () {
-            logStatus.textContent = 'disconnected · retry 10s';
-            logStatus.className = 'ops-log-status err';
-            es.close();
-            es = null;
-            setTimeout(connectLogs, 10000);
-        };
-        es.onmessage = function (ev) {
-            var line = document.createElement('div');
-            line.className = 'ops-log-line ' + classifyLine(ev.data);
-            line.textContent = ev.data;
-            logEl.appendChild(line);
-            // Trim to most recent 500 lines to keep the DOM small.
-            while (logEl.childElementCount > 500) logEl.removeChild(logEl.firstChild);
-            if (autoscroll.checked) {
-                logEl.scrollTop = logEl.scrollHeight;
-            }
-        };
-    }
-
-    function classifyLine(s) {
-        // Heuristic colouring for journalctl output.
-        if (/FIRED|✓|score \d+ \[FIRED/.test(s)) return 'log-fired';
-        if (/skipped:|skip\b/.test(s))           return 'log-skip';
-        if (/ERROR|FAIL|panic|failed/i.test(s))  return 'log-err';
-        if (/shutting down|Stopped|Deactivat/i.test(s)) return 'log-warn';
-        if (/Started|listening on/i.test(s))     return 'log-info';
-        return '';
-    }
-
-    // Tab switcher: clicking a tab reconnects the SSE stream to the new service.
-    document.querySelectorAll('.ops-log-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            var svc = tab.getAttribute('data-log-service');
-            if (svc === logService) return;
-            logService = svc;
-            document.querySelectorAll('.ops-log-tab').forEach(function (t) {
-                t.classList.toggle('active', t === tab);
-            });
-            logEl.innerHTML = '';
-            connectLogs();
-        });
-    });
-
-    connectLogs();
 
     // ─── AI advisor model selector ────────────────────────────────────
     // GET current model + filtered available list, populate dropdown.

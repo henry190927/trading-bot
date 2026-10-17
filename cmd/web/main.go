@@ -189,10 +189,6 @@ func main() {
 	r.GET("/ops/zones", srv.handleOpsZones)
 	r.POST("/ops/zone-config", srv.handleOpsZoneConfig)
 	r.GET("/ops/zone-logs", srv.handleOpsZoneLogs)
-	r.GET("/ops/logs", srv.handleOpsLogs)
-	r.POST("/ops/start", srv.handleOpsStart)
-	r.POST("/ops/stop", srv.handleOpsStop)
-	r.POST("/ops/restart", srv.handleOpsRestart)
 	r.POST("/ops/config", srv.handleOpsConfig)
 	// ── Kubernetes probes ──────────────────────────────────────────────
 	//

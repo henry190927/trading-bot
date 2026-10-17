@@ -13,7 +13,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net/http"
@@ -175,10 +174,10 @@ func systemctlAction(service, action string) error {
 	return nil
 }
 
-// handleOpsPage renders the control panel HTML shell. Live status + logs
-// arrive via /ops/status (JSON polled by JS) and /ops/logs (SSE stream).
-// Both services are rendered side-by-side at first paint; the JS polls
-// each independently to refresh.
+// handleOpsPage renders the control panel HTML shell. The monitor's status
+// is rendered at first paint and refreshed by polling /ops/status. Service
+// restarts and raw logs are not on this page: they are an SSH job
+// (scripts/ops), so the web service needs no host privileges for them.
 func (s *server) handleOpsPage(c *gin.Context) {
 	// MONITOR_ZONE_ONLY=1 makes cmd/monitor return before the confluence loop,
 	// which is the ONLY consumer of MONITOR_TFS / MIN_SCORE / MIN_TFS /
@@ -323,48 +322,6 @@ func (s *server) handleOpsZoneLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"lines": lines, "skipped": skipped})
 }
 
-func (s *server) handleOpsStart(c *gin.Context) {
-	svc, err := parseService(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := systemctlAction(svc, "start"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	time.Sleep(500 * time.Millisecond) // let systemd settle
-	c.JSON(http.StatusOK, readDaemonStatus(svc))
-}
-
-func (s *server) handleOpsStop(c *gin.Context) {
-	svc, err := parseService(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := systemctlAction(svc, "stop"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	time.Sleep(500 * time.Millisecond)
-	c.JSON(http.StatusOK, readDaemonStatus(svc))
-}
-
-func (s *server) handleOpsRestart(c *gin.Context) {
-	svc, err := parseService(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := systemctlAction(svc, "restart"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	time.Sleep(500 * time.Millisecond)
-	c.JSON(http.StatusOK, readDaemonStatus(svc))
-}
-
 // handleOpsConfig accepts monitor config changes and rewrites the .env file,
 // then restarts the monitor so the new values take effect: MONITOR_TFS +
 // MONITOR_MIN_SCORE + MONITOR_MIN_TFS + MONITOR_MIN_RATIO.
@@ -497,65 +454,6 @@ func updateMonitorEnvConfig(tfs []string, minScore, minTFs int, minRatio *float6
 		}
 	}
 	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
-}
-
-// handleOpsLogs streams journalctl -u <service> -f over Server-Sent Events.
-// Initial backlog: last 50 lines. Then follows new entries in real time.
-// Closes cleanly when the client disconnects (Gin's request context cancels).
-func (s *server) handleOpsLogs(c *gin.Context) {
-	svc, err := parseService(c)
-	if err != nil {
-		c.String(http.StatusBadRequest, err.Error())
-		return
-	}
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache, no-transform")
-	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no") // disable proxy buffering if any
-
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
-		c.String(http.StatusInternalServerError, "streaming unsupported")
-		return
-	}
-
-	ctx := c.Request.Context()
-	// No sudo — adm group membership covers journal reads.
-	cmd := exec.CommandContext(ctx, "journalctl",
-		"-u", svc,
-		"-n", "50",
-		"-f",
-		"--no-pager",
-		"--output=short-iso")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		_, _ = fmt.Fprintf(c.Writer, "data: pipe error: %s\n\n", err.Error())
-		flusher.Flush()
-		return
-	}
-	if err := cmd.Start(); err != nil {
-		_, _ = fmt.Fprintf(c.Writer, "data: start error: %s\n\n", err.Error())
-		flusher.Flush()
-		return
-	}
-	defer func() { _ = cmd.Wait() }()
-
-	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 0, 4096), 1024*1024) // up to 1MB per line
-	for scanner.Scan() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-		// SSE format: "data: <line>\n\n". Newlines within the line must be
-		// split into multiple "data:" lines, but journalctl produces one
-		// log entry per line so this is safe.
-		_, _ = fmt.Fprintf(c.Writer, "data: %s\n\n", scanner.Text())
-		flusher.Flush()
-	}
-	// scanner.Err() typically returns "signal: killed" when context cancels;
-	// not worth surfacing to the client.
 }
 
 func contains(xs []string, x string) bool {
