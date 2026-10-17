@@ -1,0 +1,100 @@
+#!/bin/bash
+# ops — operator commands for the trading services, run on the VPS over SSH.
+#
+# This is where service control lives now that /ops (the web page) no longer
+# restarts units or streams raw logs: the web service should not hold host
+# privileges, and SSH (Tailscale + key + passphrase) is the stronger door.
+#
+# The interface is meant to outlive the implementation. Today it wraps
+# systemd; when the services move into containers only the bodies below
+# change, and `ops restart monitor` keeps meaning the same thing.
+#
+#   ops status                 unit state + monitor heartbeat summary
+#   ops restart monitor|web    restart a service (asks for the sudo password)
+#   ops logs monitor|web [-f] [N]
+#                              last N journal lines (default 50), -f to follow
+#   ops zone [N]               last N zone-alert events (default 20)
+set -euo pipefail
+
+DATA="${TRADING_DATA:-/opt/trading}"
+
+unit() {
+    case "${1:-}" in
+        monitor) echo trading-monitor ;;
+        web) echo trading-web ;;
+        *) echo "unknown service '${1:-}' (monitor|web)" >&2; exit 2 ;;
+    esac
+}
+
+cmd_status() {
+    for u in trading-monitor trading-web; do
+        printf '%-16s %s\n' "$u" "$(systemctl is-active "$u" || true)"
+    done
+    echo
+    python3 - "$DATA/monitor-heartbeat.json" <<'EOF'
+import json, re, sys, datetime
+# Go writes nanoseconds; Python 3.10's fromisoformat takes at most six digits.
+def ts(s): return datetime.datetime.fromisoformat(re.sub(r"(\.\d{6})\d+", r"\1", s))
+try:
+    b = json.load(open(sys.argv[1]))
+except FileNotFoundError:
+    print("heartbeat: no file"); sys.exit(0)
+now = datetime.datetime.now(datetime.timezone.utc)
+age = (now - ts(b["written_at"])).total_seconds()
+print("heartbeat: %s, written %ds ago, pid %d" % ("ALIVE" if age <= 60 else "STALE", age, b["pid"]))
+for n in sorted(b["loops"]):
+    l = b["loops"][n]
+    every = l.get("every_sec", 0)
+    tick = (now - ts(l["last_tick"])).total_seconds() if l.get("last_tick") else None
+    if not l["running"]:
+        st = "off"
+    elif every and tick is not None and tick > max(3 * every, 120):
+        st = "STALLED"
+    elif l.get("idle"):
+        st = "idle"
+    else:
+        st = "run"
+    t = "%5ds" % tick if tick is not None else "     -"
+    print("  %-8s %-14s %s  %s" % (st, n, t, l.get("reason", "")))
+EOF
+}
+
+cmd_restart() {
+    local u
+    u="$(unit "${1:-}")"
+    sudo systemctl restart "$u"
+    sleep 1
+    printf '%-16s %s\n' "$u" "$(systemctl is-active "$u" || true)"
+}
+
+cmd_logs() {
+    local u n=50 follow=()
+    u="$(unit "${1:-}")"
+    shift || true
+    for a in "$@"; do
+        case "$a" in
+            -f) follow=(-f) ;;
+            *[!0-9]*) echo "bad argument '$a'" >&2; exit 2 ;;
+            *) n="$a" ;;
+        esac
+    done
+    journalctl -u "$u" -n "$n" --no-pager "${follow[@]}"
+}
+
+cmd_zone() {
+    local n="${1:-20}"
+    tail -n "$n" "$DATA/zone-events.jsonl" 2>/dev/null | python3 -c '
+import json, sys
+for line in sys.stdin:
+    e = json.loads(line)
+    print(e["at"][5:19].replace("T", " "), "", e["text"])
+' || echo "no zone events"
+}
+
+case "${1:-}" in
+    status) cmd_status ;;
+    restart) cmd_restart "${2:-}" ;;
+    logs) shift; cmd_logs "$@" ;;
+    zone) cmd_zone "${2:-}" ;;
+    *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
