@@ -324,6 +324,231 @@ kubectl port-forward svc/x 8080:80   從筆電打進去
 
 ---
 
+## 📐 deployment.yaml 逐段解讀
+
+> 讀完名詞對照之後看這段。**每個欄位都說明「不寫會怎樣」** ——
+> 那才是理解一個設定存在理由的方式。
+
+### 每個 K8s 物件都是同一個形狀
+
+```yaml
+apiVersion: apps/v1     # 這個物件歸哪個 API 群組/版本管
+kind: Deployment        # 這是什麼東西
+metadata:               # 它叫什麼、貼什麼標籤
+  name: trading-web
+spec:                   # 你要的【目標狀態】
+  ...
+```
+
+⭐ **K8s 的核心心智模型:你描述「想要的樣子」,controller 持續把現實推向它。**
+不是「執行這些步驟」,是「維持這個狀態」。pod 被殺掉會自己長回來,
+因為你宣告的是 `replicas: 1`,不是「啟動一個容器」。
+
+### Deployment 的 spec
+
+```yaml
+spec:
+  replicas: 1
+```
+要幾份。**不寫預設是 1。** 這裡寫 1 是刻意的 —— 見上面「為什麼 replicas: 1」。
+
+```yaml
+  selector:
+    matchLabels:
+      app: trading-web
+```
+🔴 **這是整份檔案最容易誤解的地方。**
+Deployment **不是**靠名字管理 pod,是靠**標籤比對**。它去找所有帶
+`app: trading-web` 標籤的 pod,數一數夠不夠 `replicas`。
+
+→ 所以下面 `template.metadata.labels` 必須包含這組標籤,**否則 Deployment
+建出 pod 之後就認不得自己建的那些**,會無限建下去。
+(K8s 會擋這種設定,但理由值得知道。)
+
+```yaml
+  strategy:
+    type: Recreate
+```
+更新時怎麼換。`RollingUpdate`(預設)先起新的再殺舊的;`Recreate` 先殺乾淨再起。
+**這裡選 Recreate 是因為新舊兩個 pod 會同時連交易所 websocket、同時寫同一份狀態。**
+短暫斷線換取不重疊。
+
+### Pod template
+
+```yaml
+  template:
+    metadata:
+      labels:
+        app: trading-web      # ⭐ 必須對上上面的 selector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+```
+**不寫的話容器以 root 跑。** scratch 映像沒有 `/etc/passwd`,所以只能用數字 UID
+(寫 `runAsUser: nobody` 會解析失敗)。`runAsNonRoot: true` 是保險:
+萬一映像裡設定成 root,kubelet 會拒絕啟動而不是默默以 root 跑。
+
+### Container
+
+```yaml
+      containers:
+        - name: web
+          image: trading-web:scratch
+          imagePullPolicy: IfNotPresent
+```
+🔴 `IfNotPresent` 在本機 minikube 是**必要的**。
+預設的 `Always` 會去 registry 拉 —— 但 `trading-web:scratch` 只存在你本機,
+registry 上沒有,結果是 `ErrImagePull`。
+
+> 📌 冷知識:tag 是 `:latest` 時預設就是 `Always`,其他 tag 預設 `IfNotPresent`。
+> 這也是「生產不要用 `:latest`」的其中一個理由 —— 你不知道拉到的是哪一版。
+
+```yaml
+          ports:
+            - name: http
+              containerPort: 8080
+```
+⚠️ **這一段幾乎是純文件用途。** 容器監聽什麼 port 是程式決定的,寫在這裡
+**不會**讓它開 port、也不會擋掉沒宣告的 port。
+
+**但 `name: http` 有實際作用** —— 下面的 probe 和 Service 用名字引用它。
+以後改 port 只要改這一處。
+
+```yaml
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+```
+`readOnlyRootFilesystem: true` 之後,**任何要寫的路徑都必須明確掛出來**
+(下面的 volumeMounts)。scratch 本來就幾乎是空的,順手鎖死。
+
+### resources —— 兩個數字,兩種意義
+
+```yaml
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+```
+
+```
+requests  排程器用它【找節點】。宣告「我至少需要這麼多」,
+          節點的剩餘量不夠就不會把 pod 排上去。
+limits    硬上限。
+```
+
+🔴 **CPU 和記憶體超限的行為完全不同:**
+
+```
+CPU 超過 limit    → cgroup throttle,程式變慢但活著
+記憶體超過 limit  → kernel SIGKILL,沒有優雅關閉、沒有 log、defer 不執行
+```
+
+`100m` = 0.1 顆 CPU(m = millicore)。`Mi` 是 1024 進位,`M` 是 1000 進位 —— 混用會差 5%。
+
+**不寫 requests/limits 會怎樣?** pod 變成 `BestEffort` QoS ——
+節點記憶體吃緊時**第一個被殺**。而且排程器不知道你要多少,可能把你排到已經很擠的節點。
+
+### 三種探針
+
+```yaml
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 2
+            failureThreshold: 30
+```
+`2 × 30 = 60 秒`,這是**允許的最長啟動時間**。
+通過之前,liveness 和 readiness 都不會開始計算。
+
+**不寫會怎樣?** 啟動慢的服務會在開機途中被 liveness 殺掉 → 無限重啟。
+你的 app 啟動只要 2 秒,所以其實不需要 —— 但寫著是好習慣,
+而且未來若加上大量資料載入就不用回頭補。
+
+```yaml
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+```
+`10 × 3 = 約 30 秒`才會重啟。`failureThreshold: 3` 的意義是
+**不要因為單次抖動就殺掉容器**。
+
+```yaml
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+```
+⭐ **readiness 比 liveness 敏感是刻意的**(2 次 vs 3 次,5 秒 vs 10 秒)。
+
+```
+先停流量(可逆、無痛)  →  最後才重啟(破壞性)
+```
+
+這個不對稱是 probe 設計的核心直覺。
+
+### volumes
+
+```yaml
+          volumeMounts:
+            - name: state
+              mountPath: /opt/trading
+      volumes:
+        - name: state
+          emptyDir: {}
+```
+🔴 **`emptyDir` 隨 pod 消滅。** 這只適合展示。
+
+真要保留狀態得用 `PersistentVolumeClaim`,而那又會把 Deployment 推向
+`StatefulSet`(單一寫入者語意、穩定的網路識別)。
+
+**「要不要持久化」和「能不能水平擴展」是同一個問題的兩面。**
+
+```yaml
+      terminationGracePeriodSeconds: 30
+```
+收到 `SIGTERM` 後給多久優雅關閉,逾時就 `SIGKILL`。
+這個服務有 SSE 長連線和 gRPC 串流,需要時間讓它們收尾。
+
+### Service
+
+```yaml
+apiVersion: v1
+kind: Service
+spec:
+  type: ClusterIP
+  selector:
+    app: trading-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+```
+
+```
+type: ClusterIP   只有叢集【內部】打得到。對外要 NodePort / LoadBalancer / Ingress
+selector          ⭐ 又是標籤 —— Service 不知道 Deployment 存在,它只找標籤符合的 pod
+port: 80          Service 對外的 port
+targetPort: http  指向容器那個【具名】port(8080),不是寫死數字
+```
+
+⭐ **Service 和 Deployment 之間沒有直接關係。**
+它們只是剛好都用 `app: trading-web` 這個標籤。Service 找到的是
+**readiness 通過的 pod**,沒通過的會被放進 `notReadyAddresses`。
+
+這就是實驗 A 看到的現象:readiness 一失敗,`ENDPOINTS` 欄位就空了。
+
+
+---
+
 ## 重現
 
 ```bash
