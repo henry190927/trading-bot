@@ -225,6 +225,14 @@ func (s *server) handleOpsOI(c *gin.Context) {
 		spanMin = int(newest.Sub(oldest).Minutes())
 	}
 
+	// The reading in the request's language, from the quadrant code (the
+	// label above stays the Chinese one the tests pin).
+	tr := s.translator(langOf(c))
+	for _, r := range rows {
+		if q, _ := r["quadrant"].(string); q != "" {
+			r["reading"] = tr("oi.q." + q)
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"rows":           rows,
 		"bnFetchedTPE":   bnFetched(bfStore, tpe),

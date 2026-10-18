@@ -7013,3 +7013,21 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .cs-oi-body.oi-armed .cs-oi-read { color: var(--yellow); }
 .cs-oi-num { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-dim); }
 .cs-oi-bn { margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--border); font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-dim); }
+
+/* ── Settings page (phase 5) ─────────────────────────────────────── */
+.ops-push-state { font-weight: 600; font-size: var(--fs-md); margin-bottom: var(--sp-1); }
+.ops-push-state.on { color: var(--green); } .ops-push-state.off { color: var(--text-dim); }
+.ops-exp { margin-bottom: var(--sp-2); }
+.ops-line { margin-top: var(--sp-1); }
+.ops-field { display: flex; flex-direction: column; gap: var(--sp-1); }
+.ops-field select { height: 34px; padding: 0 var(--sp-3); border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+.ops-zone-state { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; padding: 2px 8px; border-radius: 4px; background: var(--chip); border: 1px solid var(--chip-border); }
+.ops-zone-state.on { color: var(--green); border-color: rgba(var(--green-rgb), .45); }
+.ops-zone-cfg { display: flex; flex-direction: column; gap: var(--sp-3); padding-bottom: var(--sp-3); margin-bottom: var(--sp-3); border-bottom: 1px solid var(--border); }
+.ops-check { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.ops-tfs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.ops-tf { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); font-family: var(--mono); font-size: var(--fs-sm); cursor: pointer; }
+.ops-tf:has(input:checked) { border-color: var(--blue); background: var(--wash-blue); }
+.ops-zone-log { margin: var(--sp-2) 0 0; max-height: 260px; overflow: auto; font-family: var(--mono); font-size: var(--fs-xs); white-space: pre-wrap; color: var(--text); }
+.ops-read { white-space: normal !important; min-width: 200px; font-size: var(--fs-sm); }
+.ui-btn:disabled { opacity: .45; cursor: not-allowed; }

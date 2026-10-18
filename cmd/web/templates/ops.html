@@ -5,286 +5,201 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>設定 · trading-web</title>
+<title>{{t "tab.settings"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<main>
+{{/* Settings: the runtime switches the trader flips from a phone — push
+     mute, the zone-fade channel, the AI model — plus read-only account
+     views. System health is the alert bell's job (alerts.go), and service
+     restarts and raw logs are an SSH job (scripts/ops). Everything this
+     page writes lands in files under /opt/trading; it never edits .env. */}}
+<main class="ui-page">
+  <p class="ui-sub" style="margin:0">{{t "ops.lead"}}</p>
 
-<h1 class="page-title">設定</h1>
-<p class="hint">系統健康不在這頁:出事時 🔔(桌機在側欄頂端、手機在上方列)會通知,完整紀錄在 <a href="/alerts">/alerts</a>。服務重啟與原始日誌走 SSH(<code>ops restart monitor</code> · <code>ops logs monitor -f</code>)。</p>
+  <div class="ui-cols ui-cols-even">
+    <div class="ui-col">
+      {{/* Push mute. Writes monitorcfg, which the monitor re-reads on
+           every send: nothing restarts. */}}
+      <section class="ui-card">
+        <header class="ui-card-h"><h2>{{template "icon" "bell"}}{{t "ops.push"}}</h2>
+          <button type="button" class="ui-btn ghost" style="margin-top:0" id="ops-ntfy-toggle" disabled>—</button></header>
+        <div class="ops-push-state" id="ops-ntfy-state">—</div>
+        <div class="ui-sub" id="ops-ntfy-note"></div>
+      </section>
 
-<!-- ── Push + account ──
-     The service/loop/feed health that used to open this card is the alert
-     bell now (alerts.go): it tells you when something breaks instead of
-     waiting to be looked at. -->
-<section class="ops-health" id="ops-health">
-  <h2 class="ops-svc-title">
-    <span class="ops-svc-name">推播與帳戶</span>
-    <span class="ops-svc-tag">ntfy · 曝險 · OI</span>
-  </h2>
+      {{/* Account exposure. Equity alone cannot say whether a book is
+           survivable: the pair that closed the account on 2026-09-08 was
+           16,463u of notional, unremarkable next to a large balance and fatal
+           next to 139.66u. Account leverage = notional / equity, and the kill
+           distance is its reciprocal — the adverse move that takes equity to
+           zero, in the same unit a chart is read in. */}}
+      <section class="ui-card">
+        <header class="ui-card-h"><h2>{{template "icon" "wallet"}}{{t "ops.exposure"}}</h2><span class="ui-sub">{{t "ops.exposureSub"}}</span></header>
+        <div id="ops-health-exposure"><span class="ui-dim">{{t "common.loading"}}</span></div>
+      </section>
+    </div>
 
-  <div class="ops-health-ntfy" id="ops-health-ntfy">
-    <span class="ops-ntfy-state" id="ops-ntfy-state">—</span>
-    <span class="ops-state-flex"></span>
-    <button type="button" class="btn-ops" id="ops-ntfy-toggle" disabled>—</button>
+    <div class="ui-col">
+      {{/* AI model. The choice is persisted to /opt/trading/ai_model.txt
+           and survives a restart. */}}
+      <section class="ui-card">
+        <header class="ui-card-h"><h2>{{template "icon" "pulse"}}{{t "ops.ai"}}</h2><span class="ops-ai-provider ui-tag" id="ops-ai-provider">—</span></header>
+        <label class="ops-field">
+          <span class="ui-dim ui-sm">{{t "ops.aiModel"}}</span>
+          <select id="ops-ai-model" disabled><option value="">{{t "common.loading"}}</option></select>
+        </label>
+        <div class="ui-sub" id="ops-ai-model-hint" style="margin-top:var(--sp-2)">{{t "ops.aiHint"}}</div>
+      </section>
+
+      {{/* Zone-fade alerts run inside trading-monitor; the config applies
+           live (re-read every 25s). */}}
+      <section class="ui-card" id="ops-zone-block">
+        <header class="ui-card-h"><h2>{{template "icon" "flag"}}{{t "ops.zones"}}</h2>
+          <span class="ops-zone-state" data-role="zone-label">{{if .Zone.Enabled}}{{t "ops.zoneArmed"}}{{else}}{{t "ops.zoneOff"}}{{end}}</span></header>
+        <div class="ops-zone-cfg">
+          <label class="ops-check"><input type="checkbox" id="zone-auto-in" {{if .Zone.Auto}}checked{{end}}> <span>{{t "ops.zoneAuto"}}</span></label>
+          <div class="ops-tfs" role="group" aria-label="{{t "ops.zoneTFs"}}">
+            <span class="ui-dim ui-sm">{{t "ops.zoneTFs"}}</span>
+            {{$zoneTFs := .ZoneTFList}}
+            {{range $opt := .ZoneTFOptions}}
+              <label class="ops-tf"><input type="checkbox" name="tfs" value="{{$opt}}" {{range $sel := $zoneTFs}}{{if eq (printf "%s" $sel) $opt}}checked{{end}}{{end}}><span>{{$opt}}</span></label>
+            {{end}}
+          </div>
+          <div class="ui-detail-actions">
+            <button type="button" class="ui-btn" style="margin-top:0" id="ops-zone-apply">{{t "ops.zoneApply"}}</button>
+            <button type="button" class="ui-btn ghost" style="margin-top:0" data-zone-action="start">{{t "ops.zoneStart"}}</button>
+            <button type="button" class="ui-btn ghost ui-danger" style="margin-top:0" data-zone-action="stop">{{t "ops.zoneStop"}}</button>
+          </div>
+          <div class="ui-sub">{{t "ops.zoneLive"}}</div>
+        </div>
+        <div class="ops-zone-armed" data-role="zone-armed"><span class="ui-dim">{{t "common.loading"}}</span></div>
+        <details class="ui-howto" id="ops-zone-logwrap"><summary>{{t "ops.zoneLog"}}</summary><pre class="ops-zone-log" id="ops-zone-log">—</pre></details>
+      </section>
+    </div>
   </div>
-  <div class="hint ops-ntfy-note" id="ops-ntfy-note"></div>
 
-  <!-- Account exposure. Equity alone cannot say whether a book is
-       survivable: the pair that closed the account on 2026-09-08 was 16,463u
-       of notional, unremarkable next to a large balance and fatal next to
-       139.66u. 帳戶槓桿 = 名目/權益, and 歸零距離 is its reciprocal — the
-       adverse move that takes equity to zero, in the same unit a chart is
-       read in. Neither figure existed anywhere in the system before. -->
-  <div class="ops-health-loops">
-    <div class="ops-loops-title">帳戶曝險 <span class="ops-svc-tag">名目/權益 · 唯讀 · 兩個 signed GET</span></div>
-    <div class="ops-stream-grid" id="ops-health-exposure"><span class="hint">載入中…</span></div>
-  </div>
-
-  <div class="ops-health-loops">
-    <div class="ops-loops-title">OI Δ / funding <span class="ops-svc-tag">持倉量 1h 變化 · 讀本地快照 · 零 API 呼叫</span></div>
-    <div id="oi-note" class="hint">載入中…</div>
+  {{/* OI Δ / funding: the readout the engine only shows as an annotation
+       on a Long/Short signal. Local snapshots only, zero API calls. */}}
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "research"}}{{t "ops.oi"}}</h2><span class="ui-sub" id="oi-note">{{t "common.loading"}}</span></header>
     <div id="oi-host"></div>
-  </div>
-
-</section>
-
-
-<!-- ── Zone-fade alerts (runs inside trading-monitor) ── -->
-<section class="ops-svc-block" id="ops-zone-block">
-  <h2 class="ops-svc-title">
-    <span class="ops-svc-name">zone-fade alerts</span>
-    <span class="ops-svc-tag">runs in trading-monitor · ntfy</span>
-  </h2>
-  <div class="ops-status-card">
-    <div class="ops-status-row">
-      <span class="ops-state-dot {{if .Zone.Enabled}}on{{else}}off{{end}}" data-role="zone-dot"></span>
-      <span class="ops-state-label" data-role="zone-label">{{if .Zone.Enabled}}ARMED{{else}}DISABLED{{end}}</span>
-      <span class="ops-state-flex"></span>
-      <span class="ops-config-pill">auto <strong data-role="zone-auto">{{if .Zone.Auto}}on{{else}}off{{end}}</strong></span>
-      <span class="ops-config-pill" title="TFs 只餵給自動樞紐區推導 (zone.ComputeAuto);auto 關閉時不影響手動區">TFs <strong data-role="zone-tfs">{{.Zone.TFs}}</strong>{{if not .Zone.Auto}} <span class="ops-na">· auto 關閉,不適用</span>{{end}}</span>
-      <span class="ops-config-pill">poll <strong data-role="zone-poll">25s</strong></span>
-    </div>
-    <div class="ops-zone-armed" data-role="zone-armed"><span class="ops-zone-hint">loading…</span></div>
-  </div>
-  <div class="ops-actions">
-    <button type="button" class="btn-ops btn-start" data-zone-action="start">▶ Start</button>
-    <button type="button" class="btn-ops btn-stop" data-zone-action="stop">■ Stop</button>
-  </div>
-</section>
-
-<section class="ops-block">
-  <h2>zone-fade config <span class="hint">(applies live — monitor re-reads every 25s, no restart)</span></h2>
-  <form id="ops-zone-config-form" class="trade-form" onsubmit="return false;">
-    <div class="field">
-      <label>Auto fade-zone TFs <span class="hint">(structure-derived; 1h,2h recommended)</span></label>
-      {{$zoneTFs := .ZoneTFList}}
-      <div class="ops-tf-checkboxes">
-        {{range $opt := .ZoneTFOptions}}
-          <label class="ops-tf-check">
-            <input type="checkbox" name="tfs" value="{{$opt}}"
-              {{range $sel := $zoneTFs}}{{if eq (printf "%s" $sel) $opt}}checked{{end}}{{end}}>
-            <span>{{$opt}}</span>
-          </label>
-        {{end}}
-      </div>
-    </div>
-    <div class="field">
-      <label class="ops-tf-check ops-zone-autorow">
-        <input type="checkbox" id="zone-auto-in" {{if .Zone.Auto}}checked{{end}}>
-        <span>auto — 從結構自動導出 fade 區（關掉則只用手動 zones.json）</span>
-      </label>
-    </div>
-    <div class="form-actions">
-      <button type="button" class="btn-primary" id="ops-zone-apply">Apply config</button>
-    </div>
-  </form>
-
-  <div class="ops-zone-logwrap">
-    <div class="ops-zone-logbar">
-      <span>zone log</span>
-      <button type="button" class="btn-ops" id="ops-zone-logtoggle">show</button>
-    </div>
-    <pre class="ops-zone-log hidden" id="ops-zone-log">—</pre>
-  </div>
-</section>
-
-<section class="ops-block">
-  <h2>AI advisor model <span class="hint">(applies to /ai/analyze/* endpoints)</span></h2>
-  <div class="field-row">
-    <div class="field">
-      <label for="ops-ai-model">Active model</label>
-      <select id="ops-ai-model" disabled>
-        <option value="">— loading —</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Provider</label>
-      <span class="ops-config-pill" id="ops-ai-provider">—</span>
-    </div>
-  </div>
-  <div class="hint" id="ops-ai-model-hint" style="margin-top: 0.4rem;">
-    Change takes effect immediately for new Analyze clicks. Choice persisted to <code>/opt/trading/ai_model.txt</code>, survives restart.
-  </div>
-</section>
-
-
-<div id="ops-toast" class="ops-toast hidden" role="status"></div>
-
+  </section>
 </main>
-
-<footer>
-  <span>Tailscale-only · 設定寫入 <code>/opt/trading</code> 的設定檔,不改 .env</span>
-</footer>
 
 <script>
 (function () {
-    // ─── Toast ────────────────────────────────────────────────────────
-    var toast = document.getElementById('ops-toast');
-    var toastTimer = null;
-    function showToast(msg, kind) {
-        toast.textContent = msg;
-        toast.className = 'ops-toast ' + (kind || 'info');
-        if (toastTimer) clearTimeout(toastTimer);
-        toastTimer = setTimeout(function () {
-            toast.classList.add('hidden');
-        }, 3500);
-    }
+    var CT = {
+        pushOff: {{t "ops.pushOff"}}, pushMuted: {{t "ops.pushMuted"}}, pushOn: {{t "ops.pushOn"}},
+        unmute: {{t "ops.unmute"}}, mute: {{t "ops.mute"}},
+        noteCfgErr: {{t "ops.noteCfgErr"}}, noteNoTopic: {{t "ops.noteNoTopic"}}, noteMuted: {{t "ops.noteMuted"}}, noteOn: {{t "ops.noteOn"}},
+        confirmMute: {{t "ops.confirmMute"}}, confirmUnmute: {{t "ops.confirmUnmute"}},
+        toggleFailed: {{t "ops.toggleFailed"}}, noChange: {{t "ops.noChange"}}, muted: {{t "ops.muted"}}, unmuted: {{t "ops.unmuted"}},
+        unreadable: {{t "ops.unreadable"}},
+        equity: {{t "ops.equity"}}, usedMargin: {{t "ops.usedMargin"}}, positions: {{t "ops.positions"}}, notional: {{t "ops.notional"}},
+        acctLev: {{t "trades.acctLev"}}, kill: {{t "trades.kill"}}, open: {{t "ops.openLegs"}},
+        caps: {{t "ops.caps"}}, capWarn: {{t "ops.capWarn"}}, capNotional: {{t "ops.capNotional"}}, capCount: {{t "ops.capCount"}}, none: {{t "ops.none"}},
+        noCaps: {{t "ops.noCaps"}}, every60: {{t "ops.every60"}},
+        oiNote: {{t "ops.oiNote"}}, oiBnCache: {{t "ops.oiBnCache"}}, oiBnNone: {{t "ops.oiBnNone"}}, oiShallow: {{t "ops.oiShallow"}},
+        oiNoSnap: {{t "ops.oiNoSnap"}}, oiStatic: {{t "ops.oiStatic"}}, shortsPay: {{t "ops.shortsPay"}}, longsPay: {{t "ops.longsPay"}},
+        retailLonger: {{t "ops.retailLonger"}}, retailShorter: {{t "ops.retailShorter"}},
+        thSym: {{t "th.symbol"}}, thOI1h: {{t "ops.thOI1h"}}, thPx1h: {{t "ops.thPx1h"}}, thFunding: {{t "th.funding"}},
+        thBN: {{t "ops.thBN"}}, thBNTip: {{t "ops.thBNTip"}}, thWhale: {{t "ops.thWhale"}}, thWhaleTip: {{t "ops.thWhaleTip"}}, thRead: {{t "ops.thRead"}},
+        zoneArmed: {{t "ops.zoneArmed"}}, zoneOff: {{t "ops.zoneOff"}}, zoneNoNtfy: {{t "ops.zoneNoNtfy"}}, zoneMuted: {{t "ops.zoneMuted"}},
+        zoneNone: {{t "ops.zoneNone"}}, zoneSaved: {{t "ops.zoneSaved"}}, zoneFailed: {{t "ops.zoneFailed"}},
+        zoneStarted: {{t "ops.zoneStarted"}}, zoneStopped: {{t "ops.zoneStopped"}}, zoneNoEvents: {{t "ops.zoneNoEvents"}}, zoneSkipped: {{t "ops.zoneSkipped"}},
+        cTouch: {{t "ops.c.touch"}}, cCloseIn: {{t "ops.c.closeIn"}}, cCloseAbove: {{t "ops.c.closeAbove"}}, cCloseBelow: {{t "ops.c.closeBelow"}},
+        long: {{t "chart.js.q.long"}}, short: {{t "chart.js.q.short"}}, watch: {{t "ops.watch"}},
+        aiLoadFailed: {{t "ops.aiLoadFailed"}}, aiNoModels: {{t "ops.aiNoModels"}}, aiSet: {{t "ops.aiSet"}}, aiSaveFailed: {{t "ops.aiSaveFailed"}}, netErr: {{t "ops.netErr"}}
+    };
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+    function toast(msg, kind) { if (window.toast) window.toast(msg, kind); }
 
     // ─── Push mute ────────────────────────────────────────────────────
     var ntfyBusy = false;
     function renderHealth(d) {
         var nt = d.ntfy || {};
-        var live = nt.on && !nt.muted;
         var st = document.getElementById('ops-ntfy-state');
-        st.textContent = !nt.on ? '⚪ 推播未設定' : (nt.muted ? '🔇 推播靜音' : '🔔 推播開啟');
-        st.className = 'ops-ntfy-state ' + (live ? 'on' : 'off');
-
+        st.textContent = !nt.on ? CT.pushOff : (nt.muted ? CT.pushMuted : CT.pushOn);
+        st.className = 'ops-push-state ' + (nt.on && !nt.muted ? 'on' : 'off');
         var btn = document.getElementById('ops-ntfy-toggle');
-        btn.textContent = nt.muted ? '🔔 取消靜音' : '🔇 靜音';
+        btn.textContent = nt.muted ? CT.unmute : CT.mute;
         btn.disabled = ntfyBusy || !nt.on;
         btn.dataset.mute = nt.muted ? '0' : '1';
-
         var note = document.getElementById('ops-ntfy-note');
-        if (nt.error) {
-            note.textContent = '⚠ monitor-config 讀不到:' + nt.error + ' — monitor 會維持推播開啟。';
-        } else if (!nt.on) {
-            note.textContent = 'NTFY_TOPIC 未設定 — 要在 .env 設定(SSH),網頁不改 .env。';
-        } else if (nt.muted) {
-            note.textContent = '靜音中:所有迴圈照跑、zone 觸發照樣記錄,只是不推到手機;頁面上的 🔔 告警照常。取消靜音立即生效。';
-        } else {
-            note.textContent = '靜音只跳過推播,不重啟 monitor、不改 .env;迴圈照跑。';
-        }
+        if (nt.error) note.textContent = CT.noteCfgErr + ' ' + nt.error;
+        else if (!nt.on) note.textContent = CT.noteNoTopic;
+        else if (nt.muted) note.textContent = CT.noteMuted;
+        else note.textContent = CT.noteOn;
     }
+    function fetchHealth() {
+        fetch('/ops/services?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.json(); }).then(renderHealth).catch(function () {});
+    }
+    document.getElementById('ops-ntfy-toggle').addEventListener('click', function () {
+        var mute = this.dataset.mute === '1';
+        if (!confirm(mute ? CT.confirmMute : CT.confirmUnmute)) return;
+        ntfyBusy = true; this.disabled = true;
+        fetch('/ops/ntfy', { method: 'POST', body: new URLSearchParams({ mute: mute ? '1' : '0' }) })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                ntfyBusy = false;
+                if (!res.ok || res.j.error) toast(res.j.error || CT.toggleFailed, 'err');
+                else if (res.j.changed === false) toast(CT.noChange, 'info');
+                else toast(res.j.muted ? CT.muted : CT.unmuted, 'ok');
+                fetchHealth();
+            })
+            .catch(function (e) { ntfyBusy = false; toast(CT.toggleFailed + ' ' + e, 'err'); fetchHealth(); });
+    });
 
-    // Exposure comes from /ops/balance, not /ops/services — it is two signed
-    // exchange calls and does not belong on the services poll.
-    function fmtU(v) {
-        if (v === null || v === undefined) return '—';
-        return Math.round(v).toLocaleString('en-US') + 'u';
-    }
+    // ─── Account exposure (two signed exchange calls, its own 60s timer) ──
+    function fmtU(v) { return (v === null || v === undefined) ? '—' : Math.round(v).toLocaleString('en-US') + 'u'; }
     function renderExposure(d) {
         var el = document.getElementById('ops-health-exposure');
-        if (!d || d.error) {
-            el.innerHTML = '<span class="hint">讀不到:' + ((d && d.error) || 'no data') + '</span>';
-            return;
-        }
+        if (!d || d.error) { el.innerHTML = '<span class="ui-dim">' + esc(CT.unreadable + ' ' + ((d && d.error) || '')) + '</span>'; return; }
         var e = d.exposure || {}, lim = d.limits || {};
         var eq = (d.equity !== null && d.equity !== undefined) ? d.equity : d.balance;
         var lev = e.accountLeverage || 0, kill = e.killDistancePct || 0;
         // Colour on the kill distance, not the leverage: 0.85% is inside one
         // ordinary 1h candle (19% of BTC bars, 34% of ETH bars exceed it),
         // 2% is a bad day, 5% is room.
-        var cls = 'on';
-        if (lev > 0) cls = kill < 1 ? 'fail' : (kill < 2.5 ? 'off' : 'on');
+        var cls = '';
+        if (lev > 0) cls = kill < 1 ? 'ui-down' : (kill < 2.5 ? 'ui-warn' : 'ui-up');
         var cells = [
-            ['權益', eq === null || eq === undefined ? '—' : (eq.toFixed(2) + 'u')],
-            ['已用保證金', fmtU(d.usedMargin)],
-            ['部位數', String(e.openCount || 0)],
-            ['總名目', fmtU(e.openNotionalU)],
-            ['帳戶槓桿', lev > 0 ? lev.toFixed(1) + 'x' : '—'],
-            ['歸零距離', kill > 0 ? kill.toFixed(3) + '%' : '—']
+            [CT.equity, eq === null || eq === undefined ? '—' : eq.toFixed(2) + 'u', ''],
+            [CT.usedMargin, fmtU(d.usedMargin), ''],
+            [CT.positions, String(e.openCount || 0), ''],
+            [CT.notional, fmtU(e.openNotionalU), ''],
+            [CT.acctLev, lev > 0 ? lev.toFixed(1) + '×' : '—', cls],
+            [CT.kill, kill > 0 ? kill.toFixed(3) + '%' : '—', cls]
         ];
-        var html = cells.map(function (c) {
-            var extra = (c[0] === '歸零距離' || c[0] === '帳戶槓桿') ? ' ' + cls : '';
-            return '<div class="ops-hsvc"><span class="ops-hsvc-name">' + c[0] + '</span>'
-                 + '<span class="ops-hsvc-state' + extra + '">' + c[1] + '</span></div>';
-        }).join('');
-        if ((e.legs || []).length) {
-            html += '<div class="hint" style="grid-column:1/-1">開倉:' + e.legs.join(' · ') + '</div>';
-        }
+        var html = '<div class="ui-statrow ops-exp">' + cells.map(function (c) {
+            return '<div><span class="ui-dim ui-sm">' + c[0] + '</span><b class="ui-num ' + c[2] + '">' + c[1] + '</b></div>';
+        }).join('') + '</div>';
+        if ((e.legs || []).length) html += '<div class="ui-sub ops-line">' + CT.open + ' ' + esc(e.legs.join(' · ')) + '</div>';
         var capTxt = lim.anySet
-            ? ('上限 ' + (lim.maxAccountLev > 0 ? lim.maxAccountLev.toFixed(1) + 'x' : '無')
-               + ' · 警告 ' + (lim.warnAccountLev > 0 ? lim.warnAccountLev.toFixed(1) + 'x' : '無')
-               + ' · 名目 ' + (lim.maxNotionalUSDT > 0 ? fmtU(lim.maxNotionalUSDT) : '無')
-               + ' · 倉數 ' + (lim.maxConcurrent > 0 ? lim.maxConcurrent : '無'))
-            : '未設任何上限(RISK_MAX_ACCOUNT_LEV / RISK_WARN_ACCOUNT_LEV / RISK_MAX_NOTIONAL_USDT / RISK_MAX_CONCURRENT)—— 手動下單不會被擋';
-        html += '<div class="hint" style="grid-column:1/-1">' + capTxt + '</div>';
-        (e.warnings || []).forEach(function (w) {
-            html += '<div class="hint" style="grid-column:1/-1;color:var(--yellow)">⚠ ' + w + '</div>';
-        });
-        html += '<div class="hint" style="grid-column:1/-1">' + (d.atTPE || '') + ' · 每 60s</div>';
+            ? (CT.caps + ' ' + (lim.maxAccountLev > 0 ? lim.maxAccountLev.toFixed(1) + '×' : CT.none)
+               + ' · ' + CT.capWarn + ' ' + (lim.warnAccountLev > 0 ? lim.warnAccountLev.toFixed(1) + '×' : CT.none)
+               + ' · ' + CT.capNotional + ' ' + (lim.maxNotionalUSDT > 0 ? fmtU(lim.maxNotionalUSDT) : CT.none)
+               + ' · ' + CT.capCount + ' ' + (lim.maxConcurrent > 0 ? lim.maxConcurrent : CT.none))
+            : CT.noCaps;
+        html += '<div class="ui-sub ops-line">' + esc(capTxt) + '</div>';
+        // Risk warnings are the risk package's own messages, as it logs them.
+        (e.warnings || []).forEach(function (w) { html += '<div class="ui-callout">' + esc(w) + '</div>'; });
+        html += '<div class="ui-sub ops-line">' + esc(d.atTPE || '') + ' · ' + CT.every60 + '</div>';
         el.innerHTML = html;
     }
-
-    // Its own timer, deliberately: TWO SIGNED EXCHANGE CALLS, and equity does
-    // not move meaningfully in 30s when flat.
     function fetchExposure() {
         fetch('/ops/balance?_=' + Date.now(), { cache: 'no-store' })
-            .then(function (r) { return r.json(); })
-            .then(renderExposure)
+            .then(function (r) { return r.json(); }).then(renderExposure)
             .catch(function (e) { renderExposure({ error: String(e) }); });
     }
-    function fetchHealth() {
-        fetch('/ops/services?_=' + Date.now(), { cache: 'no-store' })
-            .then(function (r) { return r.json(); })
-            .then(renderHealth)
-            .catch(function () { /* best-effort card */ });
-    }
-    document.getElementById('ops-ntfy-toggle').addEventListener('click', function () {
-        var mute = this.dataset.mute === '1';
-        if (!confirm(mute
-                ? '靜音推播?迴圈照跑,只是不推到手機(含裸倉警報)。'
-                : '恢復推播?')) return;
-        ntfyBusy = true;
-        this.disabled = true;
-        var body = new URLSearchParams({ mute: mute ? '1' : '0' });
-        fetch('/ops/ntfy', { method: 'POST', body: body })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-            .then(function (res) {
-                ntfyBusy = false;
-                if (!res.ok || res.j.error) {
-                    showToast(res.j.error || '切換失敗', 'error');
-                } else if (res.j.changed === false) {
-                    showToast(res.j.note || '沒有改動', 'info');
-                } else {
-                    showToast(res.j.muted ? '推播已靜音' : '推播已恢復', 'ok');
-                }
-                fetchHealth();
-            })
-            .catch(function (e) {
-                ntfyBusy = false;
-                showToast('切換失敗: ' + e, 'error');
-                fetchHealth();
-            });
-    });
-    fetchHealth();
-    setInterval(fetchHealth, 30000);
-    fetchExposure();
-    setInterval(fetchExposure, 60000);
 
-    // ─── OI Δ / funding ───────────────────────────────────────────────
-    // The engine turns a prior OI reading into a warning, but only as an
-    // annotation on a Long/Short signal — when everything scores FLAT the
-    // measurement exists and nothing displays it. This is that readout.
-    // Local file only, so the cadence just has to match the sampler (5m);
-    // polling faster would re-render identical numbers.
+    // ─── OI Δ / funding (local snapshots; cadence matches the 5m sampler) ──
     function oiFmtNotional(v) {
         if (typeof v !== 'number' || !v) return '—';
         if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
@@ -292,266 +207,161 @@
         if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
         return v.toFixed(0);
     }
+    function pctS(v, d) { return (v >= 0 ? '+' : '') + (v * 100).toFixed(d) + '%'; }
     function renderOI(d) {
-        var note = document.getElementById('oi-note');
-        var host = document.getElementById('oi-host');
-        if (!d || d.error) {
-            note.textContent = '讀不到:' + ((d && d.error) || 'no data');
-            host.innerHTML = '';
-            return;
-        }
-        var thr = ((d.deltaThreshold || 0.02) * 100).toFixed(0);
-        note.textContent = 'BingX ' + d.samples + ' 筆快照 · 跨距 ' + d.spanMin + ' 分鐘 · 門檻 ±' + thr + '%'
-            + (d.bnFetchedTPE ? ' · Binance 交叉參考 ' + d.bnFetchedTPE : ' · Binance 無快取')
-            + (d.hasHourOfDepth ? '' : ' — 尚未累積滿 1 小時,Δ 欄會是空的')
-            + ' · ' + d.atTPE;
+        var note = document.getElementById('oi-note'), host = document.getElementById('oi-host');
+        if (!d || d.error) { note.textContent = CT.unreadable + ' ' + ((d && d.error) || ''); host.innerHTML = ''; return; }
+        note.textContent = CT.oiNote.replace('{n}', d.samples).replace('{m}', d.spanMin).replace('{thr}', ((d.deltaThreshold || 0.02) * 100).toFixed(0))
+            + ' · ' + (d.bnFetchedTPE ? CT.oiBnCache + ' ' + d.bnFetchedTPE : CT.oiBnNone)
+            + (d.hasHourOfDepth ? '' : ' · ' + CT.oiShallow);
         var rows = (d.rows || []).map(function (r) {
-            if (r.state !== 'ok') {
-                return '<tr><td>' + r.short + '</td><td class="oi-read" colspan="7">尚無快照</td></tr>';
-            }
-            var dTxt = '—', dCls = 'cs-dim';
-            if (r.oiStatic) {
-                dTxt = 'n/a';
-            } else if (typeof r.delta === 'number') {
-                dTxt = (r.delta >= 0 ? '+' : '') + (r.delta * 100).toFixed(2) + '%';
-                if (r.arms) dCls = 'oi-armed';
-            }
-            var fTxt = '—', fCls = 'cs-dim';
-            if (typeof r.funding === 'number' && r.funding !== 0) {
-                fTxt = (r.funding >= 0 ? '+' : '') + (r.funding * 100).toFixed(4) + '%';
-                if (r.fundingSide) fCls = 'oi-crowded';
-            }
-            // Price delta over the same window. Without it an OI change
-            // says contracts were opened but not by which side, which is
-            // what the first version of this card got wrong.
-            var pTxt = '—', pCls = 'cs-dim';
-            if (typeof r.priceDelta === 'number') {
-                pTxt = (r.priceDelta >= 0 ? '+' : '') + (r.priceDelta * 100).toFixed(2) + '%';
-            }
-            // The verdict comes from the server (oiQuadrant) so the card
-            // cannot drift from the rule that produced it.
-            var readTxt = r.oiStatic ? '交易所不公布此合約 OI(固定值)'
-                        : (r.reading || (r.fundingSide === 'shorts-crowded' ? '空方付錢'
-                        : (r.fundingSide === 'longs-crowded' ? '多方付錢' : '')));
-            var readCls = 'oi-read';
-            if (r.quadrant === 'shorts-building' || r.quadrant === 'longs-building') readCls = 'oi-read oi-armed';
-            // Binance cross-reference. 15m appears ONLY here: Binance buckets
-            // are genuinely 5-minutely, so three of them is a real reading,
-            // whereas the BingX column cannot honestly go under an hour.
+            if (r.state !== 'ok') return '<tr><td><span class="ui-sym">' + esc(r.short) + '</span></td><td colspan="7" class="ui-dim">' + CT.oiNoSnap + '</td></tr>';
+            var dTxt = r.oiStatic ? 'n/a' : (typeof r.delta === 'number' ? pctS(r.delta, 2) : '—');
+            var dCls = r.arms ? 'ui-warn' : 'ui-dim';
+            var pTxt = typeof r.priceDelta === 'number' ? pctS(r.priceDelta, 2) : '—';
+            var fTxt = (typeof r.funding === 'number' && r.funding !== 0) ? pctS(r.funding, 4) : '—';
+            var fCls = r.fundingSide ? 'ui-warn' : 'ui-dim';
             var bnTxt = '—';
             if (typeof r.bnDelta1h === 'number') {
-                bnTxt = (r.bnDelta1h >= 0 ? '+' : '') + (r.bnDelta1h * 100).toFixed(2) + '%';
-                if (typeof r.bnDelta15m === 'number') {
-                    bnTxt += ' / ' + (r.bnDelta15m >= 0 ? '+' : '') + (r.bnDelta15m * 100).toFixed(2) + '%';
-                }
+                bnTxt = pctS(r.bnDelta1h, 2);
+                if (typeof r.bnDelta15m === 'number') bnTxt += ' / ' + pctS(r.bnDelta15m, 2);
             }
-            var wTxt = '—', wCls = 'cs-dim';
+            var wTxt = '—', wCls = 'ui-dim';
             if (typeof r.whaleTop === 'number') {
                 wTxt = r.whaleTop.toFixed(2) + ' / ' + r.whaleAll.toFixed(2);
-                if (r.crowd) {
-                    wCls = 'oi-crowded';
-                    wTxt += r.crowd === 'retail-longer' ? ' 散戶偏多' : ' 散戶偏空';
-                }
+                if (r.crowd) { wCls = 'ui-warn'; wTxt += ' ' + (r.crowd === 'retail-longer' ? CT.retailLonger : CT.retailShorter); }
             }
-            return '<tr><td>' + r.short + '</td>'
-                 + '<td class="cs-dim num">' + oiFmtNotional(r.oi) + '</td>'
-                 + '<td class="' + dCls + ' num">' + dTxt + '</td>'
-                 + '<td class="' + pCls + ' num">' + pTxt + '</td>'
-                 + '<td class="' + fCls + ' num">' + fTxt + '</td>'
-                 + '<td class="cs-dim num">' + bnTxt + '</td>'
-                 + '<td class="' + wCls + '">' + wTxt + '</td>'
-                 + '<td class="' + readCls + '">' + readTxt + '</td></tr>';
+            // The verdict comes from the server (oiQuadrant, localized there)
+            // so the card cannot drift from the rule that produced it.
+            var read = r.oiStatic ? CT.oiStatic
+                : (r.reading || (r.fundingSide === 'shorts-crowded' ? CT.shortsPay : (r.fundingSide === 'longs-crowded' ? CT.longsPay : '')));
+            var rCls = (r.quadrant === 'shorts-building' || r.quadrant === 'longs-building') ? 'ui-warn' : '';
+            return '<tr><td><span class="ui-sym">' + esc(r.short) + '</span></td>'
+                + '<td class="num ui-dim">' + oiFmtNotional(r.oi) + '</td>'
+                + '<td class="num ' + dCls + '">' + dTxt + '</td>'
+                + '<td class="num ui-dim">' + pTxt + '</td>'
+                + '<td class="num ' + fCls + '">' + fTxt + '</td>'
+                + '<td class="num ui-dim">' + bnTxt + '</td>'
+                + '<td class="' + wCls + '">' + wTxt + '</td>'
+                + '<td class="ops-read ' + rCls + '">' + esc(read) + '</td></tr>';
         }).join('');
-        host.innerHTML = '<div class="dt-scroll"><table class="dt dt--compact dt--numeric"><thead><tr>'
-            + '<th>標的</th><th>OI</th><th>OI 1hΔ</th><th>價格 1hΔ</th><th>funding</th>'
-            + '<th title="Binance 的真 5m 序列 — 交叉參考,不是替代">BN 1h/15m</th>'
-            + '<th title="大戶 vs 全體,兩者都按帳戶數。負 = 散戶比大戶更偏多">大戶/全體</th>'
-            + '<th style="text-align:left">判讀</th>'
+        host.innerHTML = '<div class="dt-scroll"><table class="dt"><thead><tr>'
+            + '<th>' + CT.thSym + '</th><th class="num">OI</th><th class="num">' + CT.thOI1h + '</th><th class="num">' + CT.thPx1h + '</th>'
+            + '<th class="num">' + CT.thFunding + '</th><th class="num" title="' + esc(CT.thBNTip) + '">' + CT.thBN + '</th>'
+            + '<th title="' + esc(CT.thWhaleTip) + '">' + CT.thWhale + '</th><th>' + CT.thRead + '</th>'
             + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
     function fetchOI() {
         fetch('/ops/oi?_=' + Date.now(), { cache: 'no-store' })
-            .then(function (r) { return r.json(); })
-            .then(renderOI)
+            .then(function (r) { return r.json(); }).then(renderOI)
             .catch(function (e) { renderOI({ error: String(e) }); });
     }
-    fetchOI();
-    setInterval(fetchOI, 300000);
 
-    // ─── Zone-fade alert status (recomputes structure, so slower cadence) ──
-    function zFmt(v) {
-        if (typeof v !== 'number') return v;
-        return v >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(3);
-    }
-    function zSet(role, v) {
-        var el = document.querySelector('[data-role="' + role + '"]');
-        if (el) el.textContent = v;
-    }
+    // ─── Zone-fade alerts (recomputes structure, so a slower cadence) ──
+    function zFmt(v) { return typeof v !== 'number' ? v : (v >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(3)); }
+    var CONFIRM = { '': CT.cTouch, touch: CT.cTouch, 'close-in': CT.cCloseIn, 'close-above': CT.cCloseAbove, 'close-below': CT.cCloseBelow };
     function fetchZones() {
-        fetch('/ops/zones')
-            .then(function (r) { return r.json(); })
-            .then(function (z) {
-                var on = z.enabled && z.ntfy && !z.muted;
-                var dot = document.querySelector('[data-role="zone-dot"]');
-                if (dot) dot.className = 'ops-state-dot ' + (on ? 'on' : 'off');
-                zSet('zone-label', !z.enabled ? 'DISABLED' : (!z.ntfy ? 'ntfy unset' : (z.muted ? 'MUTED' : 'ARMED')));
-                zSet('zone-auto', z.auto ? 'on' : 'off');
-                zSet('zone-tfs', z.tfs || '—');
-                var wrap = document.querySelector('[data-role="zone-armed"]');
-                if (!wrap) return;
-                var arr = z.armed || [];
-                if (!arr.length) {
-                    wrap.innerHTML = '<span class="ops-zone-hint">目前無上膛區間（沒有 symbol 在乾淨趨勢）</span>';
-                    return;
-                }
-                wrap.innerHTML = arr.map(function (a) {
-                    var cls = a.dir === 'short' ? 'z-short' : (a.dir === 'long' ? 'z-long' : 'z-watch');
-                    var tf = a.tf ? ' ' + a.tf : '';
-                    // Trigger rule is shown on every row: a touch band and a
-                    // close-confirmed band behave completely differently, and
-                    // a faulted one does not fire at all.
-                    var trig = a.fault
-                        ? '<span class="z-trig z-trig-bad">⚠ ' + a.fault + '</span>'
-                        : '<span class="z-trig' + (a.confirm ? ' z-trig-close' : '') + '">'
-                          + (a.trigger || '即時觸價') + '</span>';
-                    return '<div class="ops-zone-row ' + cls + (a.fault ? ' z-faulted' : '') + '">'
-                        + '<span class="z-sym">' + a.symbol + tf + '</span>'
-                        + '<span class="z-dir">' + a.dir + '</span>'
-                        + '<span class="z-band">' + zFmt(a.lo) + '–' + zFmt(a.hi) + '</span>'
-                        + trig
-                        + '<span class="z-note">' + (a.note || '') + '</span></div>';
-                }).join('');
-            })
-            .catch(function () {});
+        fetch('/ops/zones').then(function (r) { return r.json(); }).then(function (z) {
+            var lbl = document.querySelector('[data-role="zone-label"]');
+            if (lbl) {
+                lbl.textContent = !z.enabled ? CT.zoneOff : (!z.ntfy ? CT.zoneNoNtfy : (z.muted ? CT.zoneMuted : CT.zoneArmed));
+                lbl.className = 'ops-zone-state ' + (z.enabled && z.ntfy && !z.muted ? 'on' : 'off');
+            }
+            var wrap = document.querySelector('[data-role="zone-armed"]');
+            if (!wrap) return;
+            var arr = z.armed || [];
+            if (!arr.length) { wrap.innerHTML = '<div class="ui-dim ui-sm">' + CT.zoneNone + '</div>'; return; }
+            // The trigger rule is on every row: a touch band and a
+            // close-confirmed band behave differently, and a faulted one does
+            // not fire at all.
+            wrap.innerHTML = '<ul class="ui-list">' + arr.map(function (a) {
+                var side = a.dir === 'short' ? 'short' : (a.dir === 'long' ? 'long' : 'neutral');
+                var dirTxt = a.dir === 'short' ? CT.short : (a.dir === 'long' ? CT.long : CT.watch);
+                var trig = a.fault ? '<span class="ui-down ui-sm">⚠ ' + esc(a.fault) + '</span>'
+                    : '<span class="ui-dim ui-sm">' + esc(CONFIRM[(a.confirm || '').toLowerCase()] || a.trigger || '') + '</span>';
+                return '<li class="ui-row"><span class="ui-side ' + side + '">' + dirTxt + '</span>'
+                    + '<span class="ui-sym">' + esc(a.symbol) + '</span>' + (a.tf ? '<span class="ui-dim ui-sm">' + esc(a.tf) + '</span>' : '')
+                    + '<span class="ui-num">' + zFmt(a.lo) + '–' + zFmt(a.hi) + '</span>'
+                    + '<span class="ui-grow ui-dim ui-sm">' + esc(a.note || '') + '</span>' + trig + '</li>';
+            }).join('') + '</ul>';
+        }).catch(function () {});
     }
-    fetchZones();
-    setInterval(fetchZones, 60000);
-
-    // Start / Stop (enabled on/off, live).
     document.querySelectorAll('[data-zone-action]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var act = btn.getAttribute('data-zone-action');
             btn.disabled = true;
-            var done = function (ok, msg) { btn.disabled = false; showToast(msg, ok ? 'ok' : 'err'); fetchZones(); };
-            var body = new URLSearchParams();
-            body.set('enabled', act === 'start' ? '1' : '0');
-            fetch('/ops/zone-config', { method: 'POST', body: body })
+            fetch('/ops/zone-config', { method: 'POST', body: new URLSearchParams({ enabled: act === 'start' ? '1' : '0' }) })
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                .then(function (res) { done(res.ok, 'zone ' + act + (res.ok ? ' ok' : ': ' + (res.body.error || 'failed'))); })
-                .catch(function () { done(false, 'zone ' + act + ' failed'); });
+                .then(function (res) {
+                    btn.disabled = false;
+                    toast(res.ok ? (act === 'start' ? CT.zoneStarted : CT.zoneStopped) : CT.zoneFailed + ' ' + (res.body.error || ''), res.ok ? 'ok' : 'err');
+                    fetchZones();
+                })
+                .catch(function () { btn.disabled = false; toast(CT.zoneFailed, 'err'); });
         });
     });
-
-    // Apply config (auto + TF checkboxes) — writes zone-config.json live.
-    var zoneApplyBtn = document.getElementById('ops-zone-apply');
-    if (zoneApplyBtn) zoneApplyBtn.addEventListener('click', function () {
+    var applyBtn = document.getElementById('ops-zone-apply');
+    applyBtn.addEventListener('click', function () {
         var body = new URLSearchParams();
         body.set('auto', document.getElementById('zone-auto-in').checked ? '1' : '0');
-        document.querySelectorAll('#ops-zone-config-form input[name="tfs"]:checked').forEach(function (cb) {
-            body.append('tfs', cb.value);
-        });
-        zoneApplyBtn.disabled = true;
+        document.querySelectorAll('#ops-zone-block input[name="tfs"]:checked').forEach(function (cb) { body.append('tfs', cb.value); });
+        applyBtn.disabled = true;
         fetch('/ops/zone-config', { method: 'POST', body: body })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
-                zoneApplyBtn.disabled = false;
-                if (res.ok) { showToast('zone config saved (即時生效)', 'ok'); fetchZones(); }
-                else { showToast('zone config: ' + (res.body.error || 'failed'), 'err'); }
+                applyBtn.disabled = false;
+                if (res.ok) { toast(CT.zoneSaved, 'ok'); fetchZones(); } else toast(CT.zoneFailed + ' ' + (res.body.error || ''), 'err');
             })
-            .catch(function () { zoneApplyBtn.disabled = false; showToast('zone config failed', 'err'); });
+            .catch(function () { applyBtn.disabled = false; toast(CT.zoneFailed, 'err'); });
     });
-
-    // Zone log tail — show/hide + poll while shown.
-    var zoneLogTimer = null;
+    // Zone log: polled only while open.
+    var logTimer = null, logWrap = document.getElementById('ops-zone-logwrap');
     function fetchZoneLogs() {
-        fetch('/ops/zone-logs')
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                var el = document.getElementById('ops-zone-log');
-                if (!el) return;
-                // An error is shown as an error: rendering it as "no lines yet"
-                // would make a broken read look like a quiet channel.
-                if (d.error) { el.textContent = '⚠ ' + d.error; return; }
-                el.textContent = (d.lines && d.lines.length) ? d.lines.join('\n') : '(no zone-alert events yet)';
-                if (d.skipped) el.textContent += '\n⚠ ' + d.skipped + ' 行無法解析,已略過';
-            })
-            .catch(function () {});
+        fetch('/ops/zone-logs').then(function (r) { return r.json(); }).then(function (d) {
+            var el = document.getElementById('ops-zone-log');
+            // An error is shown as an error: rendering it as "no lines yet"
+            // would make a broken read look like a quiet channel.
+            if (d.error) { el.textContent = '⚠ ' + d.error; return; }
+            el.textContent = (d.lines && d.lines.length) ? d.lines.join('\n') : CT.zoneNoEvents;
+            if (d.skipped) el.textContent += '\n⚠ ' + CT.zoneSkipped.replace('{n}', d.skipped);
+        }).catch(function () {});
     }
-    var zoneLogToggle = document.getElementById('ops-zone-logtoggle');
-    if (zoneLogToggle) zoneLogToggle.addEventListener('click', function () {
-        var log = document.getElementById('ops-zone-log');
-        if (!log) return;
-        var showing = log.classList.toggle('hidden');
-        if (!showing) { // now visible
-            zoneLogToggle.textContent = 'hide';
-            fetchZoneLogs();
-            zoneLogTimer = setInterval(fetchZoneLogs, 10000);
-        } else {
-            zoneLogToggle.textContent = 'show';
-            if (zoneLogTimer) { clearInterval(zoneLogTimer); zoneLogTimer = null; }
-        }
+    logWrap.addEventListener('toggle', function () {
+        if (logWrap.open) { fetchZoneLogs(); logTimer = setInterval(fetchZoneLogs, 10000); }
+        else if (logTimer) { clearInterval(logTimer); logTimer = null; }
     });
 
-    // ─── AI advisor model selector ────────────────────────────────────
-    // GET current model + filtered available list, populate dropdown.
-    // On change, POST immediately; server validates + persists to file
-    // so restart preserves the choice. Toast confirms success.
-    var aiModelSel = document.getElementById('ops-ai-model');
-    var aiProvider = document.getElementById('ops-ai-provider');
-    var aiHint     = document.getElementById('ops-ai-model-hint');
+    // ─── AI model: GET current + available, POST on change (persisted) ──
+    var aiSel = document.getElementById('ops-ai-model'), aiProv = document.getElementById('ops-ai-provider'), aiHint = document.getElementById('ops-ai-model-hint');
     function loadAIModel() {
-        fetch('/api/ai/model')
+        fetch('/api/ai/model').then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (!res.ok) { aiSel.innerHTML = '<option value="">—</option>'; aiHint.textContent = CT.aiLoadFailed + ' ' + (res.body.error || ''); return; }
+                aiProv.textContent = res.body.provider || '—';
+                var avail = res.body.available || [], cur = res.body.current || '';
+                if (!avail.length) { aiSel.innerHTML = '<option value="">' + esc(cur || CT.aiNoModels) + '</option>'; aiSel.disabled = true; return; }
+                aiSel.innerHTML = avail.map(function (m) { return '<option value="' + esc(m) + '"' + (m === cur ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join('');
+                aiSel.disabled = false;
+            })
+            .catch(function (e) { aiSel.innerHTML = '<option value="">—</option>'; aiHint.textContent = CT.netErr + ' ' + e.message; });
+    }
+    aiSel.addEventListener('change', function () {
+        var v = aiSel.value; if (!v) return;
+        aiSel.disabled = true;
+        fetch('/api/ai/model', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ model: v }).toString() })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
-                if (!res.ok) {
-                    aiModelSel.innerHTML = '<option value="">(error)</option>';
-                    aiHint.textContent = '⚠ ' + (res.body.error || 'failed to load models');
-                    return;
-                }
-                aiProvider.textContent = res.body.provider || '—';
-                var avail = res.body.available || [];
-                var cur = res.body.current || '';
-                if (!avail.length) {
-                    aiModelSel.innerHTML = '<option value="">' + (cur || '(no models)') + '</option>';
-                    aiModelSel.disabled = true;
-                    return;
-                }
-                var opts = avail.map(function (m) {
-                    return '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + m + '</option>';
-                }).join('');
-                aiModelSel.innerHTML = opts;
-                aiModelSel.disabled = false;
+                aiSel.disabled = false;
+                if (!res.ok) { toast(CT.aiSaveFailed + ' ' + (res.body.error || ''), 'err'); loadAIModel(); return; }
+                toast(CT.aiSet + ' ' + res.body.current, 'ok');
             })
-            .catch(function (e) {
-                aiModelSel.innerHTML = '<option value="">(network error)</option>';
-                aiHint.textContent = '⚠ ' + e.message;
-            });
-    }
-    aiModelSel.addEventListener('change', function () {
-        var v = aiModelSel.value;
-        if (!v) return;
-        aiModelSel.disabled = true;
-        var fd = new URLSearchParams(); fd.append('model', v);
-        fetch('/api/ai/model', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: fd.toString(),
-        })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-        .then(function (res) {
-            aiModelSel.disabled = false;
-            if (!res.ok) {
-                showToast('⚠ ' + (res.body.error || 'save failed'), 'error');
-                loadAIModel(); // re-sync UI to server truth
-                return;
-            }
-            showToast('✓ Model set to ' + res.body.current, 'success');
-        })
-        .catch(function (e) {
-            aiModelSel.disabled = false;
-            showToast('⚠ network: ' + e.message, 'error');
-        });
+            .catch(function (e) { aiSel.disabled = false; toast(CT.netErr + ' ' + e.message, 'err'); });
     });
+
+    fetchHealth(); setInterval(fetchHealth, 30000);
+    fetchExposure(); setInterval(fetchExposure, 60000);
+    fetchOI(); setInterval(fetchOI, 300000);
+    fetchZones(); setInterval(fetchZones, 60000);
     loadAIModel();
 })();
 </script>
