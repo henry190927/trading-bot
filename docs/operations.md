@@ -55,7 +55,7 @@ env-overridable, which is what makes a local or fixture-backed instance cheap.
 
 | File | Written by | Read by | Notes |
 |---|---|---|---|
-| `.env` | the operator, over SSH | both units (systemd `EnvironmentFile`) | **Secrets only.** No process writes it at runtime. |
+| `.env` | the operator, over SSH | both containers (compose `env_file`) | **Secrets only.** No process writes it at runtime. |
 | `monitor-config.json` | web (`/ops` mute toggle) | monitor, every send | Runtime settings — see below |
 | `zone-config.json` | web (`/ops` zone panel) | monitor, every cycle | Zone channel on/off, auto zones, TFs |
 | `zones.json` | the operator | monitor, web | Manual zones |
@@ -133,8 +133,10 @@ git worktree remove --force /tmp/deploy
 
 ## Cut-over and rollback
 
-The move from systemd to containers, done once. Each step is reversible until
-the last.
+The move from systemd to containers. **Done 2026-10-18**: the units stopped at
+18:43:47, the containers answered at 18:44:27 — about 40 seconds down. Kept as
+the record of how, and as the runbook for a rebuilt host. Each step is
+reversible until the last.
 
 **One-time setup**
 
@@ -149,6 +151,10 @@ the last.
    - `/etc/sudoers.d/trading-deploy`: `ubuntu ALL=(root) NOPASSWD: /usr/local/bin/trading-deploy`
      (check with `sudo visudo -c`)
    - the `authorized_keys` line above, with the CI public key
+   - remove cloud-init's `ubuntu ALL=(ALL) NOPASSWD:ALL`
+     (`/etc/sudoers.d/90-cloud-init-users`) once `ubuntu` has a password you have
+     tested (`su - ubuntu -c true`). Done here 2026-10-18: `sudo` asks for the
+     password for everything except `trading-deploy`, so `ops restart` prompts.
 
 **Cut-over**
 

@@ -21,7 +21,7 @@ CLI 和 web UI 可以指定 `market.Resolve` 認得的全部 14 個合約。
 
 | | |
 |---|---|
-| **跑在哪** | 一台 Oracle Cloud Always Free VM（1 GB RAM）上的兩個 systemd 服務，只能透過 Tailscale 和 SSH 連到 |
+| **跑在哪** | 一台 Oracle Cloud Always Free VM（1 GB RAM）上的兩個容器（Docker Compose），只能透過 Tailscale 和 SSH 連到 |
 | **做什麼** | 偵測 → 打分 → 記錄／執行（paper-first）→ 推播 |
 | **紀律** | 每個策略改動都要過 60/90/120 天的 A/B，而且上線閘門是程式（`shipgate`），不是習慣 |
 | **規模** | 36 個可匯入的 package + 28 個 command · 255 個 Go 檔，其中 83 個是測試 · 約 55k 行 · `go test -race ./...` 乾淨 |
@@ -82,7 +82,7 @@ flowchart TB
 ## VPS 上：誰讀、誰寫哪個檔案
 
 兩個 process 和一個操作者共用一個資料目錄。箭頭本身就是設計：web 服務只寫
-**設定檔和 journal —— 從不寫 `.env`，也不碰任何 systemd unit。**
+**設定檔和 journal —— 從不寫 `.env`，也從不重啟任何服務。**
 
 ```mermaid
 flowchart LR
@@ -215,6 +215,7 @@ flowchart LR
 | **VPS 上用 `sudo` 改過 `journal.csv` 之後，web 寫不進去** | 用 root 編輯把所有權翻成 `root:root`，以 `ubuntu` 執行的 web 不能再 append | 任何 `sudo` 動過的重寫之後，反射性 `chown journal.csv ubuntu:ubuntu` |
 | **Backtest 報出的 edge 在實盤沒出現** | Look-ahead bias —— 早期版本用當前棒的 high/low 做 sweep 偵測 | 加「丟掉未收盤棒」的 helper，讓 live 和 backtest 在警報時刻看到完全相同的輸入 |
 | **面板把一個什麼都沒做的迴圈顯示成 ON，整整一天** | 迴圈卡片從 `.env` 推測狀態，不知道還有第二道閘門（`zone-config.json` 的 `enabled`）讓迴圈每輪短路 | monitor 改寫心跳。測試並排顯示時，還沒部署就又抓到兩個推測錯誤 |
+| **合併不等於部署：生產環境安靜地回退了 5 小時** | 另一個 session 在一個大分支合進 main 的 4 分鐘前，從自己的工作目錄部署了 main。本機每一項檢查都說新程式已經上線，生產環境跑的卻是舊版 —— 沒有心跳、沒有 zone 事件檔、web 又開始改寫 `.env`。一個「出錯也要留紀錄」的取樣腳本在第一次執行就抓到了，只是 5 小時都沒人去看 log | 只留一條部署路徑：從 main 經 CI、人工核准後部署。`ops status` 會印出目前部署的 commit，「現在跑的是什麼」變成查得到的事實，而不是假設 |
 | **一次部署差點把另一個 session 未 commit 的程式碼推上生產** | `make deploy-*` 從工作目錄編譯，而工作目錄裡有還沒審過的部位大小計算，包括一個未追蹤的 `.go` 檔 —— 會被編進去，`git diff` 卻看不到。這次是靠手動比對時間戳才擋下 | `guard-clean`：工作目錄不乾淨時每個部署都拒絕執行並列出檔案。要部署某個 commit 就用乾淨的 `git worktree` |
 
 > 💡 這些問題大多有一個共同點：**顯示或紀錄和實際不一致**，而且不是讀程式碼發現的，
@@ -250,7 +251,7 @@ OFF、**而且** env kill-switch 打開。任何一道沒開就不會有真單�
 
 | Command（28 個） | |
 |---|---|
-| **服務**（VPS 上由 systemd 管） | `web`、`monitor` —— 原本的告警程式 `serve` 已退役，不再部署 |
+| **服務**（VPS 上的容器） | `web`、`monitor` —— 原本的告警程式 `serve` 已退役，不再部署 |
 | **讀取 / 分析** | `analyze`、`validate`、`price`、`contracts` |
 | **帳戶 / 交易所** | `acct`、`protect`、`wsprobe` |
 | **資料抓取**（cron） | `earnings-fetch`、`fundamental-scan` |

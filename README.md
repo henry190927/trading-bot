@@ -18,7 +18,7 @@ CLIs and the web UI address any of the 14 contracts `market.Resolve` knows.
 
 | | |
 |---|---|
-| **Runs** | Two systemd services on one Oracle Cloud Always Free VM (1 GB RAM), reachable only over Tailscale and SSH |
+| **Runs** | Two containers (Docker Compose) on one Oracle Cloud Always Free VM (1 GB RAM), reachable only over Tailscale and SSH |
 | **Does** | Detect → score → record / execute (paper-first) → alert |
 | **Discipline** | Every strategy change goes through a 60/90/120-day A/B, and the ship gate is code (`shipgate`), not a habit |
 | **Size** | 36 importable packages + 28 commands · 255 Go files, 83 of them tests · ~55k lines · `go test -race ./...` clean |
@@ -76,7 +76,7 @@ flowchart TB
 
 Two processes and an operator share one data directory. The arrows are the
 design: the web service writes **configuration files and the journal — never
-`.env`, never a unit.**
+`.env`, and never restarts a service.**
 
 ```mermaid
 flowchart LR
@@ -201,6 +201,7 @@ latest example: it beat the baseline in all three windows and still failed.
 | **`journal.csv` lost web-write access after `sudo` edit on VPS** | Editing the file as root flipped ownership to `root:root`; the `ubuntu`-running web daemon could no longer append. | Reflex `chown journal.csv ubuntu:ubuntu` after any `sudo`-touched rewrite; a checklist item now. |
 | **Backtest reported edge that didn't appear live** | Look-ahead bias — early version used current-bar high/low for sweep detection (information not yet available at the alert moment). | Added "drop forming candle" helper so live and backtest both see identical inputs at the alert moment. |
 | **The panel reported a loop ON for a full day while it did nothing** | The loop card inferred state from `.env` and had no idea a second gate (`zone-config.json` `enabled`) short-circuited every cycle. | The monitor now writes a heartbeat; see *Engineering decisions*. Testing the side-by-side caught two more inference errors before it was even deployed. |
+| **Merged is not deployed: production silently rolled back for five hours** | A parallel session deployed `main` from its own working tree four minutes before a large branch was merged. Every local check said the new code was live; production was running the old one — no heartbeat, no zone event log, the web writing `.env` again. A sampler that logged its own failures caught it on its first run; nobody read the log for five hours. | One deploy path: CI from `main`, behind approval. `ops status` prints the deployed commit, so "what is running" is a lookup, not an assumption. |
 | **A deploy nearly shipped another session's uncommitted code** | `make deploy-*` compiles the working tree. It held unreviewed order-sizing work, including an untracked `.go` file — compiled in, invisible to `git diff`. Caught by checking timestamps by hand. | `guard-clean`: every deploy refuses a dirty tree and lists the files. Deploy a commit from a clean `git worktree`. |
 
 ---
@@ -220,7 +221,7 @@ latest example: it beat the baseline in all three windows and still failed.
 
 | Commands (28) | |
 |---|---|
-| **Services** (systemd on the VPS) | `web`, `monitor` — `serve`, the original alerter, is retired and no longer deployed |
+| **Services** (containers on the VPS) | `web`, `monitor` — `serve`, the original alerter, is retired and no longer deployed |
 | **Read / analyse** | `analyze`, `validate`, `price`, `contracts` |
 | **Account / exchange** | `acct`, `protect`, `wsprobe` |
 | **Data fetchers** (cron) | `earnings-fetch`, `fundamental-scan` |
