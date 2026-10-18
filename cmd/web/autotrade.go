@@ -227,7 +227,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 
 	envArmed := strings.EqualFold(strings.TrimSpace(os.Getenv("AUTOTRADE_ENABLED")), "true")
 
-	c.HTML(http.StatusOK, "autotrade.html", gin.H{
+	s.page(c, http.StatusOK, "autotrade.html", gin.H{
 		"Enabled":   cfg.Enabled,
 		"Paper":     cfg.Paper,
 		"EnvArmed":  envArmed,

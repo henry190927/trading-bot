@@ -3,52 +3,66 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* =====================================================================
-   Theme system. Every color in the app resolves through the semantic
-   tokens below, so switching themes = swapping this one token set.
-   `data-theme` is set on <html> by an inline head script (from
-   localStorage) + toggled by /static/theme.js.
-
-     • default (no attr) & [data-theme="slate"] → original GitHub-dark
-     • [data-theme="industrial"]                → 焦炭黑 + 琥珀 (brand)
+   Theme system: dark (default) and light. Every colour resolves through
+   these tokens, so a theme is only this token set — layout never changes.
+   `data-theme` is set on <html> by an inline head script from
+   localStorage and switched by /static/theme.js. Any other value (the old
+   slate / industrial) matches no light rule and so renders dark.
 
    The `*-rgb` triplets back the translucent washes:
    rgba(var(--green-rgb), .12) etc.
    ===================================================================== */
-:root[data-theme="industrial"] {
-    /* ---- Industrial (焦炭黑底 + 琥珀強調) ---- */
-    --bg:        #0f0b07;   --surface:   #1f1710;   --surface-2: #2a2016;
-    --border:    #46351f;   --text:      #f3ebdf;   --text-dim:  #b09a7f;
-    --green:     #6bbf7b;   --green-bg:  #14251a;   /* positive / long / win */
-    --red:       #e0602b;   --red-bg:    #38160c;   /* negative / short / loss */
-    --yellow:    #d1741f;   --yellow-bg: #3a2a10;   /* caution / pending (burnt) */
-    --blue:      #f6a623;   --cyan:      #f6a623;   /* primary + brand accent */
-    --mr:        #d1741f;   --mr-bg:     #2e1c0a;   /* mean-reversion axis */
-    --info-bg:   #3a230f;                           /* momentum / info chip bg */
-    --chip:      #0b0805;   --chip-border: #4a3820; /* price readout wells (dark, so warm values pop) */
-
-    --bg-rgb: 15,11,7;        --green-rgb: 107,191,123;  --red-rgb: 224,96,43;
-    --yellow-rgb: 209,116,31; --blue-rgb: 246,166,35;    --text-dim-rgb: 176,154,127;
-}
 :root,
-:root[data-theme="slate"] {
-    /* ---- Original GitHub-dark (default) ---- */
-    --bg:        #0d1117;   --surface:   #161b22;   --surface-2: #21262d;
-    --border:    #30363d;   --text:      #c9d1d9;   --text-dim:  #8b949e;
-    --green:     #4ade80;   --green-bg:  #0f2e1c;
-    --red:       #f87171;   --red-bg:    #2e1414;
-    --yellow:    #fbbf24;   --yellow-bg: #2e2614;
-    --blue:      #58a6ff;   --cyan:      #56d4dd;
-    --mr:        #b388ff;   --mr-bg:     #1a0f2e;
-    --info-bg:   #0f1a2e;
-    --chip:      #21262d;   --chip-border: #30363d; /* slate keeps its original chip look */
+:root[data-theme="dark"] {
+    --bg:        #0e1013;   --surface:   #15181d;   --surface-2: #1c2027;
+    --border:    #262b33;   --text:      #e7e9ec;   --text-dim:  #8b929c;
+    --green:     #3fcf8e;   --green-bg:  #10261c;   /* positive / long / win */
+    --red:       #ff6b6b;   --red-bg:    #2c1517;   /* negative / short / loss */
+    --yellow:    #f5b84a;   --yellow-bg: #2a2213;   /* caution / pending */
+    --blue:      #7aa7ff;   --cyan:      #6fd3dc;   /* primary accent */
+    --mr:        #b69cff;   --mr-bg:     #1d1830;   /* mean-reversion axis */
+    --info-bg:   #142033;
+    --chip:      #1b1f25;   --chip-border: #2a3039;
+    --on-accent: #0b1220;                           /* text on an accent fill */
 
-    --bg-rgb: 13,17,23;       --green-rgb: 74,222,128;   --red-rgb: 248,113,113;
-    --yellow-rgb: 251,191,36; --blue-rgb: 56,139,253;    --text-dim-rgb: 139,148,158;
+    --bg-rgb: 14,16,19;       --green-rgb: 63,207,142;   --red-rgb: 255,107,107;
+    --yellow-rgb: 245,184,74; --blue-rgb: 122,167,255;   --text-dim-rgb: 139,146,156;
+    color-scheme: dark;
+}
+:root[data-theme="light"] {
+    --bg:        #f5f3ee;   --surface:   #ffffff;   --surface-2: #f0ede6;
+    --border:    #e2ded5;   --text:      #1c1f24;   --text-dim:  #646972;
+    --green:     #11804c;   --green-bg:  #e3f2ea;
+    --red:       #c23b22;   --red-bg:    #f8e6e1;
+    --yellow:    #9a5b00;   --yellow-bg: #fbf1dc;
+    --blue:      #0d6b66;   --cyan:      #0d6b66;
+    --mr:        #6a4bc4;   --mr-bg:     #efeafb;
+    --info-bg:   #e3efee;
+    --chip:      #f0ede6;   --chip-border: #e2ded5;
+    --on-accent: #ffffff;
+
+    --bg-rgb: 245,243,238;    --green-rgb: 17,128,76;    --red-rgb: 194,59,34;
+    --yellow-rgb: 154,91,0;   --blue-rgb: 13,107,102;    --text-dim-rgb: 100,105,114;
+    --shadow-1: 0 1px 2px rgba(28,31,36,.06);
+    --shadow-2: 0 6px 18px rgba(28,31,36,.12);
+    --shadow-card: 0 1px 2px rgba(28,31,36,.04), 0 4px 16px rgba(28,31,36,.05);
+    color-scheme: light;
+}
+
+/* Self-hosted (OFL, see static/fonts/): no request leaves for a font CDN.
+   Latin only — CJK falls through to the system's PingFang / Noto. */
+@font-face {
+    font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400 700; font-display: swap;
+    src: url("/static/fonts/ibm-plex-sans-latin.woff2") format("woff2");
+}
+@font-face {
+    font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 700; font-display: swap;
+    src: url("/static/fonts/jetbrains-mono-latin.woff2") format("woff2");
 }
 :root {
     --cjk:  "PingFang TC","PingFang SC","Microsoft JhengHei","Noto Sans TC","Hiragino Sans GB",system-ui,sans-serif;
-    --mono: "SF Mono",ui-monospace,"Cascadia Code","Menlo",monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", var(--cjk);
+    --mono: "JetBrains Mono","SF Mono",ui-monospace,"Menlo",monospace;
+    --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", var(--cjk);
 
     /* ---- UI overhaul Phase 0: scale + semantic layer (theme-agnostic) ----
        All new components draw from these so values stop being invented ad-hoc.
@@ -58,16 +72,15 @@
     --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px; --fs-md: 15px;
     --fs-lg: 18px; --fs-xl: 24px; --fs-2xl: 34px; --fs-3xl: 40px; /* 3xl: hero figures only (score, portfolio R) */
     --lh-tight: 1.25; --lh-base: 1.5;
-    --r-sm: 6px; --r-md: 12px; --r-lg: 18px; --r-pill: 999px;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 14px; --r-pill: 999px;
     --shadow-1: 0 1px 2px rgba(0,0,0,.3);
     --shadow-2: 0 6px 18px rgba(0,0,0,.5);
-    --shadow-card: 0 1px 2px rgba(0,0,0,.2), 0 10px 30px rgba(0,0,0,.22);
+    --shadow-card: none;
     --t-fast: 120ms;
     --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--blue);
 
     /* Semantic overlays — kill hardcoded rgba/hex bypasses. Resolve per theme
        via the *-rgb triplets, so badges finally re-theme with industrial. */
-    --on-accent: var(--chip);
     --wash-green:  rgba(var(--green-rgb), .14);
     --wash-red:    rgba(var(--red-rgb), .14);
     --wash-blue:   rgba(var(--blue-rgb), .12);
@@ -106,7 +119,7 @@ body {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     position: sticky;
-    top: 0;
+    top: var(--apptop-h); /* below the app shell's bar */
     z-index: 10;
 }
 .brand {
@@ -137,7 +150,7 @@ body {
 }
 .tf-picker .tf-active {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--blue);
     font-weight: 600;
 }
@@ -281,7 +294,7 @@ button.copy-btn.score.score-mom  { background: var(--info-bg); color: var(--blue
 button.copy-btn.score.score-good       { background: var(--green-bg); color: var(--green); border-color: var(--green); font-weight: 600; }
 button.copy-btn.score.score-borderline { color: var(--yellow); }
 button.copy-btn.score.score-weak       { color: var(--text-dim); }
-button.copy-btn.score:active           { background: var(--blue); color: #0f0b07; }
+button.copy-btn.score:active           { background: var(--blue); color: var(--on-accent); }
 button.copy-btn.diag-score-axis,
 button.copy-btn.diag-score-axis.diag-axis-mr,
 button.copy-btn.diag-score-axis.diag-axis-mom {
@@ -334,7 +347,7 @@ button.copy-btn.poc-drift {
     flex: 0 0 auto;
     transition: background 100ms ease, color 100ms ease;
 }
-.ai-analyze-btn:hover  { background: var(--blue); color: #0f0b07; }
+.ai-analyze-btn:hover  { background: var(--blue); color: var(--on-accent); }
 .ai-analyze-btn:disabled { opacity: 0.5; cursor: wait; }
 .ai-result {
     margin: 0.3rem 0 0.6rem;
@@ -385,7 +398,7 @@ button.copy-btn.poc-drift {
 }
 .score-card .score-card-ai:hover {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
 }
 .score-card .score-card-ai:disabled {
     opacity: 0.5;
@@ -417,7 +430,7 @@ button.copy-btn.poc-drift {
 }
 .ai-lang-btn + .ai-lang-btn { border-left: 1px solid var(--blue); }
 .ai-lang-btn:hover  { background: rgba(var(--blue-rgb), 0.12); }
-.ai-lang-btn.active { background: var(--blue); color: #0f0b07; }
+.ai-lang-btn.active { background: var(--blue); color: var(--on-accent); }
 
 .ai-result pre {
     background: var(--bg);
@@ -572,7 +585,7 @@ button.copy-btn.copy-row:hover {
     transition: background 100ms ease, color 100ms ease;
     -webkit-tap-highlight-color: transparent;
 }
-.copy-btn:active { background: var(--blue); color: #0f0b07; }
+.copy-btn:active { background: var(--blue); color: var(--on-accent); }
 /* "Copied" confirmation: soft light-grey background, dark text, green border
    so it reads as "highlighted" without being garishly bright. */
 .copy-btn.copied,
@@ -584,7 +597,7 @@ button.copy-btn.copy-row:hover {
 .copy-btn.big { font-size: var(--fs-lg); padding: 6px 14px; font-weight: 600; }
 .copy-btn.small { padding: 3px 7px; font-size: var(--fs-base); min-height: 26px; }
 .copy-btn.stop { color: var(--red); }
-.copy-btn.stop:active { background: var(--red); color: #0f0b07; }
+.copy-btn.stop:active { background: var(--red); color: var(--on-accent); }
 .copy-btn.tp { color: var(--green); }
 .copy-btn.tp:active { background: var(--green); color: var(--bg); }
 
@@ -904,7 +917,7 @@ footer {
 }
 .chart-tf-pills .tf-pill.active {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--blue);
 }
 .chart-summary {
@@ -1151,7 +1164,7 @@ footer {
 .layer-chip:hover { color: var(--text); }
 .layer-chip.active {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--blue);
 }
 /* Category flyouts — Overlays / Oscillators / Events. Same
@@ -1184,7 +1197,7 @@ footer {
 }
 .layer-menu-toggle.has-active .layer-menu-hint {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
 }
 .layer-menu-count {
     display: inline-block;
@@ -1201,7 +1214,7 @@ footer {
 .layer-menu-count.is-zero { opacity: 0.35; }
 .layer-menu-toggle.has-active .layer-menu-count {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     opacity: 1;
 }
 .layer-menu {
@@ -1253,7 +1266,7 @@ footer {
 }
 .layer-chip.active .layer-count {
     background: rgba(255,255,255,0.22);
-    color: #0f0b07;
+    color: var(--on-accent);
 }
 .layer-count.is-zero { opacity: 0.35; }
 .layer-chip.layer-reset,
@@ -1315,7 +1328,7 @@ footer {
 .lang-btn:hover { color: var(--text); }
 .lang-btn.is-active {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
 }
 .glossary-how {
     margin: 0.4rem 0 0;
@@ -1614,7 +1627,7 @@ footer {
 }
 .draw-btn.is-active {
     background: var(--yellow);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--yellow);
 }
 .draw-btn-hide.is-active {
@@ -1678,8 +1691,8 @@ footer {
     font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
     color: var(--text);
 }
-.draw-btn-menuitem.is-active { background: var(--yellow); color: #0f0b07; }
-.draw-btn-menuitem.is-active .draw-menuitem-label { color: #0f0b07; }
+.draw-btn-menuitem.is-active { background: var(--yellow); color: var(--on-accent); }
+.draw-btn-menuitem.is-active .draw-menuitem-label { color: var(--on-accent); }
 .draw-btn-menuitem:hover { background: var(--surface-2); }
 
 /* Color palette row at the top of the drawing tools flyout.
@@ -1703,7 +1716,7 @@ footer {
 .draw-color-swatch:hover { box-shadow: 0 0 0 1px rgba(255,255,255,0.35); }
 .draw-color-swatch.is-active {
     border-color: #fff;
-    box-shadow: 0 0 0 1px #0f0b07, 0 0 0 3px currentColor;
+    box-shadow: 0 0 0 1px var(--on-accent), 0 0 0 3px currentColor;
 }
 .draw-menu-sep {
     height: 1px;
@@ -1716,7 +1729,7 @@ footer {
        the grid row ends up being. The clamp that used to live here moved
        there as a min-height; LWC runs autoSize:true and follows the box. */
     height: 100%;
-    background: #0f0b07;
+    background: var(--on-accent);
     border: 1px solid var(--border);
     border-radius: 6px;
 }
@@ -1748,7 +1761,7 @@ footer {
 .chart-rsi-canvas {
     width: 100%;
     height: 140px;
-    background: #0f0b07;
+    background: var(--on-accent);
     border: 1px solid var(--border);
     border-radius: 6px;
 }
@@ -1923,7 +1936,7 @@ footer {
 .tool-chip:hover { color: var(--text); }
 .tool-chip.is-active {
     background: var(--yellow);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--yellow);
 }
 .tool-chip.tool-clear {
@@ -1938,7 +1951,7 @@ footer {
 .chart-price-marker-label { min-width: 60px; text-align: right; }
 .chart-price-plus {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border: 0;
     border-radius: 3px;
     width: 20px;
@@ -2100,12 +2113,12 @@ footer {
 .quick-side-btn:hover { color: var(--text); }
 .quick-side-btn.active[data-side="long"] {
     background: var(--green);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--green);
 }
 .quick-side-btn.active[data-side="short"] {
     background: var(--red);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--red);
 }
 .quick-actions {
@@ -2128,7 +2141,7 @@ footer {
 }
 .quick-go.btn-primary {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--blue);
 }
 .quick-go.btn-primary:hover:not(:disabled)   { background: var(--blue); }
@@ -2171,7 +2184,7 @@ footer {
     line-height: 1.4;
 }
 .quick-tab:hover { color: var(--text); }
-.quick-tab.is-active { background: var(--blue); color: #0f0b07; }
+.quick-tab.is-active { background: var(--blue); color: var(--on-accent); }
 .quick-modal[data-tab="validate"] .quick-record-fields { display: none; }
 .quick-record-fields {
     display: flex;
@@ -2718,7 +2731,7 @@ footer {
 }
 .btn-primary {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--blue);
 }
 .btn-primary:active { opacity: 0.8; }
@@ -2743,7 +2756,7 @@ footer {
 .record-btn {
     margin-left: auto;
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     padding: 4px 10px;
     border-radius: 4px;
     text-decoration: none;
@@ -3007,7 +3020,7 @@ footer {
 }
 .btn-apply-partials {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border: none;
     border-radius: 5px;
     padding: 0.35rem 0.7rem;
@@ -3556,7 +3569,7 @@ footer {
 .pf-section-action {
     margin-left: auto;
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     padding: 0.3rem 0.7rem;
     border-radius: 5px;
     text-decoration: none;
@@ -3841,7 +3854,7 @@ footer {
 }
 .pf-page-num.active {
     background: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     border-color: var(--blue);
 }
 .pf-page-arrow.disabled {
@@ -4710,13 +4723,13 @@ footer {
 .tf-pill.active {
     background: var(--blue);
     border-color: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     font-weight: 600;
 }
 .tf-pill:has(input:checked) {
     background: var(--blue);
     border-color: var(--blue);
-    color: #0f0b07;
+    color: var(--on-accent);
     font-weight: 600;
 }
 
@@ -5380,13 +5393,13 @@ main { overflow-x: hidden; }
        Usages fall back to --surface, which is what .stats-card paints. */
 }
 .dt th, .dt td { padding: var(--sp-2) var(--sp-3); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-/* Sticky column header. top:0 on desktop (left-sidebar layout = NO top bar);
-   the old top:52px was for the retired horizontal topnav and left the header
-   floating 52px below the viewport (the "跑版" on setups / stock boards).
-   On mobile a compact .topbar-mobile (~48px) sits at top:0, so tuck below it. */
+/* Sticky column header: below the app top bar (--apptop-h), which is sticky
+   at every width since the 2026-10 shell. Inside a .dt-scroll the header is
+   sticky to THAT scroll box instead, so there it is top:0 (see below). The
+   history: a hardcoded 52px once outlived the bar it was measured from. */
 .dt th {
     color: var(--text-dim); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
-    position: sticky; top: 0; z-index: 2;
+    position: sticky; top: var(--apptop-h); z-index: 2;
     /* Tinted band over an opaque base: rows scrolling under a sticky header
        must not show through, and the tint stays a token (no color-mix). */
     background: linear-gradient(var(--th-bg), var(--th-bg)) var(--surface);
@@ -5397,9 +5410,7 @@ main { overflow-x: hidden; }
    computes to auto), so sticky `top` is relative to THAT box, not the page —
    a 48px offset floats the header down over the first rows (跑版). top:0 sticks
    it to the container top, aligned with the table. */
-@media (max-width: 1023.98px) {
-    .dt th { top: 0; }
-}
+.dt-scroll .dt th { top: 0; }
 /* Zebra at zero specificity (:where) so any row-state class (.holder-cex,
    the --cards card surface) still wins over it. Paging keeps parity: pages are
    contiguous runs of an even size. */
@@ -5825,10 +5836,10 @@ main { overflow-x: hidden; }
     flex-direction: column;
     gap: var(--sp-2);
     /* content-height; cap to viewport so a very long panel still scrolls */
-    max-height: calc(100vh - 72px);
+    max-height: calc(100vh - 72px - var(--apptop-h));
     overflow-y: auto;
     position: sticky;
-    top: var(--sp-2);
+    top: calc(var(--apptop-h) + var(--sp-2));
 }
 .chart-grid.side-collapsed .chart-side { display: none; }
 /* Toggle now lives in the toolbar — a normal button, no chart overlap. */
@@ -5885,12 +5896,8 @@ main { overflow-x: hidden; }
    easy to revert as one block.
    ===================================================================== */
 
-/* Softer, friendlier dark ground + a touch more surface separation. */
-:root, :root[data-theme="slate"] {
-    --bg: #0a0c10;
-    --surface: #14181f;
-    --surface-2: #1c222c;
-}
+/* (The ground colours the reskin used to override here now live in the
+   theme blocks at the top of this file.) */
 
 body { font-size: var(--fs-md); letter-spacing: -0.005em; }
 
@@ -5981,90 +5988,86 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
 .symbol-card .copy-btn.price { font-size: var(--fs-md); font-weight: 700; }
 
 /* =====================================================================
-   LEFT SIDEBAR NAV (structural reskin — replaces the top tab-row).
-   Fixed vertical rail on desktop; off-canvas drawer on mobile behind a
-   compact top bar. This is the single biggest "looks like a product" move.
+   APP SHELL (2026-10 redesign): a 64px icon rail, and a top bar holding
+   the current section's tabs, search, theme, language, alerts and clock.
+   Markup: templates/partials.html "topnav". Desktop keeps the rail fixed;
+   under 1024px the rail becomes a drawer behind the top bar's menu button.
    ===================================================================== */
-.sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 220px; z-index: 30;
-    display: flex; flex-direction: column;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: var(--sp-4) var(--sp-3);
-    gap: var(--sp-1);
-    overflow-y: auto;
+:root { --rail-w: 64px; --apptop-h: 52px; }
+.rail {
+    position: fixed; left: 0; top: 0; bottom: 0; width: var(--rail-w); z-index: 30;
+    display: flex; flex-direction: column; align-items: center; gap: var(--sp-1);
+    padding: 10px 8px; background: var(--surface); border-right: 1px solid var(--border);
 }
-.sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3); }
-.sidebar-brand {
-    display: flex; align-items: center; gap: var(--sp-2);
-    font-size: var(--fs-lg); font-weight: 800; letter-spacing: -0.02em;
-    color: var(--text); text-decoration: none;
+.rail-logo { display: grid; place-items: center; width: 44px; height: 40px; margin-bottom: var(--sp-2); color: var(--blue); }
+.rail-logo .ico { width: 24px; height: 24px; stroke-width: 2.2; }
+.rail-nav { display: flex; flex-direction: column; gap: 2px; }
+.rail-item {
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--r-sm);
+    color: var(--text-dim); text-decoration: none; transition: background var(--t-fast), color var(--t-fast);
 }
-.sidebar-collapse, .sidebar-reopen {
-    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
-    border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-md); line-height: 1; padding: 3px 8px;
-}
-.sidebar-collapse:hover, .sidebar-reopen:hover { color: var(--text); }
-.sidebar-reopen { display: none; position: fixed; top: var(--sp-3); left: var(--sp-2); z-index: 31; padding: 6px 12px; }
-.brand-mark { color: var(--blue); font-size: 1.2em; }
-.sidebar .topnav { flex-direction: column; align-items: stretch; gap: 2px; flex: 0 0 auto; }
-.sidebar .topnav > a, .sidebar .nav-group > a {
-    display: flex; align-items: center; padding: 6px var(--sp-3);
-    border-radius: var(--r-md); color: var(--text-dim); text-decoration: none;
-    font-size: var(--fs-md); font-weight: 600; min-height: 38px;
-    transition: background var(--t-fast), color var(--t-fast);
-}
-.sidebar .topnav a:hover { background: var(--wash-dim); color: var(--text); }
-.sidebar .topnav a.active { background: var(--wash-blue); color: var(--text); box-shadow: inset 3px 0 0 var(--blue); font-weight: 700; }
-.sidebar .nav-group {
-    display: flex; flex-direction: column; align-items: stretch; gap: 2px;
-    border-left: none; border-top: 1px solid var(--border);
-    margin: var(--sp-1) 0 0; padding: var(--sp-1) 0 0;
-}
-.sidebar .nav-group-label {
-    font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .08em;
-    color: var(--text-dim); opacity: .6; margin: 0 0 2px var(--sp-3);
-}
-.sidebar-foot { margin-top: auto; display: flex; gap: var(--sp-2); flex-wrap: wrap; padding-top: var(--sp-3); border-top: 1px solid var(--border); }
-.sidebar-foot .theme-toggle, .sidebar-foot .lang-toggle { position: static; }
+.rail-item span { display: none; }
+.rail-item:hover { background: var(--row-hover); color: var(--text); }
+.rail-item.on { background: var(--wash-blue); color: var(--blue); }
+.ico { width: 20px; height: 20px; flex: 0 0 auto; }
 
-/* Desktop: offset all page content to the right of the fixed rail. */
+.apptop {
+    position: sticky; top: 0; z-index: 20; height: var(--apptop-h);
+    display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-5);
+    background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.at-tabs { display: flex; align-items: stretch; height: 100%; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.at-tabs::-webkit-scrollbar { display: none; }
+.at-tab {
+    display: flex; align-items: center; padding: 0 var(--sp-3); white-space: nowrap;
+    color: var(--text-dim); text-decoration: none; font-size: var(--fs-base); font-weight: 500;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.at-tab:hover { color: var(--text); }
+.at-tab.on { color: var(--text); font-weight: 600; border-bottom-color: var(--blue); }
+.at-right { margin-left: auto; display: flex; align-items: center; gap: var(--sp-2); }
+.at-search {
+    display: flex; align-items: center; gap: var(--sp-2); height: 32px; width: 240px; padding: 0 var(--sp-2) 0 var(--sp-3);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text-dim); font: inherit; font-size: var(--fs-base); cursor: pointer;
+}
+.at-search span { flex: 1; text-align: left; }
+.at-search kbd { font-family: var(--mono); font-size: var(--fs-xs); padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; }
+.at-seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); }
+.at-seg button {
+    height: 26px; padding: 0 var(--sp-3); border: 0; background: transparent; border-radius: 6px;
+    color: var(--text-dim); font: inherit; font-size: var(--fs-sm); cursor: pointer;
+}
+.at-seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+.at-icon {
+    position: relative; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text-dim); font: inherit; font-size: var(--fs-sm); font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.at-icon:hover { color: var(--text); }
+.at-icon .ico { width: 18px; height: 18px; }
+.at-clock { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-dim); white-space: nowrap; }
+.at-menu { display: none; }
+.rail-scrim { display: none; }
+
 @media (min-width: 1024px) {
-    body { padding-left: 220px; }
-    .topbar-mobile, .sidebar-scrim, .nav-burger { display: none; }
-    body.nav-collapsed { padding-left: 0; }
-    body.nav-collapsed .sidebar { transform: translateX(-100%); }
-    body.nav-collapsed .sidebar-reopen { display: inline-flex; }
+    body { padding-left: var(--rail-w); }
 }
-
-/* Mobile: rail becomes an off-canvas drawer behind a compact top bar. */
 @media (max-width: 1023.98px) {
-    .sidebar {
-        transform: translateX(-100%);
-        transition: transform 180ms ease;
-        width: 260px; box-shadow: var(--shadow-2);
-    }
-    .sidebar.open { transform: none; }
-    .topbar-mobile {
-        display: flex; align-items: center; gap: var(--sp-3);
-        position: sticky; top: 0; z-index: 20;
-        padding: var(--sp-2) var(--sp-3);
-        background: rgba(var(--bg-rgb), .9); backdrop-filter: blur(8px);
-        border-bottom: 1px solid var(--border);
-    }
-    .topbar-mobile .brand { display: flex; align-items: center; gap: var(--sp-1); color: var(--text); text-decoration: none; font-weight: 800; }
-    .nav-burger {
-        display: inline-flex; align-items: center; justify-content: center;
-        background: var(--surface-2); border: 1px solid var(--border);
-        color: var(--text); border-radius: var(--r-sm);
-        font-size: var(--fs-lg); line-height: 1; padding: 6px 12px; cursor: pointer;
-    }
-    .sidebar-scrim { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 25; }
-    .sidebar-scrim.show { display: block; }
+    .rail { transform: translateX(-100%); transition: transform 180ms ease; width: 220px; align-items: stretch; box-shadow: var(--shadow-2); }
+    .rail.open { transform: none; }
+    .rail-item { width: auto; display: flex; gap: var(--sp-3); padding: 0 var(--sp-3); }
+    .rail-item span { display: inline; font-weight: 500; }
+    .rail-logo { width: auto; justify-content: flex-start; padding-left: var(--sp-3); }
+    .rail-scrim.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 25; }
+    .at-menu { display: grid; }
+    .apptop { padding: 0 var(--sp-3); gap: var(--sp-2); }
+    .at-search span, .at-search kbd, .at-clock { display: none; }
+    .at-search { width: 32px; padding: 0; justify-content: center; }
 }
-/* Desktop: hide the mobile bar (redundant safety). */
-@media (min-width: 1024px) { .topbar-mobile { display: none; } }
-@media (max-width: 1023.98px) { .sidebar-collapse { display: none; } }
+@media (max-width: 560px) {
+    .at-seg { display: none; } /* theme is in ⌘K on phones */
+}
 
 /* =====================================================================
    ⌘K command palette — jump to any page / symbol / action. Global (in the
@@ -6662,15 +6665,7 @@ html[data-density="compact"] .dt {
    Alert bell + notification panel (static/alerts.js, cmd/web/alerts.go).
    Solid tokens only (--red-bg etc.), no color-mix: iOS Safari < 16.4.
    ===================================================================== */
-.sidebar-head-actions { display: flex; align-items: center; gap: var(--sp-2); }
-.alert-bell {
-    position: relative; display: inline-flex; align-items: center; justify-content: center;
-    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
-    border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-md); line-height: 1; padding: 3px 8px;
-}
-.alert-bell:hover { color: var(--text); }
-.alert-bell.has-critical { border-color: var(--red); background: var(--red-bg); }
-.alert-bell-mobile { margin-left: auto; padding: 6px 10px; }
+.alert-bell.has-critical { border-color: var(--red); background: var(--red-bg); color: var(--red); }
 .alert-badge {
     position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px;
     border-radius: 999px; background: var(--yellow); color: #111;

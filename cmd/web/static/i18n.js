@@ -1,30 +1,22 @@
-/* Top-level i18n — mirrors the theme system.
-   Default = en (keeps current English UI, no flash); zh is opt-in.
-   New UI uses t('key') / [data-i18n="key"]; legacy strings migrate
-   incrementally. A no-flash inline <head> script applies the saved lang
-   before paint (see templates). Language state = localStorage['tw-lang'];
-   a toggle button is injected into header.topbar next to the theme one. */
+/* LEGACY client-side i18n, kept only for page bodies not yet moved to the
+   server-side dictionaries (cmd/web/i18n.go). The language is no longer
+   chosen here: the server renders <html data-lang> from the `lang` cookie
+   and the shell's EN/中 link switches it. This file only fills the legacy
+   [data-i18n] strings of a page in that language, and shrinks to nothing
+   as pages migrate. */
 (function () {
-  var KEY = 'tw-lang';
   var root = document.documentElement;
 
-  // Dictionary. en is the source of truth (matches existing markup);
-  // zh is the translation. Add keys here as strings migrate.
+  // Legacy dictionary. Do not add keys here — new strings go in
+  // cmd/web/i18n/{zh,en}.json and render on the server.
   var DICT = {
     en: {
-      'nav.today': 'Today', 'nav.dashboard': 'Scan', 'nav.portfolio': 'Portfolio', 'nav.validate': 'Validate',
-      'nav.chart': 'Chart', 'nav.scan': '🎯 Live', 'nav.verify': '🔎 Verify', 'nav.setups': 'Setups', 'nav.tips': 'Tips', 'nav.calendar': 'Calendar',
-      'nav.g.trade': 'Trade', 'nav.g.journal': 'Journal', 'nav.g.research': 'Research', 'nav.g.system': 'System', 'nav.ops': 'Settings', 'nav.alerts': '🔔 Alerts',
       'setups.total': 'Total', 'setups.open': 'Open', 'setups.win': 'Win ✓', 'setups.loss': 'Loss ✗',
       'setups.expired': 'Expired', 'setups.skip': 'Skip', 'setups.hitrate': 'Hit-rate',
       'setups.refill': '↻ Backfill', 'setups.slice': 'Engine × Regime hit-rate',
-      'setups.r_neutral': 'neutral chop', 'setups.r_trend': 'trend (HH-HL / LH-LL)',
-      'lang.toggle': '繁', 'lang.title': 'Switch language / 切換語言'
+      'setups.r_neutral': 'neutral chop', 'setups.r_trend': 'trend (HH-HL / LH-LL)'
     },
     zh: {
-      'nav.today': '今日', 'nav.dashboard': '掃描', 'nav.portfolio': '投資組合', 'nav.validate': '驗證',
-      'nav.chart': '圖表', 'nav.scan': '🎯 機會', 'nav.verify': '🔎 查證', 'nav.setups': 'Setups', 'nav.tips': '小卡', 'nav.calendar': '行事曆',
-      'nav.g.trade': '交易', 'nav.g.journal': '紀錄', 'nav.g.research': '研究', 'nav.g.system': '系統', 'nav.ops': '設定', 'nav.alerts': '🔔 告警',
       'setups.total': 'Total', 'setups.open': 'Open', 'setups.win': '勝 ✓', 'setups.loss': '負 ✗',
       'setups.expired': 'Expired', 'setups.skip': 'Skip', 'setups.hitrate': '命中率',
       'setups.refill': '↻ 回填 outcome', 'setups.slice': 'Engine × Regime 命中率切片',
@@ -62,18 +54,11 @@
       'fee math thin': '手續費偏高(edge 薄)',
       'fee math fatal': '手續費吃掉 edge',
       'bounce short in falling POC regime': '下跌 POC 中反彈放空',
-      'trend-aligned': '順勢',
-      'lang.toggle': 'EN', 'lang.title': '切換語言 / Switch language'
+      'trend-aligned': '順勢'
     }
   };
 
   function cur() { return root.getAttribute('data-lang') === 'zh' ? 'zh' : 'en'; }
-  // Keep the real <html lang> in sync with the active UI language (a11y/SEO).
-  // Templates hardcode lang="en" server-side; this makes it authoritative &
-  // dynamic. Runs at top level (defer → after parse) so it tracks the value
-  // the no-flash inline <head> script already set.
-  function syncHtmlLang() { root.setAttribute('lang', cur() === 'zh' ? 'zh-Hant' : 'en'); }
-  syncHtmlLang();
   // Global lookup: current lang → en fallback → raw key.
   window.t = function (k) { var L = cur(); return (DICT[L] && DICT[L][k]) || DICT.en[k] || k; };
 
@@ -85,42 +70,10 @@
     document.querySelectorAll('[data-i18n-html]').forEach(function (el) {
       var v = window.t(el.getAttribute('data-i18n-html')); if (v != null) el.innerHTML = v;
     });
-    var b = document.getElementById('lang-toggle');
-    if (b) { b.textContent = window.t('lang.toggle'); b.title = window.t('lang.title'); }
   }
   window.i18nApply = apply; // let dynamic renderers re-apply after inserting DOM
 
-  function setLang(L) {
-    root.setAttribute('data-lang', L);
-    syncHtmlLang();
-    try { localStorage.setItem(KEY, L); } catch (e) {}
-    apply();
-  }
-
   document.addEventListener('DOMContentLoaded', function () {
     apply();
-    // Mark the active nav link by current path (topnav is now a shared
-    // partial with no per-page active class).
-    // Activate only the MOST-SPECIFIC matching link: a bare prefix test lights up
-    // both a parent tab and its child (e.g. /ops and /ops/autotrade), so pick the
-    // longest matching href and mark just that one.
-    var path = location.pathname;
-    var best = null, bestLen = -1;
-    document.querySelectorAll('.topnav a').forEach(function (a) {
-      var h = a.getAttribute('href');
-      var on = h === '/' ? (path === '/') : (path === h || path.indexOf(h + '/') === 0);
-      if (on && h.length > bestLen) { best = a; bestLen = h.length; }
-    });
-    if (best) best.classList.add('active');
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'lang-toggle';
-    btn.id = 'lang-toggle';
-    btn.textContent = window.t('lang.toggle');
-    btn.title = window.t('lang.title');
-    btn.addEventListener('click', function () { setLang(cur() === 'zh' ? 'en' : 'zh'); });
-    var bar = document.querySelector('#sidebar-foot') || document.querySelector('header.topbar');
-    if (bar) bar.appendChild(btn);
-    else { btn.classList.add('floating'); document.body.appendChild(btn); }
   });
 })();

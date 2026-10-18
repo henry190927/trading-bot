@@ -10,7 +10,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"html/template"
 	"io/fs"
 	"log"
 	"net/http"
@@ -74,8 +73,16 @@ func main() {
 	})
 
 	// Embedded templates + static assets so the binary is self-contained.
-	tmpl := template.Must(template.New("").Funcs(templateFuncs()).ParseFS(assets, "templates/*.html"))
-	r.SetHTMLTemplate(tmpl)
+	// Templates are parsed once per language (i18n.go); pages render through
+	// srv.page, never c.HTML.
+	dicts, err := loadDicts(i18nFS)
+	if err != nil {
+		log.Fatalf("i18n: %v", err)
+	}
+	pages, err := parsePages(assets, dicts)
+	if err != nil {
+		log.Fatalf("templates: %v", err)
+	}
 	staticFS, err := fs.Sub(assets, "static")
 	if err != nil {
 		log.Fatalf("static fs: %v", err)
@@ -105,6 +112,7 @@ func main() {
 		}
 	}
 	srv := &server{
+		pages:          pages,
 		client:         bxClient,
 		ai:             aiProvider,
 		aiProviderName: providerName,
@@ -115,6 +123,7 @@ func main() {
 	// The hub's only dependency is "give me a snapshot" — the same builder
 	// /api/tickers serves, so both transports carry identical numbers.
 	srv.hub = newTickerHub(func(ctx context.Context) any { return srv.buildTickers(ctx) })
+	r.GET("/lang/:code", srv.handleLang)
 	r.GET("/", srv.handleTodayPage)      // home = Today (symbols overview)
 	r.GET("/today", srv.handleTodayPage) // kept for existing links/bookmarks
 	r.GET("/scan", srv.handleDashboard)  // Scan moved off "/"

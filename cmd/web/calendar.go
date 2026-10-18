@@ -234,7 +234,7 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 		nextDays = int(nx.DatetimeUTC.Sub(now).Hours() / 24)
 	}
 
-	c.HTML(http.StatusOK, "calendar.html", gin.H{
+	s.page(c, http.StatusOK, "calendar.html", gin.H{
 		"Months":     months,
 		"ActiveName": activeName,
 		"NextName":   nextName,

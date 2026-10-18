@@ -1,48 +1,41 @@
-/* Theme switcher — slate (default GitHub-dark) <-> industrial (amber).
-   The <head> inline script already applied the saved theme before paint;
-   this only builds the toggle control and persists clicks. */
+/* Theme: dark (default) | light. Colours only — the layout never changes
+   with the theme. The <head> inline script applied the saved value before
+   paint; this wires the top bar's [data-theme-set] buttons and keeps the
+   browser-chrome colour in step.
+
+   Saved values from the old pair (slate / industrial) are not "light", so
+   they fall through to dark — the CSS default — without a migration. */
 (function () {
   var KEY = 'tw-theme';
   var root = document.documentElement;
+  var META = { dark: '#0e1013', light: '#f5f3ee' };
 
-  function cur()  { return root.getAttribute('data-theme') === 'industrial' ? 'industrial' : 'slate'; }
-  function label(t) { return t === 'slate' ? '◑ Slate' : '◐ Industrial'; }
+  function cur() { return root.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
 
-  // Keep the browser-chrome / PWA status-bar color in sync with the theme
-  // (the one color that can't be a CSS var). slate = GitHub-dark, industrial
-  // = warm charcoal.
-  function applyMeta(t) {
+  function mark() {
+    var t = cur();
+    document.querySelectorAll('[data-theme-set]').forEach(function (b) {
+      var on = b.getAttribute('data-theme-set') === t;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', t === 'industrial' ? '#0f0b07' : '#0d1117');
+    if (m) m.setAttribute('content', META[t]);
   }
 
   function apply(t) {
     root.setAttribute('data-theme', t);
-    applyMeta(t);
     try { localStorage.setItem(KEY, t); } catch (e) {}
+    mark();
+    // Canvas charts paint their colours once; they listen for this.
+    document.dispatchEvent(new CustomEvent('themechange', { detail: t }));
   }
+  window.themeToggle = function () { apply(cur() === 'light' ? 'dark' : 'light'); };
 
   document.addEventListener('DOMContentLoaded', function () {
-    applyMeta(cur());   // sync meta to the theme the inline head script applied
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'theme-toggle';
-    btn.textContent = label(cur());
-    btn.title = '切換配色主題 (工業風 / 原深藍灰)';
-    btn.addEventListener('click', function () {
-      var next = cur() === 'slate' ? 'industrial' : 'slate';
-      apply(next);
-      btn.textContent = label(next);
+    mark();
+    document.querySelectorAll('[data-theme-set]').forEach(function (b) {
+      b.addEventListener('click', function () { apply(b.getAttribute('data-theme-set')); });
     });
-
-    // Prefer the top bar; fall back to a floating control on pages
-    // without one (e.g. the full-screen chart view).
-    var bar = document.querySelector('#sidebar-foot') || document.querySelector('header.topbar');
-    if (bar) {
-      bar.appendChild(btn);
-    } else {
-      btn.classList.add('floating');
-      document.body.appendChild(btn);
-    }
   });
 })();

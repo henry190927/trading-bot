@@ -193,7 +193,7 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 		}
 		orphans, orphanNakedN = s.exchangeOrphans(ctx, trades)
 	}
-	c.HTML(http.StatusOK, "verify_exchange.html", gin.H{
+	s.page(c, http.StatusOK, "verify_exchange.html", gin.H{
 		"Rows":         rows,
 		"Orphans":      orphans,
 		"OrphanNakedN": orphanNakedN,

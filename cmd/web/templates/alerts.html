@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{.Shell.HTMLLang}}" data-lang="{{.Shell.Lang}}">
 <head>
 <meta charset="utf-8">
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
-<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>告警 · trading-web</title>
+<title>{{t "alerts.title"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
@@ -16,26 +15,22 @@
 {{template "topnav" .}}
 
 <main class="alerts-main">
-  <h1 class="page-title">告警</h1>
-  <p class="hint">
-    每 15 秒檢查一次,條件連續成立兩次才觸發、連續解除兩次才恢復。
-    嚴重(critical)另外推 ntfy;monitor 停止由主機上的 daemon-watch 推。
-    「已讀」只是不再提醒,告警要等條件解除才會恢復。
-  </p>
+  <h1 class="page-title">{{t "alerts.title"}}</h1>
+  <p class="hint">{{t "alerts.page.lead"}}</p>
 
   <div class="alerts-toolbar">
     <div class="alerts-filter" role="tablist">
-      <button type="button" class="btn-ops is-active" data-filter="all">全部</button>
-      <button type="button" class="btn-ops" data-filter="open">進行中</button>
-      <button type="button" class="btn-ops" data-filter="unread">未讀</button>
+      <button type="button" class="btn-ops is-active" data-filter="all">{{t "alerts.page.all"}}</button>
+      <button type="button" class="btn-ops" data-filter="open">{{t "alerts.open"}}</button>
+      <button type="button" class="btn-ops" data-filter="unread">{{t "alerts.page.unread"}}</button>
     </div>
-    <label class="alerts-info-toggle"><input type="checkbox" id="alerts-show-info"> 顯示紀錄(啟動 / 重啟)</label>
+    <label class="alerts-info-toggle"><input type="checkbox" id="alerts-show-info"> {{t "alerts.page.showInfo"}}</label>
     <span class="ops-state-flex"></span>
-    <button type="button" class="btn-ops" id="alerts-page-ackall">全部標為已讀</button>
+    <button type="button" class="btn-ops" id="alerts-page-ackall">{{t "alerts.ackAll"}}</button>
   </div>
 
   <ul class="alert-list alert-list-page" id="alerts-page-list">
-    <li class="alert-empty">載入中…</li>
+    <li class="alert-empty">{{t "common.loading"}}</li>
   </ul>
 </main>
 
@@ -57,7 +52,7 @@
     if (!rows.length) {
       var li = document.createElement('li');
       li.className = 'alert-empty';
-      li.textContent = filter === 'all' ? '沒有任何告警紀錄' : '沒有符合的告警';
+      li.textContent = filter === 'all' ? {{t "alerts.page.none"}} : {{t "alerts.page.noMatch"}};
       listEl.appendChild(li);
       return;
     }

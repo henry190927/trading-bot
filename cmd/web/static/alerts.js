@@ -16,21 +16,24 @@
   var baseTitle = document.title;
   var last = null;
 
-  var SEV = { critical: '嚴重', warning: '警告', info: '紀錄' };
+  // Strings come from the server's dictionary via the shell (window.I18N),
+  // so the bell speaks the page's language.
+  var L = window.I18N || {};
+  function T(k) { return L[k] || k; }
 
   function fmtTime(iso) {
     if (!iso) return '';
-    return new Date(iso).toLocaleString('zh-TW', {
+    return new Date(iso).toLocaleString('sv-SE', {
       timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', hour12: false
     });
   }
   function fmtDur(ms) {
     var s = Math.max(0, Math.round(ms / 1000));
-    if (s < 60) return s + ' 秒';
-    if (s < 3600) return Math.round(s / 60) + ' 分';
-    if (s < 86400) return Math.floor(s / 3600) + ' 時 ' + Math.round((s % 3600) / 60) + ' 分';
-    return Math.floor(s / 86400) + ' 天 ' + Math.floor((s % 86400) / 3600) + ' 時';
+    if (s < 60) return s + ' ' + T('dur.s');
+    if (s < 3600) return Math.round(s / 60) + ' ' + T('dur.m');
+    if (s < 86400) return Math.floor(s / 3600) + ' ' + T('dur.h') + ' ' + Math.round((s % 3600) / 60) + ' ' + T('dur.m');
+    return Math.floor(s / 86400) + ' ' + T('dur.d') + ' ' + Math.floor((s % 86400) / 3600) + ' ' + T('dur.h');
   }
   function isOpen(a) { return !a.resolved_at; }
   function isUnread(a) { return a.severity !== 'info' && !a.acked_at; }
@@ -39,8 +42,8 @@
   function statusText(a) {
     if (a.severity === 'info' && a.fired_at === a.resolved_at) return '';
     var start = new Date(a.fired_at).getTime();
-    if (isOpen(a)) return '進行中 · ' + fmtDur(Date.now() - start);
-    return '已恢復 · 持續 ' + fmtDur(new Date(a.resolved_at).getTime() - start);
+    if (isOpen(a)) return T('alerts.open') + ' · ' + fmtDur(Date.now() - start);
+    return T('alerts.resolvedFor') + ' ' + fmtDur(new Date(a.resolved_at).getTime() - start);
   }
 
   function el(tag, cls, text) {
@@ -54,7 +57,7 @@
   function renderItem(a, opts) {
     var li = el('li', 'alert-item sev-' + a.severity + (isOpen(a) ? ' is-open' : ' is-resolved') + (isUnread(a) ? ' is-unread' : ''));
     var head = el('div', 'alert-item-head');
-    head.appendChild(el('span', 'alert-sev', SEV[a.severity] || a.severity));
+    head.appendChild(el('span', 'alert-sev', T('alerts.sev.' + a.severity)));
     head.appendChild(el('span', 'alert-title', a.title));
     li.appendChild(head);
     if (a.detail) li.appendChild(el('div', 'alert-detail', a.detail));
@@ -62,9 +65,9 @@
     meta.appendChild(el('span', '', fmtTime(a.fired_at)));
     var st = statusText(a);
     if (st) meta.appendChild(el('span', 'alert-status', st));
-    if (a.acked_at) meta.appendChild(el('span', 'alert-acked', '已讀 ' + fmtTime(a.acked_at)));
+    if (a.acked_at) meta.appendChild(el('span', 'alert-acked', T('alerts.acked') + ' ' + fmtTime(a.acked_at)));
     if (isUnread(a)) {
-      var b = el('button', 'btn-ops alert-ack', '標為已讀');
+      var b = el('button', 'btn-ops alert-ack', T('alerts.ack'));
       b.type = 'button';
       b.addEventListener('click', function (ev) { ev.stopPropagation(); ack(a.id); });
       meta.appendChild(b);
@@ -91,7 +94,7 @@
     list.innerHTML = '';
     var shown = s.alerts.filter(function (a) { return a.severity !== 'info'; }).slice(0, 8);
     if (!shown.length) {
-      list.appendChild(el('li', 'alert-empty', '沒有告警 — 一切正常'));
+      list.appendChild(el('li', 'alert-empty', T('alerts.empty')));
       return;
     }
     shown.forEach(function (a) { list.appendChild(renderItem(a)); });

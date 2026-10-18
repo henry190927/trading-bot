@@ -84,7 +84,7 @@ func (s *server) handleTodayPage(c *gin.Context) {
 		}
 	}
 
-	c.HTML(http.StatusOK, "today.html", gin.H{
+	s.page(c, http.StatusOK, "today.html", gin.H{
 		"MacroActive": activeBO,
 		"BONext":      boNext,
 		"MacroGaps":   macroGaps,

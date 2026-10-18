@@ -300,5 +300,5 @@ func (s *server) handleAlertsAck(c *gin.Context) {
 
 // handleAlertsPage — GET /alerts, the full history.
 func (s *server) handleAlertsPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "alerts.html", gin.H{})
+	s.page(c, http.StatusOK, "alerts.html", gin.H{})
 }

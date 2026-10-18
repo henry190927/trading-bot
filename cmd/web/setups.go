@@ -542,7 +542,7 @@ func regimeRollup(all []Setup) map[string]map[string]SliceCell {
 // cards (bilingual via the i18n .i18n-en/.i18n-zh CSS toggle).
 func (s *server) handleTipsPage(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	c.HTML(http.StatusOK, "tips.html", gin.H{})
+	s.page(c, http.StatusOK, "tips.html", gin.H{})
 }
 
 // handleSetupsList — GET /setups. Newest first + hit-rate rollup.
@@ -554,7 +554,7 @@ func (s *server) handleSetupsList(c *gin.Context) {
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID > all[j].ID })
 	c.Header("Cache-Control", "no-store")
-	c.HTML(http.StatusOK, "setups.html", gin.H{
+	s.page(c, http.StatusOK, "setups.html", gin.H{
 		"Setups": all,
 		"Stats":  rollupSetups(all),
 		"Regime": regimeRollup(all),

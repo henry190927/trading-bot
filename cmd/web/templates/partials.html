@@ -1,128 +1,133 @@
+{{/* ============================================================ */}}
+{{/* icon — the one line-icon set. Emoji are not icons: they render */}}
+{{/* differently per OS and never match the type around them.       */}}
+{{/* ============================================================ */}}
+{{define "icon"}}<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{if eq . "today"}}<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>{{else if eq . "chart"}}<path d="M7 3v4M7 17v4M17 6v3M17 15v3"/><rect x="5" y="7" width="4" height="10" rx="1"/><rect x="15" y="9" width="4" height="6" rx="1"/>{{else if eq . "portfolio"}}<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/>{{else if eq . "research"}}<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/>{{else if eq . "settings"}}<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>{{else if eq . "bell"}}<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>{{else if eq . "search"}}<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>{{else if eq . "menu"}}<path d="M4 6h16M4 12h16M4 18h16"/>{{else if eq . "logo"}}<path d="M4 18 10 9l4 5 6-9"/>{{end}}</svg>{{end}}
+
+{{/* ============================================================ */}}
+{{/* topnav — the shell every page includes: rail, top bar with the */}}
+{{/* section's tabs, alert bell, ⌘K, toasts. Needs .Shell, which    */}}
+{{/* server.page adds (i18n.go).                                    */}}
+{{/* ============================================================ */}}
 {{define "topnav"}}
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-head">
-    <a class="sidebar-brand" href="/"><span class="brand-mark">◈</span><span class="brand-text">Hentra</span></a>
-    <span class="sidebar-head-actions">
-      <button type="button" class="alert-bell" data-alert-bell title="告警" aria-label="alerts" aria-haspopup="true">🔔<span class="alert-badge" hidden></span></button>
-      <button type="button" class="sidebar-collapse" id="sidebar-collapse" title="收合側欄" aria-label="collapse sidebar">«</button>
-    </span>
-  </div>
-  <nav class="topnav" id="topnav">
-    <a href="/" data-i18n="nav.today">Today</a>
-    <a href="/scan" data-i18n="nav.dashboard">Scan</a>
-    <div class="nav-group">
-      <span class="nav-group-label" data-i18n="nav.g.trade">Trade</span>
-      <a href="/chart" data-i18n="nav.chart">Chart</a>
-      <a href="/ops/scan" data-i18n="nav.scan">🎯 機會</a>
-      <a href="/validate" data-i18n="nav.validate">Validate</a>
-    </div>
-    <div class="nav-group">
-      <span class="nav-group-label" data-i18n="nav.g.journal">Journal</span>
-      <a href="/journal" data-i18n="nav.portfolio">Portfolio</a>
-      <a href="/setups" data-i18n="nav.setups">Setups</a>
-      <a href="/tips" data-i18n="nav.tips">Tips</a>
-    </div>
-    <div class="nav-group">
-      <span class="nav-group-label" data-i18n="nav.g.research">Research</span>
-      <a href="/calendar" data-i18n="nav.calendar">Calendar</a>
-    </div>
-    <div class="nav-group">
-      <span class="nav-group-label" data-i18n="nav.g.system">System</span>
-      <a href="/alerts" data-i18n="nav.alerts">🔔 Alerts</a>
-      <a href="/ops" data-i18n="nav.ops">Settings</a>
-      <a href="/ops/autotrade">🤖 Auto</a>
-      <a href="/ops/verify" data-i18n="nav.verify">🔎 查證</a>
-    </div>
+<script>
+  /* The server decided the language; legacy page strings follow it. */
+  document.documentElement.setAttribute('data-lang', {{.Shell.Lang}});
+  document.documentElement.lang = {{.Shell.HTMLLang}};
+  window.I18N = {
+    'alerts.ack': {{t "alerts.ack"}}, 'alerts.empty': {{t "alerts.empty"}},
+    'alerts.sev.critical': {{t "alerts.sev.critical"}}, 'alerts.sev.warning': {{t "alerts.sev.warning"}}, 'alerts.sev.info': {{t "alerts.sev.info"}},
+    'alerts.open': {{t "alerts.open"}}, 'alerts.resolvedFor': {{t "alerts.resolvedFor"}}, 'alerts.acked': {{t "alerts.acked"}},
+    'dur.s': {{t "dur.s"}}, 'dur.m': {{t "dur.m"}}, 'dur.h': {{t "dur.h"}}, 'dur.d': {{t "dur.d"}}
+  };
+</script>
+<aside class="rail" id="rail" aria-label="primary">
+  <a class="rail-logo" href="/" aria-label="{{t "nav.home"}}">{{template "icon" "logo"}}</a>
+  <nav class="rail-nav">
+    {{range .Shell.Nav}}<a href="{{.Href}}" class="rail-item{{if .On}} on{{end}}"{{if .On}} aria-current="page"{{end}} title="{{t .Key}}">{{template "icon" .Icon}}<span>{{t .Key}}</span></a>
+    {{end}}
   </nav>
-  <div class="sidebar-foot" id="sidebar-foot"></div>
 </aside>
-<header class="topbar-mobile">
-  <button type="button" class="nav-burger" id="nav-burger" aria-label="menu" aria-expanded="false">☰</button>
-  <a class="brand" href="/"><span class="brand-mark">◈</span> Hentra</a>
-  <button type="button" class="alert-bell alert-bell-mobile" data-alert-bell title="告警" aria-label="alerts" aria-haspopup="true">🔔<span class="alert-badge" hidden></span></button>
-</header>
-<!-- Alert bell dropdown (alerts.js). One panel for both bells. -->
-<div class="alert-panel" id="alert-panel" role="dialog" aria-label="alerts" hidden>
-  <div class="alert-panel-head">
-    <strong>告警</strong>
-    <button type="button" class="btn-ops alert-ackall" id="alert-ackall">全部標為已讀</button>
+<div class="rail-scrim" id="rail-scrim"></div>
+<header class="apptop">
+  <button type="button" class="at-icon at-menu" id="rail-open" aria-label="{{t "nav.menu"}}" aria-expanded="false">{{template "icon" "menu"}}</button>
+  {{if .Shell.Tabs}}<nav class="at-tabs" aria-label="section">
+    {{range .Shell.Tabs}}<a href="{{.Href}}" class="at-tab{{if .On}} on{{end}}"{{if .On}} aria-current="page"{{end}}>{{t .Key}}</a>{{end}}
+  </nav>{{end}}
+  <div class="at-right">
+    <button type="button" class="at-search" id="cmdk-open">{{template "icon" "search"}}<span>{{t "shell.search"}}</span><kbd>⌘K</kbd></button>
+    <div class="at-seg" role="group" aria-label="{{t "shell.theme"}}">
+      <button type="button" data-theme-set="dark">{{t "theme.dark"}}</button><button type="button" data-theme-set="light">{{t "theme.light"}}</button>
+    </div>
+    <a class="at-icon at-lang" href="/lang/{{.Shell.OtherLang}}?next={{.Shell.Here}}" title="{{t "lang.switchTitle"}}">{{t "lang.switch"}}</a>
+    <button type="button" class="at-icon alert-bell" data-alert-bell aria-label="{{t "alerts.title"}}" aria-haspopup="true">{{template "icon" "bell"}}<span class="alert-badge" hidden></span></button>
+    <span class="at-clock num" id="at-clock" title="UTC+8"></span>
   </div>
-  <ul class="alert-list" id="alert-panel-list"></ul>
-  <a class="alert-panel-foot" href="/alerts">查看全部紀錄 →</a>
-</div>
-<script src="/static/alerts.js" defer></script>
-<div class="sidebar-scrim" id="sidebar-scrim"></div>
-<button type="button" class="sidebar-reopen" id="sidebar-reopen" title="展開側欄" aria-label="open sidebar">☰</button>
+</header>
 <script>
   (function () {
-    var side = document.getElementById('sidebar'), b = document.getElementById('nav-burger'), scrim = document.getElementById('sidebar-scrim');
-    if (!side || !b) return;
-    function close() { side.classList.remove('open'); if (scrim) scrim.classList.remove('show'); b.setAttribute('aria-expanded', 'false'); }
-    b.addEventListener('click', function () {
-      var open = side.classList.toggle('open');
-      if (scrim) scrim.classList.toggle('show', open);
-      b.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-    if (scrim) scrim.addEventListener('click', close);
-    side.addEventListener('click', function (e) { if (e.target.tagName === 'A') close(); });
-
-    // Desktop collapse (persisted): hide the rail, show a floating reopen.
-    var col = document.getElementById('sidebar-collapse'), reo = document.getElementById('sidebar-reopen'), body = document.body, CK = 'nav-collapsed';
-    try { if (localStorage.getItem(CK) === '1') body.classList.add('nav-collapsed'); } catch (e) {}
-    function setCol(on) { body.classList.toggle('nav-collapsed', on); try { localStorage.setItem(CK, on ? '1' : '0'); } catch (e) {} }
-    if (col) col.addEventListener('click', function () { setCol(true); });
-    if (reo) reo.addEventListener('click', function () { setCol(false); });
+    var rail = document.getElementById('rail'), scrim = document.getElementById('rail-scrim'), b = document.getElementById('rail-open');
+    function set(open) { rail.classList.toggle('open', open); scrim.classList.toggle('show', open); b.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+    b.addEventListener('click', function () { set(!rail.classList.contains('open')); });
+    scrim.addEventListener('click', function () { set(false); });
+    // Market time is UTC+8 everywhere in this app, whatever the device says.
+    var clk = document.getElementById('at-clock');
+    function tick() {
+      var d = new Date(Date.now() + 8 * 3600e3);
+      var p = function (n) { return (n < 10 ? '0' : '') + n; };
+      clk.textContent = p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ' UTC+8';
+    }
+    tick(); setInterval(tick, 15000);
   })();
 </script>
 
+<!-- Alert bell dropdown (static/alerts.js). -->
+<div class="alert-panel" id="alert-panel" role="dialog" aria-label="{{t "alerts.title"}}" hidden>
+  <div class="alert-panel-head">
+    <strong>{{t "alerts.title"}}</strong>
+    <button type="button" class="btn-ops alert-ackall" id="alert-ackall">{{t "alerts.ackAll"}}</button>
+  </div>
+  <ul class="alert-list" id="alert-panel-list"></ul>
+  <a class="alert-panel-foot" href="/alerts">{{t "alerts.viewAll"}} →</a>
+</div>
+<script src="/static/alerts.js" defer></script>
+
 <div class="cmdk-backdrop" id="cmdk-backdrop" hidden>
   <div class="cmdk" role="dialog" aria-label="command palette" aria-modal="true">
-    <input class="cmdk-input" id="cmdk-input" type="text" placeholder="跳到… 頁面 / 標的 / 動作 (⌘K)" autocomplete="off" spellcheck="false">
+    <input class="cmdk-input" id="cmdk-input" type="text" placeholder="{{t "cmdk.placeholder"}}" autocomplete="off" spellcheck="false">
     <ul class="cmdk-list" id="cmdk-list"></ul>
   </div>
 </div>
 <script>
   (function () {
     var CMDS = [
-      {t:'Today', h:'home', u:'/today'}, {t:'Scan', h:'dashboard', u:'/'},
-      {t:'Chart', h:'', u:'/chart'}, {t:'Validate', h:'', u:'/validate'},
-      {t:'Portfolio', h:'journal', u:'/journal'}, {t:'New journal entry', h:'record', u:'/journal/new'},
-      {t:'Setups', h:'forward-log', u:'/setups'}, {t:'Tips', h:'', u:'/tips'},
-      {t:'Calendar', h:'macro', u:'/calendar'},
-      {t:'Settings', h:'ops · push · zones', u:'/ops'}, {t:'Alerts', h:'告警', u:'/alerts'},
-      {t:'Chart · BTC', h:'symbol', u:'/chart?symbol=BTC'}, {t:'Chart · ETH', h:'symbol', u:'/chart?symbol=ETH'},
-      {t:'Chart · XAU', h:'symbol', u:'/chart?symbol=XAU'}, {t:'Chart · XAG', h:'symbol', u:'/chart?symbol=XAG'},
-      {t:'Chart · SNDK', h:'symbol', u:'/chart?symbol=SNDK'}, {t:'Chart · NVDA', h:'symbol', u:'/chart?symbol=NVDA'},
-      {t:'Toggle theme', h:'slate / industrial', a:'theme'}, {t:'Toggle language', h:'EN / 繁', a:'lang'},
-      {t:'Toggle density', h:'cozy / compact', a:'density'}
+      {t: {{t "tab.today"}}, u: '/today'}, {t: {{t "tab.live"}}, u: '/ops/scan'},
+      {t: {{t "tab.chart"}}, u: '/chart'}, {t: {{t "tab.validate"}}, u: '/validate'},
+      {t: {{t "tab.trades"}}, u: '/journal'}, {t: {{t "cmdk.newTrade"}}, u: '/journal/new'},
+      {t: {{t "tab.setups"}}, u: '/setups'}, {t: {{t "tab.auto"}}, u: '/ops/autotrade'}, {t: {{t "tab.verify"}}, u: '/ops/verify'},
+      {t: {{t "tab.calendar"}}, u: '/calendar'}, {t: {{t "tab.scan"}}, u: '/scan'}, {t: {{t "tab.tips"}}, u: '/tips'},
+      {t: {{t "tab.settings"}}, u: '/ops'}, {t: {{t "tab.alerts"}}, u: '/alerts'},
+      {t: 'BTC', h: {{t "cmdk.symbol"}}, u: '/chart?symbol=BTC'}, {t: 'ETH', h: {{t "cmdk.symbol"}}, u: '/chart?symbol=ETH'},
+      {t: 'XAU', h: {{t "cmdk.symbol"}}, u: '/chart?symbol=XAU'}, {t: 'XAG', h: {{t "cmdk.symbol"}}, u: '/chart?symbol=XAG'},
+      {t: 'SNDK', h: {{t "cmdk.symbol"}}, u: '/chart?symbol=SNDK'}, {t: 'NVDA', h: {{t "cmdk.symbol"}}, u: '/chart?symbol=NVDA'},
+      {t: {{t "cmdk.theme"}}, a: 'theme'}, {t: {{t "cmdk.lang"}}, u: '/lang/' + {{.Shell.OtherLang}} + '?next=' + encodeURIComponent(location.pathname + location.search)},
+      {t: {{t "cmdk.density"}}, a: 'density'}
     ];
-    var bd=document.getElementById('cmdk-backdrop'), inp=document.getElementById('cmdk-input'), list=document.getElementById('cmdk-list');
-    if(!bd||!inp||!list) return;
-    var sel=0, filtered=CMDS;
-    function fuzzy(q,s){ q=q.toLowerCase(); s=s.toLowerCase(); var i=0; for(var j=0;j<s.length&&i<q.length;j++){ if(s[j]===q[i]) i++; } return i===q.length; }
-    function render(){
-      list.innerHTML='';
-      filtered.forEach(function(c,i){
-        var li=document.createElement('li'); li.className='cmdk-item'+(i===sel?' sel':'');
-        li.innerHTML='<span class="cmdk-t">'+c.t+'</span>'+(c.h?'<span class="cmdk-h">'+c.h+'</span>':'');
-        li.addEventListener('click',function(){ run(c); });
+    var bd = document.getElementById('cmdk-backdrop'), inp = document.getElementById('cmdk-input'), list = document.getElementById('cmdk-list');
+    if (!bd || !inp || !list) return;
+    var sel = 0, filtered = CMDS;
+    function fuzzy(q, s) { q = q.toLowerCase(); s = s.toLowerCase(); var i = 0; for (var j = 0; j < s.length && i < q.length; j++) { if (s[j] === q[i]) i++; } return i === q.length; }
+    function render() {
+      list.innerHTML = '';
+      filtered.forEach(function (c, i) {
+        var li = document.createElement('li'); li.className = 'cmdk-item' + (i === sel ? ' sel' : '');
+        var tt = document.createElement('span'); tt.className = 'cmdk-t'; tt.textContent = c.t; li.appendChild(tt);
+        if (c.h) { var hh = document.createElement('span'); hh.className = 'cmdk-h'; hh.textContent = c.h; li.appendChild(hh); }
+        li.addEventListener('click', function () { run(c); });
         list.appendChild(li);
       });
     }
-    function refilter(){ var q=inp.value.trim(); filtered=q?CMDS.filter(function(c){return fuzzy(q,c.t+' '+(c.h||''));}):CMDS; sel=0; render(); }
-    function open(){ bd.hidden=false; inp.value=''; refilter(); setTimeout(function(){inp.focus();},0); }
-    function close(){ bd.hidden=true; }
-    function run(c){ close(); if(c.u){ location.href=c.u; } else if(c.a==='theme'){ var b=document.querySelector('.theme-toggle'); if(b)b.click(); } else if(c.a==='lang'){ var b=document.querySelector('.lang-toggle'); if(b)b.click(); } else if(c.a==='density'){ var b=document.querySelector('.density-toggle'); if(b)b.click(); } }
-    document.addEventListener('keydown',function(e){
-      if((e.metaKey||e.ctrlKey)&&e.key==='k'){ e.preventDefault(); bd.hidden?open():close(); return; }
-      if(bd.hidden) return;
-      if(e.key==='Escape'){ close(); }
-      else if(e.key==='ArrowDown'){ e.preventDefault(); sel=Math.min(sel+1,filtered.length-1); render(); }
-      else if(e.key==='ArrowUp'){ e.preventDefault(); sel=Math.max(sel-1,0); render(); }
-      else if(e.key==='Enter'){ e.preventDefault(); if(filtered[sel]) run(filtered[sel]); }
+    function refilter() { var q = inp.value.trim(); filtered = q ? CMDS.filter(function (c) { return fuzzy(q, c.t + ' ' + (c.h || '')); }) : CMDS; sel = 0; render(); }
+    function open() { bd.hidden = false; inp.value = ''; refilter(); setTimeout(function () { inp.focus(); }, 0); }
+    function close() { bd.hidden = true; }
+    function run(c) {
+      close();
+      if (c.u) location.href = c.u;
+      else if (c.a === 'theme' && window.themeToggle) window.themeToggle();
+      else if (c.a === 'density' && window.densityToggle) window.densityToggle();
+    }
+    var ob = document.getElementById('cmdk-open');
+    if (ob) ob.addEventListener('click', open);
+    document.addEventListener('keydown', function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); bd.hidden ? open() : close(); return; }
+      if (bd.hidden) return;
+      if (e.key === 'Escape') { close(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, filtered.length - 1); render(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (filtered[sel]) run(filtered[sel]); }
     });
-    inp.addEventListener('input',refilter);
-    bd.addEventListener('click',function(e){ if(e.target===bd) close(); });
+    inp.addEventListener('input', refilter);
+    bd.addEventListener('click', function (e) { if (e.target === bd) close(); });
   })();
 </script>
 <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="false"></div>
@@ -130,7 +135,7 @@
   (function () {
     var stack = document.getElementById('toast-stack');
     if (!stack) return;
-    var ICO = { ok: '\u2713', err: '\u2715', warn: '\u26A0', info: '\u2139' };
+    var ICO = { ok: '✓', err: '✕', warn: '!', info: 'i' };
     window.toast = function (msg, kind, ms) {
       kind = kind || 'info';
       var t = document.createElement('div');
@@ -149,23 +154,15 @@
   })();
 </script>
 <script>
+  /* Table density: compact tightens .dt rows. No button any more — ⌘K. */
   (function () {
     var KEY = 'tw-density', root = document.documentElement;
-    function cur() { return root.getAttribute('data-density') === 'compact' ? 'compact' : 'cozy'; }
     try { if (localStorage.getItem(KEY) === 'compact') root.setAttribute('data-density', 'compact'); } catch (e) {}
-    function label(d) { return d === 'compact' ? '\u25A4 Compact' : '\u25A6 Cozy'; }
-    function apply(d) {
-      if (d === 'compact') root.setAttribute('data-density', 'compact'); else root.removeAttribute('data-density');
-      try { localStorage.setItem(KEY, d); } catch (e) {}
-    }
-    document.addEventListener('DOMContentLoaded', function () {
-      var btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'density-toggle';
-      btn.textContent = label(cur()); btn.title = '\u8868\u683C\u758F\u5BC6\u5207\u63DB';
-      btn.addEventListener('click', function () { var n = cur() === 'compact' ? 'cozy' : 'compact'; apply(n); btn.textContent = label(n); });
-      var bar = document.querySelector('#sidebar-foot') || document.querySelector('header.topbar');
-      if (bar) bar.appendChild(btn); else { btn.classList.add('floating'); document.body.appendChild(btn); }
-    });
+    window.densityToggle = function () {
+      var on = root.getAttribute('data-density') !== 'compact';
+      if (on) root.setAttribute('data-density', 'compact'); else root.removeAttribute('data-density');
+      try { localStorage.setItem(KEY, on ? 'compact' : 'cozy'); } catch (e) {}
+    };
   })();
 </script>
 {{end}}

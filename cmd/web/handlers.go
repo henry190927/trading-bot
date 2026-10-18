@@ -34,6 +34,9 @@ import (
 )
 
 type server struct {
+	// pages holds the parsed templates per language (i18n.go).
+	pages map[string]*template.Template
+
 	client *bingx.Client
 	ai     ai.Provider
 	// aiProviderName is a friendly label ("gemini", "anthropic", or
@@ -288,7 +291,7 @@ func (s *server) handleDashboard(c *gin.Context) {
 	scanViews = append(scanViews, stockViews...)
 	scanViews = append(scanViews, altViews...)
 
-	c.HTML(http.StatusOK, "dashboard.html", gin.H{
+	s.page(c, http.StatusOK, "dashboard.html", gin.H{
 		"TF":              tf,
 		"Symbols":         scanViews,
 		"CoreCount":       len(views),
@@ -876,7 +879,7 @@ func (s *server) handleJournalNew(c *gin.Context) {
 	if analyzedAt == "" {
 		analyzedAt = time.Now().Local().Format("2006-01-02T15:04")
 	}
-	c.HTML(http.StatusOK, "journal_new.html", gin.H{
+	s.page(c, http.StatusOK, "journal_new.html", gin.H{
 		"Symbol":         c.Query("symbol"),
 		"Side":           c.Query("side"),
 		"Entry":          c.Query("entry"),
@@ -918,7 +921,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	leverageStr := strings.TrimSpace(c.PostForm("leverage"))
 
 	rerender := func(errMsg string) {
-		c.HTML(http.StatusOK, "journal_new.html", gin.H{
+		s.page(c, http.StatusOK, "journal_new.html", gin.H{
 			"Symbol": symbol, "Side": side, "Entry": entryStr, "Stop": stopStr,
 			"TP1": tp1Str, "TP2": tp2Str, "Anchor": anchor, "TF": tf,
 			"Score": score, "Notes": notes, "AnalyzedAt": analyzedAtStr,
@@ -1619,19 +1622,19 @@ func (s *server) handleJournalUnwind(c *gin.Context) {
 func (s *server) handleJournalCloseForm(c *gin.Context) {
 	t, idx, trades, err := s.loadTradeByID(c)
 	if err != nil {
-		c.HTML(http.StatusNotFound, "journal_close.html", gin.H{"Error": err.Error()})
+		s.page(c, http.StatusNotFound, "journal_close.html", gin.H{"Error": err.Error()})
 		return
 	}
 	_ = trades
 	_ = idx
 	if !t.IsOpen() {
-		c.HTML(http.StatusBadRequest, "journal_close.html", gin.H{
+		s.page(c, http.StatusBadRequest, "journal_close.html", gin.H{
 			"Error": fmt.Sprintf("trade #%d is already closed", t.ID),
 			"Trade": t,
 		})
 		return
 	}
-	c.HTML(http.StatusOK, "journal_close.html", gin.H{
+	s.page(c, http.StatusOK, "journal_close.html", gin.H{
 		"Trade":     t,
 		"Outcome":   "",
 		"ExitPrice": "",
@@ -1648,11 +1651,11 @@ func (s *server) handleJournalCloseForm(c *gin.Context) {
 func (s *server) handleJournalClosePost(c *gin.Context) {
 	t, idx, trades, err := s.loadTradeByID(c)
 	if err != nil {
-		c.HTML(http.StatusNotFound, "journal_close.html", gin.H{"Error": err.Error()})
+		s.page(c, http.StatusNotFound, "journal_close.html", gin.H{"Error": err.Error()})
 		return
 	}
 	if !t.IsOpen() {
-		c.HTML(http.StatusBadRequest, "journal_close.html", gin.H{
+		s.page(c, http.StatusBadRequest, "journal_close.html", gin.H{
 			"Error": fmt.Sprintf("trade #%d is already closed", t.ID),
 			"Trade": t,
 		})
@@ -1665,7 +1668,7 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 	closedAtStr := strings.TrimSpace(c.PostForm("closed_at"))
 
 	rerender := func(errMsg string) {
-		c.HTML(http.StatusOK, "journal_close.html", gin.H{
+		s.page(c, http.StatusOK, "journal_close.html", gin.H{
 			"Trade":     t,
 			"Outcome":   outcome,
 			"ExitPrice": exitStr,
@@ -1741,10 +1744,10 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 func (s *server) handleJournalEditForm(c *gin.Context) {
 	t, _, _, err := s.loadTradeByID(c)
 	if err != nil {
-		c.HTML(http.StatusNotFound, "journal_edit.html", editFormData(journal.Trade{}, err.Error()))
+		s.page(c, http.StatusNotFound, "journal_edit.html", editFormData(journal.Trade{}, err.Error()))
 		return
 	}
-	c.HTML(http.StatusOK, "journal_edit.html", editFormData(t, ""))
+	s.page(c, http.StatusOK, "journal_edit.html", editFormData(t, ""))
 }
 
 // handleJournalEditPost applies field-by-field changes from the form. Handles
@@ -1752,7 +1755,7 @@ func (s *server) handleJournalEditForm(c *gin.Context) {
 func (s *server) handleJournalEditPost(c *gin.Context) {
 	_, idx, trades, err := s.loadTradeByID(c)
 	if err != nil {
-		c.HTML(http.StatusNotFound, "journal_edit.html", editFormData(journal.Trade{}, err.Error()))
+		s.page(c, http.StatusNotFound, "journal_edit.html", editFormData(journal.Trade{}, err.Error()))
 		return
 	}
 
@@ -1767,7 +1770,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		t.OpenNotes = strings.TrimSpace(c.PostForm("open_notes"))
 		t.CloseNotes = strings.TrimSpace(c.PostForm("close_notes"))
 		t.Outcome = strings.ToLower(strings.TrimSpace(c.PostForm("outcome")))
-		c.HTML(http.StatusOK, "journal_edit.html", editFormData(t, errMsg))
+		s.page(c, http.StatusOK, "journal_edit.html", editFormData(t, errMsg))
 	}
 
 	// Required string fields
@@ -2228,7 +2231,7 @@ func parseFloat(s string) (float64, error) {
 func (s *server) handleJournalList(c *gin.Context) {
 	trades, err := journal.ReadAll("")
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "journal_list.html", gin.H{
+		s.page(c, http.StatusInternalServerError, "journal_list.html", gin.H{
 			"Error": err.Error(),
 		})
 		return
@@ -2327,7 +2330,7 @@ func (s *server) handleJournalList(c *gin.Context) {
 		pageNums = append(pageNums, i)
 	}
 
-	c.HTML(http.StatusOK, "journal_list.html", gin.H{
+	s.page(c, http.StatusOK, "journal_list.html", gin.H{
 		"Trades":       pageTrades,
 		"TotalTrades":  totalTrades,
 		"Page":         page,
@@ -2881,6 +2884,9 @@ func shortVerdictTag(v string) string {
 // templateFuncs exposes formatting helpers to the templates.
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
+		// t is replaced per language by parsePages (i18n.go). This identity
+		// version only lets a template parse outside that path, e.g. tests.
+		"t": func(key string) string { return key },
 		// Four decimals is right for everything quoted at or above 1, and
 		// wrong below it: AKE quotes to SIX and rendered 0.054028 as "0.0540",
 		// so two distinct prices displayed as one. Sub-1 values get the full
@@ -3212,7 +3218,7 @@ func (s *server) handleValidateForm(c *gin.Context) {
 			defaultStr(c.Query("fee_bps"), "6"))
 		return
 	}
-	c.HTML(http.StatusOK, "validate_form.html", gin.H{
+	s.page(c, http.StatusOK, "validate_form.html", gin.H{
 		"Symbol":    strings.ToUpper(c.Query("symbol")),
 		"Side":      strings.ToLower(c.Query("side")),
 		"Entry":     c.Query("entry"),
@@ -3249,7 +3255,7 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 	}
 
 	rerender := func(errMsg string) {
-		c.HTML(http.StatusOK, "validate_form.html", gin.H{
+		s.page(c, http.StatusOK, "validate_form.html", gin.H{
 			"Symbol":    symStr,
 			"Side":      sideStr,
 			"Entry":     entryIn,
@@ -3315,7 +3321,7 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 	// /validate takes no stop of its own: the question it can answer is
 	// "would an ATR-appropriate stop survive the open bar on this symbol".
 	sessWarn := s.sessionStopWarning(ctx, sym, entry, res.SuggStop, time.Now())
-	c.HTML(http.StatusOK, "validate_result.html", gin.H{
+	s.page(c, http.StatusOK, "validate_result.html", gin.H{
 		"R":           res,
 		"TF":          tfStr,
 		"Short":       shortSymbol(sym),
@@ -4098,7 +4104,7 @@ func (s *server) handleChartPage(c *gin.Context) {
 	// embedded JS is where the live-price polling lives, so a
 	// user with a cached shell will silently run last-week's code.
 	c.Header("Cache-Control", "no-store, must-revalidate")
-	c.HTML(http.StatusOK, "chart.html", gin.H{
+	s.page(c, http.StatusOK, "chart.html", gin.H{
 		"Symbol":  strings.ToUpper(defaultStr(c.Query("symbol"), "BTC")),
 		"TF":      defaultStr(c.Query("tf"), "1h"),
 		"Symbols": uiSymbols,

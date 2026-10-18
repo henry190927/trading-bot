@@ -246,7 +246,7 @@ func (s *server) renderScan(c *gin.Context, rows []scanRow) {
 	sort.SliceStable(armedFiring, func(i, j int) bool { return armedFiring[i].Score > armedFiring[j].Score })
 	sort.SliceStable(unarmedFiring, func(i, j int) bool { return unarmedFiring[i].Score > unarmedFiring[j].Score })
 
-	c.HTML(http.StatusOK, "scan_setups.html", gin.H{
+	s.page(c, http.StatusOK, "scan_setups.html", gin.H{
 		"Rows":          rows,
 		"Firing":        armedFiring,
 		"UnarmedFiring": unarmedFiring,

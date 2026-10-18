@@ -40,7 +40,7 @@ var validTFs = []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"}
 // logs are an SSH job (scripts/ops), so the web service needs no host
 // privileges for them.
 func (s *server) handleOpsPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "ops.html", gin.H{
+	s.page(c, http.StatusOK, "ops.html", gin.H{
 		"Zone":          zone.ReadConfig(),
 		"ZoneTFList":    zone.ReadConfig().TFList(),
 		"ZoneTFOptions": []string{"15m", "30m", "1h", "2h", "4h"},
