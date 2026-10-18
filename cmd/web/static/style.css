@@ -6914,3 +6914,50 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
    the taller column's height. */
 .ui-cols-even { align-items: stretch; }
 .ui-cols-even > .ui-col > .ui-card:last-child { flex: 1 1 auto; }
+
+/* ── Chart side panel (phase 4b): a stack of cards ───────────────── */
+.chart-side { gap: var(--sp-3); }
+.chart-side > .cs-card,
+.chart-side > .chart-header,
+.chart-side > .chart-one-liner,
+.chart-side > .chart-hvn-panel,
+.chart-side > .chart-struct-panel,
+.chart-side > .tf-bias-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: var(--sp-3) var(--sp-4); box-shadow: var(--shadow-card); margin: 0;
+}
+.chart-side > .chart-header { display: block; border-left-width: 1px; }
+.chart-side > .chart-header.band-strong  { box-shadow: inset 3px 0 0 var(--green); }
+.chart-side > .chart-header.band-take    { box-shadow: inset 3px 0 0 var(--blue); }
+.chart-side > .chart-header.band-neutral { box-shadow: inset 3px 0 0 var(--yellow); }
+.chart-side > .chart-header.band-avoid   { box-shadow: inset 3px 0 0 var(--red); }
+.cs-price .chart-header-symrow { display: flex; align-items: center; gap: var(--sp-2); }
+.cs-price .chart-header-sym { font-weight: 600; font-size: var(--fs-base); }
+.cs-price .chart-header-price-row { display: flex; align-items: baseline; gap: var(--sp-2); margin-top: var(--sp-1); }
+.cs-price .chart-header-price { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-2xl); font-weight: 600; line-height: 1.15; }
+.cs-price .chart-header-change { font-family: var(--mono); font-size: var(--fs-sm); }
+.cs-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.cs-stats > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cs-stats span { font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-stats em { font-style: normal; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-price .chart-header-ctx { margin-top: var(--sp-2); }
+.cs-price .chart-header-ctx:empty { display: none; }
+.cs-card-h { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.cs-card-h h2 { margin: 0; font-size: var(--fs-base); font-weight: 600; }
+.cs-verdict { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; padding: 2px 8px; border-radius: 4px; background: var(--chip); border: 1px solid var(--chip-border); letter-spacing: .02em; }
+.cs-score { display: flex; align-items: center; gap: var(--sp-3); }
+.cs-score-num { font-family: var(--mono); font-variant-numeric: tabular-nums; line-height: 1; }
+.cs-score-num .chart-banner-score-num { font-size: var(--fs-3xl); font-weight: 600; }
+.cs-score-num small { font-size: var(--fs-sm); color: var(--text-dim); margin-left: 2px; }
+.cs-score-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-left: auto; justify-content: flex-end; }
+.chart-side .chart-banner-action { margin-top: var(--sp-3); text-align: left; }
+.chart-side .chart-banner-action-text { font-size: var(--fs-base); font-weight: 600; text-align: left; }
+.chart-side .chart-banner-note { font-size: var(--fs-xs); color: var(--text-dim); text-align: left; }
+.chart-side .chart-factors { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.chart-side > .chart-one-liner { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); font-size: var(--fs-sm); line-height: 1.55; color: var(--text-dim); }
+/* The older .chart-header rules (flex row, right-aligned action, band
+   left border) predate the card stack; these win on specificity. */
+.chart-side > .chart-header[id] { display: block; border: 1px solid var(--border); background: var(--surface); padding: var(--sp-3) var(--sp-4); }
+.chart-side > .chart-header[id] .chart-banner-action { display: block; text-align: left; align-items: flex-start; }
+.chart-side > .chart-header[id] .chart-banner-action-text { font-size: var(--fs-base); }
+.chart-side > .chart-header[id] .chart-banner-score-num { font-size: var(--fs-3xl); }

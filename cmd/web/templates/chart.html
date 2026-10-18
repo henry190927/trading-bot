@@ -18,7 +18,7 @@
 
   <div class="chart-ticker-wrap">
     <button type="button" class="chart-fav-filter" id="chart-fav-filter"
-            title="只顯示已收藏的標的。目前看的那個一定會顯示,不管有沒有收藏。"
+            title="{{t "chart.favOnlyHint"}}"
             aria-pressed="false">☆ <span id="chart-fav-count"></span></button>
     <div class="chart-ticker" id="chart-ticker" aria-label="all symbols ticker"></div>
   </div>
@@ -64,13 +64,13 @@
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="plan">plan</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="opens">開盤/高低 <span class="layer-count" data-layer-count="opens">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="liquidity">流動性 EQH/EQL <span class="layer-count" data-layer-count="liquidity">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="zones">支撐帶 <span class="layer-count" data-layer-count="zones">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="shelves">樞紐帶 S/R <span class="layer-count" data-layer-count="shelves">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="opens">{{t "chart.layer.opens"}} <span class="layer-count" data-layer-count="opens">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="liquidity">{{t "chart.layer.liquidity"}} <span class="layer-count" data-layer-count="liquidity">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="zones">{{t "chart.layer.zones"}} <span class="layer-count" data-layer-count="zones">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="shelves">{{t "chart.layer.shelves"}} <span class="layer-count" data-layer-count="shelves">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">POC migration</button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="struct">N字 struct <span class="layer-count" data-layer-count="struct">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="tf-bias">TF bias 表</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="struct">{{t "chart.layer.struct"}} <span class="layer-count" data-layer-count="struct">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="tf-bias">{{t "chart.layer.tfbias"}}</button>
       </div>
     </div>
 
@@ -124,7 +124,7 @@
     <div class="chart-controls-end">
       <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
               data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
-      <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="收合/展開分析面板" aria-expanded="true" aria-label="toggle analysis panel">⇥</button>
+      <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="{{t "chart.panelToggle"}}" aria-expanded="true" aria-label="toggle analysis panel">⇥</button>
     </div>
   </div>
   <!-- /chart-controls -->
@@ -220,55 +220,62 @@
     </div>
   </div>
   <aside class="chart-side" id="chart-sidepanel">
-  <div class="chart-header" id="chart-header">
-    <div class="chart-header-left">
-      <div class="chart-header-symrow">
-        <span class="chart-header-sym" id="chart-header-sym">{{.Symbol}}-USDT</span>
-        <span class="badge badge--lg side-flat" id="chart-side">—</span>
-        <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
-      </div>
-      <div class="chart-header-price-row">
-        <span class="chart-header-price" id="chart-header-price">—</span>
-        <span class="chart-header-change" id="chart-header-change">—</span>
-      </div>
-      <div class="chart-header-stats" id="chart-header-stats">
-        <span>24h H <em id="chart-h24-high">—</em></span>
-        <span>L <em id="chart-h24-low">—</em></span>
-        <span>Vol <em id="chart-h24-vol">—</em></span>
-      </div>
-      <div class="chart-header-ctx" id="chart-banner-ctx"></div>
+  {{/* Redesign phase 4b: the panel is a stack of cards — price, engine
+       score, the one-line read, then the structure / HVN / TF-bias reads.
+       Every id is unchanged, so the renderer fills it exactly as before.
+       #chart-header keeps its bare "chart-header" class: the renderer
+       rewrites className to "chart-header <band>" on every refresh. */}}
+  <section class="cs-card cs-price">
+    <div class="chart-header-symrow">
+      <span class="chart-header-sym" id="chart-header-sym">{{.Symbol}}-USDT</span>
+      <span class="badge badge--lg side-flat" id="chart-side">—</span>
+      <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
     </div>
-    <div class="chart-header-right">
-      <div class="chart-header-scores">
+    <div class="chart-header-price-row">
+      <span class="chart-header-price" id="chart-header-price">—</span>
+      <span class="chart-header-change" id="chart-header-change">—</span>
+    </div>
+    <div class="cs-stats" id="chart-header-stats">
+      <div><span>{{t "chart.high24"}}</span><em id="chart-h24-high">—</em></div>
+      <div><span>{{t "chart.low24"}}</span><em id="chart-h24-low">—</em></div>
+      <div><span>{{t "chart.vol24"}}</span><em id="chart-h24-vol">—</em></div>
+    </div>
+    <div class="chart-header-ctx" id="chart-banner-ctx"></div>
+  </section>
+
+  <div class="chart-header" id="chart-header">
+    <div class="cs-card-h">
+      <h2>{{t "chart.engineScore"}}</h2>
+      <span class="cs-verdict" id="chart-banner-score-band">—</span>
+    </div>
+    <div class="cs-score">
+      <div class="cs-score-num"><span class="chart-banner-score-num" id="chart-banner-score-num">—</span><small>/100</small></div>
+      <div class="cs-score-chips">
         <span class="score score-mr" id="chart-mr">MR —</span>
         <span class="score score-mom" id="chart-mom">MOM —</span>
-        <span class="score score-votes" id="chart-total" title="系統A 共識票數(每票+1,MIN=3)">— 票</span>
-      </div>
-      <div class="chart-banner-score" id="chart-banner-score">
-        <div class="chart-banner-label">評分 /100</div>
-        <div class="chart-banner-score-num" id="chart-banner-score-num">—</div>
-        <div class="chart-banner-score-band" id="chart-banner-score-band">—</div>
-      </div>
-      <div class="chart-banner-action" id="chart-banner-action">
-        <div class="chart-banner-action-text" id="chart-banner-action-text">Loading…</div>
-        <div class="chart-banner-note" id="chart-banner-note"></div>
+        <span class="score score-votes" id="chart-total" title="{{t "chart.votesHint"}}">—</span>
       </div>
     </div>
-    <div class="chart-factors" id="chart-factors" aria-label="主要評分因素"></div>
+    <div class="chart-banner-action" id="chart-banner-action">
+      <div class="chart-banner-action-text" id="chart-banner-action-text">{{t "common.loading"}}</div>
+      <div class="chart-banner-note" id="chart-banner-note"></div>
+    </div>
+    <div class="chart-factors" id="chart-factors" aria-label="{{t "chart.factors"}}"></div>
   </div>
+
   <div class="chart-one-liner" id="chart-oneliner">
-    <span id="chart-oneliner-text">Loading…</span>
-    <button type="button" class="cs-record-btn" id="cs-record-btn" title="記錄目前 setup 到 forward-log(/setups),不管有沒有開單 — 獨立於 N字圖層">⚑ 記 setup</button>
+    <span id="chart-oneliner-text">{{t "common.loading"}}</span>
+    <button type="button" class="cs-record-btn" id="cs-record-btn" title="{{t "chart.recordHint"}}">{{t "chart.record"}}</button>
   </div>
   <div class="chart-hvn-panel hidden" id="chart-hvn-panel"
-       title="量能節點目標(A3) — R 後面的數字是路上還有幾個節點擋著。四個節點外的 +10R 比淨空的 +4.7R 更難到">
-    <span class="cs-kv"><em>HVN 目標</em><span id="chart-hvn-body">—</span></span>
+       title="{{t "chart.hvnHint"}}">
+    <span class="cs-kv"><em>{{t "chart.hvnTarget"}}</em><span id="chart-hvn-body">—</span></span>
   </div>
   <div class="chart-struct-panel hidden" id="chart-struct-panel">
     <span class="cs-lean" id="cs-lean">—</span>
     <span class="cs-kv"><em>trend</em><span id="cs-trend">—</span></span>
     <span class="cs-kv"><em>event</em><span id="cs-event">—</span></span>
-    <span class="cs-kv" id="cs-zone-wrap"><em>樞紐區</em><span id="cs-zone">—</span></span>
+    <span class="cs-kv" id="cs-zone-wrap"><em>{{t "chart.pivotZone"}}</em><span id="cs-zone">—</span></span>
     <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
     <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
   </div>
@@ -2113,9 +2120,11 @@
     // switching lang in one modal follows through to AI analysis text
     // and vice versa.
     var GLOSS_LANG_KEY = 'ai-lang';
+    // The glossary (and AI text, which shares the key) opens in the PAGE's
+    // language, set on the server from the lang cookie. The in-modal EN/中
+    // buttons still switch it for the moment.
     function currentGlossLang() {
-        try { var v = localStorage.getItem(GLOSS_LANG_KEY); if (v === 'en' || v === 'zh') return v; } catch (e) {}
-        return 'en';
+        return document.documentElement.getAttribute('data-lang') === 'zh' ? 'zh' : 'en';
     }
     function setGlossLang(lang) {
         if (lang !== 'en' && lang !== 'zh') lang = 'en';
