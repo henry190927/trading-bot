@@ -28,7 +28,6 @@ import (
 
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/market"
-	"github.com/henry190927/trading-bot/notify"
 	"github.com/henry190927/trading-bot/zone"
 )
 
@@ -98,9 +97,10 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 	topic := os.Getenv("NTFY_TOPIC")
 	if topic == "" {
 		log.Printf("zonealert: NTFY_TOPIC unset — zone alerts disabled")
+		hb.Off("zonealert", "NTFY_TOPIC 空白 → 沒啟動")
 		return
 	}
-	n := notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
+	n := newNtfy(topic)
 	inside := map[string]bool{}
 	warned := map[string]bool{} // misconfig log-once, so a bad zone can't spam every 25s
 	cc := newCloseCache(ctx, client)
@@ -109,6 +109,8 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 	var lastTFs string
 	log.Printf("zonealert: up — poll %s, config=%s, manual=%s", zonePollEvery, zone.ConfigPath(), zone.Path())
 
+	const zoneReason = "樞紐區/突破警報 · 25s 輪詢現價"
+	hb.Start("zonealert", zonePollEvery, zoneReason)
 	tick := time.NewTicker(zonePollEvery)
 	defer tick.Stop()
 	for {
@@ -121,10 +123,13 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 		// Live config — re-read each cycle so /ops toggles apply without
 		// a restart. Disabled → no fetches, no alerts (loop keeps running
 		// so re-enabling is live too).
+		hb.Tick("zonealert")
 		cfg := zone.ReadConfig()
 		if !cfg.Enabled {
+			hb.SetIdle("zonealert", true, "zone-config.json enabled=false → 每輪短路,不發警報")
 			continue
 		}
+		markPushIdle("zonealert", zoneReason)
 		if cfg.Auto {
 			tfKey := cfg.TFs
 			if time.Since(lastStruct) >= zoneStructEvery || tfKey != lastTFs {
@@ -170,8 +175,10 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 			if fault := zone.TriggerFault(z); fault != "" {
 				if !warned[key] {
 					warned[key] = true
-					log.Printf("zonealert: SKIP %s %s %s–%s — %s",
+					msg := fmt.Sprintf("SKIP %s %s %s–%s — %s",
 						short, z.TF, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), fault)
+					log.Printf("zonealert: %s", msg)
+					recordZoneEvent(zone.EventSkip, short, z.TF, msg)
 				}
 				continue
 			}
@@ -198,12 +205,25 @@ func runZoneAlerts(ctx context.Context, client *bingx.Client) {
 			if in && !inside[key] {
 				px, _ := livePx(short, sym) // for the push body; 0 if unavailable
 				title, body, tags := zoneAlertText(z, short, px, bar)
-				if err := n.Push(ctx, title, body, tags); err != nil {
-					log.Printf("zonealert: push failed: %v", err)
-				} else {
-					log.Printf("zonealert: fired %s %s %s–%s dir=%s confirm=%q px=%s close=%s",
-						short, z.TF, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi),
-						strings.ToUpper(z.Dir), z.Confirm, zone.FmtPrice(px), zone.FmtPrice(bar.Close))
+				msg := fmt.Sprintf("fired %s %s %s–%s dir=%s confirm=%q px=%s close=%s",
+					short, z.TF, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi),
+					strings.ToUpper(z.Dir), z.Confirm, zone.FmtPrice(px), zone.FmtPrice(bar.Close))
+				switch {
+				case pushMuted():
+					// Still a fire: record it, so a muted stretch can be
+					// reviewed afterwards, but say it never reached the phone.
+					msg += " (muted, not pushed)"
+					log.Printf("zonealert: %s", msg)
+					recordZoneEvent(zone.EventFired, short, z.TF, msg)
+				default:
+					if err := n.Push(ctx, title, body, tags); err != nil {
+						log.Printf("zonealert: push failed: %v", err)
+						recordZoneEvent(zone.EventPushFailed, short, z.TF,
+							fmt.Sprintf("push failed %s %s: %v", short, z.TF, err))
+					} else {
+						log.Printf("zonealert: %s", msg)
+						recordZoneEvent(zone.EventFired, short, z.TF, msg)
+					}
 				}
 			}
 			inside[key] = in
@@ -265,4 +285,14 @@ func zoneAlertText(z zone.Zone, short string, px float64, bar market.Candle) (ti
 	body = fmt.Sprintf("%s %s%s ｜ 現價 %s\n🟡 樞紐區 %s–%s（%s %s）\n%s\n⏱ %s 快照（方向性結構,圖表即時值可能不同）\n→ 判斷 reject / 進場",
 		dirEmoji, short, tfTag, pxStr, zone.FmtPrice(z.Lo), zone.FmtPrice(z.Hi), dirEmoji, dir, z.Note, snap)
 	return title, body, tags
+}
+
+// recordZoneEvent appends to the event log /ops reads (zone.EventsPath). A
+// failed write is logged and dropped: the push has already happened or not,
+// and the journal line above still records it.
+func recordZoneEvent(kind, short, tf, text string) {
+	e := zone.Event{At: time.Now(), Kind: kind, Symbol: short, TF: tf, Text: text}
+	if err := zone.AppendEvent(zone.EventsPath(), e); err != nil {
+		log.Printf("zonealert: event log write failed: %v", err)
+	}
 }

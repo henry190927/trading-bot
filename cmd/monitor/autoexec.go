@@ -53,11 +53,12 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 
 	var n *notify.Ntfy
 	if topic := os.Getenv("NTFY_TOPIC"); topic != "" {
-		n = notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic)
+		n = newNtfy(topic)
 	}
 	state := map[string]*autoState{}
 	var halt haltState
 
+	hb.Start("autoexec", 60*time.Second, "自動執行器")
 	tick := time.NewTicker(60 * time.Second)
 	defer tick.Stop()
 	for {
@@ -67,11 +68,18 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		case <-tick.C:
 		}
 
+		hb.Tick("autoexec")
 		cfg := autotrade.Load() // hot-reload
 		if !cfg.Enabled {
+			hb.SetIdle("autoexec", true, "autotrade.json enabled=false → 每輪短路")
 			continue
 		}
 		live := cfg.LiveArmed()
+		if live {
+			hb.SetIdle("autoexec", false, "自動執行器 · LIVE")
+		} else {
+			hb.SetIdle("autoexec", false, "自動執行器 · paper")
+		}
 
 		// Global risk caps need a whole-book view, so assemble it ONCE per
 		// tick. The kline cache is shared with paperBlocked below, which

@@ -37,6 +37,7 @@ import (
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/config"
 	"github.com/henry190927/trading-bot/earnings"
+	"github.com/henry190927/trading-bot/heartbeat"
 	"github.com/henry190927/trading-bot/indicator"
 	"github.com/henry190927/trading-bot/macro"
 	"github.com/henry190927/trading-bot/market"
@@ -44,6 +45,10 @@ import (
 	sig "github.com/henry190927/trading-bot/signal"
 	"github.com/henry190927/trading-bot/validator"
 )
+
+// hb is the process-wide heartbeat registry. Every long-running loop reports
+// into it; hb.Run in main writes it out for /ops to read.
+var hb = heartbeat.New()
 
 func main() {
 	config.LoadDotEnv()
@@ -111,13 +116,19 @@ func main() {
 		notifier.Sinks = append(notifier.Sinks, notify.Mac{})
 	}
 	if topic := os.Getenv("NTFY_TOPIC"); topic != "" {
-		notifier.Sinks = append(notifier.Sinks, notify.NewNtfy(os.Getenv("NTFY_SERVER"), topic))
+		notifier.Sinks = append(notifier.Sinks, newNtfy(topic))
 		log.Printf("ntfy push configured for topic %q", topic)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go waitForShutdown(cancel)
+
+	// Self-reported loop state for /ops (see package heartbeat). The first
+	// write lands before the loops below have registered; the next one, 15s
+	// later, lists them.
+	go hb.Run(ctx, heartbeat.Path(), log.Printf)
+	go watchMute(ctx)
 
 	// Earnings-blackout calendar (F3). signal.Evaluate reads earnings.Default()
 	// to gate stock symbols around a report; without this load that gate is a
@@ -184,6 +195,8 @@ func main() {
 	// reach the confluence loop below.
 	if os.Getenv("MONITOR_ZONE_ONLY") == "1" {
 		log.Printf("MONITOR_ZONE_ONLY=1 — zonealert + autoexec + macrowarn + bracket only (confluence / structalert disabled)")
+		hb.Off("confluence", "MONITOR_ZONE_ONLY=1 → 沒啟動")
+		hb.Off("structalert", "MONITOR_ZONE_ONLY=1 → 沒啟動")
 		<-ctx.Done()
 		log.Printf("monitor shutting down")
 		return
@@ -198,6 +211,14 @@ func main() {
 	}
 	log.Printf("multi-TF monitor up — TFs=%v min-score=%d min-tfs=%d min-ratio=%s", tfList(monitoredTFs), *minScore, *minTFs, ratioMsg)
 
+	const confReason = "多 TF 匯合掃描 · 收盤觸發"
+	hb.Start("confluence", time.Minute, confReason)
+	if os.Getenv("NTFY_TOPIC") != "" {
+		trackPushIdle("confluence", confReason)
+	} else {
+		// Still scans and logs; it just has nowhere to push.
+		hb.SetIdle("confluence", true, "NTFY_TOPIC 空白 → 只寫 log,不推播")
+	}
 	for {
 		// Sleep to the next UTC minute boundary.
 		now := time.Now().UTC()
@@ -208,6 +229,7 @@ func main() {
 			return
 		case <-time.After(time.Until(next)):
 		}
+		hb.Tick("confluence")
 
 		closed := tfsThatJustClosed(time.Now().UTC(), monitoredTFs)
 		if len(closed) == 0 {

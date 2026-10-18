@@ -2298,7 +2298,7 @@ func (s *server) handleJournalList(c *gin.Context) {
 	// the same builders over its deduped positions (see rstats.go).
 	rt := rTradesFromJournal(trades)
 	histogram := buildRHistogram(rt)
-	calendar := buildDailyCalendar(rt, 42) // 6 weeks
+	calendar := buildDailyCalendar(rt, 42, time.Now()) // 6 weeks
 	periods := buildPeriodStats(trades)
 	equity := buildEquityCurve(rt)
 
@@ -2622,8 +2622,10 @@ type dailyCell struct {
 // buildDailyCalendar builds a weeks-tall grid of the last `days` days
 // (default 42 = 6 weeks). Each cell shows the day's net R from closed
 // trades. Renders Mon-Sun rows, with the most recent week at the bottom
-// (GitHub-style).
-func buildDailyCalendar(trades []rTrade, days int) [][]dailyCell {
+// (GitHub-style). now is the grid's last day; it is a parameter, not
+// time.Now(), so a test over a fixed book does not expire — this one did on
+// 2026-10-14, 42 days after the 09-02 fixture.
+func buildDailyCalendar(trades []rTrade, days int, now time.Time) [][]dailyCell {
 	// Aggregate closed R by local date.
 	type agg struct {
 		count int
@@ -2655,7 +2657,7 @@ func buildDailyCalendar(trades []rTrade, days int) [][]dailyCell {
 	}
 
 	// Walk from `days-1` ago up to today; align grid so Monday starts each row.
-	now := time.Now().Local()
+	now = now.Local()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	start := today.AddDate(0, 0, -(days - 1))
 	// Back up `start` so its weekday is Monday — leading cells will be empty.
