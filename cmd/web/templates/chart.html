@@ -833,25 +833,35 @@
         }
     }
 
-    var chart = LightweightCharts.createChart(container, {
-        layout: {
-            background: { type: 'solid', color: '#0f0b07' },
-            textColor:  '#f3ebdf',
-        },
-        grid: {
-            vertLines: { color: 'rgba(255,255,255,0.04)' },
-            horzLines: { color: 'rgba(255,255,255,0.04)' },
-        },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.10)' },
+    // Canvas colours come from the page theme (dark / light), read off the
+    // CSS tokens rather than hardcoded, and are re-applied when the theme
+    // changes — a canvas cannot follow a CSS variable on its own. Candle
+    // colours are data-viz and stay the same in both themes.
+    function chartThemeOptions() {
+        var cs = getComputedStyle(document.documentElement);
+        var tok = function (n) { return cs.getPropertyValue(n).trim(); };
+        var dim = tok('--text-dim-rgb');
+        return {
+            layout: { background: { type: 'solid', color: tok('--surface') }, textColor: tok('--text-dim') },
+            grid: {
+                vertLines: { color: 'rgba(' + dim + ',0.08)' },
+                horzLines: { color: 'rgba(' + dim + ',0.08)' },
+            },
+            rightPriceScale: { borderColor: tok('--border') },
+            timeScale: { borderColor: tok('--border') },
+        };
+    }
+    var chart = LightweightCharts.createChart(container, Object.assign(chartThemeOptions(), {
         timeScale: {
-            borderColor: 'rgba(255,255,255,0.10)',
+            borderColor: chartThemeOptions().timeScale.borderColor,
             timeVisible: true, secondsVisible: false,
             tickMarkFormatter: fmtTZAxis,
         },
         localization: { timeFormatter: fmtTZTime },
         crosshair: { mode: 1 /* magnet */ },
         autoSize: true,
-    });
+    }));
+    document.addEventListener('themechange', function () { chart.applyOptions(chartThemeOptions()); });
 
     // Wire the timezone <select>. Rebinding via applyOptions makes
     // LWC re-format the whole time axis immediately.

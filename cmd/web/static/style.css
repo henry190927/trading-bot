@@ -1716,7 +1716,7 @@ footer {
 .draw-color-swatch:hover { box-shadow: 0 0 0 1px rgba(255,255,255,0.35); }
 .draw-color-swatch.is-active {
     border-color: #fff;
-    box-shadow: 0 0 0 1px var(--on-accent), 0 0 0 3px currentColor;
+    box-shadow: 0 0 0 1px var(--surface), 0 0 0 3px currentColor;
 }
 .draw-menu-sep {
     height: 1px;
@@ -1729,7 +1729,7 @@ footer {
        the grid row ends up being. The clamp that used to live here moved
        there as a min-height; LWC runs autoSize:true and follows the box. */
     height: 100%;
-    background: var(--on-accent);
+    background: var(--surface); /* matches the LWC canvas, which reads --surface */
     border: 1px solid var(--border);
     border-radius: 6px;
 }
@@ -1761,7 +1761,7 @@ footer {
 .chart-rsi-canvas {
     width: 100%;
     height: 140px;
-    background: var(--on-accent);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
 }
