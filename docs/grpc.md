@@ -15,6 +15,180 @@ gRPC 在這裡是**第二種 transport，不是第二條資料路徑**。
 
 ---
 
+## 0. 全貌:誰在哪個檔案、做什麼
+
+### 0.1 一次呼叫走過的路
+
+```
+🖥  Client(grpcurl / NewMarketDataClient)
+    │
+    │  HTTP/2
+    │  :path = /tradingbot.marketdata.v1.MarketData/GetMarkPrice
+    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ 📄 proto/marketdata/v1/            ← 產生的,不要手改            │
+│                                                                  │
+│    marketdata.proto                ⭐ 契約本身,唯一的真實來源    │
+│    marketdata.pb.go                 訊息型別 + 序列化            │
+│    marketdata_grpc.pb.go                                         │
+│      · MarketDataServer             你「必須」實作的介面         │
+│      · _MarketData_*_Handler        分派器:解碼 → 呼叫你的方法  │
+│      · RegisterMarketDataServer()   把實作掛進 grpc.Server       │
+└──────────────────────────────────────────────────────────────────┘
+    │  呼叫介面方法
+    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ 🧠 grpcsrv/server.go               ← 我寫的實作                  │
+│                                                                  │
+│    Service                                                       │
+│      · GetMarkPrice()               訂一次 → 取快照 → 退訂       │
+│      · StreamMarkPrices()           訂閱 → 迴圈 Send → 退訂      │
+│      · Drain()                      關機時讓所有 stream 退場     │
+│                                                                  │
+│    ⭐ 它只依賴這個介面,完全不知道 tickerHub 存在:              │
+│                                                                  │
+│      type PriceSource interface {                                │
+│          Subscribe() (<-chan []byte, []byte, func())             │
+│      }                                                           │
+└──────────────────────────────────────────────────────────────────┘
+    │
+    │  ⭐ 接縫(seam)
+    │  var _ grpcsrv.PriceSource = (*tickerHub)(nil)   ← 編譯期斷言
+    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ 🔌 cmd/web/grpc.go                 ← 接線,90 行                  │
+│                                                                  │
+│    func (h *tickerHub) Subscribe() { return h.subscribe() }      │
+│                                     一行 exported wrapper        │
+│                                     (介面只吃大寫開頭的方法)    │
+│    startGRPC(hub)                   讀 GRPC_BIND · listen        │
+│                                     接管 SIGTERM · go Serve      │
+└──────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ 📡 cmd/web/stream.go               ← 本來就在跑的,一個字沒改    │
+│                                                                  │
+│    tickerHub                                                     │
+│      drop-oldest backpressure · 500ms conflation · refcount      │
+└──────────────────────────────────────────────────────────────────┘
+    ▲                                        ▲
+    │ BingX websocket + 30s REST 補洞        │ 瀏覽器分頁
+    │                                        │ SSE /api/stream/tickers
+```
+
+> 🔑 **`grpcsrv` 和 `cmd/web` 之間那條線就是 `PriceSource` 介面。**
+> `grpcsrv` 不 import `cmd/web`,而且**也不能** —— Go 不允許 import 一個 `package main`。
+> 它只知道「有個東西會 `Subscribe()`」。
+
+### 0.2 函式對照表
+
+| 檔案 | 名稱 | 做什麼 |
+|---|---|---|
+| **`proto/.../marketdata.proto`** | — | ⭐ **契約本身**。改這裡,其他產生檔跟著重生 |
+| `marketdata.pb.go` *(產生)* | `GetMarkPriceRequest` 等 | 訊息型別 + 序列化 |
+| `marketdata_grpc.pb.go` *(產生)* | `MarketDataServer` | 你**必須**實作的介面 |
+| | `RegisterMarketDataServer()` | 把實作掛進 `grpc.Server` |
+| | `_MarketData_*_Handler()` | 分派器:解碼 bytes → 呼叫你的方法 |
+| | `MarketDataClient` / `NewMarketDataClient()` | client 端 stub |
+| **`grpcsrv/server.go`** | `PriceSource` | ⭐ **seam** —— 和 hub 之間唯一的依賴 |
+| | `Service` | 實作 `MarketDataServer` 的那個 struct |
+| | `NewService(src)` | 建構;存 `src` 和 drain channel |
+| | `Drain()` | ⭐ 關掉 drain channel → 所有 stream 回 `UNAVAILABLE` |
+| | `decodeSnapshot(b)` | hub 給的 JSON `[]byte` → `[]tickerRow` |
+| | `normalize(s)` | symbol 去空白 + 轉大寫(`doge` → `DOGE`) |
+| | `checkKnown(want, rows)` | 不認得的 symbol → `NOT_FOUND` |
+| | `toProto(row)` | `tickerRow` → `pb.MarkPrice`(含 `live` 和 `as_of`) |
+| | `GetMarkPrice()` | ⭐ **unary RPC**:訂一次 → 取快照 → 退訂 |
+| | `StreamMarkPrices()` | ⭐ **streaming RPC**:訂閱 → 迴圈 Send → 退訂 |
+| | `NewServer(svc)` | 組 `grpc.Server`:keepalive + reflection + register |
+| | `Serve(ctx, lis, src, logf)` | ⭐ 跑起來 + 關機編排(見 0.4) |
+| **`cmd/web/grpc.go`** | `(*tickerHub).Subscribe()` | 一行 exported wrapper(介面只吃大寫方法) |
+| | `var _ grpcsrv.PriceSource = ...` | ⭐ 編譯期斷言:真的 hub 合得上 seam |
+| | `startGRPC(hub)` | 讀 `GRPC_BIND` → listen → 接管 SIGTERM → `go Serve` |
+| **`cmd/web/main.go`** | `startGRPC(srv.hub)` | 唯一的接線,**5 行** |
+
+### 0.3 啟動順序
+
+```
+main()
+  └─ startGRPC(hub)
+       │
+       ├─ GRPC_BIND 沒設? ──► 直接 return
+       │                      ⭐ 不建 listener · 不接管 signal
+       │                         整個 process 行為完全不變
+       │
+       ├─ lc.Listen(tcp, bind)
+       │     └─ 失敗? ──► log + return
+       │                  ⭐ HTTP 不受影響,維持原狀
+       │
+       ├─ signal.NotifyContext(SIGTERM, SIGINT)
+       │     ⭐ 順序很重要:「先 bind 再接管 signal」
+       │        port 被佔用時,不會留下「signal 被接管但沒有 server 可關」的半殘狀態
+       │
+       └─ go grpcsrv.Serve(ctx, lis, hub, log.Printf)
+              └─ NewService(src) → NewServer(svc) → gs.Serve(lis)
+                   NewServer 做三件事:
+                     · keepalive(30s ping / 10s timeout)
+                     · reflection 打開(grpcurl 不用 .proto 檔)
+                     · RegisterMarketDataServer(gs, svc)
+```
+
+> ⭐ **先 bind 再接管 signal**。port 被佔用的話,整個 process 維持原狀 ——
+> 而不是「signal 已經被接管、但沒有 server 可以關」的半殘狀態。
+
+### 0.4 關機順序(⭐ 最值得看的一段)
+
+```
+SIGTERM / Ctrl-C
+      │
+      ▼
+  ctx.Done()
+      │
+      ├──────────────────────────────┬────────────────────────────┐
+      ▼                              ▼                            │
+ svc.Drain()                   gs.GracefulStop()                  │
+ 關掉 drain channel            等 in-flight unary 結束            │
+      │                        + 送 GOAWAY                        │
+      ▼                              │                            │
+ 每個 StreamMarkPrices 的迴圈        │                     15 秒上限
+ 看到 drain → return UNAVAILABLE     │                            │
+      │                              ▼                            ▼
+      ▼                        ✅ stopped gracefully      ⏱ 逾時 → gs.Stop()
+ defer release()                     │                       硬斷
+ ⭐ refcount 減一                     └──────────┬────────────────┘
+      │                                          ▼
+      ▼                                     os.Exit(0)
+ 還有別的 subscriber 嗎?
+      │
+      └─ 沒有 ──► hub cancel 自己的 loop
+                  關掉上游 websocket
+```
+
+**⭐ 為什麼一定要先 `Drain()` 再 `GracefulStop()`:**
+
+```
+GracefulStop 會等「所有進行中的 RPC」結束
+而 StreamMarkPrices 只有在「client 離開」時才結束
+⇒ 一個健康的訂閱者就能讓關機「永遠」卡住
+
+所以:先把 stream 全部趕走(回 UNAVAILABLE —— 慣例上「可以稍後重試」的那個碼;client 會不會重試取決於它的 retry policy,grpc-go 預設不會),
+     再讓 GracefulStop 去收尾剩下的 unary。
+```
+
+實際跑起來的 log,中間兩行就是「gRPC 真的是 hub 的訂閱者」的證據:
+
+```
+grpc: draining streams, then GracefulStop (grace 15s)
+stream: stats loop stopped (no subscribers)            ← refcount 還回去了
+stream: markprice ws stopped after 3s (no subscribers) ← 上游 websocket 才關
+grpc: stopped gracefully
+grpc: shutdown complete — exiting
+```
+
+
+---
+
 ## 1. 檔案位置
 
 ```
@@ -220,8 +394,9 @@ fan-out 給所有 subscriber。如果改成讓它交出 typed struct，那次 ma
 所以關機是兩段式的（`grpcsrv.Serve`）：
 
 1. `svc.Drain()` — 關掉一個 channel，所有開著的 stream handler 從 `select` 醒來，
-   回傳 `UNAVAILABLE`。`UNAVAILABLE` 是 gRPC client 預設會 retry 的 code，
-   語意剛好對：「這台現在不行，等一下再來」。
+   回傳 `UNAVAILABLE`。`UNAVAILABLE` 是慣例上「可以稍後重試」的 code，
+   語意剛好對：「這台現在不行，等一下再來」。注意:client 會不會真的重試，
+   取決於它的 retry policy —— grpc-go 預設**不會**重試已經送到 server 的請求。
 2. `gs.GracefulStop()` — 把已經在飛的 unary call 做完、送出 GOAWAY、關閉。
 
 用 `Stop()` 取代的話，會在 frame 中間直接砍斷每一條連線，client 端看到的是一個

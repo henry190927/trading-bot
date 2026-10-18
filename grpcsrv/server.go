@@ -97,8 +97,9 @@ func NewService(src PriceSource) *Service {
 // RPC. GracefulStop stops accepting connections and then waits for in-flight
 // RPCs to return — but StreamMarkPrices only returns when the CLIENT goes
 // away, so a single attached client would block shutdown indefinitely. Drain
-// is the application-level half: the handler returns UNAVAILABLE, which is
-// the code a gRPC client retries on, and GracefulStop then completes.
+// is the application-level half: the handler returns UNAVAILABLE — the
+// conventional "retry later" code; whether a client actually retries is its
+// retry policy, grpc-go does not by default — and GracefulStop then completes.
 func (s *Service) Drain() {
 	s.drainOnce.Do(func() { close(s.done) })
 }

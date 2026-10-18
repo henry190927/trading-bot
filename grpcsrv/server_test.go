@@ -353,7 +353,7 @@ func TestDrainEndsAnOpenStream(t *testing.T) {
 	svc.Drain()
 	_, err = stream.Recv()
 	if errors.Is(err, io.EOF) {
-		t.Fatal("stream ended with EOF — a drained server should say UNAVAILABLE so the client retries")
+		t.Fatal("stream ended with EOF — a drained server should say UNAVAILABLE, the retryable code")
 	}
 	if got := codeOf(err); got != codes.Unavailable {
 		t.Fatalf("code = %v (err %v), want Unavailable", got, err)

@@ -108,7 +108,8 @@ command="sudo /usr/local/bin/trading-deploy \"$SSH_ORIGINAL_COMMAND\"",restrict 
 so whatever the client sends arrives as one argument, which must be a 40-char
 commit SHA. It fetches **that commit's** `deploy/compose.yaml` (image and
 settings always come from one commit), pulls, `up -d`, and within 60 seconds
-requires web `/health` 200 and a monitor heartbeat from a **new** pid — or it
+requires web `/health` 200 and a monitor heartbeat from a **new** process
+(its `started_at` changed — not its pid, which is 1 in every container) — or it
 puts the previous `TAG` back and fails the job. Sudoers allows `ubuntu`
 exactly that script, nothing else.
 

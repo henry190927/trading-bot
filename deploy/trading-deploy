@@ -80,7 +80,8 @@ fi
 mv "$new_compose" "$COMPOSE"
 
 old_started="$(python3 -c "import json;print(json.load(open('$HB'))['started_at'])" 2>/dev/null || echo none)"
-say "deploying ${sha:0:12} (was ${prev_tag:0:12}${prev_tag:+…}${prev_tag:-none})"
+prev_short="${prev_tag:0:12}"   # ${x:-default} is not an else: it expands to $x when x is set
+say "deploying ${sha:0:12} (was ${prev_short:-none})"
 
 rollback() {
     say "rolling back to ${prev_tag:-nothing}"
