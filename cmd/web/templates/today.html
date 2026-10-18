@@ -33,37 +33,10 @@
     <a class="ui-kpi" href="/alerts"><div class="ui-kpi-label">{{t "today.kpi.alerts"}}</div><div class="ui-kpi-val{{if .Unread}} ui-down{{end}}">{{.Unread}}</div></a>
   </section>
 
-  <div class="ui-cols">
-    <div class="ui-col">
-      {{if .MacroGaps}}
-      <section class="ui-card warn">
-        <header class="ui-card-h"><h2>{{template "icon" "alert"}}{{t "today.gaps"}} <span class="ui-count">{{len .MacroGaps}}</span></h2><span class="ui-sub">{{t "today.gapsSub"}}</span></header>
-        <ul class="ui-list">
-          {{range .MacroGaps}}
-          <li class="ui-row"><span class="ui-num ui-dim">{{.when}}</span><span class="ui-tag">{{.country}}</span><span class="ui-grow">{{.name}}</span><span class="ui-num ui-dim">{{.hours}}h</span></li>
-          {{end}}
-        </ul>
-      </section>
-      {{end}}
-
-      <section class="ui-card">
-        <header class="ui-card-h"><h2>{{template "icon" "flag"}}{{t "today.pending"}} <span class="ui-count">{{.PendingN}}</span></h2><a class="ui-link" href="/setups">{{t "common.viewAll"}} {{template "icon" "arrow"}}</a></header>
-        {{if .Pending}}
-        <ul class="ui-list">
-          {{range .Pending}}
-          <li><a class="ui-row" href="/setups">
-            <span class="ui-side {{.Dir}}">{{t (printf "side.%s" .Dir)}}</span>
-            <span class="ui-sym">{{.Symbol}}</span><span class="ui-dim">{{.TF}}</span>
-            <span class="ui-grow ui-dim ui-sm">{{t .LeanKey}}</span>
-            <span class="ui-num">{{fmtPx .Entry}}</span>
-            <span class="ui-num ui-dim ui-sm">{{.At}}</span>
-          </a></li>
-          {{end}}
-        </ul>
-        {{else}}<div class="ui-empty"><div class="ui-dim">{{t "today.noPending"}}</div></div>{{end}}
-      </section>
-    </div>
-
+  {{/* Two columns that end level: the cards stretch to the taller column, so
+       an empty state never leaves a hole. The market table, the one long
+       block, runs full width underneath. */}}
+  <div class="ui-cols ui-cols-even">
     <div class="ui-col">
       <section class="ui-card">
         <header class="ui-card-h"><h2>{{template "icon" "wallet"}}{{t "today.positions"}} <span class="ui-count">{{len .OpenTrades}}</span></h2>{{if .OpenTrades}}<a class="ui-link" href="/journal">{{t "common.viewAll"}} {{template "icon" "arrow"}}</a>{{end}}</header>
@@ -86,8 +59,38 @@
         </div>
         {{end}}
       </section>
+      {{if .MacroGaps}}
+      <section class="ui-card warn">
+        <header class="ui-card-h"><h2>{{template "icon" "alert"}}{{t "today.gaps"}} <span class="ui-count">{{len .MacroGaps}}</span></h2><span class="ui-sub">{{t "today.gapsSub"}}</span></header>
+        <ul class="ui-list">
+          {{range .MacroGaps}}
+          <li class="ui-row"><span class="ui-num ui-dim">{{.when}}</span><span class="ui-tag">{{.country}}</span><span class="ui-grow">{{.name}}</span><span class="ui-num ui-dim">{{.hours}}h</span></li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
+    </div>
+    <div class="ui-col">
+      <section class="ui-card">
+        <header class="ui-card-h"><h2>{{template "icon" "flag"}}{{t "today.pending"}} <span class="ui-count">{{.PendingN}}</span></h2><a class="ui-link" href="/setups">{{t "common.viewAll"}} {{template "icon" "arrow"}}</a></header>
+        {{if .Pending}}
+        <ul class="ui-list">
+          {{range .Pending}}
+          <li><a class="ui-row" href="/setups">
+            <span class="ui-side {{.Dir}}">{{t (printf "side.%s" .Dir)}}</span>
+            <span class="ui-sym">{{.Symbol}}</span><span class="ui-dim">{{.TF}}</span>
+            <span class="ui-grow ui-dim ui-sm">{{t .LeanKey}}</span>
+            <span class="ui-num">{{fmtPx .Entry}}</span>
+            <span class="ui-num ui-dim ui-sm">{{.At}}</span>
+          </a></li>
+          {{end}}
+        </ul>
+        {{else}}<div class="ui-empty"><div class="ui-dim">{{t "today.noPending"}}</div></div>{{end}}
+      </section>
+    </div>
+  </div>
 
-      <section class="ui-card market-overview">
+  <section class="ui-card market-overview">
         <header class="ui-card-h"><h2>{{template "icon" "pulse"}}{{t "today.market"}}</h2>
           <div class="ui-seg" id="mkt-tabs">
             <button type="button" class="on" data-cat="all">{{t "cat.all"}}</button><button type="button" data-cat="crypto">{{t "cat.crypto"}}</button><button type="button" data-cat="metal">{{t "cat.metal"}}</button><button type="button" data-cat="stock">{{t "cat.stock"}}</button>
@@ -103,9 +106,7 @@
           </table>
         </div>
       </section>
-      <p class="ui-sub" style="margin:0"><span id="mkt-updated">—</span></p>
-    </div>
-  </div>
+  <p class="ui-sub" style="margin:0"><span id="mkt-updated">—</span></p>
 </main>
 
 <script>

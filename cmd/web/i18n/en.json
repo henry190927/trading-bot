@@ -299,5 +299,7 @@
   "at.absorbedHint": "Folds in %d hourly re-entries of the same setup",
   "at.noFires": "No fires yet: the rules are running and enter only when a symbol reaches a range edge (bottom or top third). Mid-range, they wait.",
   "at.autoRefresh": "Auto-refreshes every 10s without losing your scroll position",
-  "side.auto": "L/S"
+  "side.auto": "L/S",
+  "nav.collapse": "Collapse",
+  "nav.expand": "Expand sidebar"
 }

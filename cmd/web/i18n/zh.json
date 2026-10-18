@@ -299,5 +299,7 @@
   "at.absorbedHint": "收合了 %d 筆同一個 setup 的每小時重複進場",
   "at.noFires": "還沒有觸發:規則在跑,等標的碰到箱邊(底部或頂部三分之一)才會進場,在箱子中間不動。",
   "at.autoRefresh": "每 10 秒自動更新,捲軸位置不會跳",
-  "side.auto": "雙"
+  "side.auto": "雙",
+  "nav.collapse": "收合側欄",
+  "nav.expand": "展開側欄"
 }

@@ -5993,20 +5993,33 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
    Markup: templates/partials.html "topnav". Desktop keeps the rail fixed;
    under 1024px the rail becomes a drawer behind the top bar's menu button.
    ===================================================================== */
-:root { --rail-w: 64px; --apptop-h: 52px; }
+:root { --rail-w: 200px; --apptop-h: 52px; }
+html[data-rail="narrow"] { --rail-w: 64px; }
 .rail {
     position: fixed; left: 0; top: 0; bottom: 0; width: var(--rail-w); z-index: 30;
-    display: flex; flex-direction: column; align-items: center; gap: var(--sp-1);
-    padding: 10px 8px; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-1);
+    padding: 10px; background: var(--surface); border-right: 1px solid var(--border);
+    transition: width 160ms ease;
 }
-.rail-logo { display: grid; place-items: center; width: 44px; height: 40px; margin-bottom: var(--sp-2); color: var(--blue); }
+.rail-logo { display: flex; align-items: center; height: 40px; padding-left: 10px; margin-bottom: var(--sp-2); color: var(--blue); }
 .rail-logo .ico { width: 24px; height: 24px; stroke-width: 2.2; }
 .rail-nav { display: flex; flex-direction: column; gap: 2px; }
 .rail-item {
-    display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--r-sm);
-    color: var(--text-dim); text-decoration: none; transition: background var(--t-fast), color var(--t-fast);
+    display: flex; align-items: center; gap: var(--sp-3); height: 40px; padding: 0 10px; border-radius: var(--r-sm);
+    color: var(--text-dim); text-decoration: none; font-size: var(--fs-base); font-weight: 500; white-space: nowrap; overflow: hidden;
+    transition: background var(--t-fast), color var(--t-fast);
 }
-.rail-item span { display: none; }
+.rail-toggle {
+    margin-top: auto; display: flex; align-items: center; gap: var(--sp-3); height: 36px; padding: 0 10px;
+    border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-dim);
+    font: inherit; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; cursor: pointer;
+}
+.rail-toggle:hover { background: var(--row-hover); color: var(--text); }
+.rail-toggle .ico { width: 18px; height: 18px; transition: transform 160ms ease; }
+/* Narrow: icons only, centred; the labels move into the hover title. */
+html[data-rail="narrow"] .rail-item, html[data-rail="narrow"] .rail-toggle, html[data-rail="narrow"] .rail-logo { justify-content: center; padding: 0; }
+html[data-rail="narrow"] .rail-item span, html[data-rail="narrow"] .rail-toggle span { display: none; }
+html[data-rail="narrow"] .rail-toggle .ico { transform: rotate(180deg); }
 .rail-item:hover { background: var(--row-hover); color: var(--text); }
 .rail-item.on { background: var(--wash-blue); color: var(--blue); }
 .ico { width: 20px; height: 20px; flex: 0 0 auto; }
@@ -6054,11 +6067,12 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
     body { padding-left: var(--rail-w); }
 }
 @media (max-width: 1023.98px) {
-    .rail { transform: translateX(-100%); transition: transform 180ms ease; width: 220px; align-items: stretch; box-shadow: var(--shadow-2); }
+    .rail { transform: translateX(-100%); transition: transform 180ms ease; width: 220px; box-shadow: var(--shadow-2); }
     .rail.open { transform: none; }
-    .rail-item { width: auto; display: flex; gap: var(--sp-3); padding: 0 var(--sp-3); }
-    .rail-item span { display: inline; font-weight: 500; }
-    .rail-logo { width: auto; justify-content: flex-start; padding-left: var(--sp-3); }
+    /* The drawer always shows labels, whatever the desktop preference. */
+    html[data-rail="narrow"] .rail-item { justify-content: flex-start; padding: 0 10px; }
+    html[data-rail="narrow"] .rail-item span { display: inline; }
+    .rail-toggle { display: none; }
     .rail-scrim.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 25; }
     .at-menu { display: grid; }
     .apptop { padding: 0 var(--sp-3); gap: var(--sp-2); }
@@ -6896,3 +6910,7 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ui-so.at-tp { color: var(--green); } .ui-so.at-stop { color: var(--red); } .ui-so.at-open { color: var(--yellow); } .ui-so.at-pending { color: var(--blue); } .ui-so.at-no-fill { color: var(--text-dim); font-weight: 500; }
 .ui-pager .ui-btn { min-width: 40px; justify-content: center; }
 .ui-side.auto { background: var(--wash-blue); color: var(--blue); }
+/* Columns that end level (Today): the last card in each column grows to
+   the taller column's height. */
+.ui-cols-even { align-items: stretch; }
+.ui-cols-even > .ui-col > .ui-card:last-child { flex: 1 1 auto; }
