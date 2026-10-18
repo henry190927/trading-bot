@@ -21,7 +21,7 @@ CLIs and the web UI address any of the 14 contracts `market.Resolve` knows.
 | **Runs** | Two containers (Docker Compose) on one Oracle Cloud Always Free VM (1 GB RAM), reachable only over Tailscale and SSH |
 | **Does** | Detect → score → record / execute (paper-first) → alert |
 | **Discipline** | Every strategy change goes through a 60/90/120-day A/B, and the ship gate is code (`shipgate`), not a habit |
-| **Size** | 36 importable packages + 28 commands · 255 Go files, 83 of them tests · ~55k lines · `go test -race ./...` clean |
+| **Size** | 35 importable packages + 28 commands · 247 Go files, 83 of them tests · ~54k lines · `go test -race ./...` clean |
 | **Ships as** | `FROM scratch` images (web 28.7 MB, monitor 7.4 MB) built by CI per commit, deployed with Docker Compose behind a manual approval ([`docs/operations.md`](docs/operations.md#deploying)) |
 
 ---
@@ -32,11 +32,11 @@ CLIs and the web UI address any of the 14 contracts `market.Resolve` knows.
 flowchart TB
     subgraph External["🌐 External"]
         bx[(BingX REST + WebSocket)]
-        others[(TWSE · Finnhub · Moralis · Etherscan · Gemini)]
+        others[(Finnhub · Gemini)]
     end
 
-    subgraph Core["🧠 36 importable packages — data flows down, never back up"]
-        datain["Data in — bingx · market · twse · onchain · econcal · earnings · fundamental · macro"]
+    subgraph Core["🧠 35 importable packages — data flows down, never back up"]
+        datain["Data in — bingx · market · econcal · earnings · fundamental · macro"]
         math["Pure math — indicator"]
         detect["Detection — signal · analyzer · zone · session"]
         decide["Decision + risk — validator · risk · shipgate · bracket · protect"]
@@ -210,7 +210,7 @@ latest example: it beat the baseline in all three windows and still failed.
 
 | Layer | Packages | Responsibility |
 |---|---|---|
-| **Data in** | `bingx` (REST + WebSocket + paginated klines), `market` (Symbol/Candle types, 14 contracts incl. NCCO* metals and NCSK* stock synthetics), `twse`, `onchain`, `econcal`, `earnings`, `fundamental`, `macro`, `dxy` | Every external read. `market.Resolve` is the single symbol map — the canonical one, after three stale copies caused outages. |
+| **Data in** | `bingx` (REST + WebSocket + paginated klines), `market` (Symbol/Candle types, 14 contracts incl. NCCO* metals and NCSK* stock synthetics), `econcal`, `earnings`, `fundamental`, `macro`, `dxy` | Every external read. `market.Resolve` is the single symbol map — the canonical one, after three stale copies caused outages. |
 | **Pure math** | `indicator` | Stateless: RSI, BOLL, MACD, ATR, Fibonacci, volume profile (HVN/POC). No I/O, no clock. |
 | **Detection** | `signal` (confluence voting, N字 BOS/CHoCH structure, EQH/EQL liquidity pools, session opens, shelves), `analyzer` (sweep + reclaim, divergence, CVD, double patterns), `zone` (pivot-zone bands, manual + auto-derived), `session` (US cash-open bar modelling) | Turns candles into named events. **Closed bars only** — the forming bar is never read, which is what keeps live and backtest identical. |
 | **Decision + risk** | `validator` (/10 discretionary score), `risk` (notional/equity, kill distance), `shipgate` (PASS/FAIL/UNDECIDED), `bracket` (naked-position guard), `protect` (stop management) | Scores a proposal and refuses bad ones. `shipgate` is the notable one: the ship criteria are CODE, not a habit — see below. |

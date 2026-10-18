@@ -226,10 +226,10 @@ A mute also silences the naked-position alarm — the confirm dialog says so.
 | `/journal`, `/journal/new`, `/journal/:id/edit`, `/journal/:id/close` | Portfolio — trades, stats, the partials calculator for multi-leg exits |
 | `/validate` | Score a proposed entry |
 | `/setups`, `/scan` | Setup tracking with the path-dependent real outcome; current setups |
-| `/today` | Today — open trades, unit health, pending setups |
+| `/today` | Today — open trades, macro gaps, pending setups |
 | `/tips` | Lessons distilled from the journal |
 | `/calendar` | Macro calendar (curated events gate the engine; the live feed is display-only) |
-| `/tw`, `/fundamentals`, `/onchain` | Taiwan stocks (TWSE open data), US stock fundamentals, on-chain |
+| `/alerts` (and the 🔔 on every page) | In-app alerts — see [alerts.md](alerts.md) |
 | `/ops`, `/ops/autotrade`, `/ops/verify` | Operations — see [Operating](#operating) |
 
 Add it to the iPhone home screen from Safari's share menu for a full-screen

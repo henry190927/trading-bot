@@ -29,7 +29,6 @@ import (
 	"github.com/henry190927/trading-bot/macro"
 	"github.com/henry190927/trading-bot/market"
 	"github.com/henry190927/trading-bot/oi"
-	"github.com/henry190927/trading-bot/onchain"
 	"github.com/henry190927/trading-bot/signal"
 	"github.com/henry190927/trading-bot/validator"
 )
@@ -45,11 +44,6 @@ type server struct {
 	// the admin's model choice survives restarts. Read on boot (see
 	// main.go LoadPersistedModel), written on each POST.
 	aiModelPath string
-
-	// onchain orchestrator — powers the /onchain tab's per-coin holder
-	// + dump-signal lookup. Constructed once in main.go so the
-	// CoinGecko cache + CEX registry persist across requests.
-	onchain *onchain.Service
 
 	// hub owns the single upstream price refresh and fans snapshots out to
 	// SSE subscribers. Constructed in main.go; starts polling only while at
@@ -3606,47 +3600,27 @@ var uiSymbols = []string{"BTC", "ETH", "XAU", "XAG", "SNDK", "NVDA", "SPCX", "MS
 var fwdStockSymbols = []string{"SNDK", "NVDA", "SPCX", "MSTR", "APP"}
 var fwdAltSymbols = []string{"SOL", "LINK", "SUI", "HYPE", "NEAR", "XRP", "AKE", "UNI"}
 
+// fundamentalsPath is the daily board cmd/fundamental-scan writes. The page
+// that browsed it is gone (2026-10-18); the AI symbol overlay still reads it.
+func fundamentalsPath() string {
+	if p := strings.TrimSpace(os.Getenv("FUNDAMENTALS_FILE")); p != "" {
+		return p
+	}
+	return "/opt/trading/fundamentals.json"
+}
+
+func firstNote(ns []string) string {
+	if len(ns) > 0 {
+		return ns[0]
+	}
+	return ""
+}
+
 func defaultStr(v, fallback string) string {
 	if v == "" {
 		return fallback
 	}
 	return v
-}
-
-// handleOnchainPage renders the /onchain tab — a search form + result
-// pane for the top-holders / dump-signal lookup. Pure HTML shell; the
-// lookup itself is triggered client-side via /api/onchain/lookup.
-func (s *server) handleOnchainPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "onchain.html", gin.H{
-		"Prefill": strings.TrimSpace(c.Query("symbol")),
-		"Chains":  []string{"", "bsc", "eth", "base"},
-	})
-}
-
-// handleOnchainLookup — GET /api/onchain/lookup?symbol=X&chain=Y
-// Runs the onchain.Service pipeline (CoinGecko → Moralis → scan → CEX match)
-// and returns JSON with holders + dump signals.
-func (s *server) handleOnchainLookup(c *gin.Context) {
-	if s.onchain == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "onchain service not initialized"})
-		return
-	}
-	symbol := strings.TrimSpace(c.Query("symbol"))
-	if symbol == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "symbol required (ticker like AKE or coingecko id like akedo)"})
-		return
-	}
-	chain := onchain.Chain(strings.TrimSpace(c.Query("chain")))
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
-	defer cancel()
-
-	res, err := s.onchain.Lookup(ctx, symbol, chain)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, res)
 }
 
 // handleAIAnalyzeSymbol is the dashboard-level AI advisor endpoint. POST

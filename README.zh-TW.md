@@ -24,7 +24,7 @@ CLI 和 web UI 可以指定 `market.Resolve` 認得的全部 14 個合約。
 | **跑在哪** | 一台 Oracle Cloud Always Free VM（1 GB RAM）上的兩個容器（Docker Compose），只能透過 Tailscale 和 SSH 連到 |
 | **做什麼** | 偵測 → 打分 → 記錄／執行（paper-first）→ 推播 |
 | **紀律** | 每個策略改動都要過 60/90/120 天的 A/B，而且上線閘門是程式（`shipgate`），不是習慣 |
-| **規模** | 36 個可匯入的 package + 28 個 command · 255 個 Go 檔，其中 83 個是測試 · 約 55k 行 · `go test -race ./...` 乾淨 |
+| **規模** | 35 個可匯入的 package + 28 個 command · 247 個 Go 檔，其中 83 個是測試 · 約 54k 行 · `go test -race ./...` 乾淨 |
 | **怎麼出貨** | `FROM scratch` 映像（web 28.7 MB、monitor 7.4 MB），CI 依 commit 建置，人工核准後用 Docker Compose 部署（[`docs/operations.md`](docs/operations.md#deploying)） |
 
 > 💡 這個專案真正的重點不是「會不會賺錢」，而是**每一個策略改動都要通過 60/90/120 天
@@ -39,11 +39,11 @@ CLI 和 web UI 可以指定 `market.Resolve` 認得的全部 14 個合約。
 flowchart TB
     subgraph External["🌐 外部"]
         bx[(BingX REST + WebSocket)]
-        others[(TWSE · Finnhub · Moralis · Etherscan · Gemini)]
+        others[(Finnhub · Gemini)]
     end
 
-    subgraph Core["🧠 36 個可匯入的 package — 資料往下流，不回頭"]
-        datain["資料進入 — bingx · market · twse · onchain · econcal · earnings · fundamental · macro"]
+    subgraph Core["🧠 35 個可匯入的 package — 資料往下流，不回頭"]
+        datain["資料進入 — bingx · market · econcal · earnings · fundamental · macro"]
         math["純數學 — indicator"]
         detect["偵測 — signal · analyzer · zone · session"]
         decide["決策 + 風控 — validator · risk · shipgate · bracket · protect"]
@@ -228,7 +228,7 @@ flowchart LR
 
 | 層 | Package | 責任 |
 |---|---|---|
-| **資料進入** | `bingx`（REST + WebSocket + 分頁 K 線）、`market`（Symbol/Candle 型別，14 個合約）、`twse`、`onchain`、`econcal`、`earnings`、`fundamental`、`macro`、`dxy` | 所有對外讀取。`market.Resolve` 是**唯一**的 symbol 對照表 |
+| **資料進入** | `bingx`（REST + WebSocket + 分頁 K 線）、`market`（Symbol/Candle 型別，14 個合約）、`econcal`、`earnings`、`fundamental`、`macro`、`dxy` | 所有對外讀取。`market.Resolve` 是**唯一**的 symbol 對照表 |
 | **純數學** | `indicator` | 無狀態：RSI、BOLL、MACD、ATR、Fibonacci、volume profile（HVN/POC）。沒有 I/O、沒有時鐘 |
 | **偵測** | `signal`、`analyzer`、`zone`、`session` | 把 K 線變成有名字的事件。**只讀收盤棒** |
 | **決策 + 風控** | `validator`（`/10` 分）、`risk`、`shipgate`、`bracket`（裸倉守衛）、`protect`（停損管理） | 給提案打分，並拒絕不該做的 |

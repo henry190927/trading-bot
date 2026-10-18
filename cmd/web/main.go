@@ -27,7 +27,6 @@ import (
 	"github.com/henry190927/trading-bot/econcal"
 	"github.com/henry190927/trading-bot/indicator"
 	"github.com/henry190927/trading-bot/macro"
-	"github.com/henry190927/trading-bot/onchain"
 )
 
 //go:embed templates/*.html static
@@ -105,10 +104,6 @@ func main() {
 			log.Printf("[ai] GEMINI_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable GEMINI_DRY_RUN=true.")
 		}
 	}
-	onchainSvc := onchain.NewService()
-	if count, _, source, _ := onchainSvc.CEX.Stats(); count > 0 {
-		log.Printf("[onchain] CEX registry seeded from %s: %d addresses", source, count)
-	}
 	srv := &server{
 		client:         bxClient,
 		ai:             aiProvider,
@@ -116,7 +111,6 @@ func main() {
 		aiModelPath:    aiModelPath,
 		aiCache:        make(map[int]aiCacheEntry),
 		aiSymbolCache:  make(map[string]aiCacheEntry),
-		onchain:        onchainSvc,
 	}
 	// The hub's only dependency is "give me a snapshot" — the same builder
 	// /api/tickers serves, so both transports carry identical numbers.
@@ -152,15 +146,10 @@ func main() {
 	r.POST("/api/chart/setup", srv.handleAPIChartSetupRecord)
 	r.GET("/setups", srv.handleSetupsList)
 	r.GET("/tips", srv.handleTipsPage)
-	r.GET("/fundamentals", srv.handleFundamentalsPage)
-	r.GET("/api/stock/news", srv.handleStockNews)
-	r.GET("/tw", srv.handleTWStocksPage)
 	r.GET("/calendar", srv.handleCalendarPage)
 	r.POST("/api/setups/refresh", srv.handleAPISetupsRefresh)
 	r.POST("/setups/:id/skip", srv.handleSetupSkip)
 	r.POST("/setups/:id/delete", srv.handleSetupDelete)
-	r.GET("/onchain", srv.handleOnchainPage)
-	r.GET("/api/onchain/lookup", srv.handleOnchainLookup)
 	r.GET("/chart", srv.handleChartPage)
 	r.GET("/api/chart/data", srv.handleChartData)
 	r.GET("/api/chart/bias", srv.handleChartBias)

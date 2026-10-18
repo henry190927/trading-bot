@@ -2319,7 +2319,7 @@ footer {
     cursor: pointer;
 }
 
-/* On-chain lookup page — /onchain */
+/* Page lead + inline field row (shared; the /onchain page that introduced them is gone) */
 .page-hint {
     color: var(--text-dim);
     font-size: var(--fs-md);
@@ -2333,63 +2333,6 @@ footer {
     flex-wrap: wrap;
     align-items: flex-end;
 }
-.field-grow { flex: 1 1 240px; }
-.field-btn { align-self: flex-end; }
-.field-btn .btn-primary { min-height: 42px; padding: 0 1.4rem; }
-
-.onchain-status {
-    padding: 0.6rem 0.9rem;
-    border-radius: 4px;
-    margin: 0.8rem 0;
-    font-size: var(--fs-md);
-}
-.onchain-status.hidden { display: none; }
-.onchain-status-loading { background: rgba(var(--blue-rgb),0.10); color: var(--blue); border: 1px solid var(--blue); }
-.onchain-status-error   { background: var(--red-bg);          color: var(--red);   border: 1px solid var(--red); }
-
-.onchain-result { margin-top: 1rem; }
-.onchain-result.hidden { display: none; }
-.onchain-header {
-    padding: 0.6rem 0.9rem;
-    background: var(--surface-2);
-    border-radius: 6px;
-    margin-bottom: 1rem;
-}
-.onchain-title { font-size: var(--fs-lg); font-weight: 700; }
-.onchain-ticker { color: var(--text-dim); font-weight: 400; }
-.onchain-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-    margin-top: 0.4rem;
-}
-.onchain-meta a { color: var(--blue); }
-
-.onchain-partial-errors {
-    background: rgba(var(--yellow-rgb),0.10);
-    color: var(--yellow);
-    border: 1px solid var(--yellow);
-    padding: 0.5rem 0.8rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
-    font-size: var(--fs-base);
-}
-.onchain-partial-errors ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
-
-.onchain-block { margin-bottom: 1.5rem; }
-.onchain-block h2 { font-size: var(--fs-md); margin: 0 0 0.5rem; }
-
-/* Dump + holder tables are .dt.dt--compact; only the page's cell semantics live here. */
-.onchain-block .dt a { color: var(--blue); text-decoration: none; }
-.onchain-block .dt a:hover { text-decoration: underline; }
-.dt .dump-cex { color: var(--red); font-weight: 600; }
-
-.holder-cex      { background: rgba(255, 90, 95, 0.08); }
-.holder-cex td   { color: var(--red); }
-.holder-contract { color: var(--text-dim); }
-
 .tradeable-list {
     display: flex;
     flex-direction: column;
@@ -5331,19 +5274,19 @@ main { overflow-x: hidden; }
    {{.Outcome}}, {{.Cat}}, {{.Status}}, sideClass) and the tone is decided
    here, so no template needs a lookup table. Scoped to .badge because
    .side-long and friends also style non-badge elements. */
-.badge:is(.side-long, .fund-buy, .oc-win, .st-upcoming, .poc-rising) {
+.badge:is(.side-long, .st-upcoming, .poc-rising) {
     --tone: var(--green); --tone-rgb: var(--green-rgb);
 }
-.badge:is(.side-short, .fund-avoid, .oc-loss, .st-active, .cat-fomc, .cat-minutes, .cat-speech, .knife, .poc-falling) {
+.badge:is(.side-short, .st-active, .cat-fomc, .cat-minutes, .cat-speech, .knife, .poc-falling) {
     --tone: var(--red); --tone-rgb: var(--red-rgb);
 }
-.badge:is(.fund-hold, .oc-open, .cat-cpi, .cat-ppi, .squeeze) {
+.badge:is(.cat-cpi, .cat-ppi, .squeeze) {
     --tone: var(--yellow); --tone-rgb: var(--yellow-rgb);
 }
 .badge:is(.cat-nfp, .cat-earnings, .cat-data) {
     --tone: var(--blue); --tone-rgb: var(--blue-rgb);
 }
-.badge:is(.side-flat, .fund-unknown, .oc-expired, .oc-skip, .oc-no-fill, .st-past, .cat-other, .va-in) {
+.badge:is(.side-flat, .st-past, .cat-other, .va-in) {
     --tone: var(--text-dim); --tone-rgb: var(--text-dim-rgb);
 }
 /* Value-area flags are volume-profile readings — data-viz, so they keep
@@ -5495,7 +5438,7 @@ main { overflow-x: hidden; }
    --numeric  figures board: every column right-aligned, label column left.
    --matrix   cross-tab: cells centred under their headers, row-head column
               left and bold.
-   --compact  secondary table inside a card (ops OI, onchain): tighter cells,
+   --compact  secondary table inside a card (ops OI): tighter cells,
               one step smaller type.
    --lg       headline table (home market overview): one step larger type.
    --cards    ≤640px rows collapse to labelled cards (needs td[data-label];
@@ -5510,8 +5453,6 @@ main { overflow-x: hidden; }
 .dt--lg { font-size: var(--fs-md); }
 .dt--lg th, .dt--lg td { padding: calc((var(--sp-2) + var(--sp-3)) / 2) var(--sp-3); }
 /* Text columns on a numeric board (TW name, trailing note) read left-to-right. */
-.dt th.fund-note, .dt td.fund-note,
-.dt th.fund-cell-nametd, .dt td.fund-cell-nametd { text-align: left; }
 
 /* Phones: the first column (symbol / id) stays pinned while a wide table
    scrolls sideways inside .dt-scroll, so a row never loses its name. Pinned
@@ -5826,16 +5767,6 @@ main { overflow-x: hidden; }
    blocks and re-pointed at theme tokens (Phase 0 token-bypass fix), so
    these badges finally re-theme under industrial instead of freezing slate.
    ===================================================================== */
-.fund-note{color:var(--text-dim);font-size:var(--fs-sm);text-align:left;white-space:normal;max-width:22rem}
-.fund-counts{display:flex;gap:var(--sp-4);flex-wrap:wrap;margin:var(--sp-1) 0 var(--sp-3);font-size:var(--fs-md)}
-.fund-counts b{font-variant-numeric:tabular-nums}
-.fund-downgrades{border:1px solid var(--wash-red);background:var(--wash-red);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);margin:var(--sp-1) 0 var(--sp-3)}
-.fund-dg-title{font-weight:700;color:var(--red);margin-bottom:var(--sp-1);font-size:var(--fs-md)}
-.fund-dg-item{display:inline-block;margin:2px var(--sp-2) 2px 0;font-size:var(--fs-sm)}
-.fund-info{margin:var(--sp-1) 0 var(--sp-3);font-size:var(--fs-sm)}
-.fund-info summary{cursor:pointer;color:var(--text-dim)}
-.fund-info ul{margin:var(--sp-2) 0 0;padding-left:1.1rem;line-height:var(--lh-base)}
-.fund-info li{margin:var(--sp-1) 0}
 
 /* TW-specific */
 
@@ -6179,7 +6110,6 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
    hidden, each row → a card, each cell shows its column via ::before. Scoped
    to .dt--cards so setups / other .dt tables are untouched.
    ===================================================================== */
-.fund-cell-name { display: none; }  /* desktop: TW name lives in its own column */
 
 @media (max-width: 640px) {
     .dt-scroll:has(.dt--cards) { border: none; overflow: visible; }
@@ -6215,25 +6145,6 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
         flex: 0 0 auto;
     }
     .dt--cards td[colspan] { grid-column: 1 / -1; }
-    /* Symbol = card header: full width, bigger, no label prefix */
-    .dt--cards td.fund-cell-sym {
-        grid-column: 1 / -1;
-        font-size: var(--fs-lg);
-        padding-bottom: var(--sp-1);
-        margin-bottom: var(--sp-1);
-        border-bottom: 1px solid var(--border);
-        justify-content: flex-start;
-    }
-    .dt--cards td.fund-cell-sym::before { display: none; }
-    .dt--cards .fund-cell-name {
-        display: inline; margin-left: var(--sp-2);
-        color: var(--text-dim); font-weight: 400; font-size: var(--fs-sm);
-    }
-    .dt--cards td.fund-cell-nametd { display: none; }  /* TW name folded into header */
-    /* Rating + Note span the full card width */
-    .dt--cards td[data-label="Rating"],
-    .dt--cards td.fund-note { grid-column: 1 / -1; justify-content: flex-start; }
-    .dt--cards td.fund-note::before { margin-right: var(--sp-2); }
 }
 
 /* =====================================================================
