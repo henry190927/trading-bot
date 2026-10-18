@@ -36,6 +36,9 @@ import (
 type server struct {
 	// pages holds the parsed templates per language (i18n.go).
 	pages map[string]*template.Template
+	// dicts are the same dictionaries, for strings built in Go handlers
+	// (translator in i18n_bias.go).
+	dicts map[string]map[string]string
 
 	client *bingx.Client
 	ai     ai.Provider

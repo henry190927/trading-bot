@@ -127,11 +127,14 @@ func computeTFBias(tf market.Timeframe, st signal.StructureState, sig signal.Sig
 	// lens read short. The figure was never wrong; the label let it be read
 	// as recent momentum.
 	span := ""
+	var spanDays, spanHours float64 // raw, for localizeBias
 	if d := market.BarDuration(tf); d > 0 {
 		if days := (200 * d).Hours() / 24; days >= 1 {
+			spanDays = days
 			span = fmt.Sprintf("/200根≈%.0f天", days)
 		} else {
-			span = fmt.Sprintf("/200根≈%.0f小時", (200 * d).Hours())
+			spanHours = (200 * d).Hours()
+			span = fmt.Sprintf("/200根≈%.0f小時", spanHours)
 		}
 	}
 	pocLabel := fmt.Sprintf("POC%s %s %+.1f%%", span, pocArrow, sig.POCMig.DriftPct*100)
@@ -148,6 +151,10 @@ func computeTFBias(tf market.Timeframe, st signal.StructureState, sig signal.Sig
 		"structVote": sv,
 		"poc":        pocLabel,
 		"pocVote":    pv,
+		// The parts pocLabel is built from, so localizeBias can rebuild it
+		// in the request's language.
+		"pocSpanDays": spanDays, "pocSpanHours": spanHours,
+		"pocArrow": pocArrow, "pocDrift": sig.POCMig.DriftPct, "pocStacked": sig.POCMig.Stacked,
 		"engine":     sig.Side.String(),
 		"engineVote": ev,
 	}
@@ -261,7 +268,7 @@ func (s *server) handleChartBias(c *gin.Context) {
 	if e, ok := biasCache[short]; ok && time.Since(e.at) < biasCacheTTL {
 		resp := e.resp
 		biasCacheMu.Unlock()
-		c.JSON(http.StatusOK, resp)
+		c.JSON(http.StatusOK, localizeBias(resp, s.translator(langOf(c))))
 		return
 	}
 	// A recompute costs a multi-TF scan. The chart polls this endpoint on a
@@ -276,7 +283,7 @@ func (s *server) handleChartBias(c *gin.Context) {
 				c.JSON(http.StatusBadGateway, gin.H{"error": "bias recompute failed"})
 				return
 			}
-			c.JSON(http.StatusOK, call.resp)
+			c.JSON(http.StatusOK, localizeBias(call.resp, s.translator(langOf(c))))
 		case <-c.Request.Context().Done():
 			// Caller gave up; nothing to write.
 		}
@@ -349,7 +356,7 @@ func (s *server) handleChartBias(c *gin.Context) {
 	biasCacheMu.Lock()
 	biasCache[short] = biasCacheEntry{at: time.Now(), resp: resp}
 	biasCacheMu.Unlock()
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, localizeBias(resp, s.translator(langOf(c))))
 }
 
 // computeAlignment summarizes multi-TF agreement so the UI can flag a "TF
@@ -481,7 +488,7 @@ func computeAlignment(tfs []gin.H) gin.H {
 
 	return gin.H{
 		"state": state, "label": label + word(dom) + breadth,
-		"agree": agree, "against": against, "htfAgree": htfAgree,
+		"agree": agree, "against": against, "htfAgree": htfAgree, "oneHourDissents": oneHourDissents,
 		"htfSum": htfSum, "ltfSum": ltfSum, "tfCount": len(tfs),
 	}
 }

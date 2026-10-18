@@ -5,7 +5,7 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>chart · trading-web</title>
+<title>{{t "chart.ui.title"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
@@ -20,7 +20,7 @@
     <button type="button" class="chart-fav-filter" id="chart-fav-filter"
             title="{{t "chart.favOnlyHint"}}"
             aria-pressed="false">☆ <span id="chart-fav-count"></span></button>
-    <div class="chart-ticker" id="chart-ticker" aria-label="all symbols ticker"></div>
+    <div class="chart-ticker" id="chart-ticker" aria-label="{{t "chart.ui.tickerAria"}}"></div>
   </div>
 
   <div class="chart-controls">
@@ -30,7 +30,7 @@
         {{$cs := .Symbol}}
         {{range .Symbols}}<option value="{{.}}" {{if eq . $cs}}selected{{end}}>{{.}}</option>{{end}}
       </select>
-      <div class="chart-tf-pills" role="radiogroup" aria-label="timeframe">
+      <div class="chart-tf-pills" role="radiogroup" aria-label="{{t "chart.ui.tfAria"}}">
         {{$ct := .TF}}
         {{range .TFs}}
           <button type="button" class="tf-pill{{if eq . $ct}} active{{end}}" data-tf="{{.}}">{{.}}</button>
@@ -44,8 +44,8 @@
   <span class="hidden" id="chart-verdict">—</span>
   <span class="hidden" id="chart-banner-score-tf">—</span>
 
-  <div class="chart-layers" role="group" aria-label="chart layers">
-    <span class="chart-layers-label">Indicators:</span>
+  <div class="chart-layers" role="group" aria-label="{{t "chart.ui.layersAria"}}">
+    <span class="chart-layers-label">{{t "chart.ui.indicators"}}</span>
 
     <!-- Three category buttons — each opens a flyout listing the
          individual chips in that category. Mirrors the drawing
@@ -54,21 +54,21 @@
          Active-count badges tell you how many chips inside are on. -->
     <div class="layer-menu-wrap">
       <button type="button" class="layer-chip layer-menu-toggle" data-menu="overlays" aria-haspopup="menu" aria-expanded="false">
-        <span class="layer-menu-hint">OL</span> Overlays
+        <span class="layer-menu-hint">OL</span> {{t "chart.ui.overlays"}}
         <span class="layer-menu-count" data-menu-count="overlays">0</span>
       </button>
       <div class="layer-menu hidden" data-menu-panel="overlays" role="menu">
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="boll">BOLL</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="vol">VOL</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="vp">VP</button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="plan">plan</button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">positions <span class="layer-count" data-layer-count="positions">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="plan">{{t "chart.ui.l.plan"}}</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="positions">{{t "chart.ui.l.positions"}} <span class="layer-count" data-layer-count="positions">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="hvn">HVN <span class="layer-count" data-layer-count="hvn">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="opens">{{t "chart.layer.opens"}} <span class="layer-count" data-layer-count="opens">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="liquidity">{{t "chart.layer.liquidity"}} <span class="layer-count" data-layer-count="liquidity">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="zones">{{t "chart.layer.zones"}} <span class="layer-count" data-layer-count="zones">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="shelves">{{t "chart.layer.shelves"}} <span class="layer-count" data-layer-count="shelves">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">POC migration</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="poc-mig">{{t "chart.ui.l.pocmig"}}</button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="struct">{{t "chart.layer.struct"}} <span class="layer-count" data-layer-count="struct">0</span></button>
         <button type="button" class="layer-chip layer-chip-menuitem" data-layer="tf-bias">{{t "chart.layer.tfbias"}}</button>
       </div>
@@ -76,55 +76,55 @@
 
     <div class="layer-menu-wrap">
       <button type="button" class="layer-chip layer-menu-toggle" data-menu="osc" aria-haspopup="menu" aria-expanded="false">
-        <span class="layer-menu-hint">∿</span> Oscillators
+        <span class="layer-menu-hint">∿</span> {{t "chart.ui.oscillators"}}
         <span class="layer-menu-count" data-menu-count="osc">0</span>
       </button>
       <div class="layer-menu hidden" data-menu-panel="osc" role="menu">
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="rsi">RSI pane</button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="macd-pane">MACD pane</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="rsi">{{t "chart.ui.l.rsi"}}</button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="macd-pane">{{t "chart.ui.l.macdpane"}}</button>
       </div>
     </div>
 
     <div class="layer-menu-wrap">
       <button type="button" class="layer-chip layer-menu-toggle" data-menu="events" aria-haspopup="menu" aria-expanded="false">
-        <span class="layer-menu-hint">✦</span> Events
+        <span class="layer-menu-hint">✦</span> {{t "chart.ui.events"}}
         <span class="layer-menu-count" data-menu-count="events">0</span>
       </button>
       <div class="layer-menu hidden" data-menu-panel="events" role="menu">
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="sweep">sweep <span class="layer-count" data-layer-count="sweep">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="double">2× top/bot <span class="layer-count" data-layer-count="double">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="div">RSI div <span class="layer-count" data-layer-count="div">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="delta-div">Delta div <span class="layer-count" data-layer-count="delta-div">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="volx">vol× <span class="layer-count" data-layer-count="volx">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="bb-events">BB touch/break <span class="layer-count" data-layer-count="bb-events">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="macd">MACD × <span class="layer-count" data-layer-count="macd">0</span></button>
-        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="flags">⚑ flags <span class="layer-count" data-layer-count="flags">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="sweep">{{t "chart.ui.l.sweep"}} <span class="layer-count" data-layer-count="sweep">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="double">{{t "chart.ui.l.double"}} <span class="layer-count" data-layer-count="double">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="div">{{t "chart.ui.l.div"}} <span class="layer-count" data-layer-count="div">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="delta-div">{{t "chart.ui.l.deltadiv"}} <span class="layer-count" data-layer-count="delta-div">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="volx">{{t "chart.ui.l.volx"}} <span class="layer-count" data-layer-count="volx">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="bb-events">{{t "chart.ui.l.bb"}} <span class="layer-count" data-layer-count="bb-events">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="macd">{{t "chart.ui.l.macd"}} <span class="layer-count" data-layer-count="macd">0</span></button>
+        <button type="button" class="layer-chip layer-chip-menuitem" data-layer="flags">{{t "chart.ui.l.flags"}} <span class="layer-count" data-layer-count="flags">0</span></button>
       </div>
     </div>
     <span class="chart-layers-group chart-layers-actions">
-      <button type="button" class="layer-chip layer-info" id="layers-info" title="What do these indicators mean?" aria-label="Indicator glossary">ⓘ</button>
-      <select id="chart-tz-select" class="layer-chip chart-tz-select" title="Timezone for axis / tooltip times" aria-label="Timezone">
+      <button type="button" class="layer-chip layer-info" id="layers-info" title="{{t "chart.ui.glossTip"}}" aria-label="{{t "chart.ui.glossAria"}}">ⓘ</button>
+      <select id="chart-tz-select" class="layer-chip chart-tz-select" title="{{t "chart.ui.tzTip"}}" aria-label="{{t "chart.ui.tzAria"}}">
         <option value="0">UTC</option>
-        <option value="8" selected>UTC+8 Taipei</option>
-        <option value="9">UTC+9 Tokyo</option>
-        <option value="-4">UTC-4 NY (EDT)</option>
-        <option value="-5">UTC-5 NY (EST)</option>
-        <option value="1">UTC+1 London</option>
+        <option value="8" selected>UTC+8 {{t "chart.ui.tz.tpe"}}</option>
+        <option value="9">UTC+9 {{t "chart.ui.tz.tyo"}}</option>
+        <option value="-4">UTC-4 {{t "chart.ui.tz.nyedt"}}</option>
+        <option value="-5">UTC-5 {{t "chart.ui.tz.nyest"}}</option>
+        <option value="1">UTC+1 {{t "chart.ui.tz.lon"}}</option>
       </select>
-      <button type="button" class="layer-chip layer-reset" id="layers-reset" title="Reset chart zoom to fit all data">⟲ fit</button>
-      <button type="button" class="layer-chip layer-eye" id="layers-eye" title="toggle display without clearing selections" aria-label="Toggle indicator visibility">
+      <button type="button" class="layer-chip layer-reset" id="layers-reset" title="{{t "chart.ui.fitTip"}}">⟲ {{t "chart.ui.fit"}}</button>
+      <button type="button" class="layer-chip layer-eye" id="layers-eye" title="{{t "chart.ui.eyeTip"}}" aria-label="{{t "chart.ui.eyeAria"}}">
         <svg class="icon-eye-open"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         <svg class="icon-eye-off"   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
       </button>
-      <button type="button" class="layer-chip layer-clear" id="layers-clear" title="clear all layer selections">× clear</button>
-      <button type="button" class="layer-chip layer-all" id="layers-all" title="enable all layers">all</button>
+      <button type="button" class="layer-chip layer-clear" id="layers-clear" title="{{t "chart.ui.clearTip"}}">× {{t "chart.ui.clear"}}</button>
+      <button type="button" class="layer-chip layer-all" id="layers-all" title="{{t "chart.ui.allTip"}}">{{t "chart.ui.all"}}</button>
     </span>
   </div>
 
     <div class="chart-controls-end">
       <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
-              data-symbol="{{.Symbol}}" data-tf="{{.TF}}">AI analyze ▸</button>
-      <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="{{t "chart.panelToggle"}}" aria-expanded="true" aria-label="toggle analysis panel">⇥</button>
+              data-symbol="{{.Symbol}}" data-tf="{{.TF}}">{{t "chart.ui.ai"}} ▸</button>
+      <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="{{t "chart.panelToggle"}}" aria-expanded="true" aria-label="{{t "chart.ui.panelAria"}}">⇥</button>
     </div>
   </div>
   <!-- /chart-controls -->
@@ -141,46 +141,46 @@
          buttons arm a drawing mode; the trash / hide toggles sit at
          the bottom of the same group so all drawing actions stay
          together. -->
-    <div class="chart-draw-sidebar" id="draw-sidebar" role="toolbar" aria-label="drawing tools">
+    <div class="chart-draw-sidebar" id="draw-sidebar" role="toolbar" aria-label="{{t "chart.ui.drawAria"}}">
       <!-- Aggregate "marker" toggle. Clicking it opens the flyout
            (draw-tools-menu) that reveals the three drawing tools;
            picking one arms the tool and closes the flyout. Keeps
            the sidebar visually compact — TradingView-style. -->
-      <button type="button" class="draw-btn draw-tools-toggle" id="draw-tools-toggle" title="Drawing tools" aria-label="Drawing tools" aria-haspopup="menu" aria-expanded="false">
+      <button type="button" class="draw-btn draw-tools-toggle" id="draw-tools-toggle" title="{{t "chart.ui.draw"}}" aria-label="{{t "chart.ui.draw"}}" aria-haspopup="menu" aria-expanded="false">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
       </button>
       <div class="draw-tools-menu hidden" id="draw-tools-menu" role="menu">
         <!-- Color palette applied to any drawing created while this
              color is selected. Persisted to localStorage. -->
-        <div class="draw-color-row" role="group" aria-label="drawing color">
-          <button type="button" class="draw-color-swatch" data-color="#4dabf7" style="background:#4dabf7" title="Blue"></button>
-          <button type="button" class="draw-color-swatch" data-color="#20c997" style="background:#20c997" title="Teal"></button>
-          <button type="button" class="draw-color-swatch" data-color="#f59f00" style="background:#f59f00" title="Orange"></button>
-          <button type="button" class="draw-color-swatch" data-color="#e03131" style="background:#e03131" title="Red"></button>
-          <button type="button" class="draw-color-swatch" data-color="#fcc419" style="background:#fcc419" title="Yellow"></button>
-          <button type="button" class="draw-color-swatch" data-color="#e599f7" style="background:#e599f7" title="Purple"></button>
-          <button type="button" class="draw-color-swatch" data-color="#c9d1d9" style="background:#c9d1d9" title="White"></button>
+        <div class="draw-color-row" role="group" aria-label="{{t "chart.ui.drawColor"}}">
+          <button type="button" class="draw-color-swatch" data-color="#4dabf7" style="background:#4dabf7" title="{{t "chart.ui.c.blue"}}"></button>
+          <button type="button" class="draw-color-swatch" data-color="#20c997" style="background:#20c997" title="{{t "chart.ui.c.teal"}}"></button>
+          <button type="button" class="draw-color-swatch" data-color="#f59f00" style="background:#f59f00" title="{{t "chart.ui.c.orange"}}"></button>
+          <button type="button" class="draw-color-swatch" data-color="#e03131" style="background:#e03131" title="{{t "chart.ui.c.red"}}"></button>
+          <button type="button" class="draw-color-swatch" data-color="#fcc419" style="background:#fcc419" title="{{t "chart.ui.c.yellow"}}"></button>
+          <button type="button" class="draw-color-swatch" data-color="#e599f7" style="background:#e599f7" title="{{t "chart.ui.c.purple"}}"></button>
+          <button type="button" class="draw-color-swatch" data-color="#c9d1d9" style="background:#c9d1d9" title="{{t "chart.ui.c.white"}}"></button>
         </div>
         <div class="draw-menu-sep"></div>
-        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="hline" title="Horizontal line (1 click)">
+        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="hline" title="{{t "chart.ui.hlineTip"}}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" x2="21" y1="12" y2="12"/></svg>
-          <span class="draw-menuitem-label">Horizontal line</span>
+          <span class="draw-menuitem-label">{{t "chart.ui.hline"}}</span>
         </button>
-        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="tline" title="Trend line (2 clicks)">
+        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="tline" title="{{t "chart.ui.tlineTip"}}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" x2="20" y1="20" y2="4"/></svg>
-          <span class="draw-menuitem-label">Trend line</span>
+          <span class="draw-menuitem-label">{{t "chart.ui.tline"}}</span>
         </button>
-        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="rect"  title="Rectangle (2 clicks)">
+        <button type="button" class="draw-btn draw-btn-menuitem" data-tool="rect"  title="{{t "chart.ui.rectTip"}}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>
-          <span class="draw-menuitem-label">Rectangle</span>
+          <span class="draw-menuitem-label">{{t "chart.ui.rect"}}</span>
         </button>
       </div>
       <div class="draw-sep"></div>
-      <button type="button" class="draw-btn draw-btn-hide"  id="draw-hide"  title="Hide / show drawings" aria-label="Toggle drawings visibility">
+      <button type="button" class="draw-btn draw-btn-hide"  id="draw-hide"  title="{{t "chart.ui.drawHide"}}" aria-label="{{t "chart.ui.drawHide"}}">
         <svg class="icon-eye-open"  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         <svg class="icon-eye-off"   width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
       </button>
-      <button type="button" class="draw-btn draw-btn-clear" id="draw-clear" title="Delete all drawings on this symbol/TF" aria-label="Delete all drawings">
+      <button type="button" class="draw-btn draw-btn-clear" id="draw-clear" title="{{t "chart.ui.drawClear"}}" aria-label="{{t "chart.ui.drawClear"}}">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
       </button>
     </div>
@@ -202,7 +202,7 @@
           <span class="ohlc-kv"><em>H</em> <span id="ohlc-h">—</span></span>
           <span class="ohlc-kv"><em>L</em> <span id="ohlc-l">—</span></span>
           <span class="ohlc-kv"><em>C</em> <span id="ohlc-c">—</span></span>
-          <span class="ohlc-kv"><em>Vol</em> <span id="ohlc-v">—</span></span>
+          <span class="ohlc-kv"><em>{{t "chart.ui.vol"}}</em> <span id="ohlc-v">—</span></span>
           <span class="ohlc-chg" id="ohlc-chg">—</span>
         </div>
         <svg id="chart-vp-overlay" class="chart-vp-overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -214,7 +214,7 @@
         <svg id="chart-draw-overlay" class="chart-draw-overlay"></svg>
         <div class="chart-price-marker" id="chart-price-marker" hidden>
           <span class="chart-price-marker-label" id="chart-price-marker-label">—</span>
-          <button type="button" class="chart-price-plus" id="chart-price-plus" title="Record trade / validate at this price" aria-label="Record trade / validate at this price">+</button>
+          <button type="button" class="chart-price-plus" id="chart-price-plus" title="{{t "chart.ui.plusTip"}}" aria-label="{{t "chart.ui.plusTip"}}">+</button>
         </div>
       </div>
     </div>
@@ -273,11 +273,11 @@
   </div>
   <div class="chart-struct-panel hidden" id="chart-struct-panel">
     <span class="cs-lean" id="cs-lean">—</span>
-    <span class="cs-kv"><em>trend</em><span id="cs-trend">—</span></span>
-    <span class="cs-kv"><em>event</em><span id="cs-event">—</span></span>
+    <span class="cs-kv"><em>{{t "chart.ui.trend"}}</em><span id="cs-trend">—</span></span>
+    <span class="cs-kv"><em>{{t "chart.ui.event"}}</em><span id="cs-event">—</span></span>
     <span class="cs-kv" id="cs-zone-wrap"><em>{{t "chart.pivotZone"}}</em><span id="cs-zone">—</span></span>
-    <span class="cs-kv" id="cs-inzone-wrap"><em>in-zone</em><span id="cs-inzone">—</span></span>
-    <span class="cs-kv" id="cs-tgt-wrap"><em>target</em><span id="cs-target">—</span></span>
+    <span class="cs-kv" id="cs-inzone-wrap"><em>{{t "chart.ui.inzone"}}</em><span id="cs-inzone">—</span></span>
+    <span class="cs-kv" id="cs-tgt-wrap"><em>{{t "chart.ui.target"}}</em><span id="cs-target">—</span></span>
   </div>
     <!-- TF bias — moved out of the plot overlay 2026-09-12. It sat
          absolutely positioned over the chart's top-left, which is where
@@ -285,7 +285,7 @@
          price to show a read ABOUT that price. Here it is a normal side
          card and the plot is clean. Same #tf-bias id, so the renderer
          finds it unchanged. -->
-    <div class="tf-bias-panel" id="tf-bias" aria-label="multi-timeframe bias"></div>
+    <div class="tf-bias-panel" id="tf-bias" aria-label="{{t "chart.ui.tfbiasAria"}}"></div>
   </aside>
   </div><!-- /chart-grid -->
   <script>
@@ -311,28 +311,28 @@
   <div class="modal-backdrop hidden" id="quick-modal-backdrop">
     <div class="modal quick-modal" role="dialog" aria-labelledby="quick-modal-title" data-tab="validate">
       <div class="modal-head">
-        <h3 id="quick-modal-title">Quick action</h3>
+        <h3 id="quick-modal-title">{{t "chart.ui.q.title"}}</h3>
         <div class="quick-tabs" role="tablist">
-          <button type="button" class="quick-tab is-active" data-tab="validate" role="tab">Validate</button>
-          <button type="button" class="quick-tab" data-tab="record" role="tab">Record</button>
+          <button type="button" class="quick-tab is-active" data-tab="validate" role="tab">{{t "chart.ui.q.validate"}}</button>
+          <button type="button" class="quick-tab" data-tab="record" role="tab">{{t "chart.ui.q.record"}}</button>
         </div>
-        <button type="button" class="modal-x" id="quick-modal-close" aria-label="Close">&times;</button>
+        <button type="button" class="modal-x" id="quick-modal-close" aria-label="{{t "chart.ui.q.close"}}">&times;</button>
       </div>
       <div class="modal-body">
         <div class="quick-row">
-          <label>Symbol</label>
+          <label>{{t "th.symbol"}}</label>
           <span id="quick-sym">—</span>
           <span class="quick-tf" id="quick-tf">—</span>
         </div>
         <div class="quick-row">
-          <label for="quick-price">Price</label>
+          <label for="quick-price">{{t "th.price"}}</label>
           <input type="number" step="any" id="quick-price">
         </div>
         <div class="quick-row">
-          <label>Side</label>
+          <label>{{t "th.side"}}</label>
           <div class="quick-side-group">
-            <button type="button" class="quick-side-btn" data-side="long">LONG</button>
-            <button type="button" class="quick-side-btn" data-side="short">SHORT</button>
+            <button type="button" class="quick-side-btn" data-side="long">{{t "chart.ui.q.long"}}</button>
+            <button type="button" class="quick-side-btn" data-side="short">{{t "chart.ui.q.short"}}</button>
           </div>
         </div>
 
@@ -344,21 +344,21 @@
              with everything prefilled. -->
         <div class="quick-record-fields">
           <div class="quick-row">
-            <label for="quick-stop">Stop</label>
-            <input type="number" step="any" id="quick-stop" placeholder="stop-loss price">
+            <label for="quick-stop">{{t "trades.stop"}}</label>
+            <input type="number" step="any" id="quick-stop" placeholder="{{t "chart.ui.q.stopPh"}}">
           </div>
           <div class="quick-row">
             <label for="quick-tp1">TP1</label>
-            <input type="number" step="any" id="quick-tp1" placeholder="optional">
+            <input type="number" step="any" id="quick-tp1" placeholder="{{t "chart.ui.q.optional"}}">
           </div>
           <div class="quick-row">
             <label for="quick-tp2">TP2</label>
-            <input type="number" step="any" id="quick-tp2" placeholder="optional">
+            <input type="number" step="any" id="quick-tp2" placeholder="{{t "chart.ui.q.optional"}}">
           </div>
           <div class="quick-row quick-row-pair">
-            <label for="quick-margin">Margin</label>
+            <label for="quick-margin">{{t "at.margin"}}</label>
             <input type="number" step="any" min="0" id="quick-margin" placeholder="USDT">
-            <label for="quick-leverage" class="quick-inline-label">Lev</label>
+            <label for="quick-leverage" class="quick-inline-label">{{t "at.lev"}}</label>
             <input type="number" step="1" min="0" max="500" id="quick-leverage" placeholder="×">
           </div>
           <!-- Estimated P&L block — populated live from entry / stop /
@@ -366,9 +366,9 @@
                stored on the trade row. -->
           <div class="quick-pnl hidden" id="quick-pnl">
             <div class="quick-pnl-row">
-              <span class="quick-pnl-label">Notional</span>
+              <span class="quick-pnl-label">{{t "chart.ui.q.notional"}}</span>
               <span class="quick-pnl-val" id="quick-pnl-notional">—</span>
-              <span class="quick-pnl-label">Risk</span>
+              <span class="quick-pnl-label">{{t "chart.ui.q.risk"}}</span>
               <span class="quick-pnl-val quick-pnl-neg" id="quick-pnl-risk">—</span>
             </div>
             <div class="quick-pnl-row">
@@ -383,17 +383,17 @@
             </div>
           </div>
           <div class="quick-row">
-            <label for="quick-anchor">Anchor</label>
-            <input type="text" id="quick-anchor" placeholder="e.g. sweep, HVN, BB">
+            <label for="quick-anchor">{{t "trades.anchor"}}</label>
+            <input type="text" id="quick-anchor" placeholder="{{t "chart.ui.q.anchorPh"}}">
           </div>
           <div class="quick-row quick-row-notes">
-            <label for="quick-notes">Notes</label>
-            <textarea id="quick-notes" rows="3" placeholder="short thesis, confluence, exit plan…"></textarea>
+            <label for="quick-notes">{{t "chart.ui.q.notes"}}</label>
+            <textarea id="quick-notes" rows="3" placeholder="{{t "chart.ui.q.notesPh"}}"></textarea>
           </div>
         </div>
 
         <div class="quick-actions">
-          <button type="button" class="btn-primary quick-go" id="quick-go-submit">Run</button>
+          <button type="button" class="btn-primary quick-go" id="quick-go-submit">{{t "chart.ui.q.run"}}</button>
         </div>
 
         <!-- Inline result panel — validate score/verdict or
@@ -402,8 +402,8 @@
         <div class="quick-result hidden" id="quick-result"></div>
 
         <p class="quick-hint">
-          <a href="#" class="quick-hint-link" id="quick-open-full">Open full form ↗</a>
-          — go to <code>/journal/new</code> or <code>/validate</code> with fields prefilled.
+          <a href="#" class="quick-hint-link" id="quick-open-full">{{t "chart.ui.q.full"}} ↗</a>
+          {{t "chart.ui.q.fullHint"}}
         </p>
       </div>
     </div>
@@ -752,27 +752,27 @@
   <div class="chart-legend-row" id="chart-legend">
     <span class="chart-legend-group">
       <span class="chart-legend-item" data-legend-layer="boll"><span class="chart-legend-sw" style="background:#4c6ef5"></span>BOLL</span>
-      <span class="chart-legend-item" data-legend-layer="boll"><span class="chart-legend-sw" style="background:#adb5bd"></span>mid</span>
+      <span class="chart-legend-item" data-legend-layer="boll"><span class="chart-legend-sw" style="background:#adb5bd"></span>{{t "chart.leg.mid"}}</span>
     </span>
     <span class="chart-legend-group">
-      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#f59f00"></span>entry</span>
-      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#e03131"></span>stop</span>
+      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#f59f00"></span>{{t "chart.leg.entry"}}</span>
+      <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#e03131"></span>{{t "chart.leg.stop"}}</span>
       <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#2f9e44"></span>TP1</span>
       <span class="chart-legend-item" data-legend-layer="plan"><span class="chart-legend-sw" style="background:#0ca678"></span>TP2</span>
     </span>
     <span class="chart-legend-group chart-legend-markers">
-      <span class="chart-legend-item" data-legend-layer="sweep"><span class="chart-legend-mk" style="color:#e03131">▼</span>sweep-high</span>
-      <span class="chart-legend-item" data-legend-layer="sweep"><span class="chart-legend-mk" style="color:#2f9e44">▲</span>sweep-low</span>
-      <span class="chart-legend-item" data-legend-layer="double"><span class="chart-legend-mk" style="color:#ae3ec9">●</span>double top/bot</span>
-      <span class="chart-legend-item" data-legend-layer="div"><span class="chart-legend-mk" style="color:#adb5bd">■</span>RSI div</span>
-      <span class="chart-legend-item" data-legend-layer="delta-div"><span class="chart-legend-mk" style="color:#fcc419">■</span>Δ div</span>
-      <span class="chart-legend-item" data-legend-layer="volx"><span class="chart-legend-mk" style="color:#fab005">●</span>vol×</span>
-      <span class="chart-legend-item" data-legend-layer="macd"><span class="chart-legend-mk" style="color:#20c997">▲</span>MACD bull ×</span>
-      <span class="chart-legend-item" data-legend-layer="macd"><span class="chart-legend-mk" style="color:#f76707">▼</span>MACD bear ×</span>
+      <span class="chart-legend-item" data-legend-layer="sweep"><span class="chart-legend-mk" style="color:#e03131">▼</span>{{t "chart.leg.sweepHigh"}}</span>
+      <span class="chart-legend-item" data-legend-layer="sweep"><span class="chart-legend-mk" style="color:#2f9e44">▲</span>{{t "chart.leg.sweepLow"}}</span>
+      <span class="chart-legend-item" data-legend-layer="double"><span class="chart-legend-mk" style="color:#ae3ec9">●</span>{{t "chart.leg.double"}}</span>
+      <span class="chart-legend-item" data-legend-layer="div"><span class="chart-legend-mk" style="color:#adb5bd">■</span>{{t "chart.leg.rsiDiv"}}</span>
+      <span class="chart-legend-item" data-legend-layer="delta-div"><span class="chart-legend-mk" style="color:#fcc419">■</span>{{t "chart.leg.deltaDiv"}}</span>
+      <span class="chart-legend-item" data-legend-layer="volx"><span class="chart-legend-mk" style="color:#fab005">●</span>{{t "chart.leg.volx"}}</span>
+      <span class="chart-legend-item" data-legend-layer="macd"><span class="chart-legend-mk" style="color:#20c997">▲</span>{{t "chart.leg.macdBull"}}</span>
+      <span class="chart-legend-item" data-legend-layer="macd"><span class="chart-legend-mk" style="color:#f76707">▼</span>{{t "chart.leg.macdBear"}}</span>
     </span>
     <span class="chart-legend-group chart-legend-vp">
-      <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#4c6ef5"></span>VP buy</span>
-      <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#f59f00"></span>VP sell</span>
+      <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#4c6ef5"></span>{{t "chart.leg.vpBuy"}}</span>
+      <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:#f59f00"></span>{{t "chart.leg.vpSell"}}</span>
       <span class="chart-legend-item" data-legend-layer="vp"><span class="chart-legend-sw" style="background:transparent;border-top:1px dashed var(--text-dim)"></span>VA 70%</span>
       <span class="chart-legend-item chart-vp-meta" data-legend-layer="vp" id="chart-vp-meta"></span>
     </span>
@@ -783,7 +783,7 @@
 </main>
 
 <footer>
-  <span>on-demand refresh · <button type="button" id="chart-refresh" class="chart-refresh-btn">refresh</button></span>
+  <span>{{t "chart.ui.refreshHint"}} · <button type="button" id="chart-refresh" class="chart-refresh-btn">{{t "chart.ui.refresh"}}</button></span>
 </footer>
 
 <script src="/static/copy.js"></script>
@@ -791,6 +791,160 @@
 <script src="/static/lightweight-charts.standalone.production.js"></script>
 <script>
 (function () {
+    // Every string this script shows, in the page's language (server-side
+    // dictionaries, keys chart.js.*). Placeholders in braces are filled with
+    // .replace('{name}', value).
+    var CT = {
+        "lean.BOS-up": {{t "chart.js.lean.BOS-up"}},
+        "lean.BOS-down": {{t "chart.js.lean.BOS-down"}},
+        "lean.CHoCH-up": {{t "chart.js.lean.CHoCH-up"}},
+        "lean.CHoCH-down": {{t "chart.js.lean.CHoCH-down"}},
+        "lean.zoneUp": {{t "chart.js.lean.zoneUp"}},
+        "lean.zoneDown": {{t "chart.js.lean.zoneDown"}},
+        "lean.trendUp": {{t "chart.js.lean.trendUp"}},
+        "lean.trendDown": {{t "chart.js.lean.trendDown"}},
+        "lean.neutral": {{t "chart.js.lean.neutral"}},
+        "zone.sideUp": {{t "chart.js.zone.sideUp"}},
+        "zone.sideDown": {{t "chart.js.zone.sideDown"}},
+        "zone.directional": {{t "chart.js.zone.directional"}},
+        "zone.reference": {{t "chart.js.zone.reference"}},
+        "zone.fadeNote": {{t "chart.js.zone.fadeNote"}},
+        "zone.long": {{t "chart.js.zone.long"}},
+        "zone.short": {{t "chart.js.zone.short"}},
+        "zone.ref": {{t "chart.js.zone.ref"}},
+        "zone.in": {{t "chart.js.zone.in"}},
+        "zone.out": {{t "chart.js.zone.out"}},
+        "rec.noStruct": {{t "chart.js.rec.noStruct"}},
+        "rec.saving": {{t "chart.js.rec.saving"}},
+        "zone.line": {{t "chart.js.zone.line"}},
+        "hvn.blocked": {{t "chart.js.hvn.blocked"}},
+        "hvn.clear": {{t "chart.js.hvn.clear"}},
+        "zone.merged": {{t "chart.js.zone.merged"}},
+        "shelf.title": {{t "chart.js.shelf.title"}},
+        "shelf.touches": {{t "chart.js.shelf.touches"}},
+        "act.noTrade": {{t "chart.js.act.noTrade"}},
+        "act.noTradeNote": {{t "chart.js.act.noTradeNote"}},
+        "act.long": {{t "chart.js.act.long"}},
+        "act.short": {{t "chart.js.act.short"}},
+        "act.strong": {{t "chart.js.act.strong"}},
+        "act.take": {{t "chart.js.act.take"}},
+        "act.weakValidator": {{t "chart.js.act.weakValidator"}},
+        "act.weakValidatorNote": {{t "chart.js.act.weakValidatorNote"}},
+        "act.lowConf": {{t "chart.js.act.lowConf"}},
+        "act.lowConfNote": {{t "chart.js.act.lowConfNote"}},
+        "act.wait": {{t "chart.js.act.wait"}},
+        "act.waitNote": {{t "chart.js.act.waitNote"}},
+        "votes": {{t "chart.js.votes"}},
+        "vp.meta": {{t "chart.js.vp.meta"}},
+        "vp.inVA": {{t "chart.js.vp.inVA"}},
+        "vp.outVA": {{t "chart.js.vp.outVA"}},
+        "align.conflictTip": {{t "chart.js.align.conflictTip"}},
+        "align.weakTip": {{t "chart.js.align.weakTip"}},
+        "align.weakAgainst": {{t "chart.js.align.weakAgainst"}},
+        "align.weakRestNeutral": {{t "chart.js.align.weakRestNeutral"}},
+        "align.weakTail": {{t "chart.js.align.weakTail"}},
+        "align.alignedTip": {{t "chart.js.align.alignedTip"}},
+        "align.alignedAgainst": {{t "chart.js.align.alignedAgainst"}},
+        "align.alignedTail": {{t "chart.js.align.alignedTail"}},
+        "align.mixedTip": {{t "chart.js.align.mixedTip"}},
+        "tf.struct": {{t "chart.js.tf.struct"}},
+        "oi.staticTip": {{t "chart.js.oi.staticTip"}},
+        "oi.price": {{t "chart.js.oi.price"}},
+        "oi.noVerdict": {{t "chart.js.oi.noVerdict"}},
+        "oi.window": {{t "chart.js.oi.window"}},
+        "oi.age": {{t "chart.js.oi.age"}},
+        "oi.howto": {{t "chart.js.oi.howto"}},
+        "oi.notYet": {{t "chart.js.oi.notYet"}},
+        "bn.whales": {{t "chart.js.bn.whales"}},
+        "bn.all": {{t "chart.js.bn.all"}},
+        "bn.retailLong": {{t "chart.js.bn.retailLong"}},
+        "bn.retailShort": {{t "chart.js.bn.retailShort"}},
+        "bn.tip": {{t "chart.js.bn.tip"}},
+        "hvn.stripTip": {{t "chart.js.hvn.stripTip"}},
+        "range.tip": {{t "chart.js.range.tip"}},
+        "range.box": {{t "chart.js.range.box"}},
+        "fav.none": {{t "chart.js.fav.none"}},
+        "fav.showAll": {{t "chart.js.fav.showAll"}},
+        "fav.onlyFavs": {{t "chart.js.fav.onlyFavs"}},
+        "load.failed": {{t "chart.js.load.failed"}},
+        "load.updating": {{t "chart.js.load.updating"}},
+        "sum.notStacked": {{t "chart.js.sum.notStacked"}},
+        "sum.belowMin": {{t "chart.js.sum.belowMin"}},
+        "tf.title": {{t "chart.js.tf.title"}},
+        "hvn.noteClear": {{t "chart.js.hvn.noteClear"}},
+        "hvn.noteBlocked": {{t "chart.js.hvn.noteBlocked"}},
+        "verdict.STRONG TAKE": {{t "chart.js.verdict.STRONG TAKE"}},
+        "verdict.TAKE": {{t "chart.js.verdict.TAKE"}},
+        "verdict.NEUTRAL": {{t "chart.js.verdict.NEUTRAL"}},
+        "verdict.WEAK": {{t "chart.js.verdict.WEAK"}},
+        "verdict.AVOID": {{t "chart.js.verdict.AVOID"}},
+        "err.short": {{t "chart.js.err.short"}},
+        "load.loading": {{t "chart.js.load.loading"}},
+        "ai.loading": {{t "chart.js.ai.loading"}},
+        "ai.empty": {{t "chart.js.ai.empty"}},
+        "q.recordBtn": {{t "chart.js.q.recordBtn"}},
+        "q.validateBtn": {{t "chart.js.q.validateBtn"}},
+        "q.recording": {{t "chart.js.q.recording"}},
+        "q.validating": {{t "chart.js.q.validating"}},
+        "q.recorded": {{t "chart.js.q.recorded"}},
+        "q.edit": {{t "chart.js.q.edit"}},
+        "q.allTrades": {{t "chart.js.q.allTrades"}},
+        "q.long": {{t "chart.js.q.long"}},
+        "q.short": {{t "chart.js.q.short"}},
+        "q.riskLbl": {{t "chart.js.q.riskLbl"}},
+        "q.feeLbl": {{t "chart.js.q.feeLbl"}},
+        "q.suggStop": {{t "chart.js.q.suggStop"}},
+        "open.daily": {{t "chart.js.open.daily"}},
+        "open.weekly": {{t "chart.js.open.weekly"}},
+        "open.london": {{t "chart.js.open.london"}},
+        "open.ny": {{t "chart.js.open.ny"}},
+        "open.dayHigh": {{t "chart.js.open.dayHigh"}},
+        "open.dayLow": {{t "chart.js.open.dayLow"}},
+        "open.weekHigh": {{t "chart.js.open.weekHigh"}},
+        "open.weekLow": {{t "chart.js.open.weekLow"}},
+        "open.monthly": {{t "chart.js.open.monthly"}}
+    };
+    // Validator factor names → the page language. TestFactorNamesTranslated
+    // keeps this in step with validator/*.go.
+    var CF = {
+        "POC far in trade direction": {{t "factor.POC far in trade direction"}},
+        "POC reachable as target": {{t "factor.POC reachable as target"}},
+        "bounce short in falling POC regime": {{t "factor.bounce short in falling POC regime"}},
+        "direction aligned with engine": {{t "factor.direction aligned with engine"}},
+        "direction opposes engine": {{t "factor.direction opposes engine"}},
+        "engine flat \u2014 neutral on direction": {{t "factor.engine flat — neutral on direction"}},
+        "engine has tradeable score": {{t "factor.engine has tradeable score"}},
+        "entry above VAH \u2014 chasing trend": {{t "factor.entry above VAH — chasing trend"}},
+        "entry above VAH \u2014 extension short": {{t "factor.entry above VAH — extension short"}},
+        "entry above non-POC HVN (chip resistance)": {{t "factor.entry above non-POC HVN (chip resistance)"}},
+        "entry at POC": {{t "factor.entry at POC"}},
+        "entry at VAH fighting value-area ceiling": {{t "factor.entry at VAH fighting value-area ceiling"}},
+        "entry at VAH \u2014 mean-rev short": {{t "factor.entry at VAH — mean-rev short"}},
+        "entry at VAL fighting value-area floor": {{t "factor.entry at VAL fighting value-area floor"}},
+        "entry at VAL \u2014 mean-rev long": {{t "factor.entry at VAL — mean-rev long"}},
+        "entry at fib 0.618": {{t "factor.entry at fib 0.618"}},
+        "entry at lower Bollinger": {{t "factor.entry at lower Bollinger"}},
+        "entry at recent sweep level": {{t "factor.entry at recent sweep level"}},
+        "entry at sweep but wrong side": {{t "factor.entry at sweep but wrong side"}},
+        "entry at upper Bollinger": {{t "factor.entry at upper Bollinger"}},
+        "entry below VAL \u2014 chasing trend": {{t "factor.entry below VAL — chasing trend"}},
+        "entry below VAL \u2014 extension long": {{t "factor.entry below VAL — extension long"}},
+        "entry below non-POC HVN (chip support)": {{t "factor.entry below non-POC HVN (chip support)"}},
+        "entry inside VA \u2014 chop zone": {{t "factor.entry inside VA — chop zone"}},
+        "entry near HVN but wrong side for direction": {{t "factor.entry near HVN but wrong side for direction"}},
+        "fading away from chip zone": {{t "factor.fading away from chip zone"}},
+        "fee math acceptable": {{t "factor.fee math acceptable"}},
+        "fee math fatal": {{t "factor.fee math fatal"}},
+        "fee math healthy": {{t "factor.fee math healthy"}},
+        "fee math thin": {{t "factor.fee math thin"}},
+        "long above POC in falling regime": {{t "factor.long above POC in falling regime"}},
+        "long fighting falling POC regime": {{t "factor.long fighting falling POC regime"}},
+        "pullback long in rising POC regime": {{t "factor.pullback long in rising POC regime"}},
+        "short below POC in rising regime": {{t "factor.short below POC in rising regime"}},
+        "short fighting rising POC regime": {{t "factor.short fighting rising POC regime"}},
+        "trend-follow long with rising POC": {{t "factor.trend-follow long with rising POC"}},
+        "trend-follow short with falling POC": {{t "factor.trend-follow short with falling POC"}}
+    };
     var symSel = document.getElementById('chart-symbol');
     var tfPills = document.querySelectorAll('.chart-tf-pills .tf-pill');
     var container = document.getElementById('chart-container');
@@ -1384,19 +1538,19 @@
     function structLean(s) {
         if (!s) return { txt: '—', cls: '' };
         switch (s.event) {
-            case 'BOS-up':     return { txt: '偏多 · BOS 續勢', cls: 'bull' };
-            case 'BOS-down':   return { txt: '偏空 · BOS 續勢', cls: 'bear' };
-            case 'CHoCH-up':   return { txt: '轉多警訊 · CHoCH', cls: 'bull' };
-            case 'CHoCH-down': return { txt: '轉空警訊 · CHoCH', cls: 'bear' };
+            case 'BOS-up':     return { txt: CT['lean.BOS-up'], store: '偏多 · BOS 續勢', cls: 'bull' };
+            case 'BOS-down':   return { txt: CT['lean.BOS-down'], store: '偏空 · BOS 續勢', cls: 'bear' };
+            case 'CHoCH-up':   return { txt: CT['lean.CHoCH-up'], store: '轉多警訊 · CHoCH', cls: 'bull' };
+            case 'CHoCH-down': return { txt: CT['lean.CHoCH-down'], store: '轉空警訊 · CHoCH', cls: 'bear' };
         }
         if (s.zone && s.inZone) {
             return s.zone.dir === 'up'
-                ? { txt: '偏多 · 樞紐區回檔', cls: 'bull' }
-                : { txt: '偏空 · 樞紐區反彈', cls: 'bear' };
+                ? { txt: CT['lean.zoneUp'], store: '偏多 · 樞紐區回檔', cls: 'bull' }
+                : { txt: CT['lean.zoneDown'], store: '偏空 · 樞紐區反彈', cls: 'bear' };
         }
-        if (s.trend === 'HH-HL uptrend')   return { txt: '結構偏多 (HH-HL)', cls: 'bull' };
-        if (s.trend === 'LH-LL downtrend') return { txt: '結構偏空 (LH-LL)', cls: 'bear' };
-        return { txt: '中性 · 無明確結構', cls: '' };
+        if (s.trend === 'HH-HL uptrend')   return { txt: CT['lean.trendUp'], store: '結構偏多 (HH-HL)', cls: 'bull' };
+        if (s.trend === 'LH-LL downtrend') return { txt: CT['lean.trendDown'], store: '結構偏空 (LH-LL)', cls: 'bear' };
+        return { txt: CT['lean.neutral'], store: '中性 · 無明確結構', cls: '' };
     }
     function csFmt(v) {
         if (v === undefined || v === null) return '—';
@@ -1436,16 +1590,16 @@
             var zoneDirectional = (s.trend === 'HH-HL uptrend' || s.trend === 'LH-LL downtrend');
             // Label the zone by leg direction so it's unambiguous which SIDE it's an
             // entry for: up-leg = buy-the-pullback (多區), down-leg = sell-the-rally (空區).
-            var zoneSide = s.zone.dir === 'up' ? '多區(買回檔)' : '空區(賣反彈)';
+            var zoneSide = s.zone.dir === 'up' ? CT['zone.sideUp'] : CT['zone.sideDown'];
             var zoneWrap = document.getElementById('cs-zone-wrap');
             if (zoneWrap) zoneWrap.title = (zoneDirectional
-                ? '方向性樞紐區 — auto ntfy 會採用'
-                : 'neutral 趨勢:僅參考,auto ntfy 不會對此區發警報')
-                + ' ｜ ' + zoneSide + '(可能與 bias 動能方向相反 = 反彈進 fade 區)';
+                ? CT['zone.directional']
+                : CT['zone.reference'])
+                + ' | ' + zoneSide + CT['zone.fadeNote'];
             csSet('cs-zone', csFmt(s.zone.lo) + '–' + csFmt(s.zone.hi)
-                + ' ' + (s.zone.dir === 'up' ? '🟢多區' : '🔴空區')
-                + (zoneDirectional ? '' : ' ⚪參考'));
-            csSet('cs-inzone', (s.inZone ? '✓ 區內' : '✗ 區外') + (zoneLive ? ' ⏳' : ''));
+                + ' ' + (s.zone.dir === 'up' ? CT['zone.long'] : CT['zone.short'])
+                + (zoneDirectional ? '' : ' · ' + CT['zone.ref']));
+            csSet('cs-inzone', (s.inZone ? CT['zone.in'] : CT['zone.out']) + (zoneLive ? ' ⏳' : ''));
             csMark('cs-inzone', zoneLive);
             csSet('cs-target', csFmt(s.zone.target) + ' / inv ' + csFmt(s.zone.invalidate));
             csShow('cs-zone-wrap', true); csShow('cs-inzone-wrap', true); csShow('cs-tgt-wrap', true);
@@ -1477,13 +1631,15 @@
         if (!btn) return;
         btn.addEventListener('click', function () {
             var s = lastStructure;
-            if (!s) { (window.toast ? window.toast('目前沒有結構資料可記', 'warn') : alert('目前沒有結構資料可記')); return; }
+            if (!s) { (window.toast ? window.toast(CT['rec.noStruct'], 'warn') : alert(CT['rec.noStruct'])); return; }
             var z = s.zone;
             var body = {
                 symbol: currentSym(), tf: currentTF(),
                 price: lastRecordCtx.price || 0,
                 dir: structDir(s),
-                lean: structLean(s).txt,
+                // Stored in Chinese whatever the UI language: setups.jsonl is
+                // data, and display reads the event/trend codes (leanKey).
+                lean: structLean(s).store || structLean(s).txt,
                 trend: s.trend || '', event: s.event || '',
                 in_zone: !!s.inZone, forming: !!s.forming,
                 entry: z ? (z.lo + z.hi) / 2 : (lastRecordCtx.price || 0),
@@ -1495,7 +1651,7 @@
                 opened: false, note: ''
             };
             var orig = btn.textContent;
-            btn.disabled = true; btn.textContent = '記錄中…';
+            btn.disabled = true; btn.textContent = CT['rec.saving'];
             fetch('/api/chart/setup', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
@@ -1543,8 +1699,8 @@
             }));
         }
         if (s.zone) {
-            structLines.push(candleSeries.createPriceLine({ price: s.zone.hi, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '樞紐 .5' }));
-            structLines.push(candleSeries.createPriceLine({ price: s.zone.lo, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '樞紐 .705' }));
+            structLines.push(candleSeries.createPriceLine({ price: s.zone.hi, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: CT['zone.line'] + ' .5' }));
+            structLines.push(candleSeries.createPriceLine({ price: s.zone.lo, color: '#f6a623', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: CT['zone.line'] + ' .705' }));
             structLines.push(candleSeries.createPriceLine({ price: s.zone.invalidate, color: '#e03131', lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: 'invalid' }));
             structLines.push(candleSeries.createPriceLine({ price: s.zone.target, color: '#2f9e44', lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: 'target' }));
         }
@@ -1597,11 +1753,14 @@
         var parts = [];
         (h.targets || []).forEach(function (t) {
             var one = fmtPrice(t.price) + ' ' + t.r.toFixed(2) + 'R';
-            one += t.obstacles > 0 ? ' (擋' + t.obstacles + ')' : ' (淨空)';
+            one += t.obstacles > 0 ? ' (' + CT['hvn.blocked'].replace('{n}', t.obstacles) + ')' : ' (' + CT['hvn.clear'] + ')';
             if (t.isPOC) one += ' ★POC';
             parts.push(t.clean ? '<b>' + one + '</b>' : one);
         });
-        if (h.note) parts.push('<i>' + h.note + '</i>');
+        // The server's two fixed notes (chart_hvn_targets.go), in the page
+        // language: clear air ahead, or every node sits behind another.
+        if (h.note) parts.push('<i>' + (h.clearAhead ? CT['hvn.noteClear']
+            : (h.note.indexOf('no unobstructed') === 0 ? CT['hvn.noteBlocked'] : h.note)) + '</i>');
         body.innerHTML = parts.join(' · ') || '—';
     }
 
@@ -1758,7 +1917,7 @@
                 lineWidth: 1,
                 lineStyle: EXTREME_KINDS[o.kind] || 2, // extremes dotted, opens dashed
                 axisLabelVisible: false, // label drawn on the LEFT (like POC), keeps right axis clean
-                title: o.label,
+                title: CT['open.' + o.kind] || o.label,
             }));
         });
         drawOpenLabels();
@@ -1791,7 +1950,7 @@
             if (!o || !o.price) return;
             var key = o.price >= 1000 ? o.price.toFixed(1) : o.price.toFixed(3);
             if (!byPrice[key]) { byPrice[key] = { price: o.price, kind: o.kind, labels: [], key: key }; priceOrder.push(key); }
-            byPrice[key].labels.push(o.label);
+            byPrice[key].labels.push(CT['open.' + o.kind] || o.label);
         });
 
         // Pass 2 — SPREAD vertically, do not merge.
@@ -1902,7 +2061,7 @@
             el.style.top = top + 'px';
             el.style.height = h + 'px';
             el.title = (b.role || 'zone') + ' ' + b.lo.toFixed(0) + '–' + b.hi.toFixed(0)
-                + ' (' + (b.touches || 0) + 'x' + (b.count > 1 ? ', ' + b.count + ' 池合併' : '') + ')';
+                + ' (' + (b.touches || 0) + 'x' + (b.count > 1 ? ', ' + CT['zone.merged'].replace('{n}', b.count) : '') + ')';
             host.appendChild(el);
         });
     }
@@ -1939,8 +2098,8 @@
             el.className = 'chart-shelf-band' + (bal >= 3 ? ' shelf-strong' : '');
             el.style.top = top + 'px';
             el.style.height = h + 'px';
-            el.title = '樞紐帶 ' + fmtPrice(b.lo) + '–' + fmtPrice(b.hi)
-                + '  ' + (b.label || '') + '  (' + (b.touches || 0) + ' 觸)';
+            el.title = CT['shelf.title'] + ' ' + fmtPrice(b.lo) + '–' + fmtPrice(b.hi)
+                + '  ' + (b.label || '') + '  (' + CT['shelf.touches'].replace('{n}', b.touches || 0) + ')';
             host.appendChild(el);
         });
     }
@@ -2202,27 +2361,47 @@
     // Mirrors signal.BuildSummary's suggestionFragment but formatted for
     // the big banner (2-line max). Chinese-leaning phrasing to match
     // the reference screenshot's style.
+    // The one-line read, rebuilt here in the page language from the data
+    // rather than shown as data.summary (signal.BuildSummary, English, also
+    // used by pushes and the CLI). Score, verdict and the suggested action
+    // are already in the score card above, so this keeps what is only here:
+    // the POC migration and the vote split against MIN_SCORE.
+    // The validator's verdict codes (STRONG TAKE / TAKE / NEUTRAL / WEAK /
+    // AVOID) in the page language; an unknown code shows as it came.
+    function verdictText(v) { return (v && CT['verdict.' + v]) || v || ''; }
+    function localSummary(data) {
+        var parts = [], pm = data && data.pocMigration, sig = (data && data.signal) || {};
+        if (pm && pm.trend && pm.trend !== 'flat' && typeof pm.driftPct === 'number') {
+            var arrow = pm.trend === 'rising' ? '↗' : (pm.trend === 'falling' ? '↘' : '→');
+            parts.push('POC ' + arrow + ' ' + (pm.driftPct >= 0 ? '+' : '') + (pm.driftPct * 100).toFixed(2) + '%'
+                + (pm.stacked ? ' stacked' : ' ' + CT['sum.notStacked']));
+        }
+        var votes = 'MR ' + (sig.mrScore || 0) + ' + MOM ' + (sig.momScore || 0);
+        if ((sig.score || 0) < 3) votes += ' (' + CT['sum.belowMin'] + ')';
+        parts.push(votes);
+        return parts.join(' · ');
+    }
     function actionText(sig, diag) {
         if (!sig || !sig.side || sig.side === 'FLAT') {
-            return { text: 'NO TRADE — 觀望', note: 'engine flat, no confluence' };
+            return { text: CT['act.noTrade'], note: CT['act.noTradeNote'] };
         }
         var side = sig.side;
-        var sideZh = side === 'LONG' ? '多頭' : '空頭';
+        var sideZh = side === 'LONG' ? CT['act.long'] : CT['act.short'];
         var total = diag && diag.total != null ? diag.total : 0;
         var score = sig.score || 0;
         if (score >= 4 && total >= 7.5) {
-            return { text: '全倉 ' + sideZh + '進場 · STRONG', note: 'MR ' + sig.mrScore + ' + MOM ' + sig.momScore + ' · ' + diag.verdict };
+            return { text: CT['act.strong'].replace('{side}', sideZh), note: 'MR ' + sig.mrScore + ' + MOM ' + sig.momScore + ' · ' + diag.verdict };
         }
         if (score >= 3 && total >= 5.5) {
-            return { text: '預設倉 ' + sideZh + ' · TAKE band', note: 'MR ' + sig.mrScore + ' + MOM ' + sig.momScore };
+            return { text: CT['act.take'].replace('{side}', sideZh), note: 'MR ' + sig.mrScore + ' + MOM ' + sig.momScore };
         }
         if (score >= 3) {
-            return { text: sideZh + '訊號但 validator 較弱', note: 'score OK, /10 = ' + total.toFixed(1) };
+            return { text: CT['act.weakValidator'].replace('{side}', sideZh), note: CT['act.weakValidatorNote'].replace('{v}', total.toFixed(1)) };
         }
         if (total >= 5.5) {
-            return { text: '低信心 ' + sideZh + ' · discretionary', note: 'validator 撐著、engine 不夠' };
+            return { text: CT['act.lowConf'].replace('{side}', sideZh), note: CT['act.lowConfNote'] };
         }
-        return { text: 'WAIT — ' + sideZh + ' lean 太薄', note: 'below MIN_SCORE=3 且 /10 < 5.5' };
+        return { text: CT['act.wait'].replace('{side}', sideZh), note: CT['act.waitNote'] };
     }
 
     // Header DOM refs for the new left-tile (big price + 24h stats).
@@ -2333,7 +2512,7 @@
         // raw vote count is demoted to the small "N 票" chip (System A, MIN=3).
         mrEl.textContent    = 'MR ' + (diag.mr100  != null ? diag.mr100.toFixed(0)  : '—');
         momEl.textContent   = 'MOM ' + (diag.mom100 != null ? diag.mom100.toFixed(0) : '—');
-        totalEl.textContent = (sig.score != null ? sig.score : '—') + ' 票';
+        totalEl.textContent = CT['votes'].replace('{n}', sig.score != null ? sig.score : '—');
         totalEl.className   = 'score score-votes ' + scoreClass(sig.score);
         // Legacy hidden nodes — kept for older code paths that may
         // still read them; header no longer displays these directly.
@@ -2344,7 +2523,7 @@
             ratioEl.textContent = '—/10';
             verdEl.textContent  = '';
         }
-        linerEl.textContent = data.summary || '';
+        linerEl.textContent = localSummary(data);
         aiBtn.dataset.symbol = data.symbol;
         aiBtn.dataset.tf     = data.tf;
 
@@ -2354,7 +2533,7 @@
         bannerEl.className = 'chart-header ' + band;
         if (diag.total100 != null) {
             bannerScoreNum.textContent = diag.total100.toFixed(1);
-            bannerScoreBand.textContent = diag.verdict || '';
+            bannerScoreBand.textContent = verdictText(diag.verdict);
         } else {
             bannerScoreNum.textContent = '—';
             bannerScoreBand.textContent = '—';
@@ -2390,7 +2569,7 @@
                 // it live on a language toggle; window.t sets the initial text.
                 var nm = document.createElement('span');
                 nm.setAttribute('data-i18n', f.name);
-                nm.textContent = (window.t ? window.t(f.name) : f.name);
+                nm.textContent = CF[f.name] || f.name;
                 chip.appendChild(pts);
                 chip.appendChild(nm);
                 facEl.appendChild(chip);
@@ -2630,7 +2809,7 @@
         if (!el) return;
         if (!layerOn('vp') || !prof || !prof.bins.length) { el.textContent = ''; return; }
         var dp = (prof.vah != null && prof.vah < 10) ? 4 : 2;
-        el.textContent = 'VP ' + prof.bins.length + ' 格 · ' + prof.bars + ' 根 · VA ' +
+        el.textContent = 'VP ' + CT['vp.meta'].replace('{bins}', prof.bins.length).replace('{bars}', prof.bars) + ' · VA ' +
             Math.round(prof.vaPct * 100) + '% ' +
             prof.val.toFixed(dp) + '–' + prof.vah.toFixed(dp);
     }
@@ -2659,7 +2838,7 @@
             if (!hit) { hide(); return; }
             var dp = hit.priceHigh < 10 ? 4 : 2;
             tip.innerHTML = '<b>' + hit.priceLow.toFixed(dp) + '–' + hit.priceHigh.toFixed(dp) + '</b><br>' +
-                Math.round(hit.frac * 100) + '% of POC · ' + (hit.inVA ? 'VA 內' : 'VA 外') +
+                Math.round(hit.frac * 100) + '% of POC · ' + (hit.inVA ? CT['vp.inVA'] : CT['vp.outVA']) +
                 (hit.isPOC ? ' · POC' : '');
             tip.hidden = false;
             tip.style.top  = Math.max(2, y - 34) + 'px';
@@ -2895,21 +3074,21 @@
                 // show the previous symbol's bias under the new symbol's name.
                 if (sym !== currentSym()) return;
                 if (!d || !d.tfs) return;
-                var html = '<div class="tf-bias-title">TF bias</div>';
+                var html = '<div class="tf-bias-title">' + CT['tf.title'] + '</div>';
                 if (d.alignment && d.alignment.label) {
                     var al = d.alignment, atip;
                     if (al.state === 'conflict') {
-                        atip = 'HTF(2h/4h) 與 LTF(5m/15m/1h) 方向相反 = 低信心,等對齊或縮小部位。';
+                        atip = CT['align.conflictTip'];
                     } else if (al.state.indexOf('weak-') === 0) {
-                        atip = '弱共識:只有 ' + (al.agree || 0) + '/' + (al.tfCount || 5) + ' 個 TF 有方向'
-                             + (al.against ? '(另有 ' + al.against + ' 個反向)' : ',其餘中性')
-                             + '。不算趨勢 → 套用區間規則(邊緣做、中間別做),別當順勢單進。';
+                        atip = CT['align.weakTip'].replace('{agree}', al.agree || 0).replace('{n}', al.tfCount || 5)
+                             + (al.against ? CT['align.weakAgainst'].replace('{against}', al.against) : CT['align.weakRestNeutral'])
+                             + CT['align.weakTail'];
                     } else if (al.state.indexOf('aligned-') === 0) {
-                        atip = (al.agree || 0) + '/' + (al.tfCount || 5) + ' 個 TF 同向'
-                             + (al.against ? '(反向 ' + al.against + ')' : '')
-                             + ',含 HTF ' + (al.htfAgree || 0) + ' 個 → 順勢等回踩。';
+                        atip = CT['align.alignedTip'].replace('{agree}', al.agree || 0).replace('{n}', al.tfCount || 5)
+                             + (al.against ? CT['align.alignedAgainst'].replace('{against}', al.against) : '')
+                             + CT['align.alignedTail'].replace('{htf}', al.htfAgree || 0);
                     } else {
-                        atip = '各 TF 無明確方向 → 視為盤整,套用區間規則。';
+                        atip = CT['align.mixedTip'];
                     }
                     html += '<div class="tf-bias-align align-' + al.state + '" title="'
                           + atip.replace(/"/g, '&quot;') + '">' + al.label + '</div>';
@@ -2918,7 +3097,7 @@
                     var m = biasMeta(t.dir);
                     var sc = (t.score >= 0 ? '+' : '') + t.score;
                     var tip = t.tf + '  ' + (t.dir || '') + ' (score ' + sc + ')\n'
-                            + '結構 ' + (t.struct || '-') + '\n'
+                            + CT['tf.struct'] + ' ' + (t.struct || '-') + '\n'
                             + (t.poc || '-') + '\n'
                             + 'engine ' + (t.engine || '-');
                     html += '<div class="tf-bias-row ' + m.cls + '" title="'
@@ -2936,22 +3115,22 @@
                         ? ((o.funding >= 0 ? '+' : '') + (o.funding * 100).toFixed(4) + '%') : '—';
                     if (o.static) {
                         oTxt = 'OI n/a';
-                        oTip = '交易所對這個合成合約公布固定 OI(30 次取樣只有 1 個相異值),所以沒有變化量可讀。funding 是真的。';
+                        oTip = CT['oi.staticTip'];
                     } else if (typeof o.delta === 'number') {
                         oTxt = 'OI ' + (o.delta >= 0 ? '+' : '') + (o.delta * 100).toFixed(2) + '%';
                         if (typeof o.priceDelta === 'number') {
-                            oTxt += ' · 價 ' + (o.priceDelta >= 0 ? '+' : '') + (o.priceDelta * 100).toFixed(2) + '%';
+                            oTxt += ' · ' + CT['oi.price'] + ' ' + (o.priceDelta >= 0 ? '+' : '') + (o.priceDelta * 100).toFixed(2) + '%';
                         }
                         if (o.quadrant === 'shorts-building' || o.quadrant === 'longs-building') oCls = 'oi-armed';
                         else if (o.quadrant) oCls = 'oi-unwind';
-                        oTip = (o.reading || '門檻內,沒有結論')
-                             + '\n窗口 1 小時(固定 —— BingX 沒有 OI 歷史端點,且每約 10 分鐘才重發一次,更短的窗會在量發布頻率)'
+                        oTip = (o.reading || CT['oi.noVerdict'])
+                             + '\n' + CT['oi.window']
                              + '\nOI ' + Math.round(o.oi).toLocaleString('en-US') + 'u · funding ' + fTxt
-                             + '\n快照 ' + (o.ageMin || 0) + ' 分鐘前'
-                             + '\nOI 說「有多少」,價格說「是誰的」:OI↑價↑=多單堆積、OI↑價↓=空單堆積、OI↓價↑=空單回補、OI↓價↓=多單解除';
+                             + '\n' + CT['oi.age'].replace('{m}', o.ageMin || 0)
+                             + '\n' + CT['oi.howto'];
                     } else {
                         oTxt = 'OI —';
-                        oTip = '尚未累積滿 1 小時的快照,或缺同窗價格。';
+                        oTip = CT['oi.notYet'];
                     }
                     html += '<div class="tf-bias-oi ' + oCls + '" title="'
                           + oTip.replace(/"/g, '&quot;') + '">' + oTxt
@@ -2969,15 +3148,12 @@
                         bnBits.push(b);
                     }
                     if (typeof o.whaleTop === 'number') {
-                        bnBits.push('大戶 ' + o.whaleTop.toFixed(2) + ' / 全體 ' + o.whaleAll.toFixed(2)
-                            + (o.crowd === 'retail-longer' ? ' 散戶偏多'
-                             : o.crowd === 'retail-shorter' ? ' 散戶偏空' : ''));
+                        bnBits.push(CT['bn.whales'] + ' ' + o.whaleTop.toFixed(2) + ' / ' + CT['bn.all'] + ' ' + o.whaleAll.toFixed(2)
+                            + (o.crowd === 'retail-longer' ? ' ' + CT['bn.retailLong']
+                             : o.crowd === 'retail-shorter' ? ' ' + CT['bn.retailShort'] : ''));
                     }
                     if (bnBits.length) {
-                        var bnTip = 'Binance 交叉參考 —— 不同的帳本,你的單在 BingX 成交。'
-                            + '\n15m 只有這一側有:Binance 發布真正的 5 分鐘桶,BingX 那側 15 分鐘只是重讀同一個值。'
-                            + '\n大戶/全體兩者都按帳戶數(可比);另有按倉位大小的大戶比率不併入此差值。'
-                            + '\n差距在 ±0.25 內不標註 —— 兩個母體結構不同,小差距是基線不是訊號。';
+                        var bnTip = CT['bn.tip'];
                         html += '<div class="tf-bias-bn' + (o.crowd ? ' bn-crowd' : '') + '" title="'
                               + bnTip.replace(/"/g, '&quot;') + '">' + bnBits.join(' · ') + '</div>';
                     }
@@ -2987,13 +3163,13 @@
                     var hv = '';
                     if (d.hvn.above) hv += '↑' + fmtH(d.hvn.above);
                     if (d.hvn.below) hv += (hv ? '  ' : '') + '↓' + fmtH(d.hvn.below);
-                    html += '<div class="tf-bias-hvn" title="最近的籌碼密集區 (VP HVN, 近100根1h) — 目標參考:↑多單目標/空單上限  ↓空單目標/多單支撐">🎯 ' + hv + '</div>';
+                    html += '<div class="tf-bias-hvn" title="' + CT['hvn.stripTip'].replace(/"/g, '&quot;') + '">HVN ' + hv + '</div>';
                 }
                 if (d.range && d.range.lo) {
                     var rf = function (v) { return v >= 1000 ? v.toFixed(0) : (v >= 1 ? v.toFixed(2) : v.toFixed(4)); };
                     var rzcls = d.range.isRange ? ('rzone-' + d.range.zone) : 'rzone-trend';
-                    html += '<div class="tf-bias-range ' + rzcls + '" title="近24h震盪箱 · 現價在箱內位置(0=底 100=頂) · ' + d.range.action + '">'
-                          + '📦 ' + rf(d.range.lo) + '–' + rf(d.range.hi) + ' ·' + d.range.pos + '%<br><span class="tf-range-act">' + d.range.action + '</span></div>';
+                    html += '<div class="tf-bias-range ' + rzcls + '" title="' + CT['range.tip'] + ' · ' + d.range.action + '">'
+                          + CT['range.box'] + ' ' + rf(d.range.lo) + '–' + rf(d.range.hi) + ' ·' + d.range.pos + '%<br><span class="tf-range-act">' + d.range.action + '</span></div>';
                 }
                 el.innerHTML = html;
             })
@@ -3051,8 +3227,8 @@
         b.querySelector('.ff-star').textContent = (favOnly && n) ? '★' : '☆';
         b.querySelector('#chart-fav-count').textContent = n ? String(n) : '';
         b.title = n === 0
-            ? '先點標的左邊的 ☆ 收藏,再用這裡只看收藏的'
-            : (favOnly ? '顯示全部 ' + tkRosterN() + ' 個標的' : '只看收藏的 ' + n + ' 個（目前看的那個一定會顯示）');
+            ? CT['fav.none']
+            : (favOnly ? CT['fav.showAll'].replace('{n}', tkRosterN()) : CT['fav.onlyFavs'].replace('{n}', n));
         b.setAttribute('aria-pressed', favOnly ? 'true' : 'false');
         b.classList.toggle('on', favOnly && n > 0);
     }
@@ -3237,10 +3413,10 @@
         linerEl.textContent = '⚠ ' + msg;
         bannerEl.className = 'chart-header band-avoid';
         if (bannerScoreNum)  bannerScoreNum.textContent = '—';
-        if (bannerScoreBand) bannerScoreBand.textContent = 'error';
+        if (bannerScoreBand) bannerScoreBand.textContent = CT['err.short'];
         if (bannerActText)   bannerActText.textContent = '⚠ ' + msg;
         if (bannerActNote)   bannerActNote.textContent = '';
-        if (window.toast) window.toast(currentSym() + ' ' + currentTF() + ' 載入失敗:' + msg, 'err');
+        if (window.toast) window.toast(currentSym() + ' ' + currentTF() + ' ' + CT['load.failed'] + ' ' + msg, 'err');
     }
 
     // F4 — optimistic draw from a per-(symbol,TF) memo.
@@ -3349,9 +3525,9 @@
         if (cached) {
             applyChart(cached);
             applyHeader(cached);
-            linerEl.textContent = sym + ' ' + tf + ' · 更新中…';
+            linerEl.textContent = sym + ' ' + tf + ' · ' + CT['load.updating'];
         } else {
-            linerEl.textContent = 'Loading ' + sym + ' ' + tf + '…';
+            linerEl.textContent = CT['load.loading'] + ' ' + sym + ' ' + tf + '…';
         }
         loadBias();
         loadTickers();
@@ -3596,7 +3772,7 @@
         // chart and looks like nothing happened.
         aiPane.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (aiPane.dataset.loaded === '1') return;
-        aiPane.innerHTML = '<em class="ai-loading">Querying Quant advisor for ' + aiBtn.dataset.symbol + ' ' + aiBtn.dataset.tf + '…</em>';
+        aiPane.innerHTML = '<em class="ai-loading">' + CT['ai.loading'] + ' ' + aiBtn.dataset.symbol + ' ' + aiBtn.dataset.tf + '…</em>';
         aiBtn.disabled = true;
         // Guard: if aiRender didn't load (script blocked, cached-out,
         // etc.) we'd silently fail. Fall back to inline HTML so the
@@ -3611,7 +3787,7 @@
             } else if (payload.text) {
                 target.innerHTML = '<pre style="white-space:pre-wrap;color:var(--text);">' + payload.text.replace(/</g, '&lt;') + '</pre>';
             } else {
-                target.innerHTML = '<div class="ai-error">no renderer + no text</div>';
+                target.innerHTML = '<div class="ai-error">' + CT['ai.empty'] + '</div>';
             }
         }
         fetch('/ai/analyze/symbol/' + aiBtn.dataset.symbol + '/' + aiBtn.dataset.tf, { method: 'POST' })
@@ -3730,7 +3906,7 @@
         function setTab(name) {
             modalRoot.setAttribute('data-tab', name);
             tabBtns.forEach(function (b) { b.classList.toggle('is-active', b.dataset.tab === name); });
-            submitBtn.textContent = name === 'record' ? 'Record Trade' : 'Validate';
+            submitBtn.textContent = name === 'record' ? CT['q.recordBtn'] : CT['q.validateBtn'];
             resultBox.classList.add('hidden');
             resultBox.innerHTML = '';
         }
@@ -3998,13 +4174,13 @@
             var lines = [
                 '<div class="qr-header band-' + band + '">',
                 '  <span class="qr-score">' + fmtR(r.total) + '/10</span>',
-                '  <span class="qr-verdict">' + (r.verdict || '—') + '</span>',
-                '  <span class="qr-side">' + r.side.toUpperCase() + ' @ ' + r.entry + '</span>',
+                '  <span class="qr-verdict">' + (verdictText(r.verdict) || '—') + '</span>',
+                '  <span class="qr-side">' + (r.side === 'long' ? CT['q.long'] : r.side === 'short' ? CT['q.short'] : r.side) + ' @ ' + r.entry + '</span>',
                 '</div>',
-                '<div class="qr-sub">MR ' + fmtR(r.totalMR) + ' · MOM ' + fmtR(r.totalMOM) + ' · risk ' + fmtR(r.risk) + '% · fee ' + fmtR(r.feeR) + 'R</div>',
+                '<div class="qr-sub">MR ' + fmtR(r.totalMR) + ' · MOM ' + fmtR(r.totalMOM) + ' · ' + CT['q.riskLbl'] + ' ' + fmtR(r.risk) + '% · ' + CT['q.feeLbl'] + ' ' + fmtR(r.feeR) + 'R</div>',
             ];
             if (r.suggStop || r.suggTP1 || r.suggTP2) {
-                lines.push('<div class="qr-sub">sugg stop ' + (r.suggStop || '—') + ' · TP1 ' + (r.suggTP1 || '—') + ' · TP2 ' + (r.suggTP2 || '—') + '</div>');
+                lines.push('<div class="qr-sub">' + CT['q.suggStop'] + ' ' + (r.suggStop || '—') + ' · TP1 ' + (r.suggTP1 || '—') + ' · TP2 ' + (r.suggTP2 || '—') + '</div>');
             }
             if (r.reasons && r.reasons.length) {
                 lines.push('<ul class="qr-reasons">' + r.reasons.slice(0, 6).map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>');
@@ -4013,7 +4189,7 @@
             resultBox.className = 'quick-result';
         }
         function renderRecordResult(r) {
-            resultBox.innerHTML = '<div class="qr-ok">✓ Recorded trade #' + r.id + '. <a href="/journal/' + r.id + '/edit">Edit</a> · <a href="/journal">All trades</a></div>';
+            resultBox.innerHTML = '<div class="qr-ok">✓ ' + CT['q.recorded'] + ' #' + r.id + ' · <a href="/journal/' + r.id + '/edit">' + CT['q.edit'] + '</a> · <a href="/journal">' + CT['q.allTrades'] + '</a></div>';
             resultBox.className = 'quick-result';
         }
         function renderError(msg) {
@@ -4026,7 +4202,7 @@
             var tab = currentTab();
             var url = tab === 'record' ? '/api/chart/journal-open' : '/api/chart/validate';
             submitBtn.disabled = true;
-            submitBtn.textContent = tab === 'record' ? 'Recording…' : 'Validating…';
+            submitBtn.textContent = tab === 'record' ? CT['q.recording'] : CT['q.validating'];
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -4035,14 +4211,14 @@
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                 .then(function (res) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = tab === 'record' ? 'Record Trade' : 'Validate';
+                    submitBtn.textContent = tab === 'record' ? CT['q.recordBtn'] : CT['q.validateBtn'];
                     if (!res.ok) { renderError(res.body.error || 'request failed'); return; }
                     if (tab === 'record') renderRecordResult(res.body);
                     else                  renderValidateResult(res.body);
                 })
                 .catch(function (err) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = tab === 'record' ? 'Record Trade' : 'Validate';
+                    submitBtn.textContent = tab === 'record' ? CT['q.recordBtn'] : CT['q.validateBtn'];
                     renderError('network: ' + (err && err.message ? err.message : 'unknown'));
                 });
         });

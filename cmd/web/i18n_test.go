@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -220,5 +222,35 @@ func TestDynamicKeysExist(t *testing.T) {
 				t.Errorf("%s.json: no key %q", l, k)
 			}
 		}
+	}
+}
+
+// Every validator factor name the chart can show has a translation. Reads
+// validator/*.go directly, so a new Factor{"..."} without a dictionary entry
+// fails here rather than showing up untranslated on the chart.
+func TestFactorNamesTranslated(t *testing.T) {
+	dicts, _ := loadDicts(i18nFS)
+	files, _ := filepath.Glob("../../validator/*.go")
+	if len(files) == 0 {
+		t.Fatal("no validator sources found")
+	}
+	re := regexp.MustCompile(`Factor\{"([^"]+)"`)
+	n := 0
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		raw, _ := os.ReadFile(f)
+		for _, m := range re.FindAllStringSubmatch(string(raw), -1) {
+			n++
+			for _, l := range langs {
+				if _, ok := dicts[l]["factor."+m[1]]; !ok {
+					t.Errorf("%s.json: no translation for factor %q (%s)", l, m[1], filepath.Base(f))
+				}
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("found no Factor{...} literals — the pattern no longer matches validator")
 	}
 }

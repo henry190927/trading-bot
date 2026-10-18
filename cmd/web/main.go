@@ -113,6 +113,7 @@ func main() {
 	}
 	srv := &server{
 		pages:          pages,
+		dicts:          dicts,
 		client:         bxClient,
 		ai:             aiProvider,
 		aiProviderName: providerName,
