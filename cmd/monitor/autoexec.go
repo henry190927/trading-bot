@@ -106,6 +106,20 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			continue
 		}
 
+		// Equity for risk sizing, read ONCE per tick: every rule in this tick
+		// sizes off the same number, and an unreadable balance blocks every
+		// fire this tick (Size refuses) rather than falling back to the old
+		// fixed margin. Fixed-margin mode does not need it, so no call there.
+		var equity float64
+		var equityOK bool
+		if cfg.RiskPerTradePct > 0 {
+			if b, err := client.AccountBalance(ctx); err != nil {
+				log.Printf("autoexec: balance read failed, risk sizing will block this tick: %v", err)
+			} else {
+				equity, equityOK = b.EquityOrZero()
+			}
+		}
+
 		for i := range cfg.Rules {
 			r := cfg.Rules[i]
 			if !r.Enabled {
@@ -153,7 +167,26 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				continue
 			}
 
-			// Global caps, with THIS rule's margin as the candidate. Checked
+			// Size from the stop (see autotrade/sizing.go). Before the caps,
+			// because the caps need this fire's margin and in risk mode that
+			// margin only exists once the stop distance is known. A refusal
+			// here is the liquidation guard or an unreadable balance; it is
+			// recorded like a caps block so the replay can see what it cost.
+			sz := autotrade.Size(cfg, r, trig.Entry, trig.Stop, equity, equityOK)
+			if sz.Blocked {
+				if !st.lastBlockBar.Equal(barTime) {
+					st.lastBlockBar = barTime
+					log.Printf("autoexec: %s %s/%s BLOCKED by sizing — %s", r.Symbol, r.TF, r.Strategy, sz.Reason)
+					autotrade.AppendBlocked(autotrade.BlockedCandidate{
+						Fire:   fireRecord(r, trig, sz, trig.Why, 0, false),
+						Reason: sz.Reason, BarTime: barTime,
+						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
+					})
+				}
+				continue
+			}
+
+			// Global caps, with THIS fire's margin as the candidate. Checked
 			// after the per-rule guards so a rule that was going to be skipped
 			// anyway doesn't consume a slot in the reasoning, and re-checked
 			// per rule because an earlier rule in this same tick may have just
@@ -161,7 +194,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			// trig.Side (not r.Side) — a rule may be configured "auto", and the
 			// trigger has already resolved the concrete direction by here.
 			if v := autotrade.CheckCaps(cfg, book, autotrade.Candidate{
-				Symbol: r.Symbol, Side: trig.Side, Margin: r.MarginUSDT,
+				Symbol: r.Symbol, Side: trig.Side, Margin: sz.Margin,
 			}); v.Blocked {
 				// Record WHAT was denied, not just that something was (C7).
 				// The one-line log above cannot answer "would best-first have
@@ -177,15 +210,9 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				if !st.lastBlockBar.Equal(barTime) {
 					st.lastBlockBar = barTime
 					log.Printf("autoexec: %s %s/%s BLOCKED by caps — %s", r.Symbol, r.TF, r.Strategy, v.Reason)
-					qty := r.MarginUSDT * float64(r.Leverage) / trig.Entry
 					autotrade.AppendBlocked(autotrade.BlockedCandidate{
-						Fire: autotrade.PaperFire{
-							Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF,
-							Strategy: r.Strategy, Side: trig.Side, Market: trig.Market,
-							Entry: trig.Entry, Stop: trig.Stop, TP: trig.TP, Qty: qty,
-							Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.Why,
-							Score: autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry),
-						},
+						Fire: fireRecord(r, trig, sz, trig.Why,
+							autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry), false),
 						Reason: v.Reason, BarTime: barTime,
 						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
 					})
@@ -204,14 +231,8 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 					st.lastBlockBar = barTime
 					log.Printf("autoexec: %s %s/%s BLOCKED by session guard — %s",
 						r.Symbol, r.TF, r.Strategy, why)
-					q := r.MarginUSDT * float64(r.Leverage) / trig.Entry
 					autotrade.AppendBlocked(autotrade.BlockedCandidate{
-						Fire: autotrade.PaperFire{
-							Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF,
-							Strategy: r.Strategy, Side: trig.Side, Market: trig.Market,
-							Entry: trig.Entry, Stop: trig.Stop, TP: trig.TP, Qty: q,
-							Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.Why,
-						},
+						Fire:   fireRecord(r, trig, sz, trig.Why, 0, false),
 						Reason: "session-guard: " + why, BarTime: barTime,
 						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
 					})
@@ -219,22 +240,21 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				continue
 			}
 
-			qty := r.MarginUSDT * float64(r.Leverage) / trig.Entry
+			qty := sz.Qty
 			st.lastFireBar = barTime
 			// Account for it immediately: buildBook only runs once per tick, so
 			// without this two rules firing in the same tick would both see an
 			// empty slot and the cap would be breached by one.
 			book.OpenCount++
-			book.OpenMargin += r.MarginUSDT
+			book.OpenMargin += sz.Margin
 			score := autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry)
 
 			if !live {
 				// PAPER: log + ntfy the intended order, no API call.
-				msg := fmt.Sprintf("%s %s @%.4f stop %.4f tp %.4f (qty %.4f, %du×%d) — %s",
-					r.Symbol, trig.Side, trig.Entry, trig.Stop, trig.TP, qty, int(r.MarginUSDT), r.Leverage, trig.Why)
+				msg := fmt.Sprintf("%s %s @%.4f stop %.4f tp %.4f (qty %.4f, %.1fu×%d, risk %.2fu) — %s",
+					r.Symbol, trig.Side, trig.Entry, trig.Stop, trig.TP, qty, sz.Margin, sz.Lev, sz.RiskUSDT, trig.Why)
 				log.Printf("[AUTO-PAPER] would place %s", msg)
-				autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.Side, Market: trig.Market,
-					Entry: trig.Entry, Stop: trig.Stop, TP: trig.TP, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.Why, Score: score, Live: false})
+				autotrade.AppendFire(fireRecord(r, trig, sz, trig.Why, score, false))
 				if n != nil {
 					_ = n.Push(ctx, "🤖 auto (paper)", msg, "robot")
 				}
@@ -242,8 +262,29 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			}
 
 			// LIVE (triple-gated). Set leverage then place the bracket.
-			if err := client.SetLeverage(ctx, sym, "BOTH", r.Leverage); err != nil {
-				log.Printf("autoexec: SetLeverage %s: %v", r.Symbol, err)
+			//
+			// A failed SetLeverage now ABORTS. It used to log and place anyway,
+			// at whatever leverage the account already had — and leverage is
+			// what the liquidation guard just computed, so placing at a higher
+			// one would put the stop past liquidation again. It also passed
+			// BOTH unconditionally, while the VPS runs hedge mode, where
+			// SetLeverage's own doc says the side must be LONG/SHORT — the
+			// same switch cmd/web's placement path already makes. Never
+			// exercised live (no live fire has ever happened), so unverified
+			// against the exchange; it is now at least fail-closed.
+			levSide := "BOTH"
+			if os.Getenv("BINGX_HEDGE_MODE") == "true" {
+				levSide = "LONG"
+				if trig.Side == "short" {
+					levSide = "SHORT"
+				}
+			}
+			if err := client.SetLeverage(ctx, sym, levSide, sz.Lev); err != nil {
+				log.Printf("autoexec: SetLeverage %s %s %dx FAILED, not placing: %v", r.Symbol, levSide, sz.Lev, err)
+				if n != nil {
+					_ = n.Push(ctx, "⚠ auto NOT placed", fmt.Sprintf("%s: set leverage %dx failed: %v", r.Symbol, sz.Lev, err), "warning")
+				}
+				continue
 			}
 			res, perr := client.PlaceLimit(ctx, sym, trig.Side, qty, trig.Entry, trig.Stop, trig.TP, false)
 			if perr != nil {
@@ -259,12 +300,24 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			}
 			log.Printf("[AUTO-LIVE] placed %s %s @%.4f stop %.4f tp %.4f qty %.4f orderId=%s",
 				r.Symbol, trig.Side, trig.Entry, trig.Stop, trig.TP, qty, id)
-			autotrade.AppendFire(autotrade.PaperFire{Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy, Side: trig.Side, Market: trig.Market,
-				Entry: trig.Entry, Stop: trig.Stop, TP: trig.TP, Qty: qty, Margin: r.MarginUSDT, Lev: r.Leverage, Why: trig.Why + " id=" + id, Score: score, Live: true})
+			autotrade.AppendFire(fireRecord(r, trig, sz, trig.Why+" id="+id, score, true))
 			if n != nil {
 				_ = n.Push(ctx, "🤖 auto PLACED", fmt.Sprintf("%s %s @%.4f (stop %.4f tp %.4f) id=%s", r.Symbol, trig.Side, trig.Entry, trig.Stop, trig.TP, id), "robot")
 			}
 		}
+	}
+}
+
+// fireRecord is the log row for one fire — placed, paper or refused — so the
+// four places that write one cannot drift apart on which size they record.
+func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, why string, score float64, live bool) autotrade.PaperFire {
+	return autotrade.PaperFire{
+		Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy,
+		Side: trig.Side, Market: trig.Market,
+		Entry: trig.Entry, Stop: trig.Stop, TP: trig.TP,
+		Qty: sz.Qty, Margin: sz.Margin, Lev: sz.Lev,
+		Why: why, Score: score, Live: live,
+		RiskUSDT: sz.RiskUSDT, Equity: sz.Equity,
 	}
 }
 

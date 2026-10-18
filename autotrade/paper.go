@@ -27,6 +27,12 @@ type PaperFire struct {
 	Why      string    `json:"why"`
 	Score    float64   `json:"score,omitempty"` // validator structural-fit score /100 at fire time (0 = not scored / legacy)
 	Live     bool      `json:"live"`            // false = paper, true = real order placed
+	// Sizing inputs at fire time (2026-10-16). Equity is recorded because it
+	// was recorded nowhere before, so no row could say what share of the
+	// account was at risk. Both 0 on older rows and in fixed-margin mode
+	// (RiskUSDT is still set there).
+	RiskUSDT float64 `json:"risk_usdt,omitempty"`
+	Equity   float64 `json:"equity,omitempty"`
 }
 
 // PaperLogPath is the on-disk JSONL store (env AUTOTRADE_PAPER_LOG or default).

@@ -251,18 +251,23 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		// the display-vs-reality shape this file has already been fixed for
 		// once this week.
 		"MaxSameSide": cfg.MaxSameSymbolSide,
-		"Rules":       cfg.Rules,
-		"Fires":       rows,
-		"PageSize":    autotradePageSize,
-		"Since":       sinceLabel,
-		"CapBlocked":  len(capBlocked),
-		"CapReasons":  blockedReasons(capBlocked),
-		"FiresRead":   len(fires),
-		"Sum":         sum,
-		"Equity":      buildEquityCurve(statTrades),
-		"Histogram":   buildRHistogram(statTrades),
-		"Calendar":    buildDailyCalendar(statTrades, 42),
-		"StatN":       len(statTrades),
+		// Risk sizing replaces margin_usdt and turns leverage into a ceiling
+		// (autotrade.Size). The rules table must say so, or it would keep
+		// showing a 35u margin that no order uses.
+		"RiskPct":    cfg.RiskPerTradePct,
+		"LiqStopPct": autotrade.LiqStopMaxFrac * 100,
+		"Rules":      cfg.Rules,
+		"Fires":      rows,
+		"PageSize":   autotradePageSize,
+		"Since":      sinceLabel,
+		"CapBlocked": len(capBlocked),
+		"CapReasons": blockedReasons(capBlocked),
+		"FiresRead":  len(fires),
+		"Sum":        sum,
+		"Equity":     buildEquityCurve(statTrades),
+		"Histogram":  buildRHistogram(statTrades),
+		"Calendar":   buildDailyCalendar(statTrades, 42),
+		"StatN":      len(statTrades),
 		// perfPanels labels its distribution panel with .ClosedCount.
 		"ClosedCount":     len(statTrades),
 		"StatUnscoreable": statUnscoreable,

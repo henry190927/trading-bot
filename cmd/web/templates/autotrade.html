@@ -56,8 +56,9 @@
     <p class="glossary-hint">
       真錢需<b>同時</b> master ON + PAPER off + AUTOTRADE_ENABLED=true。目前
       {{if .LiveArmed}}<b style="color:var(--red)">已武裝真錢</b>{{else}}<b style="color:var(--green)">不會下真單</b>{{end}}。
-      caps <span class="ops-caps-live">同時 <strong>{{.Book.OpenCount}}</strong>/{{.MaxConc}} 倉 · 保證金 <strong>{{printf "%.0f" .Book.OpenMargin}}</strong>/{{printf "%.0f" .MaxMargin}}u · 今日 <strong>{{printf "%+.2f" .Book.RealizedRToday}}</strong>/{{printf "%.1f" .DailyHaltR}}R · 同標的同向 {{if .MaxSameSide}}<strong>{{.MaxSameSide}}</strong>{{else}}<span class="b-dim">未設</span>{{end}}</span> · config <code>{{.ConfigPath}}</code>
+      caps <span class="ops-caps-live">同時 <strong>{{.Book.OpenCount}}</strong>/{{.MaxConc}} 倉 · 保證金 <strong>{{printf "%.0f" .Book.OpenMargin}}</strong>/{{printf "%.0f" .MaxMargin}}u · 今日 <strong>{{printf "%+.2f" .Book.RealizedRToday}}</strong>/{{printf "%.1f" .DailyHaltR}}R · 同標的同向 {{if .MaxSameSide}}<strong>{{.MaxSameSide}}</strong>{{else}}<span class="b-dim">未設</span>{{end}} · 每筆風險 {{if gt .RiskPct 0.0}}<strong>{{printf "%.2f" .RiskPct}}%</strong> 權益{{else}}<span class="b-dim">未設(固定保證金)</span>{{end}}</span> · config <code>{{.ConfigPath}}</code>
       <div class="hint ops-caps-note">上限<strong>已強制執行</strong>於開單路徑(autotrade.CheckCaps)。左側數字由 <code>autotrade.BuildBook</code> 計算 —— 跟閘門用的是同一個函式,不會各算一套。日虧熔斷於 00:00 UTC 自動重新武裝。
+      強平守衛:停損距離必須在強平距離的 {{printf "%.0f" .LiqStopPct}}% 以內,否則{{if gt .RiskPct 0.0}}降槓桿{{else}}擋單{{end}}。
       其他生效守衛:每規則每根去重 · macro+earnings blackout · 一倉一規則 · 停損後冷卻 {{.Cooldown}} 根{{if not .CooldownUniform}}(各規則不一致,取最大值){{end}}。
       {{if gt .BookUnscored 0}}<br><span class="ops-caps-warn">⚠ {{.BookUnscored}} 筆無法評分的 fire 被保守計為「持倉中」(fail-safe,寧可擋單也不超限)</span>{{end}}</div>
     </p>
@@ -67,12 +68,12 @@
     <h2 class="section-title">Rules</h2>
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>symbol</th><th>strategy</th><th>tf</th><th>side</th><th>margin</th><th>lev</th><th>stop%</th><th>on</th></tr></thead>
+      <thead><tr><th>symbol</th><th>strategy</th><th>tf</th><th>side</th><th>margin</th><th>{{if gt .RiskPct 0.0}}lev 上限{{else}}lev{{end}}</th><th>stop%</th><th>on</th></tr></thead>
       <tbody>
         {{range .Rules}}
         <tr>
           <td><strong>{{.Symbol}}</strong></td><td>{{.Strategy}}</td><td>{{.TF}}</td><td class="dir-{{.Side}}">{{.Side}}</td>
-          <td class="num">{{printf "%.0f" .MarginUSDT}}u</td><td class="num">{{.Leverage}}x</td><td class="num">{{printf "%.2f" .StopPct}}</td>
+          <td class="num">{{if gt $.RiskPct 0.0}}<span class="b-dim" title="risk sizing: margin = 風險 ÷ 停損距離 ÷ 槓桿">依停損</span>{{else}}{{printf "%.0f" .MarginUSDT}}u{{end}}</td><td class="num">{{.Leverage}}x</td><td class="num">{{printf "%.2f" .StopPct}}</td>
           <td>{{if .Enabled}}✓{{else}}—{{end}}</td>
         </tr>
         {{end}}

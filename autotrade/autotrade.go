@@ -48,8 +48,14 @@ type Config struct {
 	// MaxSameSymbolSide caps positions sharing a (symbol, direction). 0 =
 	// UNLIMITED, matching the other caps, so an existing file keeps today's
 	// behaviour. 1 = never repeat an opinion already on the book.
-	MaxSameSymbolSide int    `json:"max_same_symbol_side"`
-	Rules             []Rule `json:"rules"`
+	MaxSameSymbolSide int `json:"max_same_symbol_side"`
+	// RiskPerTradePct sizes every fire from its stop: lose this percent of
+	// account equity if the stop fills (1.0 = 1%). Each rule's leverage
+	// becomes a CEILING, lowered as needed to keep the stop inside the
+	// liquidation guard, and margin_usdt is no longer read. 0 = the old fixed
+	// margin_usdt × leverage sizing. See sizing.go.
+	RiskPerTradePct float64 `json:"risk_per_trade_pct"`
+	Rules           []Rule  `json:"rules"`
 }
 
 // Path is the on-disk config (env AUTOTRADE_PATH or the default).
