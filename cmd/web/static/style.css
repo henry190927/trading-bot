@@ -6727,3 +6727,95 @@ html[data-density="compact"] .dt {
 .alerts-info-toggle { font-size: var(--fs-sm); color: var(--text-dim); display: flex; align-items: center; gap: 4px; }
 .alert-list-page { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
 .alert-list-page .alert-item:last-child { border-bottom: none; }
+
+/* =====================================================================
+   REDESIGN COMPONENTS (2026-10, phase 2 onward). Pages moved to the new
+   design use only these `ui-` classes plus .dt for tables; the older
+   page-specific classes above retire as each page is redone.
+
+   Rules of the look: numbers are the loudest thing on a card; labels are
+   small and dim; explanations are one short line or not there at all;
+   cards are separated by a hairline and surface tone, not heavy borders.
+   ===================================================================== */
+.ui-page { max-width: 1600px; margin: 0 auto; padding: var(--sp-5) var(--sp-5) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-4); }
+@media (max-width: 720px) { .ui-page { padding: var(--sp-3) var(--sp-3) var(--sp-7); gap: var(--sp-3); } }
+
+.ui-status { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3); font-size: var(--fs-base); color: var(--text-dim); }
+.ui-pill { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 var(--sp-3); border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 600; }
+.ui-pill.ok { background: var(--wash-green); color: var(--green); }
+.ui-pill.bad { background: var(--wash-red); color: var(--red); }
+.ui-pill .ico { width: 14px; height: 14px; }
+
+.ui-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-3); }
+@media (max-width: 900px) { .ui-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ui-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); min-width: 0; text-decoration: none; color: inherit; }
+a.ui-kpi:hover { border-color: var(--text-dim); }
+.ui-kpi-label { font-size: var(--fs-sm); color: var(--text-dim); }
+.ui-kpi-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-xl); font-weight: 600; line-height: 1.2; margin-top: 2px; }
+.ui-kpi-val small { font-family: var(--sans); font-size: var(--fs-sm); color: var(--text-dim); font-weight: 400; margin-left: 4px; }
+
+.ui-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--sp-4); align-items: start; }
+@media (max-width: 1100px) { .ui-cols { grid-template-columns: minmax(0, 1fr); } }
+.ui-col { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+
+.ui-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4); box-shadow: var(--shadow-card); min-width: 0; }
+.ui-card.warn { background: var(--wash-yellow); border-color: rgba(var(--yellow-rgb), .45); }
+.ui-card-h { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.ui-card-h h2 { margin: 0; display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-base); font-weight: 600; }
+.ui-card-h h2 .ico { width: 16px; height: 16px; color: var(--text-dim); }
+.ui-card.warn .ui-card-h h2 .ico { color: var(--yellow); }
+.ui-card-h > :last-child:not(h2) { margin-left: auto; }
+.ui-count { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-dim); font-weight: 500; }
+.ui-sub { font-size: var(--fs-sm); color: var(--text-dim); }
+.ui-link { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); color: var(--blue); text-decoration: none; }
+.ui-link .ico { width: 14px; height: 14px; }
+
+.ui-list { list-style: none; margin: 0; padding: 0; }
+.ui-row { display: flex; align-items: center; gap: var(--sp-3); padding: 9px 0; border-top: 1px solid var(--border); font-size: var(--fs-base); min-width: 0; }
+.ui-row:first-child { border-top: 0; padding-top: 2px; }
+a.ui-row { color: inherit; text-decoration: none; }
+a.ui-row:hover .ui-sym { color: var(--blue); }
+.ui-grow { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.ui-dim { color: var(--text-dim); }
+.ui-sm { font-size: var(--fs-sm); }
+.ui-sym { font-weight: 600; }
+.ui-tag { font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600; padding: 1px 6px; border-radius: 4px; background: var(--chip); border: 1px solid var(--chip-border); }
+.ui-side { display: inline-grid; place-items: center; min-width: 24px; height: 20px; padding: 0 6px; border-radius: 4px; font-size: var(--fs-xs); font-weight: 700; }
+.ui-side.long { background: var(--wash-green); color: var(--green); }
+.ui-side.short { background: var(--wash-red); color: var(--red); }
+.ui-side.neutral { background: var(--wash-dim); color: var(--text-dim); }
+.ui-up { color: var(--green); } .ui-down { color: var(--red); }
+
+.ui-big { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-lg); font-weight: 600; }
+.ui-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: var(--sp-1) 0; }
+.ui-empty-t { font-weight: 600; }
+.ui-btn {
+    display: inline-flex; align-items: center; gap: var(--sp-2); height: 32px; padding: 0 var(--sp-4); margin-top: var(--sp-2);
+    border-radius: var(--r-sm); border: 1px solid var(--blue); background: var(--blue); color: var(--on-accent);
+    font: inherit; font-size: var(--fs-base); font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.ui-btn .ico { width: 16px; height: 16px; }
+.ui-btn.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+
+.ui-seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ui-seg button { height: 26px; padding: 0 var(--sp-3); border: 0; background: transparent; border-radius: 6px; color: var(--text-dim); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.ui-seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+
+/* Tables inside a ui-card bleed to the card edge, no second frame. */
+.ui-card > .dt-scroll { margin: 0 calc(var(--sp-4) * -1) calc(var(--sp-4) * -1); border: 0; border-radius: 0; border-top: 1px solid var(--border); }
+.ui-card .dt th { background: var(--surface); box-shadow: inset 0 -1px 0 var(--border); font-weight: 500; letter-spacing: 0; text-transform: none; font-size: var(--fs-xs); }
+.ui-card .dt th, .ui-card .dt td { padding: 8px var(--sp-4); }
+.ui-card .dt { --dt-zebra: transparent; }
+.ui-range { position: relative; display: inline-block; width: 110px; height: 4px; border-radius: 2px; background: var(--chip-border); vertical-align: middle; }
+.ui-range i { position: absolute; top: -3px; width: 2px; height: 10px; margin-left: -1px; border-radius: 1px; background: var(--text); }
+/* The legacy market block carried its own top margin; inside a ui-col the
+   column gap spaces it. */
+.ui-card.market-overview { margin-top: 0; }
+/* Warn cards use the solid caution ground: a translucent wash over the
+   light theme's paper turns muddy. */
+.ui-card.warn { background: var(--yellow-bg); }
+/* A list row never wraps: the flexible middle column truncates instead. */
+.ui-row > * { white-space: nowrap; flex-shrink: 0; }
+.ui-row > .ui-grow { flex-shrink: 1; }
+@media (max-width: 560px) { .ui-card-h { flex-wrap: wrap; } .ui-card-h > .ui-sub { margin-left: 0; width: 100%; } }

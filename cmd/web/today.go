@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/henry190927/trading-bot/econcal"
+	"github.com/henry190927/trading-bot/journal"
 	"github.com/henry190927/trading-bot/macro"
 )
 
@@ -70,18 +71,35 @@ func (s *server) handleTodayPage(c *gin.Context) {
 	// Open trades + live R (light: nil views → fetches only open symbols).
 	openTrades := s.buildOpenTradeCards(ctx, nil)
 
-	// Pending setups needing an outcome decision.
-	var pending []Setup
+	// Pending 模擬單 (setups) still waiting for an outcome. The KPI shows the
+	// full count; the list shows the newest eight.
+	var pending []pendingRow
+	pendingN := 0
 	if all, err := readSetups(); err == nil {
+		var open []Setup
 		for _, su := range all {
 			if su.Outcome == "" {
-				pending = append(pending, su)
+				open = append(open, su)
 			}
 		}
-		sort.Slice(pending, func(i, j int) bool { return pending[i].ID > pending[j].ID })
-		if len(pending) > 8 {
-			pending = pending[:8]
+		pendingN = len(open)
+		sort.Slice(open, func(i, j int) bool { return open[i].ID > open[j].ID })
+		if len(open) > 8 {
+			open = open[:8]
 		}
+		for _, su := range open {
+			pending = append(pending, pendingRow{Setup: su, LeanKey: leanKey(su), At: su.RecordedAt.In(tpe).Format("01-02 15:04")})
+		}
+	}
+
+	// Realized R today / this week, the same numbers the portfolio hero shows.
+	var periods periodStats
+	if trades, err := journal.ReadAll(""); err == nil {
+		periods = buildPeriodStats(trades)
+	}
+	unread := 0
+	if s.alerts != nil {
+		unread = s.alerts.Snapshot(0).Unread
 	}
 
 	s.page(c, http.StatusOK, "today.html", gin.H{
@@ -90,6 +108,45 @@ func (s *server) handleTodayPage(c *gin.Context) {
 		"MacroGaps":   macroGaps,
 		"OpenTrades":  openTrades,
 		"Pending":     pending,
-		"NowTPE":      now.In(tpe).Format("2006-01-02 15:04"),
+		"PendingN":    pendingN,
+		"Periods":     periods,
+		"Unread":      unread,
 	})
+}
+
+// pendingRow is one 模擬單 on the Today list.
+type pendingRow struct {
+	Setup
+	LeanKey string // i18n key for the structural read
+	At      string // recorded, UTC+8
+}
+
+// leanKey names a setup's structural read as a dictionary key. The stored
+// Lean is display text written by the chart page in Chinese, so it cannot be
+// shown in English; the event and trend fields it was derived from can.
+// Same precedence as structLean in chart.html: event, then zone, then trend.
+func leanKey(s Setup) string {
+	switch s.Event {
+	case "BOS-up":
+		return "lean.bosUp"
+	case "BOS-down":
+		return "lean.bosDown"
+	case "CHoCH-up":
+		return "lean.chochUp"
+	case "CHoCH-down":
+		return "lean.chochDown"
+	}
+	if s.InZone {
+		if s.Dir == "short" {
+			return "lean.zoneDown"
+		}
+		return "lean.zoneUp"
+	}
+	switch s.Trend {
+	case "HH-HL uptrend":
+		return "lean.trendUp"
+	case "LH-LL downtrend":
+		return "lean.trendDown"
+	}
+	return "lean.neutral"
 }

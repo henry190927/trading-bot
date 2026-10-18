@@ -2882,6 +2882,38 @@ func shortVerdictTag(v string) string {
 }
 
 // templateFuncs exposes formatting helpers to the templates.
+// fmtPx is the display format for a price in a list: thousands separators
+// and cents at or above 100 (83,699.81), four decimals between 1 and 100
+// (1.5303), and fmtPrice's full precision below 1. fmtPrice stays the
+// precise form for forms and order fields, where 83699.8115 must survive.
+func fmtPx(v float64) string {
+	a := math.Abs(v)
+	switch {
+	case v == 0:
+		return "-"
+	case a >= 100:
+		s := strconv.FormatFloat(a, 'f', 2, 64)
+		whole, frac, _ := strings.Cut(s, ".")
+		var b strings.Builder
+		for i, r := range whole {
+			if i > 0 && (len(whole)-i)%3 == 0 {
+				b.WriteByte(',')
+			}
+			b.WriteRune(r)
+		}
+		out := b.String() + "." + frac
+		if v < 0 {
+			out = "-" + out
+		}
+		return out
+	case a >= 1:
+		return fmt.Sprintf("%.4f", v)
+	default:
+		s := strings.TrimRight(strconv.FormatFloat(v, 'f', 6, 64), "0")
+		return strings.TrimSuffix(s, ".")
+	}
+}
+
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		// t is replaced per language by parsePages (i18n.go). This identity
@@ -2903,6 +2935,7 @@ func templateFuncs() template.FuncMap {
 			s = strings.TrimRight(s, "0")
 			return strings.TrimSuffix(s, ".")
 		},
+		"fmtPx": fmtPx,
 		"fmtPct": func(v float64) string {
 			return fmt.Sprintf("%+.4f%%", v*100)
 		},

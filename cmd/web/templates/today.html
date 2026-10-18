@@ -5,148 +5,107 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>today · trading-web</title>
+<title>{{t "tab.today"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
-<style>
-  .today-hero{border-radius:var(--r-lg);padding:var(--sp-5);margin-bottom:var(--sp-4);box-shadow:var(--shadow-card);border:1px solid var(--border)}
-  .today-hero.live{background:var(--wash-green);border-color:var(--green)}
-  .today-hero.blackout{background:var(--wash-red);border-color:var(--red)}
-  .today-hero .th-status{font-size:var(--fs-xl);font-weight:800;letter-spacing:-.02em}
-  .today-hero.live .th-status{color:var(--green)} .today-hero.blackout .th-status{color:var(--red)}
-  .today-hero .th-sub{color:var(--text-dim);margin-top:var(--sp-2);font-size:var(--fs-md)}
-  /* Coverage gap: the curated table is hand-maintained and went stale
-     silently on 2026-09-10. Amber, not red — nothing is broken, the gate
-     just does not cover these. */
-  .today-gap{background:var(--wash-yellow);border:1px solid var(--yellow);border-radius:var(--r-lg);padding:var(--sp-4);margin-bottom:var(--sp-4)}
-  .today-gap .tg-title{font-weight:700;color:var(--yellow);font-size:var(--fs-md)}
-  .today-gap .tg-note{color:var(--text-dim);font-size:var(--fs-sm);margin-top:var(--sp-1)}
-  .today-gap ul{margin:var(--sp-3) 0 0;padding-left:0;list-style:none}
-  .today-gap li{display:flex;gap:var(--sp-2);align-items:baseline;padding:var(--sp-1) 0;font-size:var(--fs-sm);border-top:1px solid var(--border)}
-  .today-gap li .tg-when{font-variant-numeric:tabular-nums;color:var(--text-dim);white-space:nowrap}
-  .today-gap li .tg-cty{font-weight:700;font-size:var(--fs-xs);opacity:.85;white-space:nowrap}
-  .today-gap li .tg-name{flex:1;min-width:0}
-  .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--sp-4);align-items:start}
-  .today-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-4);box-shadow:var(--shadow-card)}
-  .today-card h2{font-size:var(--fs-lg);font-weight:800;margin-bottom:var(--sp-3);display:flex;align-items:center;gap:var(--sp-2)}
-  .ot{display:flex;justify-content:space-between;align-items:center;padding:var(--sp-3) 0;border-bottom:1px solid var(--border)}
-  .ot:last-child{border-bottom:none}
-  .ot .sym{font-weight:700}
-  .ot .r{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--fs-lg);font-weight:800}
-  .ot .meta{color:var(--text-dim);font-size:var(--fs-xs)}
-  .pend{display:flex;justify-content:space-between;padding:var(--sp-2) 0;border-bottom:1px solid var(--border);font-size:var(--fs-sm)}
-  .pend:last-child{border-bottom:none}
-  .today-links{display:flex;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-2)}
-  .today-links a{padding:var(--sp-2) var(--sp-4);border:1px solid var(--border);border-radius:var(--r-pill);color:var(--text);text-decoration:none;font-weight:600;font-size:var(--fs-sm);background:var(--surface-2)}
-  .today-empty{color:var(--text-dim);font-size:var(--fs-sm);padding:var(--sp-3) 0}
-</style>
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<main class="tips-main">
-  <h1 class="tips-h1">
-    <span class="i18n-en">Today</span><span class="i18n-zh">今日</span>
-    <span class="tips-sub">{{.NowTPE}} (Asia/Taipei)</span>
-  </h1>
-
-  {{if .MacroActive}}
-  <div class="today-hero blackout">
-    <div class="th-status">⛔ <span class="i18n-en">BLACKOUT</span><span class="i18n-zh">停訊窗</span> — {{.MacroActive.Name}}</div>
-    <div class="th-sub"><span class="i18n-en">Engine suppressed — no new signals until the window clears.</span><span class="i18n-zh">引擎停訊 —— 事件窗過了才會再出訊號,別在窗內開新單。</span></div>
-  </div>
-  {{else}}
-  <div class="today-hero live">
-    <div class="th-status">✅ <span class="i18n-en">Engine live</span><span class="i18n-zh">引擎運作中</span></div>
-    <div class="th-sub">{{if .BONext}}<span class="i18n-en">Next event</span><span class="i18n-zh">下一個事件</span>: <strong>{{.BONext.name}}</strong> — {{.BONext.when}} · {{.BONext.hours}}h{{else}}<span class="i18n-en">no macro events on the calendar</span><span class="i18n-zh">日曆上無總經事件</span>{{end}}</div>
-  </div>
-  {{end}}
-
-  {{if .MacroGaps}}
-  <div class="today-gap">
-    <div class="tg-title">⚠️ <span class="i18n-en">Not covered by the blackout gate ({{len .MacroGaps}}, next 48h)</span><span class="i18n-zh">停訊窗沒有涵蓋的事件（{{len .MacroGaps}} 筆,未來 48 小時）</span></div>
-    <div class="tg-note"><span class="i18n-en">High-impact events on the live feed with no curated blackout window. The engine will keep firing straight through these.</span><span class="i18n-zh">live feed 上的高影響事件,但 curated 表沒有對應的停訊窗 —— 引擎會照常在這些事件裡出訊號。</span></div>
-    <ul>
-      {{range .MacroGaps}}
-      <li>
-        <span class="tg-when">{{.when}}</span>
-        <span class="tg-cty">{{.country}}</span>
-        <span class="tg-name">{{.name}}</span>
-        <span class="tg-when">{{.hours}}h</span>
-      </li>
-      {{end}}
-    </ul>
-  </div>
-  {{end}}
-
-  <div class="today-grid">
-    <!-- Open trades -->
-    <div class="today-card">
-      <h2>💼 <span class="i18n-en">Open trades</span><span class="i18n-zh">開倉</span> <span class="cs-dim">({{len .OpenTrades}})</span></h2>
-      {{if .OpenTrades}}
-        {{range .OpenTrades}}
-        <div class="ot">
-          <div>
-            <span class="sym">{{.Trade.Symbol}} {{.Trade.Side}}</span>{{if .Trade.Leverage}} <span class="meta">{{.Trade.Leverage}}x</span>{{end}}
-            <div class="meta">entry {{printf "%.2f" .Trade.Entry}} · mark {{printf "%.2f" .MarkPrice}} · {{.Trade.TF}}</div>
-          </div>
-          <div class="r {{if gt .CurrentR 0.0}}r-pos{{else if lt .CurrentR 0.0}}r-neg{{end}}">{{if gt .CurrentR 0.0}}+{{end}}{{printf "%.2f" .CurrentR}}R</div>
-        </div>
-        {{end}}
-      {{else}}<div class="today-empty"><span class="i18n-en">No open positions.</span><span class="i18n-zh">目前無持倉。</span></div>{{end}}
-    </div>
-
-    <!-- Pending setups -->
-    <div class="today-card">
-      <h2>⚑ <span class="i18n-en">Pending setups</span><span class="i18n-zh">待決 setups</span> <span class="cs-dim">({{len .Pending}})</span></h2>
-      {{if .Pending}}
-        {{range .Pending}}
-        <div class="pend">
-          <span><strong>#{{.ID}}</strong> {{.Symbol}} {{.Dir}} <span class="cs-dim">{{.TF}}</span></span>
-          <span class="cs-dim">entry {{printf "%.2f" .Entry}}</span>
-        </div>
-        {{end}}
-        <div class="today-links"><a href="/setups">→ <span class="i18n-en">Review setups</span><span class="i18n-zh">檢視 setups</span></a></div>
-      {{else}}<div class="today-empty"><span class="i18n-en">Nothing pending.</span><span class="i18n-zh">沒有待決。</span></div>{{end}}
-    </div>
-
-    <!-- Quick links (the daemon-health row that lived here is the alert
-         bell now: it pushes when something breaks instead of waiting to be
-         looked at). -->
-    <div class="today-card">
-      <h2>🧭 <span class="i18n-en">Go to</span><span class="i18n-zh">前往</span></h2>
-      <div class="today-links">
-        <a href="/scan">→ <span class="i18n-en">Scan</span><span class="i18n-zh">掃描</span></a>
-        <a href="/chart">→ Chart</a>
-        <a href="/calendar">→ <span class="i18n-en">Calendar</span><span class="i18n-zh">行事曆</span></a>
-        <a href="/ops">→ Ops</a>
-      </div>
-    </div>
+<main class="ui-page">
+  <div class="ui-status">
+    {{if .MacroActive}}
+      <span class="ui-pill bad">{{template "icon" "pause"}}{{t "today.blackout"}}</span>
+      <span>{{.MacroActive.Name}} · {{t "today.blackoutSub"}}</span>
+    {{else}}
+      <span class="ui-pill ok">{{template "icon" "check"}}{{t "today.engineLive"}}</span>
+      <span>{{if .BONext}}{{t "today.nextEvent"}} <strong>{{.BONext.name}}</strong> · {{.BONext.when}} · <span class="ui-num">{{.BONext.hours}}h</span>{{else}}{{t "today.noEvents"}}{{end}}</span>
+    {{end}}
   </div>
 
-  <section class="market-overview">
-    <div class="mkt-head">
-      <h2 class="mkt-title"><span class="i18n-en">Market</span><span class="i18n-zh">市場總覽</span></h2>
-      <div class="mkt-tabs" id="mkt-tabs">
-        <button type="button" class="mkt-tab active" data-cat="all"><span class="i18n-en">All</span><span class="i18n-zh">全部</span></button>
-        <button type="button" class="mkt-tab" data-cat="crypto"><span class="i18n-en">Crypto</span><span class="i18n-zh">加密</span></button>
-        <button type="button" class="mkt-tab" data-cat="metal"><span class="i18n-en">Metals</span><span class="i18n-zh">貴金屬</span></button>
-        <button type="button" class="mkt-tab" data-cat="stock"><span class="i18n-en">Stocks</span><span class="i18n-zh">股票</span></button>
-      </div>
-    </div>
-    <div class="dt-scroll">
-      <table class="dt dt--lg">
-        <thead><tr>
-          <th>Symbol</th><th class="num">Price</th><th class="num">24h %</th>
-          <th class="num">Funding</th><th class="num">24h Range</th>
-        </tr></thead>
-        <tbody id="mkt-body"><tr><td colspan="5" class="cs-dim">Loading…</td></tr></tbody>
-      </table>
-    </div>
-    <p class="glossary-hint"><span id="mkt-updated">—</span> · <span class="i18n-en">live mark · funding as %</span><span class="i18n-zh">即時 mark 價 · funding 為當期 %</span></p>
+  <section class="ui-kpis">
+    <a class="ui-kpi" href="/journal"><div class="ui-kpi-label">{{t "today.kpi.positions"}}</div><div class="ui-kpi-val">{{len .OpenTrades}}</div></a>
+    <a class="ui-kpi" href="/journal"><div class="ui-kpi-label">{{t "today.kpi.today"}}</div><div class="ui-kpi-val {{rClass .Periods.TodayR}}">{{fmtR .Periods.TodayR}}R<small>{{.Periods.TodayN}} {{t "unit.trades"}}</small></div></a>
+    <a class="ui-kpi" href="/journal"><div class="ui-kpi-label">{{t "today.kpi.week"}}</div><div class="ui-kpi-val {{rClass .Periods.WeekR}}">{{fmtR .Periods.WeekR}}R<small>{{.Periods.WeekN}} {{t "unit.trades"}}</small></div></a>
+    <a class="ui-kpi" href="/setups"><div class="ui-kpi-label">{{t "today.kpi.setups"}}</div><div class="ui-kpi-val">{{.PendingN}}</div></a>
+    <a class="ui-kpi" href="/alerts"><div class="ui-kpi-label">{{t "today.kpi.alerts"}}</div><div class="ui-kpi-val{{if .Unread}} ui-down{{end}}">{{.Unread}}</div></a>
   </section>
+
+  <div class="ui-cols">
+    <div class="ui-col">
+      {{if .MacroGaps}}
+      <section class="ui-card warn">
+        <header class="ui-card-h"><h2>{{template "icon" "alert"}}{{t "today.gaps"}} <span class="ui-count">{{len .MacroGaps}}</span></h2><span class="ui-sub">{{t "today.gapsSub"}}</span></header>
+        <ul class="ui-list">
+          {{range .MacroGaps}}
+          <li class="ui-row"><span class="ui-num ui-dim">{{.when}}</span><span class="ui-tag">{{.country}}</span><span class="ui-grow">{{.name}}</span><span class="ui-num ui-dim">{{.hours}}h</span></li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
+
+      <section class="ui-card">
+        <header class="ui-card-h"><h2>{{template "icon" "flag"}}{{t "today.pending"}} <span class="ui-count">{{.PendingN}}</span></h2><a class="ui-link" href="/setups">{{t "common.viewAll"}} {{template "icon" "arrow"}}</a></header>
+        {{if .Pending}}
+        <ul class="ui-list">
+          {{range .Pending}}
+          <li><a class="ui-row" href="/setups">
+            <span class="ui-side {{.Dir}}">{{t (printf "side.%s" .Dir)}}</span>
+            <span class="ui-sym">{{.Symbol}}</span><span class="ui-dim">{{.TF}}</span>
+            <span class="ui-grow ui-dim ui-sm">{{t .LeanKey}}</span>
+            <span class="ui-num">{{fmtPx .Entry}}</span>
+            <span class="ui-num ui-dim ui-sm">{{.At}}</span>
+          </a></li>
+          {{end}}
+        </ul>
+        {{else}}<div class="ui-empty"><div class="ui-dim">{{t "today.noPending"}}</div></div>{{end}}
+      </section>
+    </div>
+
+    <div class="ui-col">
+      <section class="ui-card">
+        <header class="ui-card-h"><h2>{{template "icon" "wallet"}}{{t "today.positions"}} <span class="ui-count">{{len .OpenTrades}}</span></h2>{{if .OpenTrades}}<a class="ui-link" href="/journal">{{t "common.viewAll"}} {{template "icon" "arrow"}}</a>{{end}}</header>
+        {{if .OpenTrades}}
+        <ul class="ui-list">
+          {{range .OpenTrades}}
+          <li><a class="ui-row" href="/chart?symbol={{.Trade.Symbol}}">
+            <span class="ui-side {{.Trade.Side}}">{{t (printf "side.%s" .Trade.Side)}}</span>
+            <span class="ui-sym">{{.Trade.Symbol}}</span>{{if .Trade.Leverage}}<span class="ui-dim ui-sm">{{.Trade.Leverage}}x</span>{{end}}
+            <span class="ui-grow ui-dim ui-sm ui-num">{{fmtPx .Trade.Entry}} → {{fmtPx .MarkPrice}}</span>
+            <span class="ui-big {{rClass .CurrentR}}">{{fmtR .CurrentR}}R</span>
+          </a></li>
+          {{end}}
+        </ul>
+        {{else}}
+        <div class="ui-empty">
+          <div class="ui-empty-t">{{t "today.noPositions"}}</div>
+          <div class="ui-sub">{{t "today.noPositionsSub"}}</div>
+          <a class="ui-btn" href="/chart">{{template "icon" "plus"}}{{t "today.newPosition"}}</a>
+        </div>
+        {{end}}
+      </section>
+
+      <section class="ui-card market-overview">
+        <header class="ui-card-h"><h2>{{template "icon" "pulse"}}{{t "today.market"}}</h2>
+          <div class="ui-seg" id="mkt-tabs">
+            <button type="button" class="on" data-cat="all">{{t "cat.all"}}</button><button type="button" data-cat="crypto">{{t "cat.crypto"}}</button><button type="button" data-cat="metal">{{t "cat.metal"}}</button><button type="button" data-cat="stock">{{t "cat.stock"}}</button>
+          </div>
+        </header>
+        <div class="dt-scroll">
+          <table class="dt">
+            <thead><tr>
+              <th>{{t "th.symbol"}}</th><th class="num">{{t "th.price"}}</th><th class="num">24h</th>
+              <th class="num">{{t "th.funding"}}</th><th>{{t "th.range24"}}</th>
+            </tr></thead>
+            <tbody id="mkt-body"><tr><td colspan="5" class="ui-dim">{{t "common.loading"}}</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+      <p class="ui-sub" style="margin:0"><span id="mkt-updated">—</span></p>
+    </div>
+  </div>
 </main>
 
 <script>
@@ -219,24 +178,27 @@
     return {
       px:   (r.price==null) ? '—' : fmtPx(r.price),
       chg:  chg,
-      chgc: (r.changePct==null) ? 'num cs-dim' : (r.changePct>=0 ? 'num up' : 'num down'),
+      chgc: (r.changePct==null) ? 'num ui-dim' : (r.changePct>=0 ? 'num ui-up' : 'num ui-down'),
       fund: (r.funding==null) ? '—' : (r.funding>=0?'+':'') + r.funding.toFixed(4) + '%',
-      fundc:(r.funding==null) ? 'num cs-dim' : (r.funding>=0 ? 'num up' : 'num down'),
-      rng:  (r.low24==null||r.high24==null) ? '—' : fmtPx(r.low24)+' – '+fmtPx(r.high24)
+      fundc:'num ui-dim',
+      // Where the price sits in its 24h range, as a marker on a bar; the
+      // numbers move to the tooltip. 0% = at the low, 100% = at the high.
+      pos:  (r.low24==null||r.high24==null||r.price==null||r.high24<=r.low24) ? null : Math.max(0, Math.min(100, (r.price-r.low24)/(r.high24-r.low24)*100)),
+      rng:  (r.low24==null||r.high24==null) ? '' : fmtPx(r.low24)+' – '+fmtPx(r.high24)
     };
   }
 
   function build(rows){
     var body = document.getElementById('mkt-body'); if(!body) return;
     rowEls = {};
-    if(!rows.length){ body.innerHTML = '<tr><td colspan="5" class="cs-dim">—</td></tr>'; return; }
+    if(!rows.length){ body.innerHTML = '<tr><td colspan="5" class="ui-dim">—</td></tr>'; return; }
     body.innerHTML = rows.map(function(r){
       return '<tr data-sym="'+r.symbol+'">'+
         '<td><a href="/chart?symbol='+r.symbol+'" class="mkt-sym">'+icon(r.symbol)+' <b>'+r.symbol+'</b></a></td>'+
         '<td class="num mkt-px"><span class="mkt-px-val"></span></td>'+
         '<td class="num mkt-chg"></td>'+
         '<td class="num mkt-fund"></td>'+
-        '<td class="num cs-dim mkt-rng"></td>'+
+        '<td class="mkt-rng"><span class="ui-range"><i></i></span></td>'+
       '</tr>';
     }).join('');
     rows.forEach(function(r){
@@ -286,7 +248,9 @@
       el.chg.className = c.chgc;
       if(el.fund.textContent !== c.fund){ el.fund.textContent = c.fund; }
       el.fund.className = c.fundc;
-      if(el.rng.textContent !== c.rng){ el.rng.textContent = c.rng; }
+      el.rng.title = c.rng;
+      var mk = el.rng.querySelector('i');
+      if(mk){ mk.style.display = c.pos==null ? 'none' : ''; if(c.pos!=null) mk.style.left = c.pos.toFixed(1) + '%'; }
     });
   }
 
@@ -315,8 +279,8 @@
 
   function markUpdated(){
     var u = document.getElementById('mkt-updated');
-    if(u) u.textContent = new Date().toLocaleTimeString('en-GB',{hour12:false})
-                        + (sseAlive ? ' · live' : ' · poll');
+    if(u) u.textContent = {{t "today.updated"}} + ' ' + new Date().toLocaleTimeString('en-GB',{hour12:false, timeZone:'Asia/Taipei'})
+                        + ' · ' + (sseAlive ? {{t "today.live"}} : {{t "today.poll"}});
   }
 
   function startPolling(){
@@ -359,9 +323,9 @@
 
   var tabs = document.getElementById('mkt-tabs');
   if(tabs) tabs.addEventListener('click', function(e){
-    var b = e.target.closest('.mkt-tab'); if(!b) return;
+    var b = e.target.closest('button[data-cat]'); if(!b) return;
     cat = b.getAttribute('data-cat');
-    tabs.querySelectorAll('.mkt-tab').forEach(function(x){ x.classList.toggle('active', x===b); });
+    tabs.querySelectorAll('button[data-cat]').forEach(function(x){ x.classList.toggle('on', x===b); });
     render(true);
   });
   // Paint from the REST snapshot immediately (no wait for the stream to
