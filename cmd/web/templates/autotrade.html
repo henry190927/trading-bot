@@ -1,16 +1,16 @@
 {{define "bdTable"}}
 <div class="dt-scroll">
 <table class="dt">
-  <thead><tr><th>key</th><th class="num">n</th><th class="num">tp/stop</th><th class="num">勝率</th><th class="num">net R</th><th class="num">R/筆</th></tr></thead>
+  <thead><tr><th>{{t "at.bd.key"}}</th><th class="num">n</th><th class="num">TP / {{t "trades.stop"}}</th><th class="num">{{t "trades.winRate"}}</th><th class="num">{{t "at.netR"}}</th><th class="num">{{t "at.rPerTrade"}}</th></tr></thead>
   <tbody>
   {{range .}}
     <tr>
-      <td><strong>{{.Key}}</strong></td>
-      <td class="num cs-dim">{{.Total}}</td>
-      <td class="num">{{if or .TP .Stop}}<span style="color:var(--green)">{{.TP}}</span>/<span style="color:var(--red)">{{.Stop}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-      <td class="num">{{if or .TP .Stop}}{{printf "%.0f" (mulPct .WinRate)}}%{{else}}<span class="cs-dim">—</span>{{end}}</td>
-      <td class="num"><span style="color:{{if ge .NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .NetR}}</span></td>
-      <td class="num">{{if or .TP .Stop}}<span style="color:{{if ge .RPerTrade 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .RPerTrade}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
+      <td><code class="ui-id">{{.Key}}</code></td>
+      <td class="num ui-dim">{{.Total}}</td>
+      <td class="num">{{if or .TP .Stop}}<span class="ui-up">{{.TP}}</span> / <span class="ui-down">{{.Stop}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+      <td class="num">{{if or .TP .Stop}}{{printf "%.0f" (mulPct .WinRate)}}%{{else}}<span class="ui-dim">—</span>{{end}}</td>
+      <td class="num"><b class="{{if ge .NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .NetR}}</b></td>
+      <td class="num">{{if or .TP .Stop}}<span class="{{if ge .RPerTrade 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .RPerTrade}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
     </tr>
   {{end}}
   </tbody>
@@ -24,7 +24,7 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>autotrade · trading-web</title>
+<title>{{t "tab.auto"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
@@ -34,86 +34,87 @@
 
 {{template "topnav" .}}
 
-<main class="tips-main">
-  <h1 class="tips-h1">
-    🤖 Auto-executor
-    <span class="tips-sub">paper-first · 開關維持 env/config · 監控唯讀</span>
-  </h1>
-
-  <div class="stats-card">
-    <div class="at-state">
-      <span class="badge {{if .Enabled}}b-blue{{else}}b-dim{{end}}">master {{if .Enabled}}ON{{else}}off{{end}}</span>
-      <span class="badge {{if .Paper}}b-yellow{{else}}b-red{{end}}">{{if .Paper}}PAPER (mock){{else}}LIVE mode{{end}}</span>
-      <span class="badge {{if .EnvArmed}}b-red{{else}}b-dim{{end}}">AUTOTRADE_ENABLED={{if .EnvArmed}}true{{else}}unset{{end}}</span>
-      <span class="badge {{if .LiveArmed}}b-red{{else}}b-green{{end}}">{{if .LiveArmed}}⚠ REAL ORDERS ARMED{{else}}✓ no real orders{{end}}</span>
+<main class="ui-page">
+  <section class="ui-card">
+    <header class="ui-card-h">
+      <h2>{{template "icon" "pulse"}}{{t "at.title"}}</h2>
+      <span class="ui-sub">{{t "at.sub"}}</span>
+    </header>
+    <div class="ui-detail-tags">
+      <span class="ui-tag {{if .Enabled}}tag-blue{{end}}">{{t "at.master"}} {{if .Enabled}}ON{{else}}OFF{{end}}</span>
+      <span class="ui-tag {{if .Paper}}tag-yellow{{else}}tag-red{{end}}">{{if .Paper}}{{t "at.paperMode"}}{{else}}{{t "at.liveMode"}}{{end}}</span>
+      <span class="ui-tag {{if .EnvArmed}}tag-red{{end}}">AUTOTRADE_ENABLED={{if .EnvArmed}}true{{else}}unset{{end}}</span>
+      <span class="ui-tag {{if .LiveArmed}}tag-red{{else}}tag-green{{end}}">{{if .LiveArmed}}{{t "at.armed"}}{{else}}{{t "at.notArmed"}}{{end}}</span>
     </div>
-    {{if .Paper}}
-    <p class="glossary-hint" style="border-left:3px solid var(--yellow);padding-left:.6rem;margin-top:.5rem">
-      ⚠ <b>PAPER 模式:交易所上沒有任何真實掛單或部位。</b>下方每筆是程式「當下想掛的單」的模擬紀錄,outcome 是拿之後的 K 線回放推算的——<b>pending / open 都是模擬狀態,不是真的成交</b>。真錢啟動後,這裡才會顯示交易所實際的掛單/部位狀態。
-    </p>
-    {{end}}
-    <p class="glossary-hint">
-      真錢需<b>同時</b> master ON + PAPER off + AUTOTRADE_ENABLED=true。目前
-      {{if .LiveArmed}}<b style="color:var(--red)">已武裝真錢</b>{{else}}<b style="color:var(--green)">不會下真單</b>{{end}}。
-      caps <span class="ops-caps-live">同時 <strong>{{.Book.OpenCount}}</strong>/{{.MaxConc}} 倉 · 保證金 <strong>{{printf "%.0f" .Book.OpenMargin}}</strong>/{{printf "%.0f" .MaxMargin}}u · 今日 <strong>{{printf "%+.2f" .Book.RealizedRToday}}</strong>/{{printf "%.1f" .DailyHaltR}}R · 同標的同向 {{if .MaxSameSide}}<strong>{{.MaxSameSide}}</strong>{{else}}<span class="b-dim">未設</span>{{end}} · 每筆風險 {{if gt .RiskPct 0.0}}<strong>{{printf "%.2f" .RiskPct}}%</strong> 權益{{else}}<span class="b-dim">未設(固定保證金)</span>{{end}}</span> · config <code>{{.ConfigPath}}</code>
-      <div class="hint ops-caps-note">上限<strong>已強制執行</strong>於開單路徑(autotrade.CheckCaps)。左側數字由 <code>autotrade.BuildBook</code> 計算 —— 跟閘門用的是同一個函式,不會各算一套。日虧熔斷於 00:00 UTC 自動重新武裝。
-      強平守衛:停損距離必須在強平距離的 {{printf "%.0f" .LiqStopPct}}% 以內,否則{{if gt .RiskPct 0.0}}降槓桿{{else}}擋單{{end}}。
-      其他生效守衛:每規則每根去重 · macro+earnings blackout · 一倉一規則 · 停損後冷卻 {{.Cooldown}} 根{{if not .CooldownUniform}}(各規則不一致,取最大值){{end}}。
-      {{if gt .BookUnscored 0}}<br><span class="ops-caps-warn">⚠ {{.BookUnscored}} 筆無法評分的 fire 被保守計為「持倉中」(fail-safe,寧可擋單也不超限)</span>{{end}}</div>
-    </p>
-  </div>
+    {{if .Paper}}<div class="ui-callout">{{t "at.paperNote"}}</div>{{end}}
+    <div class="ui-statrow" style="margin-top:var(--sp-3)">
+      <div><span class="ui-dim ui-sm">{{t "at.cap.conc"}}</span><b class="ui-num">{{.Book.OpenCount}} / {{.MaxConc}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.cap.margin"}}</span><b class="ui-num">{{printf "%.0f" .Book.OpenMargin}} / {{printf "%.0f" .MaxMargin}}u</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.cap.today"}}</span><b class="ui-num">{{printf "%+.2f" .Book.RealizedRToday}} / {{printf "%.1f" .DailyHaltR}}R</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.cap.sameSide"}}</span><b class="ui-num">{{if .MaxSameSide}}{{.MaxSameSide}}{{else}}<span class="ui-dim">{{t "at.unset"}}</span>{{end}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.cap.risk"}}</span><b class="ui-num">{{if gt .RiskPct 0.0}}{{printf "%.2f" .RiskPct}}%{{else}}<span class="ui-dim">{{t "at.fixedMargin"}}</span>{{end}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.cooldown"}}</span><b class="ui-num">{{.Cooldown}} {{t "unit.barsShort"}}</b></div>
+    </div>
+    {{if gt .BookUnscored 0}}<div class="ui-callout bad">{{printf (t "at.unscored") .BookUnscored}}</div>{{end}}
+    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary>
+      <p>{{t "at.howto.live"}} {{if .LiveArmed}}<b class="ui-down">{{t "at.armedNow"}}</b>{{else}}<b class="ui-up">{{t "at.notArmedNow"}}</b>{{end}}</p>
+      <p>{{printf (t "at.howto.caps") .LiqStopPct}} {{if gt .RiskPct 0.0}}{{t "at.howto.capsRisk"}}{{else}}{{t "at.howto.capsFixed"}}{{end}}{{if not .CooldownUniform}} {{t "at.howto.cooldownMixed"}}{{end}}</p>
+      <p>{{t "at.config"}} <code class="ui-id">{{.ConfigPath}}</code></p>
+    </details>
+  </section>
 
-  <div class="stats-card">
-    <h2 class="section-title">Rules</h2>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "settings"}}{{t "at.rules"}} <span class="ui-count">{{len .Rules}}</span></h2></header>
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>symbol</th><th>strategy</th><th>tf</th><th>side</th><th>margin</th><th>{{if gt .RiskPct 0.0}}lev 上限{{else}}lev{{end}}</th><th>stop%</th><th>on</th></tr></thead>
+      <thead><tr><th>{{t "th.symbol"}}</th><th>{{t "setups.strategy"}}</th><th>{{t "at.tf"}}</th><th>{{t "th.side"}}</th><th class="num">{{t "at.margin"}}</th><th class="num">{{if gt .RiskPct 0.0}}{{t "at.levCap"}}{{else}}{{t "at.lev"}}{{end}}</th><th class="num">{{t "at.stopPct"}}</th><th>{{t "at.enabled"}}</th></tr></thead>
       <tbody>
         {{range .Rules}}
-        <tr>
-          <td><strong>{{.Symbol}}</strong></td><td>{{.Strategy}}</td><td>{{.TF}}</td><td class="dir-{{.Side}}">{{.Side}}</td>
-          <td class="num">{{if gt $.RiskPct 0.0}}<span class="b-dim" title="risk sizing: margin = 風險 ÷ 停損距離 ÷ 槓桿">依停損</span>{{else}}{{printf "%.0f" .MarginUSDT}}u{{end}}</td><td class="num">{{.Leverage}}x</td><td class="num">{{printf "%.2f" .StopPct}}</td>
-          <td>{{if .Enabled}}✓{{else}}—{{end}}</td>
+        <tr class="{{if not .Enabled}}ui-off{{end}}">
+          <td><span class="ui-sym">{{.Symbol}}</span></td><td><code class="ui-id">{{.Strategy}}</code></td><td class="ui-num">{{.TF}}</td>
+          <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
+          <td class="num">{{if gt $.RiskPct 0.0}}<span class="ui-dim" title="{{t "at.byStopHint"}}">{{t "at.byStop"}}</span>{{else}}{{printf "%.0f" .MarginUSDT}}u{{end}}</td>
+          <td class="num">{{.Leverage}}×</td><td class="num">{{printf "%.2f" .StopPct}}</td>
+          <td>{{if .Enabled}}<span class="ui-up">{{t "common.on"}}</span>{{else}}<span class="ui-dim">{{t "common.off"}}</span>{{end}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
     </div>
-  </div>
+  </section>
 
   {{if .Sum.Total}}
-  <div class="stats-card">
-    <h2 class="section-title">Paper P&amp;L <span class="section-meta">replayed from closed candles</span></h2>
-    <div class="tile-row" id="at-pnl-grid">
-      <div class="tile tile--flat"><span class="tile-label" title="去重後的部位數(一倉一單),不是 autotrade_paper.jsonl 的行數 —— 同一 setup 每根重複觸發算一個部位">positions <span class="cs-dim">一倉一單</span></span><span class="tile-val">{{.Sum.Total}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label">filled</span><span class="tile-val">{{.Sum.Filled}} <span class="cs-dim">({{printf "%.0f" (mulPct .Sum.FillPct)}}%)</span></span></div>
-      <div class="tile tile--flat"><span class="tile-label">pending</span><span class="tile-val">{{.Sum.Pending}} <span class="cs-dim">掛單中</span></span></div>
-      <div class="tile tile--flat"><span class="tile-label">no-fill</span><span class="tile-val">{{.Sum.NoFill}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label">TP / stop</span><span class="tile-val"><span style="color:var(--green)">{{.Sum.TP}}</span> / <span style="color:var(--red)">{{.Sum.Stop}}</span></span></div>
-      <div class="tile tile--flat"><span class="tile-label">open</span><span class="tile-val">{{.Sum.Open}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label">win-rate</span><span class="tile-val">{{printf "%.0f" (mulPct .Sum.WinRate)}}%</span></div>
-      <div class="tile tile--flat"><span class="tile-label">net R <span class="cs-dim">已結算</span></span><span class="tile-val" style="color:{{if ge .Sum.NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .Sum.NetR}}R</span></div>
-      <div class="tile tile--flat"><span class="tile-label">浮動 R <span class="cs-dim">open</span></span><span class="tile-val" style="color:{{if ge .Sum.UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.8">{{printf "%+.2f" .Sum.UnrealR}}R*</span></div>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "wallet"}}{{t "at.pnl"}}</h2><span class="ui-sub">{{t "at.pnlSub"}}</span></header>
+    <div class="ui-statrow" id="at-pnl-grid">
+      <div title="{{t "at.positionsHint"}}"><span class="ui-dim ui-sm">{{t "at.positions"}}</span><b class="ui-num">{{.Sum.Total}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.filled"}}</span><b class="ui-num">{{.Sum.Filled}} <span class="ui-dim ui-sm">{{printf "%.0f" (mulPct .Sum.FillPct)}}%</span></b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.st.pending"}}</span><b class="ui-num">{{.Sum.Pending}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.st.no-fill"}}</span><b class="ui-num">{{.Sum.NoFill}}</b></div>
+      <div><span class="ui-dim ui-sm">TP / {{t "trades.stop"}}</span><b class="ui-num"><span class="ui-up">{{.Sum.TP}}</span> / <span class="ui-down">{{.Sum.Stop}}</span></b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.st.open"}}</span><b class="ui-num">{{.Sum.Open}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "trades.winRate"}}</span><b class="ui-num">{{printf "%.0f" (mulPct .Sum.WinRate)}}%</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.netR"}}</span><b class="ui-num {{if ge .Sum.NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.NetR}}R</b></div>
+      <div title="{{t "at.floatHint"}}"><span class="ui-dim ui-sm">{{t "at.floatR"}}</span><b class="ui-num {{if ge .Sum.UnrealR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.UnrealR}}R</b></div>
     </div>
-    <p class="glossary-hint" style="margin-top:.5rem"><b>pending</b> = 掛價還沒被觸及、6 根內仍在等成交;<b>no-fill</b> = 6 根過了還沒觸及(視為失效);<b>open</b> = 已成交未出場;outcome 先撞先算,同根撞到保守算 stop;<b>net R</b> = 已結算(tp/stop)。歷史 tp/stop 用收盤棒補抓 wick,<b>當前狀態疊加即時 mark 價</b>:現價已穿 tp/stop 即結算,否則 <b>浮動 R*</b> = open 單 mark-to-<b>即時價</b>(同 dashboard 開倉卡)。fill% 只算已定案的(pending 不計)。</p>
-  </div>
-  {{end}}
+    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "at.howto.pnl"}}</p></details>
+  </section>
 
-  {{if .Sum.Total}}
   {{/* Per-cut breakdown. Computed with autotrade.Breakdown over EVERY position
        — a PARTITION, so each table's net R column sums to the book's net R
        above. The Positions table further down is capped at a display depth;
        folding a breakdown off those rendered rows describes only the newest
        slice while reading like it describes the book. */}}
-  <div class="stats-card">
-    <h2 class="section-title">Breakdown <span class="section-meta">全部 {{.Sum.Total}} 筆部位 · 各表 net R 加總 = 上方總計</span></h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:1rem">
-      <div><h3 class="section-title" style="font-size:.85rem;margin:0 0 .35rem">by strategy</h3>{{template "bdTable" .ByStrategy}}</div>
-      <div><h3 class="section-title" style="font-size:.85rem;margin:0 0 .35rem">by side</h3>{{template "bdTable" .BySide}}</div>
-      <div><h3 class="section-title" style="font-size:.85rem;margin:0 0 .35rem">by symbol</h3>{{template "bdTable" .BySymbol}}</div>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "research"}}{{t "at.breakdown"}}</h2><span class="ui-sub">{{printf (t "at.breakdownSub") .Sum.Total}}</span></header>
+    <div class="ui-bd-grid">
+      <div><div class="ui-dim ui-sm ui-bd-h">{{t "at.byStrategy"}}</div>{{template "bdTable" .ByStrategy}}</div>
+      <div><div class="ui-dim ui-sm ui-bd-h">{{t "at.bySide"}}</div>{{template "bdTable" .BySide}}</div>
+      <div><div class="ui-dim ui-sm ui-bd-h">{{t "at.bySymbol"}}</div>{{template "bdTable" .BySymbol}}</div>
     </div>
-    <p class="glossary-hint" style="margin-top:.6rem"><b>n</b> = 該組全部部位(含未結算);<b>勝率</b>和 <b>R/筆</b> 的分母只算已結算的 tp+stop —— open/pending/no-fill 還沒貢獻 R,算進分母會把虧損規則稀釋得比實際溫和。<b style="color:var(--red)">這是事後分組,不是 A/B</b>:各組的 n 小、互相重疊(同一筆同時出現在三張表),不足以單獨用來開關規則 —— 要改閘門得在 fire 生成階段跑 shipgate。</p>
-  </div>
+    <div class="ui-callout">{{t "at.notAB"}}</div>
+    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "at.howto.breakdown"}}</p></details>
+  </section>
   {{end}}
 
   {{if .Equity.HasData}}
@@ -122,70 +123,61 @@
        rather than raw fires: a setup that re-fired every bar is one position,
        and charting the raw log would draw trades that were never taken. */}}
   {{template "perfPanels" .}}
-  <p class="glossary-hint" style="margin:-.4rem 0 1rem">
-    走勢圖用<b>一倉一單</b>後的部位、依<b>出場時間</b>排序（權益是在平倉時才動的）。
-    <b>Calendar 的日界是 UTC+8</b>（本機時區），而<b>斷路器的 todayR 用 UTC 日界</b> —— 兩者「今天」的數字可能不同,那是刻意的:斷路器要跟它自己重置的時點對齊。
-    {{if .StatOpenN}}曲線只含<b>已結算</b>;另有 {{.StatOpenN}} 筆未平倉,浮動 <b>{{printf "%+.2f" .StatOpenR}}R</b> 不在圖上。{{end}}
-    {{if .StatUnscoreable}}<b style="color:var(--red)">⚠ {{.StatUnscoreable}} 筆已結算部位無法回放</b>（K 線視窗已不及其進場時間）,未計入曲線。{{end}}
-  </p>
+  <details class="ui-howto" style="margin-top:calc(var(--sp-2) * -1)"><summary>{{t "at.howto.perfTitle"}}</summary>
+    <p>{{t "at.howto.perf"}}{{if .StatOpenN}} {{printf (t "at.howto.perfOpen") .StatOpenN .StatOpenR}}{{end}}</p>
+    {{if .StatUnscoreable}}<p class="ui-down">{{printf (t "at.howto.perfUnscored") .StatUnscoreable}}</p>{{end}}
+  </details>
   {{end}}
 
-  <div class="stats-card">
-    <h2 class="section-title">Positions <span class="section-meta">一倉一單 · newest first · ＋N = 收合的每小時重複進場</span></h2>
-    <p class="glossary-hint" style="margin:.1rem 0 .6rem">
-      {{if .Since}}
-      <b style="color:var(--yellow)">⏳ 只計 {{.Since}} 之後</b>（{{.FiresRead}} 筆 fire）——
-      <b>本頁每一個數字</b>都跟著這個區間走,不只表格。
-      {{else}}
-      區間：<b>全部</b>（{{.FiresRead}} 筆 fire）。
-      {{end}}
-      分期：
-      <a href="?since=2026-08-28">08-28 起</a> ·
-      <a href="?since=2026-09-02">09-02 起</a> ·
-      <a href="?since=2026-09-04">09-04 起</a> ·
-      <a href="?since=2026-09-23">09-23 起(剪枝後)</a> ·
-      <a href="?">全部</a>
-      <br><span class="cs-dim">日誌從不刪減 —— 這只是讀取時的篩選,換回「全部」就看得到原本的數字。</span>
-      {{if .CapBlocked}}
-      <br><span class="cs-dim">已套用 caps:另有 <b>{{.CapBlocked}}</b> 筆 fire 被上限擋下(同標的同向 / 同時倉數 / 保證金 / 日虧熔斷),
-      不計入任何數字 —— 執行器當下也不會開它們。這是拿<b>今天</b>的 caps 回放整段歷史,不是當時實際跑的設定。
-      {{range $k, $v := .CapReasons}}<br>&nbsp;&nbsp;· {{$k}} × {{$v}}{{end}}</span>
-      {{end}}
-    </p>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "portfolio"}}{{t "at.fires"}}</h2><span class="ui-sub">{{t "at.firesSub"}}</span></header>
+    <div class="ui-sm ui-dim" style="margin-bottom:var(--sp-3)">
+      {{if .Since}}<b class="ui-warn">{{printf (t "at.since") .Since .FiresRead}}</b>{{else}}{{printf (t "at.sinceAll") .FiresRead}}{{end}}
+      · {{t "at.periods"}}
+      <a class="ui-link" href="?since=2026-08-28">08-28</a> ·
+      <a class="ui-link" href="?since=2026-09-02">09-02</a> ·
+      <a class="ui-link" href="?since=2026-09-04">09-04</a> ·
+      <a class="ui-link" href="?since=2026-09-23">09-23 ({{t "at.pruned"}})</a> ·
+      <a class="ui-link" href="?">{{t "common.viewAll"}}</a>
+      {{if .CapBlocked}}<details class="ui-howto" style="margin-top:var(--sp-2)"><summary>{{printf (t "at.capBlocked") .CapBlocked}}</summary>
+        <p>{{t "at.capBlockedNote"}}</p>
+        <p>{{range $k, $v := .CapReasons}}<code class="ui-id">{{$k}}</code> × {{$v}}<br>{{end}}</p>
+      </details>{{end}}
+    </div>
     {{if .Fires}}
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>time</th><th>sym</th><th>tf</th><th>strat</th><th>side</th><th title="validator 結構適合度 /100 (開單當下算,四種策略統一比較)">評分</th><th>entry</th><th>現價</th><th>stop</th><th>tp</th><th>size</th><th>mode</th><th>outcome</th><th>netR</th><th>why</th></tr></thead>
+      <thead><tr><th>{{t "at.time"}}</th><th>{{t "th.symbol"}}</th><th>{{t "setups.strategy"}}</th><th>{{t "th.side"}}</th><th class="num" title="{{t "at.scoreHint"}}">{{t "trades.score"}}</th><th class="num">{{t "th.entry"}}</th><th class="num">{{t "at.now"}}</th><th class="num">{{t "trades.stop"}}</th><th class="num">TP</th><th class="num">{{t "at.size"}}</th><th>{{t "th.result"}}</th><th class="num">R</th><th>{{t "at.why"}}</th></tr></thead>
       <tbody id="at-fires-body">
         {{range .Fires}}
         <tr>
-          <td class="cs-dim">{{.When}}{{if .Absorbed}} <span class="badge b-dim" title="收合了 {{.Absorbed}} 筆同 setup 的每小時重複進場">＋{{.Absorbed}}</span>{{end}}</td><td><strong>{{.Symbol}}</strong></td><td class="cs-dim">{{.TF}}</td>
-          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
-          <td class="dir-{{.Side}}">{{.Side}}</td>
-          <td class="num">{{if .Score}}<span style="color:{{if ge .Score 60.0}}var(--green){{else if lt .Score 40.0}}var(--red){{else}}var(--text){{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-          <td class="num">{{printf "%.4f" .Entry}}</td>
-          <td class="num">{{if .Cur}}<span style="color:{{if .CurUp}}var(--green){{else}}var(--red){{end}}">{{printf "%.4f" .Cur}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-          <td class="num">{{printf "%.4f" .Stop}}</td><td class="num">{{printf "%.4f" .TP}}</td>
-          <td class="num cs-dim">{{printf "%.0f" .Margin}}u×{{.Lev}}</td>
-          <td>{{if .Live}}<span class="badge b-red">LIVE</span>{{else}}<span class="badge b-yellow">paper</span>{{end}}</td>
-          <td><span class="badge {{.StatusClass}}">{{.Status}}</span></td>
-          <td class="num">{{if .Resolved}}<span style="color:{{if ge .NetR 0.0}}var(--green){{else}}var(--red){{end}}">{{printf "%+.2f" .NetR}}</span>{{else if .Open}}<span title="浮動,mark-to 即時價" style="color:{{if ge .UnrealR 0.0}}var(--green){{else}}var(--red){{end}};opacity:.75;font-style:italic">{{printf "%+.2f" .UnrealR}}*</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-          <td class="cs-dim">{{.Why}}</td>
+          <td class="ui-num ui-dim">{{.When}}{{if .Absorbed}} <span class="ui-tag" title="{{printf (t "at.absorbedHint") .Absorbed}}">+{{.Absorbed}}</span>{{end}}</td>
+          <td><span class="ui-sym">{{.Symbol}}</span> <span class="ui-dim ui-sm">{{.TF}}</span></td>
+          <td><code class="ui-id">{{.Strategy}}</code>{{if .Live}} <span class="ui-tag tag-red">LIVE</span>{{end}}</td>
+          <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
+          <td class="num">{{if .Score}}<span class="{{if ge .Score 60.0}}ui-up{{else if lt .Score 40.0}}ui-down{{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="num">{{fmtPx .Entry}}</td>
+          <td class="num">{{if .Cur}}<span class="{{if .CurUp}}ui-up{{else}}ui-down{{end}}">{{fmtPx .Cur}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="num">{{fmtPx .Stop}}</td><td class="num">{{fmtPx .TP}}</td>
+          <td class="num ui-dim">{{printf "%.0f" .Margin}}u × {{.Lev}}</td>
+          <td><span class="ui-so at-{{.Status}}">{{t (printf "at.st.%s" .Status)}}</span></td>
+          <td class="num">{{if .Resolved}}<b class="{{if ge .NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .NetR}}</b>{{else if .Open}}<i class="{{if ge .UnrealR 0.0}}ui-up{{else}}ui-down{{end}}" title="{{t "at.floatHint"}}">{{printf "%+.2f" .UnrealR}}</i>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="ui-dim ui-sm ui-why">{{.Why}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
     </div>
-    <div id="at-pager" class="at-pager" data-size="{{.PageSize}}" hidden>
-      <button type="button" id="at-prev" class="at-pg">‹ 前一頁</button>
-      <span id="at-pglabel" class="cs-dim"></span>
-      <button type="button" id="at-next" class="at-pg">後一頁 ›</button>
+    <div id="at-pager" class="ui-pager" data-size="{{.PageSize}}" hidden>
+      <button type="button" id="at-prev" class="ui-btn ghost" style="margin-top:0">‹</button>
+      <span id="at-pglabel" class="ui-dim ui-sm" style="align-self:center"></span>
+      <button type="button" id="at-next" class="ui-btn ghost" style="margin-top:0">›</button>
     </div>
     {{else}}
-    <p class="empty">還沒有 fire —— 規則在跑,等 symbol 碰到箱邊(底/頂三分)才會進場。全在箱中間時不動。</p>
+    <div class="ui-empty"><div class="ui-dim">{{t "at.noFires"}}</div></div>
     {{end}}
-    <p class="glossary-hint" style="margin-top:.6rem">Updated: <span id="at-updated">{{.UpdatedUTC}}</span> · <span id="at-refresh">每 10s 自動刷新</span> · 浮動 R 用即時 mark 價 · fires 寫入 autotrade_paper.jsonl</p>
-  </div>
+    <div class="ui-sub" style="margin-top:var(--sp-3)">{{t "today.updated"}} <span id="at-updated" class="ui-num">{{.UpdatedUTC}}</span> · <span id="at-refresh">{{t "at.autoRefresh"}}</span></div>
+  </section>
 </main>
 <script>
   // Auto-refresh every 10s so floating R / current price / outcomes stay live.
@@ -220,7 +212,7 @@
       for (var i = 0; i < rows.length; i++) rows[i].hidden = (i < from || i >= to);
       pager.hidden = rows.length <= size;
       var lbl = document.getElementById('at-pglabel');
-      if (lbl) lbl.textContent = (rows.length ? (from + 1) : 0) + '–' + to + ' / ' + rows.length + ' 筆';
+      if (lbl) lbl.textContent = (rows.length ? (from + 1) : 0) + '–' + to + ' / ' + rows.length;
       var prev = document.getElementById('at-prev'), next = document.getElementById('at-next');
       if (prev) prev.disabled = atPage === 0;
       if (next) next.disabled = atPage >= pages - 1;
@@ -261,7 +253,7 @@
       if (document.hidden) { left = PERIOD; return; }
       left -= 1;
       var el = document.getElementById('at-refresh'); // re-query: <main> is swapped each cycle
-      if (el) el.textContent = '每 10s 自動更新(下次 ' + Math.max(left, 0) + 's,捲軸不跳)';
+      if (el) el.textContent = {{t "at.autoRefresh"}} + ' · ' + Math.max(left, 0) + 's';
       if (left <= 0) { left = PERIOD; softRefresh(); }
     }, 1000);
   })();

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/henry190927/trading-bot/autotrade"
 	"github.com/henry190927/trading-bot/journal"
 )
 
@@ -193,7 +194,7 @@ func TestLangCookie(t *testing.T) {
 // every value they can produce.
 func TestDynamicKeysExist(t *testing.T) {
 	dicts, _ := loadDicts(i18nFS)
-	keys := []string{"out.pending", "out.active", "out.win", "out.other", "side.long", "side.short", "side.neutral"}
+	keys := []string{"out.pending", "out.active", "out.win", "out.other", "side.long", "side.short", "side.neutral", "side.auto"} // auto: an autotrade rule that takes either direction
 	for _, o := range journal.CloseOutcomes {
 		keys = append(keys, "out."+o)
 	}
@@ -203,6 +204,15 @@ func TestDynamicKeysExist(t *testing.T) {
 		{Trend: "HH-HL uptrend"}, {Trend: "LH-LL downtrend"}, {},
 	} {
 		keys = append(keys, leanKey(s))
+	}
+	for _, c := range append(knownStrategies, "unknown-future") {
+		keys = append(keys, strategyKey(c))
+	}
+	for _, st := range []autotrade.OutcomeStatus{autotrade.OutPending, autotrade.OutNoFill, autotrade.OutOpen, autotrade.OutTP, autotrade.OutStop} {
+		keys = append(keys, "at.st."+string(st))
+	}
+	for _, o := range []string{"", "win", "loss", "expired", "skip", "no-fill", "weird"} {
+		keys = append(keys, setupOutcomeKey(o))
 	}
 	for _, l := range langs {
 		for _, k := range keys {

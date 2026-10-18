@@ -3090,7 +3090,10 @@ func templateFuncs() template.FuncMap {
 			}
 			return "status-flat"
 		},
-		"outcomeKey": outcomeKey,
+		"outcomeKey":      outcomeKey,
+		"strategyKey":     strategyKey,
+		"setupOutcomeKey": setupOutcomeKey,
+		"leanKey":         leanKey,
 		"outcomeText": func(t journal.Trade) string {
 			if t.IsPending() {
 				return "pending"

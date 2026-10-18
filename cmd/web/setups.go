@@ -560,3 +560,26 @@ func (s *server) handleSetupsList(c *gin.Context) {
 		"Regime": regimeRollup(all),
 	})
 }
+
+// knownStrategies are the Setup.Strategy codes with a dictionary entry
+// (strat.<code>). A code outside it renders as strat.other rather than as a
+// missing key.
+var knownStrategies = []string{"mr", "struct-momentum", "sweep-reject", "struct-reclaim", "range-edge"}
+
+func strategyKey(code string) string {
+	for _, k := range knownStrategies {
+		if code == k {
+			return "strat." + k
+		}
+	}
+	return "strat.other"
+}
+
+// setupOutcomeKey names a setup outcome ("" = still open) as a dictionary key.
+func setupOutcomeKey(o string) string {
+	switch o {
+	case "win", "loss", "expired", "skip", "no-fill":
+		return "so." + o
+	}
+	return "so.open"
+}

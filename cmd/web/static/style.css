@@ -6867,3 +6867,32 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ui-page .r-pos { color: var(--green); }
 .ui-page .r-neg { color: var(--red); }
 .ui-page .r-zero { color: var(--text); }
+/* "How to read this": the long explanations that used to sit open under
+   every card, folded away until asked for. */
+.ui-howto { margin-top: var(--sp-3); font-size: var(--fs-sm); color: var(--text-dim); }
+.ui-howto summary { cursor: pointer; width: max-content; }
+.ui-howto p { margin: var(--sp-2) 0 0; max-width: 860px; line-height: 1.65; }
+.ui-so { font-size: var(--fs-sm); font-weight: 600; }
+.ui-so.so-win { color: var(--green); } .ui-so.so-loss { color: var(--red); }
+.ui-so.so-open { color: var(--blue); } .ui-so.so-expired, .ui-so.so-skip, .ui-so.so-no-fill { color: var(--text-dim); font-weight: 500; }
+.ui-btn.ui-danger { color: var(--red); }
+.ui-detail-actions form { margin: 0; }
+/* A table that is not the last thing in its card keeps its own bottom. */
+.ui-card > .dt-scroll:not(:last-child) { margin-bottom: 0; border-bottom: 1px solid var(--border); }
+/* Auto-trade page */
+.ui-callout { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--yellow); background: var(--yellow-bg); border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: var(--fs-sm); line-height: 1.6; max-width: 980px; }
+.ui-callout.bad { border-left-color: var(--red); background: var(--red-bg); }
+.ui-tag.tag-blue { color: var(--blue); border-color: rgba(var(--blue-rgb), .4); }
+.ui-tag.tag-yellow { color: var(--yellow); border-color: rgba(var(--yellow-rgb), .45); }
+.ui-tag.tag-red { color: var(--red); border-color: rgba(var(--red-rgb), .45); }
+.ui-tag.tag-green { color: var(--green); border-color: rgba(var(--green-rgb), .45); }
+.ui-id { font-family: var(--mono); font-size: var(--fs-sm); }
+.ui-off td { opacity: .5; }
+.ui-warn { color: var(--yellow); }
+.ui-bd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--sp-4); }
+.ui-bd-h { margin-bottom: var(--sp-2); }
+.ui-bd-grid .dt-scroll { border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ui-why { white-space: normal !important; min-width: 220px; max-width: 360px; }
+.ui-so.at-tp { color: var(--green); } .ui-so.at-stop { color: var(--red); } .ui-so.at-open { color: var(--yellow); } .ui-so.at-pending { color: var(--blue); } .ui-so.at-no-fill { color: var(--text-dim); font-weight: 500; }
+.ui-pager .ui-btn { min-width: 40px; justify-content: center; }
+.ui-side.auto { background: var(--wash-blue); color: var(--blue); }

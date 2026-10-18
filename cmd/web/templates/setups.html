@@ -5,130 +5,129 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>setups · trading-web</title>
+<title>{{t "tab.setups"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
-<script src="/static/tablekit.js" defer></script>
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<main>
-  <div class="stats-card">
-    <h2>N字 setup forward-log
-      <button type="button" id="setups-refresh" class="ai-analyze-btn" style="margin-left:.6rem" data-i18n="setups.refill">↻ 回填 outcome</button>
-    </h2>
-    <div class="tile-row">
-      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.total">Total</span><span class="tile-val">{{.Stats.Total}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.open">Open</span><span class="tile-val">{{.Stats.Open}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.win">Win ✓</span><span class="tile-val r-pos">{{.Stats.Win}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.loss">Loss ✗</span><span class="tile-val r-neg">{{.Stats.Loss}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.expired">Expired</span><span class="tile-val r-zero">{{.Stats.Expired}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.skip">Skip</span><span class="tile-val r-zero">{{.Stats.Skip}}</span></div>
-      <div class="tile tile--flat"><span class="tile-label" data-i18n="setups.hitrate">Hit-rate</span><span class="tile-val">{{printf "%.0f" .Stats.HitRate}}%</span></div>
-      <div class="tile tile--flat"><span class="tile-label">Real hit-rate</span><span class="tile-val {{if lt .Stats.RealHitRate .Stats.HitRate}}r-neg{{else}}r-pos{{end}}">{{printf "%.0f" .Stats.RealHitRate}}%</span></div>
-      <div class="tile tile--flat"><span class="tile-label">no-fill</span><span class="tile-val r-zero">{{.Stats.RealNoFill}}</span></div>
+<main class="ui-page">
+  <section class="ui-card">
+    <header class="ui-card-h">
+      <h2>{{template "icon" "flag"}}{{t "setups.title"}} <span class="ui-count">{{.Stats.Total}}</span></h2>
+      <button type="button" id="setups-refresh" class="ui-btn ghost" style="margin-top:0">{{t "setups.refresh"}}</button>
+    </header>
+    <div class="ui-statrow">
+      <div><span class="ui-dim ui-sm">{{t "so.open"}}</span><b class="ui-num">{{.Stats.Open}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "so.win"}}</span><b class="ui-num r-pos">{{.Stats.Win}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "so.loss"}}</span><b class="ui-num r-neg">{{.Stats.Loss}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "so.expired"}}</span><b class="ui-num">{{.Stats.Expired}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "so.skip"}}</span><b class="ui-num">{{.Stats.Skip}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "so.no-fill"}}</span><b class="ui-num">{{.Stats.RealNoFill}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "setups.hitRate"}}</span><b class="ui-num">{{printf "%.0f" .Stats.HitRate}}%</b></div>
+      <div><span class="ui-dim ui-sm">{{t "setups.realHitRate"}}</span><b class="ui-num {{if lt .Stats.RealHitRate .Stats.HitRate}}r-neg{{else}}r-pos{{end}}">{{printf "%.0f" .Stats.RealHitRate}}%</b></div>
     </div>
-    <p class="glossary-hint">
-      <b>Hit-rate</b>(收盤判定)= 讀盤方向對不對:Win = 收破 target;Loss = 收破 stop;Expired = 20 根未觸;Skip = 你決定不進。
-      <b>Real hit-rate</b>(盤中 first-touch + fill 判定)= 真照這 entry/stop 交易會不會賺:看 stop / target 誰先被 wick 觸及、entry 有沒有填(no-fill = 沒填到)。
-      <b>兩者落差 = 執行/停損品質</b> —— Real 明顯低於 Hit-rate = 讀盤對但停損常被先掃(停太緊 / entry 時機差)。都記,避免倖存者偏差。
-    </p>
-  </div>
+    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "setups.howto"}}</p></details>
+  </section>
 
-  <div class="stats-card">
-    <h2 data-i18n="setups.slice">Engine × Regime 命中率切片</h2>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "research"}}{{t "setups.regime"}}</h2></header>
     <div class="dt-scroll">
-    <table class="dt dt--matrix">
-      <thead>
-        <tr><th>engine ＼ regime</th><th data-i18n="setups.r_neutral">neutral 拉鋸</th><th data-i18n="setups.r_trend">趨勢 (HH-HL / LH-LL)</th></tr>
-      </thead>
+    <table class="dt">
+      <thead><tr><th>{{t "setups.engine"}}</th><th>{{t "setups.r.neutral"}}</th><th>{{t "setups.r.trend"}}</th></tr></thead>
       <tbody>
-        <tr><td>✅ 同意<span class="cs-dim"> (engine=方向)</span></td>
-          <td>{{with index $.Regime "agree" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
-          <td>{{with index $.Regime "agree" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
-        </tr>
-        <tr><td>⚔️ 衝突<span class="cs-dim"> (engine 相反)</span></td>
-          <td>{{with index $.Regime "against" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
-          <td>{{with index $.Regime "against" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
-        </tr>
-        <tr><td>➖ 中性<span class="cs-dim"> (engine FLAT)</span></td>
-          <td>{{with index $.Regime "flat" "neutral"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
-          <td>{{with index $.Regime "flat" "trend"}}{{if .N}}<span class="{{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</span> <span class="cs-dim">({{.Win}}W/{{.Loss}}L)</span>{{else}}<span class="cs-dim">—</span>{{end}}{{end}}</td>
-        </tr>
+        <tr><td>{{t "setups.eng.agree"}}</td><td>{{with index $.Regime "agree" "neutral"}}{{if .N}}<b class="ui-num {{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</b> <span class="ui-dim ui-sm">{{.Win}}W / {{.Loss}}L</span>{{else}}<span class="ui-dim">—</span>{{end}}{{end}}</td><td>{{with index $.Regime "agree" "trend"}}{{if .N}}<b class="ui-num {{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</b> <span class="ui-dim ui-sm">{{.Win}}W / {{.Loss}}L</span>{{else}}<span class="ui-dim">—</span>{{end}}{{end}}</td></tr>
+        <tr><td>{{t "setups.eng.against"}}</td><td>{{with index $.Regime "against" "neutral"}}{{if .N}}<b class="ui-num {{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</b> <span class="ui-dim ui-sm">{{.Win}}W / {{.Loss}}L</span>{{else}}<span class="ui-dim">—</span>{{end}}{{end}}</td><td>{{with index $.Regime "against" "trend"}}{{if .N}}<b class="ui-num {{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</b> <span class="ui-dim ui-sm">{{.Win}}W / {{.Loss}}L</span>{{else}}<span class="ui-dim">—</span>{{end}}{{end}}</td></tr>
+        <tr><td>{{t "setups.eng.flat"}}</td><td>{{with index $.Regime "flat" "neutral"}}{{if .N}}<b class="ui-num {{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</b> <span class="ui-dim ui-sm">{{.Win}}W / {{.Loss}}L</span>{{else}}<span class="ui-dim">—</span>{{end}}{{end}}</td><td>{{with index $.Regime "flat" "trend"}}{{if .N}}<b class="ui-num {{if ge .HitRate 50.0}}r-pos{{else}}r-neg{{end}}">{{printf "%.0f" .HitRate}}%</b> <span class="ui-dim ui-sm">{{.Win}}W / {{.Loss}}L</span>{{else}}<span class="ui-dim">—</span>{{end}}{{end}}</td></tr>
       </tbody>
     </table>
     </div>
-    <p class="glossary-hint">
-      命中率 = Win ÷ (Win+Loss),只計已定案。<b>用法</b>:<b>衝突 + neutral</b> 命中低 → 聽 engine、別追 N struct;<b>衝突 + 趨勢</b> → N struct 可能對(engine 滯後);<b>同意</b> → 最高信心。樣本要夠才可信。
-    </p>
-  </div>
+    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "setups.regimeHowto"}}</p></details>
+  </section>
 
-  {{if .Setups}}
-  <div class="dt-scroll">
-    <table class="dt" data-tablekit data-page="50">
-      <thead>
-        <tr>
-          <th>#</th><th>time</th><th>sym/tf</th><th>dir</th><th>lean</th><th>trend</th>
-          <th>event</th><th class="num">entry</th><th class="num">stop</th><th class="num">target</th><th class="num">BOS</th><th class="num">prot</th>
-          <th>engine</th><th title="active strategy for this symbol/TF + whether it actually fired at record time. SM ✓ = valid StructMomentum data point; SM — = regime sat out (not an SM sample)">strat</th><th>開單</th><th class="cs-dim" title="收盤價判定(嚴格·參考):20 根內收盤沒穿 tp/stop 就記 expired — 常見,別被灰色嚇到,以 real 為準">outcome<br><span style="font-size:.8em;font-weight:400">收盤·參考</span></th><th title="盤中 first-touch + fill:真實掛單會止盈還止損 — 這欄才對得上手動回填">real<br><span style="font-size:.8em;font-weight:400">實戰·主判定</span></th><th></th>
-        </tr>
-      </thead>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "portfolio"}}{{t "setups.list"}}</h2><span class="ui-sub">{{t "trades.expandHint"}}</span></header>
+    {{if .Setups}}
+    <div class="dt-scroll">
+    <table class="dt ui-trades">
+      <thead><tr>
+        <th></th><th>{{t "setups.recorded"}}</th><th>{{t "th.symbol"}}</th><th>{{t "th.side"}}</th><th>{{t "setups.lean"}}</th><th>{{t "setups.strategy"}}</th>
+        <th class="num">{{t "th.entry"}}</th><th>{{t "setups.real"}}</th><th></th>
+      </tr></thead>
       <tbody>
-        {{range .Setups}}
-        <tr>
-          <td>{{.ID}}</td>
-          <td class="cs-dim">{{.RecordedAt.Format "01-02 15:04"}}</td>
-          <td><b>{{.Symbol}}</b> {{.TF}}</td>
-          <td class="dir-{{.Dir}}">{{.Dir}}</td>
-          <td>{{.Lean}}{{if .Forming}} ⏳{{end}}</td>
-          <td class="cs-dim">{{.Trend}}</td>
-          <td>{{if .Event}}{{.Event}}{{else}}—{{end}}</td>
-          <td class="num">{{if .Entry}}{{printf "%.3f" .Entry}}{{else}}—{{end}}</td>
-          <td class="num">{{if .Stop}}{{printf "%.3f" .Stop}}{{else}}—{{end}}</td>
-          <td class="num">{{if .Target}}{{printf "%.3f" .Target}}{{else}}—{{end}}</td>
-          <td class="num">{{if .BOSLevel}}{{printf "%.3f" .BOSLevel}}{{else}}—{{end}}</td>
-          <td class="num">{{if .Protected}}{{printf "%.3f" .Protected}}{{else}}—{{end}}</td>
-          <td class="cs-dim">{{.EngineSide}} {{.EngineScore}}</td>
-          <td>
-            {{if eq .Strategy "struct-momentum"}}
-              <span class="badge oc-{{if .StratFire}}win{{else}}skip{{end}}" title="StructMomentum {{if .StratFire}}fired ({{.StratSide}}) — valid SM data point{{else}}did NOT fire (regime sat out / not in-zone) — NOT an SM data point{{end}}">SM{{if .StratFire}} ✓{{else}} —{{end}}</span>
-            {{else if eq .Strategy "mr"}}
-              <span class="cs-dim" title="mean-reversion engine{{if .StratFire}} fired ({{.StratSide}}){{end}}">MR{{if .StratFire}} ✓{{end}}</span>
-            {{else}}<span class="cs-dim">—</span>{{end}}
-          </td>
-          <td>{{if .Opened}}✓{{else}}—{{end}}</td>
-          <td style="opacity:.4"><span class="badge oc-{{if .Outcome}}{{.Outcome}}{{else}}open{{end}}" style="font-size:.85em">{{if .Outcome}}{{.Outcome}}{{if .Bars}} · {{.Bars}}b{{end}}{{else}}open{{end}}</span></td>
-          <td>{{if .RealOutcome}}<span class="badge oc-{{.RealOutcome}}"><b>{{.RealOutcome}}</b>{{if .RealBars}} · {{.RealBars}}b{{end}}</span>{{if and .Outcome (ne .Outcome .RealOutcome)}} <span class="oc-gap" title="outcome≠real:讀盤對但執行會不同">⚠</span>{{end}}{{else}}<span class="cs-dim">—</span>{{end}}</td>
-          <td class="setup-actions">
-            {{if not .Outcome}}<form method="post" action="/setups/{{.ID}}/skip"><button class="setup-skip" title="標記不進 skip">skip</button></form>{{end}}
-            <form method="post" action="/setups/{{.ID}}/delete" onsubmit="return confirm('刪除 setup #{{.ID}}?')"><button class="setup-del" title="delete">✕</button></form>
-          </td>
+      {{range .Setups}}
+        <tr class="ui-trow" data-row="{{.ID}}" tabindex="0" aria-expanded="false">
+          <td class="ui-num ui-dim">#{{.ID}}</td>
+          <td class="ui-num ui-dim">{{.RecordedAt.Local.Format "01-02 15:04"}}</td>
+          <td><span class="ui-sym">{{.Symbol}}</span> <span class="ui-dim ui-sm">{{.TF}}</span></td>
+          <td><span class="ui-side {{.Dir}}">{{t (printf "side.%s" .Dir)}}</span></td>
+          <td class="ui-sm">{{t (leanKey .)}}{{if .Forming}} <span class="ui-dim" title="{{t "setups.formingHint"}}">· {{t "setups.forming"}}</span>{{end}}</td>
+          <td class="ui-sm">{{if .Strategy}}{{t (strategyKey .Strategy)}}{{if .StratFire}} <span class="ui-up" title="{{t "setups.firedHint"}}">✓</span>{{end}}{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="num">{{if .Entry}}{{fmtPx .Entry}}{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td><span class="ui-so so-{{if .RealOutcome}}{{.RealOutcome}}{{else}}open{{end}}">{{t (setupOutcomeKey .RealOutcome)}}{{if .RealBars}} · {{.RealBars}}{{t "unit.bars"}}{{end}}</span>{{if and .Outcome .RealOutcome (ne .Outcome .RealOutcome)}} <span class="ui-dim" title="{{t "setups.gapHint"}}">≠</span>{{end}}</td>
+          <td class="ui-chev" aria-hidden="true">›</td>
         </tr>
-        {{end}}
+        <tr class="ui-tdetail" data-detail="{{.ID}}" hidden><td colspan="9">
+          <div class="ui-detail">
+            <div class="ui-statrow">
+              <div><span class="ui-dim ui-sm">{{t "trades.stop"}}</span><b class="ui-num">{{if .Stop}}{{fmtPx .Stop}}{{else}}—{{end}}</b></div>
+              <div><span class="ui-dim ui-sm">{{t "setups.target"}}</span><b class="ui-num">{{if .Target}}{{fmtPx .Target}}{{else}}—{{end}}</b></div>
+              <div><span class="ui-dim ui-sm">BOS</span><b class="ui-num">{{if .BOSLevel}}{{fmtPx .BOSLevel}}{{else}}—{{end}}</b></div>
+              <div><span class="ui-dim ui-sm">{{t "setups.protected"}}</span><b class="ui-num">{{if .Protected}}{{fmtPx .Protected}}{{else}}—{{end}}</b></div>
+              <div><span class="ui-dim ui-sm">{{t "setups.engineAt"}}</span><b class="ui-num">{{if .EngineSide}}{{.EngineSide}} {{.EngineScore}}{{else}}—{{end}}</b></div>
+              <div><span class="ui-dim ui-sm">{{t "setups.closeOutcome"}}</span><b>{{t (setupOutcomeKey .Outcome)}}{{if .Bars}} · {{.Bars}}{{t "unit.bars"}}{{end}}</b></div>
+              <div><span class="ui-dim ui-sm">{{t "setups.opened"}}</span><b>{{if .Opened}}{{t "common.yes"}}{{else}}{{t "common.no"}}{{end}}</b></div>
+            </div>
+            {{if .Event}}<div class="ui-sm"><span class="ui-dim">{{t "setups.event"}}</span> <span class="ui-num">{{.Event}}</span>{{if .Trend}} · <span class="ui-dim">{{t "setups.trend"}}</span> <span class="ui-num">{{.Trend}}</span>{{end}}</div>{{end}}
+            {{if .Note}}<div class="ui-note">{{.Note}}</div>{{end}}
+            <div class="ui-detail-actions">
+              {{if not .Outcome}}<form method="post" action="/setups/{{.ID}}/skip"><button class="ui-btn ghost" style="margin-top:0">{{t "setups.skip"}}</button></form>{{end}}
+              <form method="post" action="/setups/{{.ID}}/delete" data-confirm="{{t "setups.deleteConfirm"}} #{{.ID}}"><button class="ui-btn ghost ui-danger" style="margin-top:0">{{t "common.delete"}}</button></form>
+            </div>
+          </div>
+        </td></tr>
+      {{end}}
       </tbody>
     </table>
-  </div>
-  {{else}}
-  <div class="empty">還沒有記錄的 setup。到 <a href="/chart">/chart</a> 開 <b>N字 struct</b> 層,用面板的「⚑ 記 setup」記一筆。</div>
-  {{end}}
+    </div>
+    {{else}}
+    <div class="ui-empty"><div class="ui-dim">{{t "setups.none"}}</div><a class="ui-btn" href="/chart">{{t "tab.chart"}}</a></div>
+    {{end}}
+  </section>
 </main>
 
-<footer>N字 structure setup forward-log · single-user</footer>
-
 <script>
-  document.getElementById('setups-refresh').addEventListener('click', function () {
-    var b = this; b.disabled = true; b.textContent = '回填中…';
+(function () {
+  document.querySelectorAll('.ui-trow').forEach(function (tr) {
+    function toggle() {
+      var d = document.querySelector('[data-detail="' + tr.dataset.row + '"]');
+      if (!d) return;
+      d.hidden = !d.hidden;
+      tr.classList.toggle('open', !d.hidden);
+      tr.setAttribute('aria-expanded', d.hidden ? 'false' : 'true');
+    }
+    tr.addEventListener('click', function (e) { if (!e.target.closest('a,button,form')) toggle(); });
+    tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+  document.querySelectorAll('form[data-confirm]').forEach(function (f) {
+    f.addEventListener('submit', function (e) { if (!confirm(f.dataset.confirm + '?')) e.preventDefault(); });
+  });
+  var b = document.getElementById('setups-refresh');
+  var label = b.textContent;
+  b.addEventListener('click', function () {
+    b.disabled = true; b.textContent = {{t "setups.refreshing"}};
     fetch('/api/setups/refresh', { method: 'POST' })
       .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
-      .then(function (d) { if (window.toast) window.toast('outcome 回填完成', 'ok'); location.reload(); })
+      .then(function () { if (window.toast) window.toast({{t "setups.refreshed"}}, 'ok'); location.reload(); })
       .catch(function (e) {
-        b.disabled = false; b.textContent = '↻ 回填 outcome';
-        if (window.toast) window.toast('回填失敗:' + (e && e.message ? e.message : 'error'), 'err');
+        b.disabled = false; b.textContent = label;
+        if (window.toast) window.toast({{t "setups.refreshFailed"}} + ' ' + (e && e.message ? e.message : ''), 'err');
       });
   });
+})();
 </script>
 </body>
 </html>
