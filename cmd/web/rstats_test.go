@@ -189,6 +189,15 @@ func labels(bs []rBucket) []string {
 
 func TestBuildDailyCalendarFromPositions(t *testing.T) {
 	rts, _ := rTradesFromPositions(todaysPositions())
+	// buildDailyCalendar windows on time.Now(), and the fixture is pinned to
+	// 2026-09-02, so the test started counting 0 once that date was more than
+	// 42 days old (it failed on 2026-10-18). Slide the fixture to end
+	// yesterday, keeping each trade's offset from the others: the assertions
+	// below are about the grid's shape and totals, not the calendar date.
+	shift := time.Now().AddDate(0, 0, -1).Sub(d(2, 10))
+	for i := range rts {
+		rts[i].Closed = rts[i].Closed.Add(shift)
+	}
 	grid := buildDailyCalendar(rts, 42)
 	if len(grid) == 0 {
 		t.Fatal("want a grid")
