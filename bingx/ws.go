@@ -196,16 +196,23 @@ func (s *Stream) SubscribeMarkPrices(ctx context.Context, syms []market.Symbol, 
 		}
 	}()
 
+	// After a cancel the watchdog has closed the socket, so whatever this loop
+	// trips over next — the deadline, the read, the pong — is a consequence of
+	// the cancel. Report the cancel, not the socket error it caused.
+	fail := func(err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return err
+	}
+
 	for {
 		if err := c.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-			return err
+			return fail(err)
 		}
 		_, raw, err := c.ReadMessage()
 		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return fmt.Errorf("read: %w", err)
+			return fail(fmt.Errorf("read: %w", err))
 		}
 		isPing, mp, derr := DecodeMarkFrame(raw)
 		if derr != nil {
@@ -215,7 +222,7 @@ func (s *Stream) SubscribeMarkPrices(ctx context.Context, syms []market.Symbol, 
 		}
 		if isPing {
 			if err := c.WriteMessage(websocket.TextMessage, []byte("Pong")); err != nil {
-				return fmt.Errorf("pong: %w", err)
+				return fail(fmt.Errorf("pong: %w", err))
 			}
 			continue
 		}
