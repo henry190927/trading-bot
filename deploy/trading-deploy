@@ -94,7 +94,8 @@ dc "$COMPOSE" pull || rollback
 dc "$COMPOSE" up -d --remove-orphans || rollback
 
 # ── 4. verify ────────────────────────────────────────────────────────────
-bind="$(grep -E '^WEB_BIND=' "$ENVF" | cut -d= -f2-)"
+bind="$(grep -E '^WEB_BIND=' "$ENVF" | cut -d= -f2- || true)"
+[ -n "$bind" ] || { say "WEB_BIND missing from $ENVF — cannot check the web"; rollback; }
 web_ok=0; mon_ok=0
 for _ in $(seq 1 30); do
     sleep 2

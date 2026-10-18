@@ -31,9 +31,12 @@ svc() {
 
 cmd_status() {
     local tag bind
-    tag="$(grep -E '^TAG=' "$ENVF" 2>/dev/null | cut -d= -f2-)"
-    bind="$(grep -E '^WEB_BIND=' "$ENVF" 2>/dev/null | cut -d= -f2-)"
-    printf '%-16s %s\n' "deployed" "${tag:0:12}${tag:+  https://github.com/henry190927/trading-bot/commit/$tag}"
+    # `|| true`: under set -e a grep that finds nothing would end the script
+    # right here, silently — and before the first container deploy there is no
+    # TAG yet.
+    tag="$(grep -E '^TAG=' "$ENVF" 2>/dev/null | cut -d= -f2- || true)"
+    bind="$(grep -E '^WEB_BIND=' "$ENVF" 2>/dev/null | cut -d= -f2- || true)"
+    printf '%-16s %s\n' "deployed" "${tag:+${tag:0:12}  https://github.com/henry190927/trading-bot/commit/$tag}${tag:-(no TAG yet — not running from a container deploy)}"
     if [ -n "$bind" ] && curl -fsS --max-time 3 "http://$bind/health" >/dev/null 2>&1; then
         printf '%-16s %s\n' "trading-web" "/health 200"
     else
