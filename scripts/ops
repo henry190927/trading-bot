@@ -5,31 +5,43 @@
 # restarts units or streams raw logs: the web service should not hold host
 # privileges, and SSH (Tailscale + key + passphrase) is the stronger door.
 #
-# The interface is meant to outlive the implementation. Today it wraps
-# systemd; when the services move into containers only the bodies below
-# change, and `ops restart monitor` keeps meaning the same thing.
+# The interface outlives the implementation. It wrapped systemd first; the
+# services now run as containers (deploy/compose.yaml) and only the function
+# bodies changed — `ops restart monitor` still means the same thing.
 #
-#   ops status                 unit state + monitor heartbeat summary
-#   ops restart monitor|web    restart a service (asks for the sudo password)
+#   ops status                 deployed commit, web /health, monitor heartbeat
+#   ops restart monitor|web    restart a container (asks for the sudo password)
 #   ops logs monitor|web [-f] [N]
-#                              last N journal lines (default 50), -f to follow
+#                              last N log lines (default 50), -f to follow
 #   ops zone [N]               last N zone-alert events (default 20)
 set -euo pipefail
 
 DATA="${TRADING_DATA:-/opt/trading}"
+COMPOSE="$DATA/compose.yaml"
+ENVF="$DATA/deploy.env"
 
-unit() {
+# svc validates the name; the compose service is `monitor` / `web` and its
+# journald tag (compose.yaml logging.options.tag) is `trading-<svc>`.
+svc() {
     case "${1:-}" in
-        monitor) echo trading-monitor ;;
-        web) echo trading-web ;;
+        monitor|web) echo "$1" ;;
         *) echo "unknown service '${1:-}' (monitor|web)" >&2; exit 2 ;;
     esac
 }
 
 cmd_status() {
-    for u in trading-monitor trading-web; do
-        printf '%-16s %s\n' "$u" "$(systemctl is-active "$u" || true)"
-    done
+    local tag bind
+    # `|| true`: under set -e a grep that finds nothing would end the script
+    # right here, silently — and before the first container deploy there is no
+    # TAG yet.
+    tag="$(grep -E '^TAG=' "$ENVF" 2>/dev/null | cut -d= -f2- || true)"
+    bind="$(grep -E '^WEB_BIND=' "$ENVF" 2>/dev/null | cut -d= -f2- || true)"
+    printf '%-16s %s\n' "deployed" "${tag:+${tag:0:12}  https://github.com/henry190927/trading-bot/commit/$tag}${tag:-(no TAG yet — not running from a container deploy)}"
+    if [ -n "$bind" ] && curl -fsS --max-time 3 "http://$bind/health" >/dev/null 2>&1; then
+        printf '%-16s %s\n' "trading-web" "/health 200"
+    else
+        printf '%-16s %s\n' "trading-web" "NOT answering /health on ${bind:-<no WEB_BIND>}"
+    fi
     echo
     python3 - "$DATA/monitor-heartbeat.json" <<'EOF'
 import json, re, sys, datetime
@@ -60,16 +72,15 @@ EOF
 }
 
 cmd_restart() {
-    local u
-    u="$(unit "${1:-}")"
-    sudo systemctl restart "$u"
-    sleep 1
-    printf '%-16s %s\n' "$u" "$(systemctl is-active "$u" || true)"
+    local s
+    s="$(svc "${1:-}")"
+    sudo docker compose --env-file "$ENVF" -f "$COMPOSE" restart "$s"
+    sudo docker compose --env-file "$ENVF" -f "$COMPOSE" ps "$s"
 }
 
 cmd_logs() {
-    local u n=50 follow=()
-    u="$(unit "${1:-}")"
+    local s n=50 follow=()
+    s="$(svc "${1:-}")"
     shift || true
     for a in "$@"; do
         case "$a" in
@@ -78,7 +89,8 @@ cmd_logs() {
             *) n="$a" ;;
         esac
     done
-    journalctl -u "$u" -n "$n" --no-pager "${follow[@]}"
+    # journald logging driver: readable by the adm group, so no sudo needed.
+    journalctl -t "trading-$s" -n "$n" --no-pager "${follow[@]}"
 }
 
 cmd_zone() {

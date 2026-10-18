@@ -1,0 +1,63 @@
+# The production stack on the VPS. Deployed by .github/workflows/deploy.yml
+# through scripts/trading-deploy; operated with `ops`. See docs/operations.md.
+#
+# Two env files, on purpose:
+#   /opt/trading/.env        secrets only (exchange + AI keys, ntfy topic);
+#                            handed to the containers at runtime, never baked
+#                            into an image, never written by any process
+#   /opt/trading/deploy.env  host settings that are not secret: TAG (which
+#                            image to run, rewritten by every deploy) and
+#                            WEB_BIND (the Tailscale address)
+#
+#   docker compose --env-file /opt/trading/deploy.env -f compose.yaml up -d
+name: trading
+
+x-service: &service
+  # Host networking keeps today's behaviour exactly: the web binds the
+  # Tailscale IP, the monitor reaches the exchange, nothing is NATed.
+  network_mode: host
+  # The owner of /opt/trading on the VPS (ubuntu). The image defaults to
+  # nobody; running as the data's owner means no chown on the data files.
+  user: "1001:1001"
+  working_dir: /opt/trading
+  env_file: /opt/trading/.env
+  volumes:
+    - /opt/trading:/opt/trading
+  restart: unless-stopped
+  # A scratch image has nothing to write to outside the data volume.
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  # SIGTERM, then this long before SIGKILL: the web drains gRPC streams for
+  # up to 15s, so 30s is the systemd units' value carried over.
+  stop_grace_period: 30s
+
+services:
+  web:
+    <<: *service
+    image: ghcr.io/henry190927/trading-bot-web:${TAG:?TAG is not set — see deploy.env}
+    container_name: trading-web
+    environment:
+      TZ: Asia/Taipei
+      WEB_BIND: ${WEB_BIND:?WEB_BIND is not set — see deploy.env}
+      # About 80% of mem_limit, so the GC tightens before the kernel kills
+      # (k8s/README.md: without it an OOM is a silent SIGKILL).
+      GOMEMLIMIT: 200MiB
+    mem_limit: 256m
+    logging:
+      driver: journald
+      options:
+        tag: trading-web
+
+  monitor:
+    <<: *service
+    image: ghcr.io/henry190927/trading-bot-monitor:${TAG:?TAG is not set — see deploy.env}
+    container_name: trading-monitor
+    environment:
+      TZ: Asia/Taipei
+      GOMEMLIMIT: 100MiB
+    mem_limit: 128m
+    logging:
+      driver: journald
+      options:
+        tag: trading-monitor
