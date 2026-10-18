@@ -192,7 +192,7 @@ flowchart LR
 | **gRPC server 放在 `cmd/web` 裡，不是獨立 binary** | `tickerHub` 在**每個 process** 擁有唯一一條 BingX 標記價格 websocket。獨立的 `cmd/grpc` 接不到它 —— 它得再開第二條 websocket 和第二個 REST poller，於是「BTC 現在多少」會有兩個會漂移的答案。「共用 hub」和「獨立 process」在這裡互斥，所以 gRPC listener 是 web process 內用 `GRPC_BIND` 開啟的選項（不設就不建立 listener，行為完全不變）。gRPC 是第二種**傳輸方式**，不是第二條資料路徑 |
 | **先 `Drain()` 再 `GracefulStop()`，不只 `GracefulStop()`** | `GracefulStop` 會等進行中的 RPC 結束 —— 但 `StreamMarkPrices` 只有在 *client* 離開時才結束，所以一個健康的訂閱者會讓關機**永遠**卡住。改成兩階段：先關 drain channel，讓每條串流回 `UNAVAILABLE`（gRPC client 會重試的狀態碼），再 `GracefulStop` 送完進行中的 unary 和 GOAWAY。仍然以 15 秒為上限，之後硬 `Stop()` |
 | **瀏覽器維持 SSE；gRPC 給服務用** | 瀏覽器不靠 `grpc-web` 加 proxy 就講不了 gRPC，把 UI 搬過去只會為一個本來就服務得很好的 client 多加一跳。兩者讀同一個 hub，所以 SSE 分頁和 gRPC 消費者保證看到同一個上游連線的同一個數字 |
-| **容器化了，但生產環境刻意不跑 Kubernetes** | 映像值得存在：多階段建置到 `FROM scratch` 只有 **27 MB**，靜態 binary、沒有 shell、沒有 libc，CA 憑證從 builder 複製進來。最後那件事不是可有可無也不明顯：少了它，映像照樣對 `/health` 回 200、照樣提供 `/api/tickers`，但每一個對外 TLS 呼叫都會 `x509: certificate signed by unknown authority`，經濟日曆默默退化成內建資料。Kubernetes 是另一個問題、另一個答案：一台機器上的幾個 binary、一個操作者、不需要自動擴縮和滾動更新 —— 單節點叢集只會多出 control plane、etcd、CNI 要維護。[`k8s/`](k8s/) 的清單是為了把 probe 語意弄清楚，不是要部署（逐段解說：[`k8s/README.md`](k8s/README.md)） |
+| **容器化了，但生產環境刻意不跑 Kubernetes** | 映像值得存在：多階段建置到 `FROM scratch`，web 只有 **28.7 MB**、monitor **7.4 MB**，靜態 binary、沒有 shell、沒有 libc，CA 憑證從 builder 複製進來。最後那件事不是可有可無也不明顯：少了它，映像照樣對 `/health` 回 200、照樣提供 `/api/tickers`，但每一個對外 TLS 呼叫都會 `x509: certificate signed by unknown authority`，經濟日曆默默退化成內建資料。Kubernetes 是另一個問題、另一個答案：一台機器上的幾個 binary、一個操作者、不需要自動擴縮和滾動更新 —— 單節點叢集只會多出 control plane、etcd、CNI 要維護。[`k8s/`](k8s/) 的清單是為了把 probe 語意弄清楚，不是要部署（逐段解說：[`k8s/README.md`](k8s/README.md)） |
 | **Sweep 用收盤確認失效，不只是影線穿刺** | 原本的偵測器在影線穿刺時就觸發，然後不再重新評估。Backtest 顯示它在 2026-05-27 XAG −2.4% 崩跌期間持續發出 LONG（前面棒留下的過期 sweep）。修法：只要後面任何一根棒**收盤**穿過被掃的關卡且方向相反，就殺掉那個 sweep。結果 60d/1h 聚合 **netR +10.91R → +19.97R（+83%）** |
 | **HVN / 籌碼密集區只顯示，不投票** | 直覺說「順著籌碼區做」—— 但 backtest 顯示把 HVN 當 confluence vote 會用邊際訊號稀釋分數門檻，反而降低淨 edge（BTC −1R、白銀 −5.8R）。保留計算並顯示成 `·` 行供人判斷，引擎不投它。「讓 backtest 決定」的紀律贏過「相信直覺」的紀律 |
 | **MTF bias filter 放在 opt-in 旗標後面** | 強制高週期 MACD 方向會傷 ETH 的均值回歸 edge（+6.5R → −2.4R）。做成 opt-in 而不是刪掉，保留未來用新資料 A/B 的能力 |
@@ -299,7 +299,7 @@ OFF、**而且** env kill-switch 打開。任何一道沒開就不會有真單�
 | 網路 | Tailscale（WireGuard mesh）；web 綁 Tailscale IP，不綁 `0.0.0.0` |
 | 主機 | Oracle Cloud Always Free —— $0/月 |
 | Process 監管 | Docker Compose，`restart: unless-stopped`；由 GitHub Actions 部署；透過 SSH 上的 `ops` 操作 |
-| 容器 | 多階段建置 → `FROM scratch`，**27 MB** |
+| 容器 | 多階段建置 → `FROM scratch`：web **28.7 MB**、monitor **7.4 MB**，嵌入時區資料庫 |
 | 編排 | 生產環境是單機上的 Compose；[`k8s/`](k8s/) 的清單把 probe / resource / `GOMEMLIMIT` 的語意弄清楚 |
 
 ---
