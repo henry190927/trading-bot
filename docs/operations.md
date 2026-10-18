@@ -284,7 +284,7 @@ answers. It did not change when the services moved into containers.
   explicit allow-list of the files that cannot be rebuilt — `journal.csv`,
   `setups.jsonl`, `autotrade.json`, `autotrade_paper.jsonl`,
   `autotrade_blocked.jsonl`, `zones.json`, `zone-config.json`,
-  `chart_state.json`, `macro-overlay.json` — is committed to a **private** GitHub
+  `chart_state.json`, `macro-overlay.json`, `alerts.jsonl` — is committed to a **private** GitHub
   repo with a write-only-to-that-repo deploy key. Every change is a commit,
   so a mis-edited journal row can be diffed and restored. `.env` is never
   copied. Failures and a shrinking journal push to ntfy.

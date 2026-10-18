@@ -21,7 +21,7 @@ KEY="${KEY:-$HOME/.ssh/trading-bot-data-deploy}"
 # left out: rebuildable, multi-MB and growing, it would bloat the history.
 FILES=(journal.csv setups.jsonl autotrade.json autotrade_paper.jsonl
        autotrade_blocked.jsonl zones.json zone-config.json chart_state.json
-       macro-overlay.json)
+       macro-overlay.json alerts.jsonl)
 
 export GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes -o BatchMode=yes"
 GIT=(git -c user.name="trading-bot VPS" -c user.email="henry190927@users.noreply.github.com")
