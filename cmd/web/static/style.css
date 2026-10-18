@@ -6819,3 +6819,51 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ui-row > * { white-space: nowrap; flex-shrink: 0; }
 .ui-row > .ui-grow { flex-shrink: 1; }
 @media (max-width: 560px) { .ui-card-h { flex-wrap: wrap; } .ui-card-h > .ui-sub { margin-left: 0; width: 100%; } }
+
+/* ── Portfolio (phase 3) ─────────────────────────────────────────── */
+.ui-cols-hero { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+@media (max-width: 1100px) { .ui-cols-hero { grid-template-columns: minmax(0, 1fr); } }
+.ui-hero { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-3xl); font-weight: 600; letter-spacing: -.02em; line-height: 1.1; margin: 2px 0 var(--sp-4); }
+.ui-statrow { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-5); }
+.ui-statrow > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ui-statrow b { font-size: var(--fs-md); font-weight: 600; }
+.ui-periods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4) var(--sp-5); align-content: center; }
+.ui-periods > div { display: flex; flex-direction: column; gap: 2px; }
+.ui-periods b { font-size: var(--fs-xl); font-weight: 600; }
+
+/* perfPanels inside a ui-card: the seg buttons carry .pf-tab/.active for
+   perf-tabs.js, so .active looks like .on. */
+.ui-seg button.pf-tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+.pf-group .ui-statrow { margin-bottom: var(--sp-3); }
+.ui-card .pf-equity-chart-wrap { background: transparent; border: 0; padding: 0; }
+.ui-card .pf-equity-svg { height: 220px; }
+
+/* Trades table: one row per trade, details open underneath. */
+.ui-trades .ui-trow { cursor: pointer; }
+.ui-trades .ui-trow:hover td { background: var(--row-hover); }
+.ui-trades .ui-trow:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.ui-trades .ui-trow.open td { background: var(--row-hover); border-bottom-color: transparent; }
+.ui-chev { width: 24px; color: var(--text-dim); text-align: center; transition: transform var(--t-fast); }
+.ui-trow.open .ui-chev { transform: rotate(90deg); }
+.ui-out { font-size: var(--fs-sm); color: var(--text-dim); }
+.ui-trow.status-pending .ui-out, .ui-trow.status-open .ui-out { color: var(--blue); font-weight: 600; }
+.ui-tdetail > td { background: var(--row-hover); white-space: normal !important; padding: 0 var(--sp-4) var(--sp-4) !important; }
+.ui-detail { display: flex; flex-direction: column; gap: var(--sp-3); max-width: 980px; padding-top: var(--sp-1); }
+.ui-detail-tags { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ui-detail-tags:empty { display: none; }
+.ui-detail-prices { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: center; }
+.ui-detail-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ui-note { white-space: pre-wrap; line-height: 1.6; font-size: var(--fs-base); padding: var(--sp-2) var(--sp-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ui-code { display: block; margin-top: var(--sp-1); font-family: var(--mono); font-size: var(--fs-xs); white-space: pre-wrap; word-break: break-all; color: var(--text-dim); }
+.ui-tag.kill-ok { color: var(--green); } .ui-tag.kill-warn { color: var(--yellow); } .ui-tag.kill-fatal { color: var(--red); border-color: var(--red); }
+
+.ui-pager { display: flex; justify-content: center; gap: 4px; padding-top: var(--sp-4); }
+.ui-pager a, .ui-pager span { min-width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-sm); font-family: var(--mono); font-size: var(--fs-sm); color: var(--text-dim); text-decoration: none; border: 1px solid transparent; }
+.ui-pager a:hover { border-color: var(--border); color: var(--text); }
+.ui-pager .on { background: var(--wash-blue); color: var(--blue); font-weight: 600; }
+.ui-pager .off { opacity: .35; }
+/* rClass (r-pos / r-neg / r-zero) colours everywhere on a redesigned page;
+   the older rules only applied inside specific legacy containers. */
+.ui-page .r-pos { color: var(--green); }
+.ui-page .r-neg { color: var(--red); }
+.ui-page .r-zero { color: var(--text); }

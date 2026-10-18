@@ -5,7 +5,7 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>portfolio · trading-web</title>
+<title>{{t "tab.trades"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
@@ -14,204 +14,144 @@
 
 {{template "topnav" .}}
 
-<main>
+<main class="ui-page">
 
 {{if .TP1Status}}
-  <div class="tp1-flash tp1-{{.TP1Status}}" role="status">
-    {{if eq .TP1Status "ok"}}✓ {{end}}
-    {{if eq .TP1Status "skip"}}ⓘ {{end}}
-    {{if eq .TP1Status "error"}}⚠ {{end}}
-    <strong>BingX TP1:</strong> {{.TP1Msg}}
-  </div>
+  <div class="tp1-flash tp1-{{.TP1Status}}" role="status"><strong>BingX TP1:</strong> {{.TP1Msg}}</div>
 {{end}}
 
 {{if .Error}}
-  <p class="err">⚠ {{.Error}}</p>
+  <section class="ui-card warn"><b>{{t "common.error"}}</b> {{.Error}}</section>
 {{else}}
 
-<div class="pf-layout">
-<div class="pf-main">
+<div class="ui-cols ui-cols-hero">
+  <section class="ui-card">
+    <div class="ui-dim ui-sm">{{t "trades.totalR"}}</div>
+    <div class="ui-hero {{rClass .TotalR}}">{{fmtR .TotalR}}R</div>
+    <div class="ui-statrow">
+      <div><span class="ui-dim ui-sm">{{t "trades.winRate"}}</span><b class="ui-num">{{printf "%.0f%%" .WR}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "trades.avgR"}}</span><b class="ui-num {{rClass .AvgR}}">{{fmtR .AvgR}}R</b></div>
+      <div><span class="ui-dim ui-sm">{{t "trades.closed"}}</span><b class="ui-num">{{.ClosedCount}}</b></div>
+      {{if .ActiveCount}}<div><span class="ui-dim ui-sm">{{t "out.active"}}</span><b class="ui-num">{{.ActiveCount}}</b></div>{{end}}
+      {{if .PendingCount}}<div><span class="ui-dim ui-sm">{{t "out.pending"}}</span><b class="ui-num">{{.PendingCount}}</b></div>{{end}}
+      <div title="{{t "trades.noFillHint"}}"><span class="ui-dim ui-sm">{{t "out.no-fill"}}</span><b class="ui-num">{{.NoFillCount}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "trades.best"}}</span><b class="ui-num r-pos">{{fmtR .BestR}}R</b></div>
+      <div><span class="ui-dim ui-sm">{{t "trades.worst"}}</span><b class="ui-num r-neg">{{fmtR .WorstR}}R</b></div>
+    </div>
+  </section>
+  <section class="ui-card ui-periods">
+    <div><span class="ui-dim ui-sm">{{t "period.today"}}</span><b class="ui-num {{rClass .Periods.TodayR}}">{{fmtR .Periods.TodayR}}R</b><span class="ui-dim ui-sm">{{.Periods.TodayN}} {{t "unit.trades"}}</span></div>
+    <div><span class="ui-dim ui-sm">{{t "period.week"}}</span><b class="ui-num {{rClass .Periods.WeekR}}">{{fmtR .Periods.WeekR}}R</b><span class="ui-dim ui-sm">{{.Periods.WeekN}} {{t "unit.trades"}}</span></div>
+    <div><span class="ui-dim ui-sm">{{t "period.month"}}</span><b class="ui-num {{rClass .Periods.MonthR}}">{{fmtR .Periods.MonthR}}R</b><span class="ui-dim ui-sm">{{.Periods.MonthN}} {{t "unit.trades"}}</span></div>
+    <div><span class="ui-dim ui-sm">{{t "period.all"}}</span><b class="ui-num {{rClass .Periods.AllTimeR}}">{{fmtR .Periods.AllTimeR}}R</b><span class="ui-dim ui-sm">{{.Periods.AllTimeN}} {{t "unit.trades"}}</span></div>
+  </section>
+</div>
 
-{{/* ============================================================ */}}
-{{/* HERO — total realized R, headline metrics                     */}}
-{{/* ============================================================ */}}
-<section class="pf-hero">
-  <div class="pf-hero-label">Total realized R</div>
-  <div class="pf-hero-r {{rClass .TotalR}}">{{fmtR .TotalR}}<span class="pf-hero-unit">R</span></div>
-  <div class="pf-hero-meta">
-    <span class="pf-hero-pill"><span class="lbl">WR</span><strong>{{printf "%.0f%%" .WR}}</strong></span>
-    <span class="pf-hero-pill"><span class="lbl">avgR</span><strong class="{{rClass .AvgR}}">{{fmtR .AvgR}}</strong></span>
-    <span class="pf-hero-pill"><span class="lbl">closed</span><strong>{{.ClosedCount}}</strong></span>
-    {{if .ActiveCount}}<span class="pf-hero-pill" title="filled and not yet closed"><span class="lbl">active</span><strong>{{.ActiveCount}}</strong></span>{{end}}
-    {{if .PendingCount}}<span class="pf-hero-pill pf-pill-pending" title="recorded but entry hasn't triggered yet"><span class="lbl">pending</span><strong>{{.PendingCount}}</strong></span>{{end}}
-    {{if .NoFillCount}}<span class="pf-hero-pill" title="setups where the entry never triggered — discipline log only, excluded from WR / R math"><span class="lbl">no-fill</span><strong>{{.NoFillCount}}</strong></span>{{end}}
-    <span class="pf-hero-pill"><span class="lbl">best</span><strong class="r-pos">{{fmtR .BestR}}</strong></span>
-    <span class="pf-hero-pill"><span class="lbl">worst</span><strong class="r-neg">{{fmtR .WorstR}}</strong></span>
-  </div>
-</section>
+{{if gt .ClosedCount 0}}{{template "perfPanels" .}}{{end}}
 
-{{/* ============================================================ */}}
-{{/* PERIOD STATS — today / week / month / all-time                */}}
-{{/* ============================================================ */}}
-{{if gt .ClosedCount 0}}
-<section class="pf-periods">
-  <div class="pf-period">
-    <div class="pf-period-label">Today</div>
-    <div class="pf-period-r {{rClass .Periods.TodayR}}">{{fmtR .Periods.TodayR}}R</div>
-    <div class="pf-period-n">{{.Periods.TodayN}} trade{{if ne .Periods.TodayN 1}}s{{end}}</div>
-  </div>
-  <div class="pf-period">
-    <div class="pf-period-label">This week</div>
-    <div class="pf-period-r {{rClass .Periods.WeekR}}">{{fmtR .Periods.WeekR}}R</div>
-    <div class="pf-period-n">{{.Periods.WeekN}} trade{{if ne .Periods.WeekN 1}}s{{end}}</div>
-  </div>
-  <div class="pf-period">
-    <div class="pf-period-label">This month</div>
-    <div class="pf-period-r {{rClass .Periods.MonthR}}">{{fmtR .Periods.MonthR}}R</div>
-    <div class="pf-period-n">{{.Periods.MonthN}} trade{{if ne .Periods.MonthN 1}}s{{end}}</div>
-  </div>
-  <div class="pf-period">
-    <div class="pf-period-label">All time</div>
-    <div class="pf-period-r {{rClass .Periods.AllTimeR}}">{{fmtR .Periods.AllTimeR}}R</div>
-    <div class="pf-period-n">{{.Periods.AllTimeN}} trade{{if ne .Periods.AllTimeN 1}}s{{end}}</div>
-  </div>
-</section>
-
-{{/* ============================================================ */}}
-{{/* PERFORMANCE GROUP — tabbed visualizations                     */}}
-{{/* (outer `if gt .ClosedCount 0` from period section still gates) */}}
-{{/* ============================================================ */}}
-{{template "perfPanels" .}}
-{{end}}{{/* if gt .ClosedCount 0 */}}
-
-{{/* ──────────────── end left column (pf-main) ─────────────────── */}}
-</div>{{/* /pf-main */}}
-
-<aside class="pf-aside">
-
-{{/* ============================================================ */}}
-{{/* JOURNAL GROUP — trade history (right column on desktop)       */}}
-{{/* ============================================================ */}}
-<div class="pf-group">
-  <h2 class="pf-group-title">Journal</h2>
-<section class="pf-section pf-journal">
-  <h2 class="pf-section-title">
-    <span class="pf-section-dot journal"></span>
-    Trades
-    <span class="pf-section-meta">{{.TotalTrades}} total{{if gt .TotalPages 1}} · page {{.Page}}/{{.TotalPages}}{{end}}</span>
-    <a href="/journal/new" class="pf-section-action">+ new trade</a>
-  </h2>
+<section class="ui-card">
+  <header class="ui-card-h">
+    <h2>{{template "icon" "portfolio"}}{{t "tab.trades"}} <span class="ui-count">{{.TotalTrades}}</span></h2>
+    <span class="ui-sub">{{t "trades.expandHint"}}</span>
+    <a class="ui-btn" href="/journal/new" style="margin-top:0">{{template "icon" "plus"}}{{t "trades.new"}}</a>
+  </header>
 
   {{if not .Trades}}
-    <p class="empty">No trades recorded yet. Tap <strong>+ new trade</strong> to record one.</p>
+    <div class="ui-empty"><div class="ui-dim">{{t "trades.none"}}</div></div>
   {{else}}
-
-  {{range .Trades}}
-    <article class="trade-card {{outcomeClass .}}">
-      <div class="trade-head">
-        <span class="trade-id">#{{.ID}}</span>
-        <span class="sym">{{.Symbol}}</span>
-        <span class="badge badge--lg {{sideClassStr .Side}}">{{sideStr .Side}}</span>
-        <span class="tf">{{or .TF "—"}}</span>
-        {{if .Score}}<span class="score-tag">score {{.Score}}</span>{{end}}
-        {{if .Leverage}}<span class="lev-tag">{{.Leverage}}×</span>{{end}}
-        {{with .AccountLeverage}}<span class="acct-lev-tag {{acctLevClass .}}"
-          title="帳戶槓桿 = 名目/進場時權益。這跟合約槓桿是兩件事:125× 是合約倍數,這個是「押了帳戶的幾倍」。歸零距離是它的倒數。">
-          帳戶 {{printf "%.0f" .}}×</span>{{end}}
-        {{with .KillDistancePct}}<span class="kill-tag {{killClass .}}"
-          title="歸零距離 — 反向走多少 % 權益歸零。0.85% 在 BTC 1h 有 19% 的棒子會超過,ETH 是 34%。">
-          歸零 {{printf "%.2f" .}}%</span>{{end}}
-        <span class="trade-status">{{outcomeText .}}</span>
-        {{if not .IsOpen}}
-          <span class="trade-r {{rClass .RRealized}}">{{fmtR .RRealized}}R</span>
-        {{end}}
-      </div>
-
-      <div class="trade-prices">
-        <span><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice .Entry}}">{{fmtPrice .Entry}}</button></span>
-        <span><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice .Stop}}">{{fmtPrice .Stop}}</button></span>
-        <span><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP1}}">{{fmtPrice .TP1}}</button></span>
-        <span><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP2}}">{{fmtPrice .TP2}}</button></span>
-        {{if not .IsOpen}}
-          <span><span class="lbl">exit</span> <button class="copy-btn" data-copy="{{fmtPrice .ExitPrice}}">{{fmtPrice .ExitPrice}}</button></span>
-        {{end}}
-      </div>
-
-      <div class="trade-times">
-        <span class="lbl">analyzed</span> {{fmtTime .AnalyzedAt}}
-        &nbsp;·&nbsp; <span class="lbl">opened</span> {{fmtTime .OpenedAt}}
-        {{if .FilledAt.IsZero}}
-          &nbsp;·&nbsp; <span class="lbl pending">filled</span> <span class="time-pending">pending</span>
-        {{else}}
-          &nbsp;·&nbsp; <span class="lbl">filled</span> {{fmtTime .FilledAt}}
-        {{end}}
-        {{if not .IsOpen}}&nbsp;·&nbsp; <span class="lbl">closed</span> {{fmtTime .ClosedAt}}{{end}}
-      </div>
-
-      {{if .Anchor}}<div class="trade-anchor">anchor: <span>{{.Anchor}}</span></div>{{end}}
-      {{if .SignalCtx}}<div class="trade-ctx" title="validator + engine snapshot at signal time">ctx: <code>{{.SignalCtx}}</code></div>{{end}}
-      {{if .OpenNotes}}<div class="trade-note">{{.OpenNotes}}</div>{{end}}
-      {{if .CloseNotes}}<div class="trade-note close">{{.CloseNotes}}</div>{{end}}
-
-      <div class="trade-actions">
-        {{if .IsOpen}}
-          <a href="/journal/{{.ID}}/close" class="btn-close-trade">Close trade</a>
-        {{end}}
-        <a href="/journal/{{.ID}}/edit" class="btn-edit">Edit</a>
-        <button type="button" class="btn-analyze" data-trade-id="{{.ID}}">🤖 Analyze</button>
-      </div>
-
-      <div class="ai-analysis-pane" data-pane-for="{{.ID}}" hidden>
-        <div class="ai-analysis-header">
-          <strong>AI Quant analysis</strong>
-          <span class="ai-meta" data-meta-for="{{.ID}}"></span>
-          <button type="button" class="ai-close-btn" data-close-pane="{{.ID}}">×</button>
+  <div class="dt-scroll">
+  <table class="dt ui-trades">
+    <thead><tr>
+      <th></th><th>{{t "th.symbol"}}</th><th>{{t "th.side"}}</th><th class="num">{{t "th.entry"}}</th><th class="num">{{t "th.exit"}}</th>
+      <th>{{t "th.result"}}</th><th class="num">R</th><th>{{t "th.opened"}}</th><th>{{t "th.closed"}}</th><th></th>
+    </tr></thead>
+    <tbody>
+    {{range .Trades}}
+      <tr class="ui-trow {{outcomeClass .}}" data-row="{{.ID}}" tabindex="0" aria-expanded="false">
+        <td class="ui-num ui-dim">#{{.ID}}</td>
+        <td><span class="ui-sym">{{.Symbol}}</span>{{if .TF}} <span class="ui-dim ui-sm">{{.TF}}</span>{{end}}</td>
+        <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
+        <td class="num">{{fmtPx .Entry}}</td>
+        <td class="num">{{if .IsOpen}}<span class="ui-dim">—</span>{{else}}{{fmtPx .ExitPrice}}{{end}}</td>
+        <td><span class="ui-out">{{t (outcomeKey .)}}</span></td>
+        <td class="num">{{if .IsOpen}}<span class="ui-dim">—</span>{{else if .HasR}}<b class="{{rClass .RRealized}}">{{fmtR .RRealized}}R</b>{{else}}<span class="ui-dim" title="{{t "trades.noRHint"}}">—</span>{{end}}</td>
+        <td class="ui-num ui-dim">{{.OpenedAt.Local.Format "01-02 15:04"}}</td>
+        <td class="ui-num ui-dim">{{if .IsOpen}}—{{else}}{{.ClosedAt.Local.Format "01-02 15:04"}}{{end}}</td>
+        <td class="ui-chev" aria-hidden="true">›</td>
+      </tr>
+      <tr class="ui-tdetail" data-detail="{{.ID}}" hidden><td colspan="10">
+        <div class="ui-detail">
+          <div class="ui-detail-tags">
+            {{if .Leverage}}<span class="ui-tag">{{t "trades.contractLev"}} {{.Leverage}}×</span>{{end}}
+            {{with .AccountLeverage}}<span class="ui-tag {{acctLevClass .}}" title="{{t "trades.acctLevHint"}}">{{t "trades.acctLev"}} {{printf "%.0f" .}}×</span>{{end}}
+            {{with .KillDistancePct}}<span class="ui-tag {{killClass .}}" title="{{t "trades.killHint"}}">{{t "trades.kill"}} {{printf "%.2f" .}}%</span>{{end}}
+            {{if .Score}}<span class="ui-tag">{{t "trades.score"}} {{.Score}}</span>{{end}}
+          </div>
+          <div class="ui-detail-prices">
+            <span><span class="ui-dim ui-sm">{{t "th.entry"}}</span> <button class="copy-btn" data-copy="{{fmtPrice .Entry}}">{{fmtPrice .Entry}}</button></span>
+            <span><span class="ui-dim ui-sm">{{t "trades.stop"}}</span> <button class="copy-btn stop" data-copy="{{fmtPrice .Stop}}">{{fmtPrice .Stop}}</button></span>
+            <span><span class="ui-dim ui-sm">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP1}}">{{fmtPrice .TP1}}</button></span>
+            <span><span class="ui-dim ui-sm">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice .TP2}}">{{fmtPrice .TP2}}</button></span>
+            {{if not .IsOpen}}<span><span class="ui-dim ui-sm">{{t "th.exit"}}</span> <button class="copy-btn" data-copy="{{fmtPrice .ExitPrice}}">{{fmtPrice .ExitPrice}}</button></span>{{end}}
+          </div>
+          <div class="ui-detail-times ui-num ui-sm ui-dim">
+            {{t "trades.analyzed"}} {{fmtTime .AnalyzedAt}} · {{t "th.opened"}} {{fmtTime .OpenedAt}} · {{t "trades.filled"}} {{if .FilledAt.IsZero}}{{t "out.pending"}}{{else}}{{fmtTime .FilledAt}}{{end}}{{if not .IsOpen}} · {{t "th.closed"}} {{fmtTime .ClosedAt}}{{end}}
+          </div>
+          {{if .Anchor}}<div class="ui-sm"><span class="ui-dim">{{t "trades.anchor"}}</span> {{.Anchor}}</div>{{end}}
+          {{if .OpenNotes}}<div class="ui-note"><div class="ui-dim ui-sm">{{t "trades.openNotes"}}</div>{{.OpenNotes}}</div>{{end}}
+          {{if .CloseNotes}}<div class="ui-note"><div class="ui-dim ui-sm">{{t "trades.closeNotes"}}</div>{{.CloseNotes}}</div>{{end}}
+          {{if .SignalCtx}}<details class="ui-sm"><summary class="ui-dim">{{t "trades.ctx"}}</summary><code class="ui-code">{{.SignalCtx}}</code></details>{{end}}
+          <div class="ui-detail-actions">
+            {{if .IsOpen}}<a href="/journal/{{.ID}}/close" class="ui-btn" style="margin-top:0">{{t "trades.close"}}</a>{{end}}
+            <a href="/journal/{{.ID}}/edit" class="ui-btn ghost" style="margin-top:0">{{t "trades.edit"}}</a>
+            <button type="button" class="ui-btn ghost btn-analyze" style="margin-top:0" data-trade-id="{{.ID}}">{{t "trades.ai"}}</button>
+          </div>
+          <div class="ai-analysis-pane" data-pane-for="{{.ID}}" hidden>
+            <div class="ai-analysis-header">
+              <strong>{{t "trades.aiTitle"}}</strong>
+              <span class="ai-meta" data-meta-for="{{.ID}}"></span>
+              <button type="button" class="ai-close-btn" data-close-pane="{{.ID}}" aria-label="close">×</button>
+            </div>
+            <div class="ai-analysis-body" data-body-for="{{.ID}}"></div>
+            <div class="ai-disclaimer">{{t "trades.aiDisclaimer"}}</div>
+          </div>
         </div>
-        <div class="ai-analysis-body" data-body-for="{{.ID}}">
-          <em class="ai-loading">Loading…</em>
-        </div>
-        <div class="ai-disclaimer">AI analysis — informational, not financial advice. You own the decision.</div>
-      </div>
-    </article>
-  {{end}}
-
-  {{end}}{{/* if .Trades */}}
+      </td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
 
   {{if gt .TotalPages 1}}
-    <nav class="pf-pager" aria-label="journal pagination">
-      {{if gt .Page 1}}
-        <a class="pf-page-arrow" href="?page={{sub .Page 1}}" aria-label="previous page">‹</a>
-      {{else}}
-        <span class="pf-page-arrow disabled">‹</span>
-      {{end}}
-      {{range .PageNums}}
-        {{if eq . $.Page}}
-          <span class="pf-page-num active">{{.}}</span>
-        {{else}}
-          <a class="pf-page-num" href="?page={{.}}">{{.}}</a>
-        {{end}}
-      {{end}}
-      {{if lt .Page .TotalPages}}
-        <a class="pf-page-arrow" href="?page={{add .Page 1}}" aria-label="next page">›</a>
-      {{else}}
-        <span class="pf-page-arrow disabled">›</span>
-      {{end}}
-    </nav>
+  <nav class="ui-pager" aria-label="pagination">
+    {{if gt .Page 1}}<a href="?page={{sub .Page 1}}" aria-label="previous">‹</a>{{else}}<span class="off">‹</span>{{end}}
+    {{range .PageNums}}{{if eq . $.Page}}<span class="on">{{.}}</span>{{else}}<a href="?page={{.}}">{{.}}</a>{{end}}{{end}}
+    {{if lt .Page .TotalPages}}<a href="?page={{add .Page 1}}" aria-label="next">›</a>{{else}}<span class="off">›</span>{{end}}
+  </nav>
+  {{end}}
   {{end}}
 </section>
-</div>{{/* /pf-group journal */}}
-
-</aside>{{/* /pf-aside */}}
-</div>{{/* /pf-layout */}}
 
 {{end}}{{/* if .Error */}}
-
 </main>
 
-<footer>
-  <span>tap a price to copy · tap a card's <em>Edit</em> for full controls</span>
-</footer>
-
+<script>
+/* A trade is one row; its prices, notes and actions open underneath on
+   click or Enter, so the list stays scannable however long the notes are. */
+(function () {
+  document.querySelectorAll('.ui-trow').forEach(function (tr) {
+    function toggle() {
+      var d = document.querySelector('[data-detail="' + tr.dataset.row + '"]');
+      if (!d) return;
+      d.hidden = !d.hidden;
+      tr.classList.toggle('open', !d.hidden);
+      tr.setAttribute('aria-expanded', d.hidden ? 'false' : 'true');
+    }
+    tr.addEventListener('click', function (e) { if (!e.target.closest('a,button')) toggle(); });
+    tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+})();
+</script>
 <script src="/static/copy.js"></script>
 <script src="/static/ai-render.js"></script>
 <script src="/static/perf-tabs.js"></script>
@@ -277,7 +217,7 @@
             if (!pane.hidden) { pane.hidden = true; return; }
             pane.hidden = false;
             if (body.dataset.loaded === '1') return;
-            body.innerHTML = '<em class="ai-loading">Querying Quant advisor…</em>';
+            body.innerHTML = '<em class="ai-loading">' + {{t "trades.aiLoading"}} + '</em>';
             btn.disabled = true;
             fetch('/ai/analyze/' + id, { method: 'POST' })
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })

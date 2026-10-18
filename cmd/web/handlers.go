@@ -2882,6 +2882,28 @@ func shortVerdictTag(v string) string {
 }
 
 // templateFuncs exposes formatting helpers to the templates.
+// outcomeKey names a trade's state as a dictionary key: pending and active
+// for open trades, else the recorded outcome. Anything outside
+// journal.CloseOutcomes (the legacy "win" rows, say) maps to out.other
+// rather than leaking a raw code into the page.
+func outcomeKey(t journal.Trade) string {
+	switch {
+	case t.IsPending():
+		return "out.pending"
+	case t.IsOpen():
+		return "out.active"
+	}
+	for _, o := range journal.CloseOutcomes {
+		if t.Outcome == o {
+			return "out." + o
+		}
+	}
+	if t.Outcome == "win" {
+		return "out.win"
+	}
+	return "out.other"
+}
+
 // fmtPx is the display format for a price in a list: thousands separators
 // and cents at or above 100 (83,699.81), four decimals between 1 and 100
 // (1.5303), and fmtPrice's full precision below 1. fmtPrice stays the
@@ -3068,6 +3090,7 @@ func templateFuncs() template.FuncMap {
 			}
 			return "status-flat"
 		},
+		"outcomeKey": outcomeKey,
 		"outcomeText": func(t journal.Trade) string {
 			if t.IsPending() {
 				return "pending"

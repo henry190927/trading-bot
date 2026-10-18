@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/henry190927/trading-bot/journal"
 )
 
 // A key in one dictionary and not the other is exactly the bug the server
@@ -183,5 +185,30 @@ func TestLangCookie(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", "/lang/fr", nil))
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("/lang/fr = %d, want 400", w.Code)
+	}
+}
+
+// Keys built at run time — {{t (outcomeKey .)}}, {{t (printf "side.%s" ...)}},
+// {{t .LeanKey}} — are invisible to TestTemplatesUseKnownKeys, so enumerate
+// every value they can produce.
+func TestDynamicKeysExist(t *testing.T) {
+	dicts, _ := loadDicts(i18nFS)
+	keys := []string{"out.pending", "out.active", "out.win", "out.other", "side.long", "side.short", "side.neutral"}
+	for _, o := range journal.CloseOutcomes {
+		keys = append(keys, "out."+o)
+	}
+	for _, s := range []Setup{
+		{Event: "BOS-up"}, {Event: "BOS-down"}, {Event: "CHoCH-up"}, {Event: "CHoCH-down"},
+		{InZone: true, Dir: "long"}, {InZone: true, Dir: "short"},
+		{Trend: "HH-HL uptrend"}, {Trend: "LH-LL downtrend"}, {},
+	} {
+		keys = append(keys, leanKey(s))
+	}
+	for _, l := range langs {
+		for _, k := range keys {
+			if _, ok := dicts[l][k]; !ok {
+				t.Errorf("%s.json: no key %q", l, k)
+			}
+		}
 	}
 }
