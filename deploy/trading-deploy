@@ -1,0 +1,111 @@
+#!/bin/bash
+# trading-deploy — deploy one commit's images to this host, verify, roll back
+# on failure. Installed root-owned at /usr/local/bin/trading-deploy.
+#
+# The ONLY thing the CI deploy key can do. Its authorized_keys entry is
+#
+#   command="sudo /usr/local/bin/trading-deploy \"$SSH_ORIGINAL_COMMAND\"",restrict ssh-ed25519 AAAA... ci-deploy
+#
+# so whatever the client asks to run arrives here as one argument, and is
+# refused unless it is a 40-character commit SHA. A leaked key can deploy a
+# commit that already passed CI into ghcr.io — it cannot open a shell, forward
+# a port, or pass anything else. sudoers allows ubuntu exactly this script.
+#
+# Steps:
+#   1. validate the SHA
+#   2. fetch THAT commit's deploy/compose.yaml from GitHub and validate it, so
+#      the images and the settings that run them always come from one commit
+#   3. remember the running TAG, write the new one, pull, up -d
+#   4. verify within 60s: the web answers /health and the monitor's heartbeat
+#      is fresh from a NEW pid (proves the new monitor is up, not the old file)
+#   5. on failure, put the previous TAG and compose.yaml back and exit 1, so
+#      the CI job goes red
+set -euo pipefail
+
+REPO="henry190927/trading-bot"
+DIR="/opt/trading"
+ENVF="$DIR/deploy.env"
+COMPOSE="$DIR/compose.yaml"
+HB="$DIR/monitor-heartbeat.json"
+
+say() { echo "[trading-deploy] $*"; }
+die() { say "FAIL: $*"; exit 1; }
+
+sha="${1:-}"
+[[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "expected a 40-character commit SHA, got '${sha:0:60}'"
+
+# Cut-over guard: the systemd units must be gone, or the containers would
+# start beside them — two monitors pushing every alert twice, two webs
+# fighting over the port.
+for u in trading-web trading-monitor; do
+    if systemctl is-active --quiet "$u"; then
+        die "$u.service is still running under systemd — cut over first (docs/operations.md)"
+    fi
+done
+
+[ -f "$ENVF" ] || die "$ENVF missing (needs WEB_BIND=<tailscale-ip>:8080)"
+dc() { docker compose --env-file "$ENVF" -f "$1" "${@:2}"; }
+
+# ── 2. compose.yaml from the same commit ─────────────────────────────────
+new_compose="$COMPOSE.new"
+curl -fsSL --max-time 20 \
+    "https://raw.githubusercontent.com/$REPO/$sha/deploy/compose.yaml" -o "$new_compose" \
+    || die "could not fetch deploy/compose.yaml at $sha"
+TAG="$sha" dc "$new_compose" config --quiet || die "compose.yaml at $sha does not validate"
+
+# ── 3. swap ──────────────────────────────────────────────────────────────
+prev_tag="$(grep -E '^TAG=' "$ENVF" | cut -d= -f2- || true)"
+cp "$ENVF" "$ENVF.prev"
+[ -f "$COMPOSE" ] && cp "$COMPOSE" "$COMPOSE.prev"
+
+if grep -qE '^TAG=' "$ENVF"; then
+    sed -i "s/^TAG=.*/TAG=$sha/" "$ENVF"
+else
+    echo "TAG=$sha" >> "$ENVF"
+fi
+mv "$new_compose" "$COMPOSE"
+
+old_pid="$(python3 -c "import json;print(json.load(open('$HB'))['pid'])" 2>/dev/null || echo none)"
+say "deploying ${sha:0:12} (was ${prev_tag:0:12}${prev_tag:+…}${prev_tag:-none})"
+
+rollback() {
+    say "rolling back to ${prev_tag:-nothing}"
+    cp "$ENVF.prev" "$ENVF"
+    [ -f "$COMPOSE.prev" ] && cp "$COMPOSE.prev" "$COMPOSE"
+    if [ -n "$prev_tag" ]; then
+        dc "$COMPOSE" up -d --remove-orphans || say "rollback up -d failed too — check by hand"
+    fi
+    exit 1
+}
+
+dc "$COMPOSE" pull || rollback
+dc "$COMPOSE" up -d --remove-orphans || rollback
+
+# ── 4. verify ────────────────────────────────────────────────────────────
+bind="$(grep -E '^WEB_BIND=' "$ENVF" | cut -d= -f2-)"
+web_ok=0; mon_ok=0
+for _ in $(seq 1 30); do
+    sleep 2
+    [ "$web_ok" = 1 ] || { curl -fsS --max-time 3 "http://$bind/health" >/dev/null 2>&1 && web_ok=1; }
+    if [ "$mon_ok" = 0 ]; then
+        mon_ok="$(python3 - "$HB" "$old_pid" <<'EOF'
+import json, sys, os, time
+try:
+    b = json.load(open(sys.argv[1]))
+    fresh = time.time() - os.stat(sys.argv[1]).st_mtime < 60
+    print(1 if fresh and str(b["pid"]) != sys.argv[2] else 0)
+except Exception:
+    print(0)
+EOF
+)"
+    fi
+    [ "$web_ok" = 1 ] && [ "$mon_ok" = 1 ] && break
+done
+[ "$web_ok" = 1 ] || { say "web did not answer /health within 60s"; rollback; }
+[ "$mon_ok" = 1 ] || { say "monitor heartbeat did not come back from a new pid within 60s"; rollback; }
+
+say "OK — ${sha:0:12} is live (web /health 200, monitor heartbeat from a new pid)"
+rm -f "$COMPOSE.prev" "$ENVF.prev"
+# Keep the disk from filling with old images; the running ones are in use
+# and cannot be pruned.
+docker image prune -af --filter "until=168h" >/dev/null 2>&1 || true

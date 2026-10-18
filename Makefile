@@ -43,7 +43,7 @@ SCP         := scp -i $(ORACLE_KEY)
 %:
 	@:
 
-.PHONY: help analyze validate backtest proto proto-tools grpc grpc-probe test test-race vet lint check guard-clean deploy-web deploy-monitor deploy-all deploy-ops mcp-build mcp-install mcp-sync-journal
+.PHONY: help analyze validate backtest proto proto-tools grpc grpc-probe test test-race vet lint check guard-clean deploy-all deploy-ops mcp-build mcp-install mcp-sync-journal
 
 help:
 	@echo "trading — Makefile commands"
@@ -61,11 +61,9 @@ help:
 	@echo "  make grpc [BIND]                          Run cmd/web with the gRPC listener on (default $(GRPC_BIND))"
 	@echo "  make grpc-probe [BIND]                    grpcurl smoke test of both RPCs against a running server"
 	@echo
-	@echo "Deploy to the VPS (refuses a dirty working tree; FORCE=1 overrides):"
-	@echo "  make deploy-web                           Build web UI for linux/amd64, scp, restart trading-web"
-	@echo "  make deploy-monitor                       Build monitor for linux/amd64, scp, restart trading-monitor"
+	@echo "Deploy (the services deploy through CI: push to main → .github/workflows/ci.yml):"
 	@echo "  make deploy-all                           Redeploy the CLI tools (analyze/validate/backtest/price/journal)"
-	@echo "  make deploy-ops                           Install scripts/ops as /usr/local/bin/ops (asks for sudo)"
+	@echo "  make deploy-ops                           Install the host tooling: ops, trading-deploy, daemon-watch (asks for sudo)"
 	@echo
 	@echo "Operate the VPS (scripts/ops, over SSH):"
 	@echo "  ssh trading-bot ops status                Units + monitor heartbeat"
@@ -185,23 +183,6 @@ guard-clean:
 		fi; \
 	fi
 
-# ---- deploy-web / deploy-monitor: cross-compile, scp, restart the unit -----
-deploy-web: guard-clean
-	@echo "▶ building linux/amd64 web..."
-	@GOOS=linux GOARCH=amd64 $(GO) build -o /tmp/trading-web-linux ./cmd/web
-	@echo "▶ uploading to $(ORACLE_HOST)..."
-	@$(SCP) /tmp/trading-web-linux $(ORACLE_USER)@$(ORACLE_HOST):/tmp/trading-web
-	@echo "▶ installing + restarting trading-web unit..."
-	@$(SSH) 'mv /tmp/trading-web /opt/trading/trading-web && chown ubuntu:ubuntu /opt/trading/trading-web && sudo systemctl restart trading-web && sleep 1 && systemctl status trading-web --no-pager | head -5'
-
-deploy-monitor: guard-clean
-	@echo "▶ building linux/amd64 monitor..."
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -o /tmp/trading-monitor-linux ./cmd/monitor
-	@echo "▶ uploading to $(ORACLE_HOST)..."
-	@$(SCP) /tmp/trading-monitor-linux $(ORACLE_USER)@$(ORACLE_HOST):/tmp/trading-monitor
-	@echo "▶ installing + restarting trading-monitor unit..."
-	@$(SSH) 'mv /tmp/trading-monitor /opt/trading/trading-monitor && chown ubuntu:ubuntu /opt/trading/trading-monitor && chmod +x /opt/trading/trading-monitor && sudo systemctl restart trading-monitor && sleep 1 && systemctl status trading-monitor --no-pager | head -5'
-
 # ---- deploy-all: the CLI tools only ---------------------------------------
 # Restarts nothing. It used to also ship cmd/serve and restart the retired
 # trading-bot unit, which would have brought it back up beside the monitor.
@@ -222,15 +203,22 @@ deploy-all: guard-clean
 	          mv /tmp/trading-journal-linux  /opt/trading/trading-journal  && \
 	          chown ubuntu:ubuntu /opt/trading/trading-* && echo "✅ CLI tools installed"'
 
-# ---- deploy-ops: install the operator CLI --------------------------------
-# Into /usr/local/bin so a plain `ssh trading-bot ops status` finds it — a
-# non-login SSH command never sees ~/.local/bin. Root-owned on purpose: an
-# executable on PATH that the ubuntu user could rewrite would let anyone who
-# gets that account change what `ops` does the next time it is run. -t gives
-# sudo a terminal for the password.
+# ---- deploy-ops: the host-side tooling -----------------------------------
+# The services themselves deploy through CI (push to main). What stays here is
+# what runs ON the host around them:
+#   ops            operator CLI      → /usr/local/bin, so a non-login
+#                                      `ssh trading-bot ops status` finds it
+#   trading-deploy what CI may run   → /usr/local/bin (see its header)
+#   daemon-watch   cron liveness ping → /opt/trading, where the crontab calls it
+# The two in /usr/local/bin are root-owned on purpose: an executable on PATH,
+# or one that sudo runs, which the ubuntu user could rewrite would let whoever
+# gets that account change what it does. -t gives sudo a terminal.
 deploy-ops:
-	@$(SCP) scripts/ops $(ORACLE_USER)@$(ORACLE_HOST):/tmp/ops
-	@$(SSH) -t 'sudo install -m 755 -o root -g root /tmp/ops /usr/local/bin/ops && rm -f /tmp/ops ~/.local/bin/ops && echo "✅ /usr/local/bin/ops" && ls -l /usr/local/bin/ops'
+	@$(SCP) scripts/ops deploy/trading-deploy scripts/daemon-watch.sh $(ORACLE_USER)@$(ORACLE_HOST):/tmp/
+	@$(SSH) -t 'sudo install -m 755 -o root -g root /tmp/ops /tmp/trading-deploy /usr/local/bin/ && \
+	            install -m 755 /tmp/daemon-watch.sh /opt/trading/daemon-watch.sh && \
+	            rm -f /tmp/ops /tmp/trading-deploy /tmp/daemon-watch.sh ~/.local/bin/ops && \
+	            ls -l /usr/local/bin/ops /usr/local/bin/trading-deploy /opt/trading/daemon-watch.sh'
 
 # ---- MCP server for Claude Code (zero-cost AI advisor path) ----
 #

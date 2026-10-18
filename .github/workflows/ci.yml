@@ -1,0 +1,97 @@
+# check → image → deploy.
+#
+# Every push and pull request runs the checks. A push to main also builds the
+# two images, tagged with the commit SHA, and deploys them — after a human
+# approves the `production` environment (Settings → Environments).
+#
+# Builds from a clean checkout of one commit, so "deploy whatever happened to
+# be in the working tree" cannot happen here by construction; that was the
+# reason for the Makefile's guard-clean.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    # A docs-only commit has nothing to deploy.
+    paths-ignore: ["**.md", "docs/**", "k8s/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: vet
+        run: go vet ./...
+      - name: test -race
+        run: go test -race -count=1 ./...
+
+  image:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        cmd: [web, monitor]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: CMD=${{ matrix.cmd }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/trading-bot-${{ matrix.cmd }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/trading-bot-${{ matrix.cmd }}:main
+          # Links the package to this repository on ghcr.io.
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.cmd }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cmd }}
+
+  deploy:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Required reviewers on this environment are the human gate before prod.
+    environment: production
+    # Never two deploys at once; a newer one waits instead of cancelling a
+    # half-finished swap.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: deploy ${{ github.sha }}
+        env:
+          KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          # Pinned host key: a man-in-the-middle VPS fails the job instead of
+          # being trusted on first use.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The key's authorized_keys entry turns whatever is sent into one
+          # argument to /usr/local/bin/trading-deploy; the SHA is all we send.
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            ubuntu@"$HOST" "$GITHUB_SHA"
