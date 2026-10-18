@@ -8,6 +8,7 @@ what the system *is*, see the [README](../README.md); for the CLI tools, see
 - [The data directory](#the-data-directory)
 - [Configuration: secrets vs runtime settings](#configuration-secrets-vs-runtime-settings)
 - [Deploying](#deploying)
+- [Cut-over and rollback](#cut-over-and-rollback)
 - [Operating](#operating)
 - [Push notifications](#push-notifications)
 - [Web UI](#web-ui)
@@ -25,23 +26,27 @@ what the system *is*, see the [README](../README.md); for the CLI tools, see
 One Oracle Cloud Always Free VM (`VM.Standard.E2.1.Micro`: x86_64, 1 GB RAM,
 2 GB swap file), reachable only over Tailscale and SSH.
 
-| Unit / job | Binary | What it does |
+| Service / job | Runs as | What it does |
 |---|---|---|
-| `trading-web.service` | `trading-web` (`cmd/web`) | Gin UI, SSE price stream, optional gRPC. Bound to the Tailscale IP, never `0.0.0.0`. |
-| `trading-monitor.service` | `trading-monitor` (`cmd/monitor`) | Every long-running loop: zone alerts, auto-executor (paper), naked-position guard, macro pre-warnings, OI / BLS / Binance-positioning refreshers, and — outside zone-only mode — the confluence scan and structure alerts. |
+| `trading-web` | container, `ghcr.io/henry190927/trading-bot-web:<sha>` | Gin UI, SSE price stream, optional gRPC. Bound to the Tailscale IP, never `0.0.0.0`. |
+| `trading-monitor` | container, `ghcr.io/henry190927/trading-bot-monitor:<sha>` | Every long-running loop: zone alerts, auto-executor (paper), naked-position guard, macro pre-warnings, OI / BLS / Binance-positioning refreshers, and — outside zone-only mode — the confluence scan and structure alerts. |
 | cron `10 0 * * *` | `earnings-fetch` | Earnings calendar → `earnings.json` |
 | cron `30 0 * * *` | `fundamental-scan` | Fundamentals board → `fundamentals.json` |
-| cron `*/10 * * * *` | `daemon-watch.sh check` | ntfy on a unit going down or recovering |
+| cron `*/10 * * * *` | `daemon-watch.sh check` | ntfy on a service going down or recovering |
 | cron `0 0 * * *` | `daemon-watch.sh heartbeat` | Daily "still watching" push, so silence is trustworthy |
 | cron `15 4 * * *` | `vps-data-backup.sh` | Daily off-box backup (see [Backups](#backups-and-recovery)) |
 
-Both units run as `ubuntu` with `WorkingDirectory=/opt/trading`,
-`EnvironmentFile=/opt/trading/.env`, `Environment=TZ=Asia/Taipei` and
-`Restart=always`.
+Both containers are defined in [`deploy/compose.yaml`](../deploy/compose.yaml):
+host networking, UID 1001 (the owner of `/opt/trading`), read-only root, no
+capabilities, `restart: unless-stopped`, logs to journald, `mem_limit` with
+`GOMEMLIMIT` at about 80% of it. Secrets come from `/opt/trading/.env` at
+runtime; `/opt/trading/deploy.env` holds `TAG` (the commit running) and
+`WEB_BIND`. The images are `FROM scratch` — no shell, nothing to `exec` into.
 
-> The original `trading-bot.service` (`cmd/serve`) is retired and **disabled**.
-> It is not masked, so a `systemctl restart trading-bot` would still start it
-> beside the monitor — nothing in the Makefile does that any more.
+The systemd units `trading-web.service` and `trading-monitor.service` are
+**disabled, not deleted**: they and the binaries in `/opt/trading` are the
+rollback path (see [Cut-over and rollback](#cut-over-and-rollback)). The
+original `trading-bot.service` (`cmd/serve`) is retired and disabled too.
 
 ## The data directory
 
@@ -81,37 +86,85 @@ a corrupt file must not be able to silence it.
 
 ## Deploying
 
-Every deploy cross-compiles on the Mac, `scp`s the binary and restarts the
-unit:
+**The services deploy through CI.** A push to `main` runs
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
-```bash
-make deploy-web        # trading-web
-make deploy-monitor    # trading-monitor
-make deploy-all        # the CLI tools (analyze/validate/backtest/price/journal); restarts nothing
-make deploy-ops        # scripts/ops → /usr/local/bin/ops (asks for the sudo password)
+```
+check   go vet + go test -race                     every push and PR
+image   build web + monitor, tag :<sha>, push      main only
+deploy  waits for approval on `production`, then   main only
+        ssh <sha> → /usr/local/bin/trading-deploy
 ```
 
-**Deploys refuse a dirty working tree.** A deploy compiles whatever is in the
-working tree, so it would ship another session's uncommitted work — including
-untracked `.go` files, which are compiled in but never show in `git diff`.
-`guard-clean` blocks the deploy and lists the files; `FORCE=1` overrides.
+Docs-only commits (`*.md`, `docs/`, `k8s/`) do not trigger it.
 
-To deploy a commit while the working tree has unrelated work in progress,
-deploy from a clean worktree:
+`trading-deploy` ([source](../deploy/trading-deploy)) is the only thing CI's
+deploy key can run: its `authorized_keys` entry is
+
+```
+command="sudo /usr/local/bin/trading-deploy \"$SSH_ORIGINAL_COMMAND\"",restrict ssh-ed25519 AAAA… ci-deploy
+```
+
+so whatever the client sends arrives as one argument, which must be a 40-char
+commit SHA. It fetches **that commit's** `deploy/compose.yaml` (image and
+settings always come from one commit), pulls, `up -d`, and within 60 seconds
+requires web `/health` 200 and a monitor heartbeat from a **new** pid — or it
+puts the previous `TAG` back and fails the job. Sudoers allows `ubuntu`
+exactly that script, nothing else.
+
+What still deploys from the Mac:
+
+```bash
+make deploy-all        # the CLI tools (analyze/validate/backtest/price/journal); restarts nothing
+make deploy-ops        # host tooling: ops, trading-deploy → /usr/local/bin (root-owned); daemon-watch.sh
+```
+
+These refuse a dirty working tree (`guard-clean`; untracked `.go` files are
+compiled in but never show in `git diff`). `FORCE=1` overrides; or deploy
+from a clean worktree:
 
 ```bash
 git worktree add --detach /tmp/deploy <commit>
 cp Makefile.local /tmp/deploy/          # host settings, gitignored
-make -C /tmp/deploy deploy-web
+make -C /tmp/deploy deploy-all
 git worktree remove --force /tmp/deploy
 ```
 
-Before deploying the monitor, check what else ships with it — the binary on
-the VPS may be several commits behind:
+## Cut-over and rollback
+
+The move from systemd to containers, done once. Each step is reversible until
+the last.
+
+**One-time setup**
+
+1. GitHub → *Settings → Environments* → `production`, with yourself as a
+   required reviewer.
+2. A deploy key pair just for CI (`ssh-keygen -t ed25519 -N "" -C ci-deploy`).
+   Repository secrets: `VPS_DEPLOY_KEY` (private key), `VPS_HOST`,
+   `VPS_KNOWN_HOSTS` (`ssh-keyscan -t ed25519 <host>`).
+3. On the VPS:
+   - `/opt/trading/deploy.env` with `WEB_BIND=<tailscale-ip>:8080`
+   - `make deploy-ops`
+   - `/etc/sudoers.d/trading-deploy`: `ubuntu ALL=(root) NOPASSWD: /usr/local/bin/trading-deploy`
+     (check with `sudo visudo -c`)
+   - the `authorized_keys` line above, with the CI public key
+
+**Cut-over**
+
+4. Merge to `main`. CI builds and pushes both images, then waits for approval.
+5. First push creates the ghcr.io packages as **private**: set both to public
+   (package → *Package settings → Change visibility*), then confirm the VPS
+   can pull without logging in: `sudo docker pull ghcr.io/henry190927/trading-bot-web:<sha>`.
+6. Stop the units — downtime starts here:
+   `sudo systemctl disable --now trading-web trading-monitor`
+7. Approve the deploy. `trading-deploy` refuses to run while the units are
+   active, so steps 6 and 7 cannot be swapped by accident.
+
+**Rollback** — the binaries never left `/opt/trading`:
 
 ```bash
-ssh trading-bot 'stat -c %y /opt/trading/trading-monitor'      # when it was last deployed
-git log --since='<that time>' -- $(go list -deps ./cmd/monitor | grep trading-bot | sed 's#.*/trading-bot/##')
+sudo docker compose --env-file /opt/trading/deploy.env -f /opt/trading/compose.yaml down
+sudo systemctl enable --now trading-web trading-monitor
 ```
 
 ## Operating
@@ -119,16 +172,17 @@ git log --since='<that time>' -- $(go list -deps ./cmd/monitor | grep trading-bo
 Service control is an SSH job, through one script:
 
 ```bash
-ssh trading-bot ops status                 # units + monitor heartbeat
-ssh trading-bot ops logs monitor -f        # follow a journal (or: web; N lines: ops logs monitor 200)
-ssh trading-bot ops restart monitor        # restart (asks for the sudo password)
+ssh trading-bot ops status                 # deployed commit, web /health, monitor heartbeat
+ssh trading-bot ops logs monitor -f        # follow the logs (or: web; N lines: ops logs monitor 200)
+ssh trading-bot ops restart monitor        # restart a container (asks for the sudo password)
 ssh trading-bot ops zone 20                # recent zone-alert events
 ```
 
-`ops` wraps systemd today. When the services move into containers only its
-function bodies change; the commands stay the same.
+`ops` wrapped systemd first and wraps Docker Compose now; only its function
+bodies changed. Logs go through journald (tag `trading-web` /
+`trading-monitor`), so reading them needs no sudo.
 
-The `/ops` page is the read-mostly side: unit and heartbeat state, the zone
+The `/ops` page is the read-mostly side: service and heartbeat state, the zone
 channel, the auto-executor book, exchange verification (`/ops/verify` — always
 re-check a new position's stop here rather than trusting the journal), fills,
 orders, balance and OI. It changes runtime settings (push mute, zone channel)
@@ -208,10 +262,14 @@ App-level auth is intentionally skipped because Tailscale + ufw + bind-address a
 
 | Signal | Source | Catches |
 |---|---|---|
-| ntfy "Daemon DOWN / recovered" | `daemon-watch.sh` every 10 min | a unit stopping |
+| ntfy "Daemon DOWN / recovered" | `daemon-watch.sh` every 10 min | a service stopping |
 | Daily "daemon heartbeat" push | `daemon-watch.sh` at 00:00 | the watcher itself dying — silence becomes trustworthy |
-| `monitor-heartbeat.json` | the monitor, every 15s | a loop that is alive but stuck (`stalled`), a loop idled by config or mute — what `systemctl is-active` cannot see |
+| `monitor-heartbeat.json` | the monitor, every 15s | a loop that is alive but stuck (`stalled`), a loop idled by config or mute |
 | `/ops` health card | web | all of the above, on the phone |
+
+`daemon-watch.sh` asks the services, not the platform: the monitor is up if
+its heartbeat file changed in the last 60 seconds, the web if `/health`
+answers. It did not change when the services moved into containers.
 
 ## Backups and recovery
 
@@ -259,19 +317,22 @@ App-level auth is intentionally skipped because Tailscale + ufw + bind-address a
 ## Provisioning a new VM
 
 Not scripted yet — making a rebuild cheap is the point of
-[architecture_hardening.md](architecture_hardening.md) and of the container
-work in [`k8s/`](../k8s/). Until then, by hand:
+[architecture_hardening.md](architecture_hardening.md). With the services in
+images it is now short:
 
 1. Oracle Cloud → *Always Free* → Ubuntu 22.04 on `VM.Standard.E2.1.Micro`
-   (x86_64; `A1.Flex` ARM also works if you build with `GOARCH=arm64`), with a
-   public IPv4 and a generated SSH key.
-2. `sudo timedatectl set-timezone Asia/Taipei`; add a 2 GB swap file (1 GB of
-   RAM has no headroom without one).
-3. Install Tailscale; `ufw` allowing only 22 on the public interface.
-4. Create `/opt/trading` owned by `ubuntu`, put `.env` there (`chmod 600`),
-   install the two units (see [What runs where](#what-runs-where)), the
-   crontab, and `make deploy-web deploy-monitor deploy-all deploy-ops`.
-5. Restore the data files from the private backup repo.
+   (x86_64; `A1.Flex` ARM would need `linux/arm64` added to the image build),
+   with a public IPv4 and a generated SSH key.
+2. `sudo timedatectl set-timezone Asia/Taipei`; a 2 GB swap file (1 GB of RAM
+   has no headroom without one).
+3. Install Tailscale and Docker (the official apt repository, not the
+   `curl | sh` script); `ufw` allowing only 22 on the public interface. Do
+   **not** add `ubuntu` to the `docker` group — it is root without a password.
+4. Create `/opt/trading` owned by `ubuntu`, put `.env` there (`chmod 600`) and
+   `deploy.env`; the crontab; the one-time setup in
+   [Cut-over and rollback](#cut-over-and-rollback); `make deploy-all`.
+5. Restore the data files from the private backup repo, then trigger a deploy
+   of the current `main`.
 
 ## Cost
 

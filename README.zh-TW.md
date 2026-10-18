@@ -25,7 +25,7 @@ CLI 和 web UI 可以指定 `market.Resolve` 認得的全部 14 個合約。
 | **做什麼** | 偵測 → 打分 → 記錄／執行（paper-first）→ 推播 |
 | **紀律** | 每個策略改動都要過 60/90/120 天的 A/B，而且上線閘門是程式（`shipgate`），不是習慣 |
 | **規模** | 36 個可匯入的 package + 28 個 command · 255 個 Go 檔，其中 83 個是測試 · 約 55k 行 · `go test -race ./...` 乾淨 |
-| **怎麼出貨** | 目前用 `scp` 傳靜態 binary；27 MB 的 `FROM scratch` 映像已建好並驗證過（見 [`k8s/`](k8s/)） |
+| **怎麼出貨** | `FROM scratch` 映像（web 28.7 MB、monitor 7.4 MB），CI 依 commit 建置，人工核准後用 Docker Compose 部署（[`docs/operations.md`](docs/operations.md#deploying)） |
 
 > 💡 這個專案真正的重點不是「會不會賺錢」，而是**每一個策略改動都要通過 60/90/120 天
 > 的 A/B 才能上線**，而那個閘門是寫成程式的。下面「策略怎麼上線」和「研究工具」兩節
@@ -298,9 +298,9 @@ OFF、**而且** env kill-switch 打開。任何一道沒開就不會有真單�
 | 推播 | ntfy.sh，透過可插拔的 `Notifier` + `Multi` 扇出，可執行期靜音 |
 | 網路 | Tailscale（WireGuard mesh）；web 綁 Tailscale IP，不綁 `0.0.0.0` |
 | 主機 | Oracle Cloud Always Free —— $0/月 |
-| Process 監管 | systemd `Restart=always`；透過 SSH 上的 `ops` 操作 |
+| Process 監管 | Docker Compose，`restart: unless-stopped`；由 GitHub Actions 部署；透過 SSH 上的 `ops` 操作 |
 | 容器 | 多階段建置 → `FROM scratch`，**27 MB** |
-| 編排 | 生產環境用 systemd；[`k8s/`](k8s/) 的清單把 probe / resource / `GOMEMLIMIT` 的語意弄清楚 |
+| 編排 | 生產環境是單機上的 Compose；[`k8s/`](k8s/) 的清單把 probe / resource / `GOMEMLIMIT` 的語意弄清楚 |
 
 ---
 

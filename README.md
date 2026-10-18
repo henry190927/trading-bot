@@ -22,7 +22,7 @@ CLIs and the web UI address any of the 14 contracts `market.Resolve` knows.
 | **Does** | Detect → score → record / execute (paper-first) → alert |
 | **Discipline** | Every strategy change goes through a 60/90/120-day A/B, and the ship gate is code (`shipgate`), not a habit |
 | **Size** | 36 importable packages + 28 commands · 255 Go files, 83 of them tests · ~55k lines · `go test -race ./...` clean |
-| **Ships as** | Static binaries over `scp` today; a 27 MB `FROM scratch` image is built and verified (see [`k8s/`](k8s/)) |
+| **Ships as** | `FROM scratch` images (web 28.7 MB, monitor 7.4 MB) built by CI per commit, deployed with Docker Compose behind a manual approval ([`docs/operations.md`](docs/operations.md#deploying)) |
 
 ---
 
@@ -260,9 +260,9 @@ before it:
 | Push | ntfy.sh, behind a pluggable `Notifier` with `Multi` fan-out and a runtime mute |
 | Network | Tailscale (WireGuard mesh); web bound to the Tailscale IP, not `0.0.0.0` |
 | Hosting | Oracle Cloud Always Free — $0/month |
-| Supervision | systemd `Restart=always`; operated through `ops` over SSH |
+| Supervision | Docker Compose, `restart: unless-stopped`; deployed by GitHub Actions; operated through `ops` over SSH |
 | Container | Multi-stage → `FROM scratch`, **27 MB** |
-| Orchestration | systemd in production; [`k8s/`](k8s/) manifests pin down probe / resource / `GOMEMLIMIT` semantics |
+| Orchestration | Compose on one host in production; [`k8s/`](k8s/) manifests pin down probe / resource / `GOMEMLIMIT` semantics |
 
 ---
 
