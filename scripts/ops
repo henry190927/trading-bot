@@ -36,7 +36,11 @@ cmd_status() {
     # TAG yet.
     tag="$(grep -E '^TAG=' "$ENVF" 2>/dev/null | cut -d= -f2- || true)"
     bind="$(grep -E '^WEB_BIND=' "$ENVF" 2>/dev/null | cut -d= -f2- || true)"
-    printf '%-16s %s\n' "deployed" "${tag:+${tag:0:12}  https://github.com/henry190927/trading-bot/commit/$tag}${tag:-(no TAG yet — not running from a container deploy)}"
+    if [ -n "$tag" ]; then
+        printf '%-16s %s\n' "deployed" "${tag:0:12}  https://github.com/henry190927/trading-bot/commit/$tag"
+    else
+        printf '%-16s %s\n' "deployed" "(no TAG yet — not running from a container deploy)"
+    fi
     if [ -n "$bind" ] && curl -fsS --max-time 3 "http://$bind/health" >/dev/null 2>&1; then
         printf '%-16s %s\n' "trading-web" "/health 200"
     else
