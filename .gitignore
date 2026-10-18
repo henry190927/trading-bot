@@ -13,6 +13,10 @@ ROADMAP.md
 # User trade journal — personal data, lives on the VPS
 journal.csv
 
+# Design mockups — local HTML prototypes built from real journal and price
+# data (mockups/*/data.js), so they stay off the repo like journal.csv.
+/mockups/
+
 # Incident record — journal trade numbers, real balances and position sizes.
 # The CODE keeps the mechanism (why a rail exists, what failure it prevents);
 # this file keeps the account-identifying half. See docs/incidents.md.
