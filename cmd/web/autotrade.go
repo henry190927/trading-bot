@@ -261,7 +261,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"Sum":         sum,
 		"Equity":      buildEquityCurve(statTrades),
 		"Histogram":   buildRHistogram(statTrades),
-		"Calendar":    buildDailyCalendar(statTrades, 42),
+		"Calendar":    buildDailyCalendar(statTrades, 42, time.Now()),
 		"StatN":       len(statTrades),
 		// perfPanels labels its distribution panel with .ClosedCount.
 		"ClosedCount":     len(statTrades),

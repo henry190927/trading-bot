@@ -189,7 +189,9 @@ func labels(bs []rBucket) []string {
 
 func TestBuildDailyCalendarFromPositions(t *testing.T) {
 	rts, _ := rTradesFromPositions(todaysPositions())
-	grid := buildDailyCalendar(rts, 42)
+	// Pinned to just after the 09-02 book: in any runner timezone this is
+	// 09-03 or 09-04, well inside the 42-day window.
+	grid := buildDailyCalendar(rts, 42, time.Date(2026, 9, 4, 0, 0, 0, 0, time.UTC))
 	if len(grid) == 0 {
 		t.Fatal("want a grid")
 	}
