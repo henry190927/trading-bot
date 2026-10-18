@@ -585,5 +585,21 @@
   "chart.leg.vpBuy": "VP buy",
   "chart.leg.vpSell": "VP sell",
   "chart.ui.refreshHint": "Refresh on demand",
-  "chart.ui.refresh": "Refresh"
+  "chart.ui.refresh": "Refresh",
+  "chart.js.axis.mr": "Mean rev.",
+  "chart.js.axis.mom": "Momentum",
+  "chart.js.axis.both": "Shared",
+  "chart.js.ctx.funding": "Funding",
+  "chart.js.oi.title": "Open interest",
+  "chart.js.plan.entry": "Entry",
+  "chart.js.plan.stop": "Stop",
+  "chart.js.plan.anchor": "Anchor",
+  "chart.mr": "Mean rev.",
+  "chart.mom": "Momentum",
+  "chart.plan": "Engine plan",
+  "chart.js.tf.long": "Long",
+  "chart.js.tf.longLean": "Lean long",
+  "chart.js.tf.short": "Short",
+  "chart.js.tf.shortLean": "Lean short",
+  "chart.js.tf.neutral": "Neutral"
 }

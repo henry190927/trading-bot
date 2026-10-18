@@ -585,5 +585,21 @@
   "chart.leg.vpBuy": "VP 買方",
   "chart.leg.vpSell": "VP 賣方",
   "chart.ui.refreshHint": "需要時手動更新",
-  "chart.ui.refresh": "重新整理"
+  "chart.ui.refresh": "重新整理",
+  "chart.js.axis.mr": "均值回歸",
+  "chart.js.axis.mom": "動能",
+  "chart.js.axis.both": "共通",
+  "chart.js.ctx.funding": "資金費率",
+  "chart.js.oi.title": "持倉量",
+  "chart.js.plan.entry": "進場",
+  "chart.js.plan.stop": "停損",
+  "chart.js.plan.anchor": "錨點",
+  "chart.mr": "均值回歸",
+  "chart.mom": "動能",
+  "chart.plan": "引擎計畫",
+  "chart.js.tf.long": "偏多",
+  "chart.js.tf.longLean": "略偏多",
+  "chart.js.tf.short": "偏空",
+  "chart.js.tf.shortLean": "略偏空",
+  "chart.js.tf.neutral": "中性"
 }

@@ -6961,3 +6961,55 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .chart-side > .chart-header[id] .chart-banner-action { display: block; text-align: left; align-items: flex-start; }
 .chart-side > .chart-header[id] .chart-banner-action-text { font-size: var(--fs-base); }
 .chart-side > .chart-header[id] .chart-banner-score-num { font-size: var(--fs-3xl); }
+
+/* ── Chart side panel, matched to the mockup (phase 4d) ──────────── */
+/* MR / MOM as bars beside the /100 figure; votes under them. */
+.cs-bars { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cs-bars > div { display: grid; grid-template-columns: 64px 1fr 28px; align-items: center; gap: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-bars i { display: block; height: 6px; border-radius: 3px; background: var(--chip-border); overflow: hidden; }
+.cs-bars b { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--blue); transition: width 300ms ease; }
+.cs-bars em { font-style: normal; font-family: var(--mono); font-size: var(--fs-sm); color: var(--text); text-align: right; }
+.cs-bars > .cs-votes { display: block; text-align: right; }
+.cs-votes .score { font-size: var(--fs-xs); }
+/* Factors as a list: points | name | axis. */
+.chart-side .chart-factors { display: flex; flex-direction: column; gap: 0; }
+.chart-side .chart-factors .factor-chip {
+    display: flex; align-items: baseline; gap: var(--sp-2); width: 100%;
+    padding: 5px 0; margin: 0; background: none; border: 0; border-top: 1px solid var(--border); border-radius: 0;
+    font-family: var(--sans); font-size: var(--fs-sm); color: var(--text); white-space: normal;
+}
+.chart-side .chart-factors .factor-chip:first-child { border-top: 0; padding-top: 0; }
+.chart-side .factor-chip .factor-pts { flex: 0 0 30px; font-family: var(--mono); font-weight: 600; }
+.chart-side .factor-chip.factor-pos .factor-pts { color: var(--green); }
+.chart-side .factor-chip.factor-neg .factor-pts { color: var(--red); }
+.chart-side .factor-chip > span:nth-child(2) { flex: 1 1 auto; min-width: 0; }
+.chart-side .factor-ax { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--text-dim); }
+/* Plan card */
+.cs-plan-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--sp-4); margin: 0; font-size: var(--fs-sm); }
+.cs-plan-dl dt { color: var(--text-dim); }
+.cs-plan-dl dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.cs-plan-dl .cs-up { color: var(--green); } .cs-plan-dl .cs-down { color: var(--red); }
+.cs-plan-r { color: var(--text-dim); font-size: var(--fs-xs); margin-left: 4px; }
+.cs-plan-anchor { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-plan-anchor:empty { display: none; }
+/* TF bias: the five timeframes as tiles; title, alignment, HVN and range
+   rows span the full width. */
+.chart-side > .tf-bias-panel { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.chart-side > .tf-bias-panel > :not(.tf-bias-row) { grid-column: 1 / -1; }
+.chart-side > .tf-bias-panel .tf-bias-title { font-size: var(--fs-base); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0; }
+.chart-side > .tf-bias-panel .tf-bias-row {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; margin: 0;
+    border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-xs);
+}
+.chart-side .tf-bias-row .tf-bias-tf { font-family: var(--mono); color: var(--text-dim); font-weight: 500; }
+.chart-side .tf-bias-row .tf-bias-dot { font-size: var(--fs-xs); font-weight: 600; }
+.chart-side .tf-bias-row .tf-bias-sc { display: none; } /* the score is in the tooltip */
+.chart-side .tf-bias-row.bias-short .tf-bias-dot, .chart-side .tf-bias-row.bias-short-lean .tf-bias-dot { color: var(--red); }
+.chart-side .tf-bias-row.bias-long .tf-bias-dot, .chart-side .tf-bias-row.bias-long-lean .tf-bias-dot { color: var(--green); }
+.chart-side .tf-bias-row.bias-neutral .tf-bias-dot, .chart-side .tf-bias-row.bias-na .tf-bias-dot { color: var(--text-dim); font-weight: 500; }
+/* Open interest card */
+.cs-oi-body { display: flex; flex-direction: column; gap: 2px; }
+.cs-oi-read { font-size: var(--fs-sm); font-weight: 600; }
+.cs-oi-body.oi-armed .cs-oi-read { color: var(--yellow); }
+.cs-oi-num { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-oi-bn { margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--border); font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-dim); }

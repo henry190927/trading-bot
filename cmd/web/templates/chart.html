@@ -250,10 +250,10 @@
     </div>
     <div class="cs-score">
       <div class="cs-score-num"><span class="chart-banner-score-num" id="chart-banner-score-num">—</span><small>/100</small></div>
-      <div class="cs-score-chips">
-        <span class="score score-mr" id="chart-mr">MR —</span>
-        <span class="score score-mom" id="chart-mom">MOM —</span>
-        <span class="score score-votes" id="chart-total" title="{{t "chart.votesHint"}}">—</span>
+      <div class="cs-bars">
+        <div><span>{{t "chart.mr"}}</span><i><b id="cs-mr-bar"></b></i><em id="chart-mr">—</em></div>
+        <div><span>{{t "chart.mom"}}</span><i><b id="cs-mom-bar"></b></i><em id="chart-mom">—</em></div>
+        <div class="cs-votes"><span class="score score-votes" id="chart-total" title="{{t "chart.votesHint"}}">—</span></div>
       </div>
     </div>
     <div class="chart-banner-action" id="chart-banner-action">
@@ -262,6 +262,14 @@
     </div>
     <div class="chart-factors" id="chart-factors" aria-label="{{t "chart.factors"}}"></div>
   </div>
+
+  {{/* The engine's plan for this symbol/TF — the same levels the plan
+       layer draws, with the R of each target against the stop. */}}
+  <section class="cs-card cs-plan" id="cs-plan" hidden>
+    <div class="cs-card-h"><h2>{{t "chart.plan"}}</h2><span class="ui-side" id="cs-plan-side">—</span></div>
+    <dl class="cs-plan-dl" id="cs-plan-dl"></dl>
+    <div class="cs-plan-anchor" id="cs-plan-anchor"></div>
+  </section>
 
   <div class="chart-one-liner" id="chart-oneliner">
     <span id="chart-oneliner-text">{{t "common.loading"}}</span>
@@ -286,6 +294,9 @@
          card and the plot is clean. Same #tf-bias id, so the renderer
          finds it unchanged. -->
     <div class="tf-bias-panel" id="tf-bias" aria-label="{{t "chart.ui.tfbiasAria"}}"></div>
+    {{/* Open interest, its own card (it used to sit inside the TF-bias
+         strip). Filled by loadBias from the same /api/chart/bias call. */}}
+    <section class="cs-card cs-oi" id="cs-oi" hidden></section>
   </aside>
   </div><!-- /chart-grid -->
   <script>
@@ -870,6 +881,19 @@
         "load.updating": {{t "chart.js.load.updating"}},
         "sum.notStacked": {{t "chart.js.sum.notStacked"}},
         "sum.belowMin": {{t "chart.js.sum.belowMin"}},
+        "tf.long": {{t "chart.js.tf.long"}},
+        "tf.longLean": {{t "chart.js.tf.longLean"}},
+        "tf.short": {{t "chart.js.tf.short"}},
+        "tf.shortLean": {{t "chart.js.tf.shortLean"}},
+        "tf.neutral": {{t "chart.js.tf.neutral"}},
+        "axis.mr": {{t "chart.js.axis.mr"}},
+        "axis.mom": {{t "chart.js.axis.mom"}},
+        "axis.both": {{t "chart.js.axis.both"}},
+        "ctx.funding": {{t "chart.js.ctx.funding"}},
+        "oi.title": {{t "chart.js.oi.title"}},
+        "plan.entry": {{t "chart.js.plan.entry"}},
+        "plan.stop": {{t "chart.js.plan.stop"}},
+        "plan.anchor": {{t "chart.js.plan.anchor"}},
         "tf.title": {{t "chart.js.tf.title"}},
         "hvn.noteClear": {{t "chart.js.hvn.noteClear"}},
         "hvn.noteBlocked": {{t "chart.js.hvn.noteBlocked"}},
@@ -2366,6 +2390,31 @@
     // used by pushes and the CLI). Score, verdict and the suggested action
     // are already in the score card above, so this keeps what is only here:
     // the POC migration and the vote split against MIN_SCORE.
+    // The plan card: entry / stop / TP1 / TP2, each target with its R
+    // against the stop. Hidden when the engine has no plan.
+    function renderPlanCard(p) {
+        var card = document.getElementById('cs-plan');
+        if (!card) return;
+        if (!p || !p.entry || !p.stop) { card.hidden = true; return; }
+        var side = String(p.side || '').toLowerCase();
+        var sideEl2 = document.getElementById('cs-plan-side');
+        sideEl2.className = 'ui-side ' + side;
+        sideEl2.textContent = side === 'long' ? CT['q.long'] : side === 'short' ? CT['q.short'] : (p.side || '—');
+        var risk = Math.abs(p.stop - p.entry);
+        function rOf(tp) { return risk > 0 && tp ? (Math.abs(tp - p.entry) / risk).toFixed(1) + 'R' : ''; }
+        function row(label, v, cls, extra) {
+            return '<dt>' + label + '</dt><dd class="' + (cls || '') + '">' + (v ? fmtPrice(v) : '—')
+                + (extra ? ' <span class="cs-plan-r">' + extra + '</span>' : '') + '</dd>';
+        }
+        document.getElementById('cs-plan-dl').innerHTML =
+            row(CT['plan.entry'], p.entry) +
+            row(CT['plan.stop'], p.stop, 'cs-down') +
+            row('TP1', p.tp1, 'cs-up', rOf(p.tp1)) +
+            row('TP2', p.tp2, 'cs-up', rOf(p.tp2));
+        var an = document.getElementById('cs-plan-anchor');
+        an.textContent = p.anchor ? CT['plan.anchor'] + ' ' + p.anchor : '';
+        card.hidden = false;
+    }
     // The validator's verdict codes (STRONG TAKE / TAKE / NEUTRAL / WEAK /
     // AVOID) in the page language; an unknown code shows as it came.
     function verdictText(v) { return (v && CT['verdict.' + v]) || v || ''; }
@@ -2510,8 +2559,12 @@
         // Phase-1 unified score: MR/MOM sub-scores now show the /100 weighted
         // sub-totals (validator), not the System-A integer vote counts. The
         // raw vote count is demoted to the small "N 票" chip (System A, MIN=3).
-        mrEl.textContent    = 'MR ' + (diag.mr100  != null ? diag.mr100.toFixed(0)  : '—');
-        momEl.textContent   = 'MOM ' + (diag.mom100 != null ? diag.mom100.toFixed(0) : '—');
+        mrEl.textContent    = diag.mr100  != null ? diag.mr100.toFixed(0)  : '—';
+        momEl.textContent   = diag.mom100 != null ? diag.mom100.toFixed(0) : '—';
+        var mrBar = document.getElementById('cs-mr-bar'), momBar = document.getElementById('cs-mom-bar');
+        if (mrBar)  mrBar.style.width  = Math.max(0, Math.min(100, diag.mr100  || 0)) + '%';
+        if (momBar) momBar.style.width = Math.max(0, Math.min(100, diag.mom100 || 0)) + '%';
+        renderPlanCard(data.plan);
         totalEl.textContent = CT['votes'].replace('{n}', sig.score != null ? sig.score : '—');
         totalEl.className   = 'score score-votes ' + scoreClass(sig.score);
         // Legacy hidden nodes — kept for older code paths that may
@@ -2572,6 +2625,12 @@
                 nm.textContent = CF[f.name] || f.name;
                 chip.appendChild(pts);
                 chip.appendChild(nm);
+                if (f.axis && CT['axis.' + f.axis]) {
+                    var ax = document.createElement('span');
+                    ax.className = 'factor-ax';
+                    ax.textContent = CT['axis.' + f.axis];
+                    chip.appendChild(ax);
+                }
                 facEl.appendChild(chip);
             });
             // Phones/tablets (panel above the plot): CSS shows the first two
@@ -2612,7 +2671,7 @@
             else if (mc.fundingRate >=  0.0005) fCls = ' ctx-warn-soft';
             else if (mc.fundingRate <= -0.0010) fCls = ' ctx-warn';
             else if (mc.fundingRate <= -0.0005) fCls = ' ctx-warn-soft';
-            ctxParts.push('<span class="ctx-chip' + fCls + '">funding ' + pct + '% (~' + annualized + '% APR)</span>');
+            ctxParts.push('<span class="ctx-chip' + fCls + '">' + CT['ctx.funding'] + ' ' + pct + '% (~' + annualized + '% APR)</span>');
         }
         if (mc.openInterest && mc.openInterest > 0) {
             var oiFmt = mc.openInterest >= 1e9 ? (mc.openInterest/1e9).toFixed(2) + 'B'
@@ -3047,12 +3106,12 @@
     // vote of {N-struct, POC regime, engine} from /api/chart/bias.
     function biasMeta(dir) {
         switch (dir) {
-            case 'long':       return { dot: '🟢', cls: 'bias-long' };
-            case 'long-lean':  return { dot: '🟢', cls: 'bias-long-lean' };
-            case 'short':      return { dot: '🔴', cls: 'bias-short' };
-            case 'short-lean': return { dot: '🔴', cls: 'bias-short-lean' };
-            case 'neutral':    return { dot: '⚪', cls: 'bias-neutral' };
-            default:           return { dot: '·',  cls: 'bias-na' };
+            case 'long':       return { dot: CT['tf.long'],      cls: 'bias-long' };
+            case 'long-lean':  return { dot: CT['tf.longLean'],  cls: 'bias-long-lean' };
+            case 'short':      return { dot: CT['tf.short'],     cls: 'bias-short' };
+            case 'short-lean': return { dot: CT['tf.shortLean'], cls: 'bias-short-lean' };
+            case 'neutral':    return { dot: CT['tf.neutral'],   cls: 'bias-neutral' };
+            default:           return { dot: '—',                cls: 'bias-na' };
         }
     }
     // Symbol currently being fetched, or null. A bias MISS costs a multi-TF
@@ -3109,6 +3168,7 @@
                 // OI row. A number and a verdict, deliberately not a
                 // sparkline — see computeChartOI for why the source cannot
                 // support a slope at chart resolution.
+                var oiHtml = '';
                 if (d.oi && d.oi.oi) {
                     var o = d.oi, oTxt, oCls = 'oi-flat', oTip;
                     var fTxt = (typeof o.funding === 'number' && o.funding !== 0)
@@ -3132,10 +3192,10 @@
                         oTxt = 'OI —';
                         oTip = CT['oi.notYet'];
                     }
-                    html += '<div class="tf-bias-oi ' + oCls + '" title="'
-                          + oTip.replace(/"/g, '&quot;') + '">' + oTxt
-                          + (o.reading ? '<span class="oi-verdict">' + o.reading + '</span>' : '')
-                          + '</div>';
+                    oiHtml += '<div class="cs-card-h"><h2>' + CT['oi.title'] + '</h2></div>'
+                          + '<div class="cs-oi-body ' + oCls + '" title="' + oTip.replace(/"/g, '&quot;') + '">'
+                          + (o.reading ? '<b class="cs-oi-read">' + o.reading + '</b>' : '')
+                          + '<span class="cs-oi-num">' + oTxt + ' · ' + CT['ctx.funding'] + ' ' + fTxt + '</span></div>';
                     // Binance cross-reference, its own line so it can never be
                     // mistaken for the BingX figure above. Different book —
                     // the entry fills against BingX's.
@@ -3154,7 +3214,7 @@
                     }
                     if (bnBits.length) {
                         var bnTip = CT['bn.tip'];
-                        html += '<div class="tf-bias-bn' + (o.crowd ? ' bn-crowd' : '') + '" title="'
+                        oiHtml += '<div class="cs-oi-bn' + (o.crowd ? ' bn-crowd' : '') + '" title="'
                               + bnTip.replace(/"/g, '&quot;') + '">' + bnBits.join(' · ') + '</div>';
                     }
                 }
@@ -3172,6 +3232,8 @@
                           + CT['range.box'] + ' ' + rf(d.range.lo) + '–' + rf(d.range.hi) + ' ·' + d.range.pos + '%<br><span class="tf-range-act">' + d.range.action + '</span></div>';
                 }
                 el.innerHTML = html;
+                var oiCard = document.getElementById('cs-oi');
+                if (oiCard) { oiCard.innerHTML = oiHtml; oiCard.hidden = !oiHtml; }
             })
             .catch(function () { /* strip is best-effort; ignore failures */ })
             .then(function () { if (biasInFlight === sym) biasInFlight = null; });
