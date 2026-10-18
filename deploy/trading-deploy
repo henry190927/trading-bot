@@ -7,12 +7,13 @@
 #   command="sudo /usr/local/bin/trading-deploy \"$SSH_ORIGINAL_COMMAND\"",restrict ssh-ed25519 AAAA... ci-deploy
 #
 # so whatever the client asks to run arrives here as one argument, and is
-# refused unless it is a 40-character commit SHA. A leaked key can deploy a
-# commit that already passed CI into ghcr.io — it cannot open a shell, forward
-# a port, or pass anything else. sudoers allows ubuntu exactly this script.
+# refused unless it is a 40-character SHA of a commit on main. A leaked key
+# can redeploy a commit that is already on main — it cannot open a shell,
+# forward a port, or pass anything else (all three verified 2026-10-18).
+# sudoers allows ubuntu exactly this script.
 #
 # Steps:
-#   1. validate the SHA
+#   1. validate the SHA, and that it is on main
 #   2. fetch THAT commit's deploy/compose.yaml from GitHub and validate it, so
 #      the images and the settings that run them always come from one commit
 #   3. remember the running TAG, write the new one, pull, up -d
@@ -33,6 +34,17 @@ die() { say "FAIL: $*"; exit 1; }
 
 sha="${1:-}"
 [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "expected a 40-character commit SHA, got '${sha:0:60}'"
+
+# Only commits on main. A well-formed SHA is not enough: GitHub shares one
+# object store across a fork network, so raw.githubusercontent.com serves a
+# FORK's commit under this repo's URL — and its compose.yaml could ask for
+# privileged: true or mount /. "behind" = the SHA is an ancestor of main.
+cmp="$(curl -fsS --max-time 20 "https://api.github.com/repos/$REPO/compare/main...$sha" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' 2>/dev/null || true)"
+case "$cmp" in
+    identical|behind) ;;
+    *) die "$sha is not in main's history (compare: ${cmp:-no answer})" ;;
+esac
 
 # Cut-over guard: the systemd units must be gone, or the containers would
 # start beside them — two monitors pushing every alert twice, two webs
