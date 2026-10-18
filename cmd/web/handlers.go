@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/henry190927/trading-bot/ai"
+	"github.com/henry190927/trading-bot/alert"
 	"github.com/henry190927/trading-bot/analyzer"
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/fundamental"
@@ -54,6 +55,10 @@ type server struct {
 	// SSE subscribers. Constructed in main.go; starts polling only while at
 	// least one client is attached (see stream.go).
 	hub *tickerHub
+
+	// alerts holds the incidents the bell shows (alerts.go). Started in
+	// main.go before the listener, so no handler sees it nil.
+	alerts *alert.Engine
 
 	// aiCache memoizes /ai/analyze responses by trade ID so repeat
 	// clicks (page refresh, accordion re-open) don't re-bill against

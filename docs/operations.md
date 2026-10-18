@@ -272,7 +272,7 @@ App-level auth is intentionally skipped because Tailscale + ufw + bind-address a
 | ntfy "Daemon DOWN / recovered" | `daemon-watch.sh` every 10 min | a service stopping |
 | Daily "daemon heartbeat" push | `daemon-watch.sh` at 00:00 | the watcher itself dying — silence becomes trustworthy |
 | `monitor-heartbeat.json` | the monitor, every 15s | a loop that is alive but stuck (`stalled`), a loop idled by config or mute |
-| `/ops` health card | web | all of the above, on the phone |
+| 🔔 in-app alerts | web, every 15s | monitor down, stalled loops (bracket = critical → also ntfy), restart loops, price feed down, bad macro overlay — see [alerts.md](alerts.md) |
 
 `daemon-watch.sh` asks the services, not the platform: the monitor is up if
 its heartbeat file changed in the last 60 seconds, the web if `/health`

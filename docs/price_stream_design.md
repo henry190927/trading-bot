@@ -223,8 +223,9 @@ Written down explicitly, because interviewers grade what is *said*
 
 ## 10. Observability (added 2026-09-03)
 
-`hub.stats()` is surfaced on `/ops` under 價格推流, and in the `/ops/services`
-JSON as `stream`:
+`hub.stats()` is served as JSON at `/api/stream/stats` (it was a card on
+`/ops` until 2026-10-18; a dead or silent upstream is now the `price_ws`
+alert, see [alerts.md](alerts.md)):
 
 | field | why it exists |
 |---|---|

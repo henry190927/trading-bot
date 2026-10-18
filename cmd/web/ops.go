@@ -1,23 +1,18 @@
-// Ops control panel: live daemon status, lifecycle commands, config edit,
-// and an SSE log tail. Designed for mobile use over Tailscale — gives the
-// trader full daemon control without having to SSH from the iPhone.
+// Ops settings page: the runtime switches the trader flips from a phone —
+// push mute, the zone-fade channel, the AI model — plus read-only account
+// views. Tailscale-only + ufw + interface-bound socket.
 //
-// Security model: Tailscale-only + ufw + interface-bound socket, and
-// sudoers on the VPS grants `ubuntu` exactly `systemctl start|stop|restart`
-// on the three trading units — nothing else. Everything else this file runs
-// is unprivileged: `systemctl is-active` / `status` are read-only D-Bus
-// queries, and journal reads come from adm group membership. That matters,
-// because the narrow grant is only a real boundary if nothing here needs
-// more than it. .env edits go through validation so a typo can't write
-// garbage into /opt/trading/.env.
+// It used to be "Daemon control": live unit status, start/stop/restart and a
+// journal tail, backed by a sudoers grant. All of that moved out — control to
+// SSH (scripts/ops), health to in-app alerts (alerts.go) — so nothing here
+// needs more than read/write on files in the data directory. .env is never
+// written from the web.
 package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -39,113 +34,17 @@ func envPath() string {
 // the strategy can sensibly run on.
 var validTFs = []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"}
 
-// allowedServices is the strict allowlist for any /ops/* action.
-// Sudoers on the VPS is scoped to this unit; anything else would
-// silently fail at the systemctl call but we reject early for a
-// cleaner error.
-var allowedServices = []string{"trading-monitor"}
-
-type opsStatus struct {
-	Service string `json:"service"`
-	Active  bool   `json:"active"`
-	State   string `json:"state"` // "active" | "inactive" | "failed" | "unknown"
-
-	// Monitor-specific config read from .env. Populated only when
-	// readDaemonStatus("trading-monitor") is called.
-	MonitorTFs      []string `json:"monitor_tfs,omitempty"`
-	MonitorMinScore int      `json:"monitor_min_score,omitempty"`
-	MonitorMinTFs   int      `json:"monitor_min_tfs,omitempty"`
-	MonitorMinRatio float64  `json:"monitor_min_ratio"` // 0 = disabled (always emitted so UI can distinguish "off" from "unset")
-}
-
-// readDaemonStatus reports a service's liveness — the monitor from its
-// heartbeat, the web from the fact that it is answering — plus the monitor's
-// MONITOR_* config from .env. Defaults baked into the binary apply when an
-// env var is missing. Nothing here asks systemd (see ops_heartbeat.go).
-func readDaemonStatus(service string) opsStatus {
-	st := opsStatus{Service: service, State: "unknown"}
-	if service == "trading-web" {
-		st.Active, st.State = true, "active"
-		return st
-	}
-	st.Active, st.State = monitorLiveness(readHeartbeatView(time.Now()))
-
-	if service != "trading-monitor" {
-		return st
-	}
-	data, err := os.ReadFile(envPath())
-	if err != nil {
-		return st
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		switch {
-		case strings.HasPrefix(line, "MONITOR_TFS="):
-			raw := strings.TrimPrefix(line, "MONITOR_TFS=")
-			for _, t := range strings.Split(raw, ",") {
-				if t = strings.TrimSpace(t); t != "" {
-					st.MonitorTFs = append(st.MonitorTFs, t)
-				}
-			}
-		case strings.HasPrefix(line, "MONITOR_MIN_SCORE="):
-			if v, err := strconv.Atoi(strings.TrimPrefix(line, "MONITOR_MIN_SCORE=")); err == nil {
-				st.MonitorMinScore = v
-			}
-		case strings.HasPrefix(line, "MONITOR_MIN_TFS="):
-			if v, err := strconv.Atoi(strings.TrimPrefix(line, "MONITOR_MIN_TFS=")); err == nil {
-				st.MonitorMinTFs = v
-			}
-		case strings.HasPrefix(line, "MONITOR_MIN_RATIO="):
-			if v, err := strconv.ParseFloat(strings.TrimPrefix(line, "MONITOR_MIN_RATIO="), 64); err == nil {
-				st.MonitorMinRatio = v
-			}
-		}
-	}
-
-	// Fall back to baked-in defaults (matches cmd/monitor's flag defaults)
-	// so the UI shows current values when .env hasn't been touched yet.
-	if service == "trading-monitor" {
-		if len(st.MonitorTFs) == 0 {
-			st.MonitorTFs = []string{"30m", "1h", "2h", "4h"}
-		}
-		if st.MonitorMinScore == 0 {
-			st.MonitorMinScore = 3
-		}
-		if st.MonitorMinTFs == 0 {
-			st.MonitorMinTFs = 2
-		}
-	}
-	return st
-}
-
-// parseService extracts and validates the ?service= query param.
-func parseService(c *gin.Context) (string, error) {
-	svc := c.DefaultQuery("service", "trading-monitor")
-	if !contains(allowedServices, svc) {
-		return "", fmt.Errorf("service must be one of: %s", strings.Join(allowedServices, ", "))
-	}
-	return svc, nil
-}
-
-// handleOpsPage renders the control panel HTML shell. The monitor's status
-// is rendered at first paint and refreshed by polling /ops/status. Service
-// restarts and raw logs are not on this page: they are an SSH job
-// (scripts/ops), so the web service needs no host privileges for them.
+// handleOpsPage renders the settings page: push mute, account exposure, OI,
+// the zone channel and the AI model. System health is not on it any more —
+// that is the alert bell's job (alerts.go) — and service restarts and raw
+// logs are an SSH job (scripts/ops), so the web service needs no host
+// privileges for them.
 func (s *server) handleOpsPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "ops.html", gin.H{
-		"Monitor":       readDaemonStatus("trading-monitor"),
 		"Zone":          zone.ReadConfig(),
 		"ZoneTFList":    zone.ReadConfig().TFList(),
 		"ZoneTFOptions": []string{"15m", "30m", "1h", "2h", "4h"},
 	})
-}
-
-func (s *server) handleOpsStatus(c *gin.Context) {
-	svc, err := parseService(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, readDaemonStatus(svc))
 }
 
 // handleOpsZones reports the zone-fade alert config (read from .env, so it

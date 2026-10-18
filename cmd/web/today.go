@@ -15,7 +15,8 @@ import (
 
 // /today — the "attention feed" home. Answers the morning questions on one
 // page: can the engine trade (macro blackout)? how are my open trades doing
-// (live R)? is the daemon alive? what setups need a decision? Deliberately
+// (live R)? what setups need a decision? (Whether the daemons are alive is
+// the alert bell's job now, on every page.) Deliberately
 // LIGHT — no 4-symbol engine scan (that's /), just fast sources.
 func (s *server) handleTodayPage(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
@@ -69,13 +70,6 @@ func (s *server) handleTodayPage(c *gin.Context) {
 	// Open trades + live R (light: nil views → fetches only open symbols).
 	openTrades := s.buildOpenTradeCards(ctx, nil)
 
-	// Daemon health.
-	daemons := make([]gin.H, 0, 2)
-	for _, svc := range []string{"trading-monitor", "trading-web"} {
-		st := readDaemonStatus(svc)
-		daemons = append(daemons, gin.H{"name": svc, "active": st.Active, "state": st.State})
-	}
-
 	// Pending setups needing an outcome decision.
 	var pending []Setup
 	if all, err := readSetups(); err == nil {
@@ -95,7 +89,6 @@ func (s *server) handleTodayPage(c *gin.Context) {
 		"BONext":      boNext,
 		"MacroGaps":   macroGaps,
 		"OpenTrades":  openTrades,
-		"Daemons":     daemons,
 		"Pending":     pending,
 		"NowTPE":      now.In(tpe).Format("2006-01-02 15:04"),
 	})

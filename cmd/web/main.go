@@ -166,6 +166,9 @@ func main() {
 	r.GET("/api/chart/bias", srv.handleChartBias)
 	r.GET("/api/tickers", srv.handleTickers)
 	r.GET("/api/stream/tickers", srv.handleStreamTickers)
+	// The fan-out's counters (drop rate, websocket health) for curl. They were
+	// a card on /ops; the faults among them are alerts now (alerts.go).
+	r.GET("/api/stream/stats", func(c *gin.Context) { c.JSON(http.StatusOK, srv.hub.stats()) })
 	r.GET("/ops", srv.handleOpsPage)
 	r.GET("/ops/scan", srv.handleScanSetups)
 	r.POST("/scan/record", srv.handleScanRecord)
@@ -183,8 +186,10 @@ func main() {
 	r.GET("/ops/balance", srv.handleOpsBalance)
 	r.GET("/ops/oi", srv.handleOpsOI)
 	r.GET("/ops/autotrade", srv.handleOpsAutotrade)
-	r.GET("/ops/status", srv.handleOpsStatus)
 	r.GET("/ops/services", srv.handleOpsServices)
+	r.GET("/alerts", srv.handleAlertsPage)
+	r.GET("/api/alerts", srv.handleAlertsAPI)
+	r.POST("/api/alerts/ack", srv.handleAlertsAck)
 	r.POST("/ops/ntfy", srv.handleOpsNtfy)
 	r.GET("/ops/zones", srv.handleOpsZones)
 	r.POST("/ops/zone-config", srv.handleOpsZoneConfig)
@@ -274,6 +279,9 @@ func main() {
 	// stream uses — see cmd/web/grpc.go and docs/grpc.md. Unset = no listener,
 	// no signal handler, nothing changes.
 	startGRPC(srv.hub)
+
+	// In-app alerts: evaluates the rules every 15s and serves the bell.
+	srv.startAlerts(context.Background())
 
 	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
 	if err := r.Run(bind); err != nil {

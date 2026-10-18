@@ -6746,3 +6746,78 @@ html[data-density="compact"] .dt {
     background: var(--wash-dim); color: var(--text-dim); cursor: help;
     border-left: 2px solid var(--border); }
 .tf-bias-bn.bn-crowd { color: var(--yellow); }
+
+/* =====================================================================
+   Alert bell + notification panel (static/alerts.js, cmd/web/alerts.go).
+   Solid tokens only (--red-bg etc.), no color-mix: iOS Safari < 16.4.
+   ===================================================================== */
+.sidebar-head-actions { display: flex; align-items: center; gap: var(--sp-2); }
+.alert-bell {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-md); line-height: 1; padding: 3px 8px;
+}
+.alert-bell:hover { color: var(--text); }
+.alert-bell.has-critical { border-color: var(--red); background: var(--red-bg); }
+.alert-bell-mobile { margin-left: auto; padding: 6px 10px; }
+.alert-badge {
+    position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px;
+    border-radius: 999px; background: var(--yellow); color: #111;
+    font-size: 11px; font-weight: 800; line-height: 17px; text-align: center;
+}
+.alert-badge.crit { background: var(--red); color: #fff; }
+.alert-badge[hidden] { display: none; }
+
+.alert-panel {
+    position: fixed; z-index: 70; max-height: min(70vh, 560px); overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: var(--shadow-2);
+}
+.alert-panel[hidden] { display: none; }
+.alert-panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--surface);
+}
+.alert-panel-foot {
+    display: block; padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--border);
+    font-size: var(--fs-sm); color: var(--text-dim); text-decoration: none;
+}
+.alert-panel-foot:hover { color: var(--text); }
+
+.alert-list { list-style: none; margin: 0; padding: 0; }
+.alert-item {
+    padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border);
+    border-left: 3px solid var(--text-dim);
+}
+.alert-item.sev-critical { border-left-color: var(--red); }
+.alert-item.sev-warning  { border-left-color: var(--yellow); }
+.alert-item.sev-info     { border-left-color: var(--border); }
+.alert-item.is-open.sev-critical { background: var(--red-bg); }
+.alert-item.is-open.sev-warning  { background: var(--yellow-bg); }
+.alert-item.is-resolved:not(.is-unread) { opacity: .7; }
+.alert-item-head { display: flex; align-items: baseline; gap: var(--sp-2); }
+.alert-sev {
+    flex: 0 0 auto; font-size: var(--fs-xs); font-weight: 800; padding: 1px 6px;
+    border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-dim);
+}
+.sev-critical .alert-sev { background: var(--red); color: #fff; }
+.sev-warning .alert-sev  { background: var(--yellow); color: #111; }
+.alert-title { font-weight: 700; color: var(--text); }
+.is-unread .alert-title::after { content: " ●"; color: var(--blue); font-size: .8em; }
+.alert-detail { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-dim); overflow-wrap: anywhere; }
+.alert-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3);
+    margin-top: 4px; font-size: var(--fs-xs); color: var(--text-dim);
+}
+.is-open .alert-status { color: var(--text); font-weight: 700; }
+.alert-ack { margin-left: auto; padding: 2px 8px; font-size: var(--fs-xs); }
+.alert-empty { padding: var(--sp-4) var(--sp-3); color: var(--text-dim); font-size: var(--fs-sm); text-align: center; }
+
+.alerts-main { max-width: 860px; }
+.alerts-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); margin: var(--sp-3) 0; }
+.alerts-filter { display: flex; gap: var(--sp-1); }
+.alerts-filter .is-active { border-color: var(--blue); color: var(--text); }
+.alerts-info-toggle { font-size: var(--fs-sm); color: var(--text-dim); display: flex; align-items: center; gap: 4px; }
+.alert-list-page { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
+.alert-list-page .alert-item:last-child { border-bottom: none; }

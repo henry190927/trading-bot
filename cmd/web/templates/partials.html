@@ -2,7 +2,10 @@
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-head">
     <a class="sidebar-brand" href="/"><span class="brand-mark">◈</span><span class="brand-text">Hentra</span></a>
-    <button type="button" class="sidebar-collapse" id="sidebar-collapse" title="收合側欄" aria-label="collapse sidebar">«</button>
+    <span class="sidebar-head-actions">
+      <button type="button" class="alert-bell" data-alert-bell title="告警" aria-label="alerts" aria-haspopup="true">🔔<span class="alert-badge" hidden></span></button>
+      <button type="button" class="sidebar-collapse" id="sidebar-collapse" title="收合側欄" aria-label="collapse sidebar">«</button>
+    </span>
   </div>
   <nav class="topnav" id="topnav">
     <a href="/" data-i18n="nav.today">Today</a>
@@ -27,7 +30,8 @@
     </div>
     <div class="nav-group">
       <span class="nav-group-label" data-i18n="nav.g.system">System</span>
-      <a href="/ops" data-i18n="nav.ops">Ops</a>
+      <a href="/alerts" data-i18n="nav.alerts">🔔 Alerts</a>
+      <a href="/ops" data-i18n="nav.ops">Settings</a>
       <a href="/ops/autotrade">🤖 Auto</a>
       <a href="/ops/verify" data-i18n="nav.verify">🔎 查證</a>
     </div>
@@ -37,7 +41,18 @@
 <header class="topbar-mobile">
   <button type="button" class="nav-burger" id="nav-burger" aria-label="menu" aria-expanded="false">☰</button>
   <a class="brand" href="/"><span class="brand-mark">◈</span> Hentra</a>
+  <button type="button" class="alert-bell alert-bell-mobile" data-alert-bell title="告警" aria-label="alerts" aria-haspopup="true">🔔<span class="alert-badge" hidden></span></button>
 </header>
+<!-- Alert bell dropdown (alerts.js). One panel for both bells. -->
+<div class="alert-panel" id="alert-panel" role="dialog" aria-label="alerts" hidden>
+  <div class="alert-panel-head">
+    <strong>告警</strong>
+    <button type="button" class="btn-ops alert-ackall" id="alert-ackall">全部標為已讀</button>
+  </div>
+  <ul class="alert-list" id="alert-panel-list"></ul>
+  <a class="alert-panel-foot" href="/alerts">查看全部紀錄 →</a>
+</div>
+<script src="/static/alerts.js" defer></script>
 <div class="sidebar-scrim" id="sidebar-scrim"></div>
 <button type="button" class="sidebar-reopen" id="sidebar-reopen" title="展開側欄" aria-label="open sidebar">☰</button>
 <script>
@@ -76,7 +91,7 @@
       {t:'Portfolio', h:'journal', u:'/journal'}, {t:'New journal entry', h:'record', u:'/journal/new'},
       {t:'Setups', h:'forward-log', u:'/setups'}, {t:'Tips', h:'', u:'/tips'},
       {t:'Stocks', h:'US / TW fundamentals', u:'/fundamentals'}, {t:'Calendar', h:'macro', u:'/calendar'},
-      {t:'On-chain', h:'', u:'/onchain'}, {t:'Ops', h:'daemons', u:'/ops'},
+      {t:'On-chain', h:'', u:'/onchain'}, {t:'Settings', h:'ops · push · zones', u:'/ops'}, {t:'Alerts', h:'告警', u:'/alerts'},
       {t:'Chart · BTC', h:'symbol', u:'/chart?symbol=BTC'}, {t:'Chart · ETH', h:'symbol', u:'/chart?symbol=ETH'},
       {t:'Chart · XAU', h:'symbol', u:'/chart?symbol=XAU'}, {t:'Chart · XAG', h:'symbol', u:'/chart?symbol=XAG'},
       {t:'Chart · SNDK', h:'symbol', u:'/chart?symbol=SNDK'}, {t:'Chart · NVDA', h:'symbol', u:'/chart?symbol=NVDA'},

@@ -220,8 +220,8 @@ exchange WS ──► upstreamClient ──► hub ──► sessions map
 
 ## 10. Observability（2026-09-03 補上）
 
-`hub.stats()` 已呈現在 `/ops` 的「價格推流」區塊，以及 `/ops/services` JSON 的
-`stream` 欄位：
+`hub.stats()` 以 JSON 提供在 `/api/stream/stats`（2026-10-18 前是 `/ops` 上的
+一張卡；上游斷線或沒資料現在是 `price_ws` 告警，見 [alerts.md](alerts.md)）：
 
 | 欄位 | 為什麼需要它 |
 |---|---|

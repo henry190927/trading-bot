@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>告警 · trading-web</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js" defer></script>
+<script src="/static/i18n.js" defer></script>
+</head>
+<body>
+
+{{template "topnav" .}}
+
+<main class="alerts-main">
+  <h1 class="page-title">告警</h1>
+  <p class="hint">
+    每 15 秒檢查一次,條件連續成立兩次才觸發、連續解除兩次才恢復。
+    嚴重(critical)另外推 ntfy;monitor 停止由主機上的 daemon-watch 推。
+    「已讀」只是不再提醒,告警要等條件解除才會恢復。
+  </p>
+
+  <div class="alerts-toolbar">
+    <div class="alerts-filter" role="tablist">
+      <button type="button" class="btn-ops is-active" data-filter="all">全部</button>
+      <button type="button" class="btn-ops" data-filter="open">進行中</button>
+      <button type="button" class="btn-ops" data-filter="unread">未讀</button>
+    </div>
+    <label class="alerts-info-toggle"><input type="checkbox" id="alerts-show-info"> 顯示紀錄(啟動 / 重啟)</label>
+    <span class="ops-state-flex"></span>
+    <button type="button" class="btn-ops" id="alerts-page-ackall">全部標為已讀</button>
+  </div>
+
+  <ul class="alert-list alert-list-page" id="alerts-page-list">
+    <li class="alert-empty">載入中…</li>
+  </ul>
+</main>
+
+<script>
+(function () {
+  var listEl = document.getElementById('alerts-page-list');
+  var infoBox = document.getElementById('alerts-show-info');
+  var filter = 'all', snap = null;
+
+  function render() {
+    if (!snap || !window.alertsRenderItem) return;
+    var rows = snap.alerts.filter(function (a) {
+      if (a.severity === 'info' && !infoBox.checked) return false;
+      if (filter === 'open') return !a.resolved_at;
+      if (filter === 'unread') return a.severity !== 'info' && !a.acked_at;
+      return true;
+    });
+    listEl.innerHTML = '';
+    if (!rows.length) {
+      var li = document.createElement('li');
+      li.className = 'alert-empty';
+      li.textContent = filter === 'all' ? '沒有任何告警紀錄' : '沒有符合的告警';
+      listEl.appendChild(li);
+      return;
+    }
+    rows.forEach(function (a) { listEl.appendChild(window.alertsRenderItem(a)); });
+  }
+
+  // Rendered from the bell's own poll (static/alerts.js), so this page adds
+  // no second timer.
+  document.addEventListener('alerts:update', function (ev) { snap = ev.detail; render(); });
+  infoBox.addEventListener('change', render);
+  document.querySelectorAll('[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      filter = b.getAttribute('data-filter');
+      document.querySelectorAll('[data-filter]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+      render();
+    });
+  });
+  document.getElementById('alerts-page-ackall').addEventListener('click', function () {
+    if (window.alertsAck) window.alertsAck(0);
+  });
+})();
+</script>
+</body>
+</html>

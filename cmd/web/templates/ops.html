@@ -6,7 +6,7 @@
 <script>(function(){try{var l=localStorage.getItem("tw-lang");if(l==="zh")document.documentElement.setAttribute("data-lang",l);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>ops · trading-web</title>
+<title>設定 · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
@@ -17,20 +17,18 @@
 
 <main>
 
-<h1 class="page-title">Daemon control</h1>
+<h1 class="page-title">設定</h1>
+<p class="hint">系統健康不在這頁:出事時 🔔(桌機在側欄頂端、手機在上方列)會通知,完整紀錄在 <a href="/alerts">/alerts</a>。服務重啟與原始日誌走 SSH(<code>ops restart monitor</code> · <code>ops logs monitor -f</code>)。</p>
 
-<!-- ── Health card: what is actually running right now ──
-     Answers the question that used to need an SSH session: are the units up,
-     which of the monitor's goroutines are live, and is push muted. -->
+<!-- ── Push + account ──
+     The service/loop/feed health that used to open this card is the alert
+     bell now (alerts.go): it tells you when something breaks instead of
+     waiting to be looked at. -->
 <section class="ops-health" id="ops-health">
   <h2 class="ops-svc-title">
-    <span class="ops-svc-name">系統狀態</span>
-    <span class="ops-svc-tag">services · loops · 推播</span>
+    <span class="ops-svc-name">推播與帳戶</span>
+    <span class="ops-svc-tag">ntfy · 曝險 · OI</span>
   </h2>
-
-  <div class="ops-health-svcs" id="ops-health-svcs">
-    <div class="hint">載入中…</div>
-  </div>
 
   <div class="ops-health-ntfy" id="ops-health-ntfy">
     <span class="ops-ntfy-state" id="ops-ntfy-state">—</span>
@@ -56,55 +54,8 @@
     <div id="oi-host"></div>
   </div>
 
-  <div class="ops-health-loops">
-    <div class="ops-loops-title">trading-monitor 子迴圈 <span class="ops-svc-tag">monitor 自己回報的心跳</span></div>
-    <div class="hint" id="ops-hb-summary">載入中…</div>
-    <div class="ops-loops-grid" id="ops-health-loops"></div>
-  </div>
-
-  <!-- Price pipeline, in two rows because there are two independent failures:
-       the exchange websocket can be dead while the SSE fan-out is perfectly
-       healthy (it would keep serving 30s-old REST prices), and vice versa.
-       One combined "stream OK" light would hide exactly that case. -->
-  <!-- Runtime macro overlay. The embedded calendar needs a redeploy; this
-       file does not, which is exactly why its state has to be visible: a
-       mistyped entry fails as "no blackout", which looks identical to a
-       working system right up until it isn't. -->
-  <div class="ops-health-loops">
-    <div class="ops-loops-title">Macro overlay <span class="ops-svc-tag">runtime blackout · 60s reload</span></div>
-    <div class="ops-stream-grid" id="ops-health-macro"><span class="hint">載入中…</span></div>
-  </div>
-
-  <div class="ops-health-loops">
-    <div class="ops-loops-title">價格上游 <span class="ops-svc-tag">BingX ws · @markPrice</span></div>
-    <div class="ops-stream-grid" id="ops-health-ws"><span class="hint">載入中…</span></div>
-  </div>
-  <div class="ops-health-loops">
-    <div class="ops-loops-title">價格推流 <span class="ops-svc-tag">SSE · /api/stream/tickers</span></div>
-    <div class="ops-stream-grid" id="ops-health-stream"><span class="hint">載入中…</span></div>
-  </div>
 </section>
 
-
-<!-- ── Secondary daemon: trading-monitor ── -->
-<section class="ops-svc-block" data-service="trading-monitor">
-  <h2 class="ops-svc-title">
-    <span class="ops-svc-name">trading-monitor</span>
-    <span class="ops-svc-tag">multi-TF confluence</span>
-  </h2>
-  <div class="ops-status-card">
-    <div class="ops-status-row">
-      <span class="ops-state-dot {{if .Monitor.Active}}on{{else}}off{{end}}" data-role="state-dot"></span>
-      <span class="ops-state-label" data-role="state-label">{{if .Monitor.Active}}ACTIVE{{else}}{{or .Monitor.State "unknown"}}{{end}}</span>
-      <span class="ops-state-flex"></span>
-      <span class="ops-config-pill">TFs <strong data-role="monitor-tfs">{{range $i, $t := .Monitor.MonitorTFs}}{{if $i}}·{{end}}{{$t}}{{end}}</strong></span>
-      <span class="ops-config-pill">min-score <strong data-role="monitor-score">{{.Monitor.MonitorMinScore}}</strong></span>
-      <span class="ops-config-pill">min-tfs <strong data-role="monitor-mintfs">{{.Monitor.MonitorMinTFs}}</strong></span>
-      <span class="ops-config-pill">min-ratio <strong data-role="monitor-minratio">{{if gt .Monitor.MonitorMinRatio 0.0}}{{printf "%.1f" .Monitor.MonitorMinRatio}}{{else}}off{{end}}</strong></span>
-    </div>
-  </div>
-  <div class="hint">重啟與原始日誌改由 SSH 執行:<code>ops restart monitor</code> · <code>ops logs monitor -f</code></div>
-</section>
 
 <!-- ── Zone-fade alerts (runs inside trading-monitor) ── -->
 <section class="ops-svc-block" id="ops-zone-block">
@@ -190,7 +141,7 @@
 </main>
 
 <footer>
-  <span>Tailscale-only · daemon binary at <code>/opt/trading/trading-serve</code></span>
+  <span>Tailscale-only · 設定寫入 <code>/opt/trading</code> 的設定檔,不改 .env</span>
 </footer>
 
 <script>
@@ -207,56 +158,9 @@
         }, 3500);
     }
 
-    // ─── Status refresh (per service) ──────────────────────────────────
-    function applyStatus(s) {
-        if (!s) return;
-        var block = document.querySelector('.ops-svc-block[data-service="' + s.service + '"]');
-        if (!block) return;
-        block.querySelector('[data-role="state-dot"]').className =
-            'ops-state-dot ' + (s.active ? 'on' : 'off');
-        block.querySelector('[data-role="state-label"]').textContent =
-            (s.state || 'unknown').toUpperCase();
-        // Monitor-specific pills
-        var mTFs = block.querySelector('[data-role="monitor-tfs"]');
-        if (mTFs && s.monitor_tfs) mTFs.textContent = s.monitor_tfs.join('·');
-        var mScore = block.querySelector('[data-role="monitor-score"]');
-        if (mScore && s.monitor_min_score) mScore.textContent = String(s.monitor_min_score);
-        var mMinTFs = block.querySelector('[data-role="monitor-mintfs"]');
-        if (mMinTFs && s.monitor_min_tfs) mMinTFs.textContent = String(s.monitor_min_tfs);
-        var mMinRatio = block.querySelector('[data-role="monitor-minratio"]');
-        if (mMinRatio && s.service === 'trading-monitor') {
-            var r = Number(s.monitor_min_ratio || 0);
-            mMinRatio.textContent = r > 0 ? r.toFixed(1) : 'off';
-        }
-    }
-
-    function fetchStatus(service) {
-        fetch('/ops/status?service=' + service)
-            .then(function (r) { return r.json(); })
-            .then(applyStatus)
-            .catch(function () {});
-    }
-    function fetchAll() {
-        fetchStatus('trading-monitor');
-    }
-    setInterval(fetchAll, 5000);
-
-    // ─── Health card: unit states + monitor loops + ntfy mute ─────────
-    // Deliberately its own poll: it shells out to systemctl three times and
-    // the answer changes on the scale of deploys, not seconds.
+    // ─── Push mute ────────────────────────────────────────────────────
     var ntfyBusy = false;
     function renderHealth(d) {
-        var wrap = document.getElementById('ops-health-svcs');
-        wrap.innerHTML = (d.services || []).map(function (v) {
-            var cls = v.active ? 'on' : (v.state === 'stale' ? 'fail' : 'off');
-            return '<div class="ops-hsvc">'
-                 + '<span class="ops-state-dot ' + cls + '"></span>'
-                 + '<code class="ops-hsvc-name">' + v.unit + '</code>'
-                 + '<span class="ops-hsvc-state ' + cls + '">' + (v.active ? 'ACTIVE' : (v.state || 'unknown')) + '</span>'
-                 + (v.since ? '<span class="ops-hsvc-since" title="從這個行程啟動起算 — 有人重啟過就會歸零">' + v.since + '</span>' : '')
-                 + '</div>';
-        }).join('') || '<div class="hint">無資料</div>';
-
         var nt = d.ntfy || {};
         var live = nt.on && !nt.muted;
         var st = document.getElementById('ops-ntfy-state');
@@ -274,101 +178,14 @@
         } else if (!nt.on) {
             note.textContent = 'NTFY_TOPIC 未設定 — 要在 .env 設定(SSH),網頁不改 .env。';
         } else if (nt.muted) {
-            note.textContent = '靜音中:所有迴圈照跑、zone 觸發照樣記錄,只是不推到手機。取消靜音立即生效。';
+            note.textContent = '靜音中:所有迴圈照跑、zone 觸發照樣記錄,只是不推到手機;頁面上的 🔔 告警照常。取消靜音立即生效。';
         } else {
             note.textContent = '靜音只跳過推播,不重啟 monitor、不改 .env;迴圈照跑。';
         }
-
-        renderLoops(d);
     }
 
-    // The monitor's own report of its loops (cmd/web/ops_heartbeat.go).
-    function esc(s) {
-        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    }
-    function renderLoops(d) {
-        var hb = d.heartbeat || {};
-        var sum = document.getElementById('ops-hb-summary');
-        if (!hb.present) {
-            sum.textContent = '⚠ ' + (hb.error || '讀不到心跳');
-        } else if (!hb.alive) {
-            sum.textContent = '⚠ 心跳中斷 ' + hb.age_sec + 's(超過 60s 視為停止)— ssh trading-bot ops status';
-        } else {
-            sum.textContent = '心跳 ✓ ' + hb.age_sec + 's 前 · pid ' + hb.pid + ' · 已跑 ' + (hb.uptime || '—');
-        }
-        var label = { run: 'RUN', idle: 'IDLE', stalled: 'STALLED', off: 'OFF' };
-        var lw = document.getElementById('ops-health-loops');
-        lw.innerHTML = (hb.loops || []).map(function (l) {
-            var age = (l.age_sec >= 0 && l.state !== 'off') ? ' ' + l.age_sec + 's' : '';
-            return '<div class="ops-loop ' + (l.state === 'run' ? 'on' : 'off') + '" title="' + esc(l.reason) + '">'
-                 + '<code>' + esc(l.name) + '</code>'
-                 + '<span class="ops-hb-badge hb-' + l.state + '">' + (label[l.state] || l.state) + age + '</span>'
-                 + '<span class="ops-loop-reason">' + esc(l.reason) + '</span>'
-                 + '</div>';
-        }).join('') || '<div class="hint">無資料</div>';
-    }
-    // Thresholds: any drop at all is worth a warning colour (it means a client
-    // fell behind a 3s interval), but only a sustained rate is actually bad.
-    function renderStream(st) {
-        var el = document.getElementById('ops-health-stream');
-        if (!el) return;
-        if (!st) { el.innerHTML = '<span class="hint">n/a</span>'; return; }
-        var dropCls = st.dropped === 0 ? 'ok' : (st.drop_pct >= 5 ? 'bad' : 'warn');
-        var ageTxt = st.last_age_sec < 0 ? '—' : st.last_age_sec + 's';
-        // Stale if we have subscribers but no broadcast in >3 intervals.
-        var ageCls = (st.subscribers > 0 && st.last_age_sec > st.interval_sec * 3) ? 'bad' : 'ok';
-        var cells = [
-            ['狀態', st.running ? '推流中' : '待機', st.running ? 'ok' : 'dim'],
-            ['訂閱者', st.subscribers + ' <span class="cs-dim">(峰值 ' + st.peak_subs + ')</span>', st.subscribers ? 'ok' : 'dim'],
-            ['丟棄', st.dropped + ' <span class="cs-dim">(' + st.drop_pct.toFixed(1) + '%)</span>', dropCls],
-            ['已送達', st.delivered, 'dim'],
-            ['上游刷新', st.refreshes + (st.refresh_errs ? ' <span class="ops-stream-bad">/' + st.refresh_errs + ' err</span>' : ''), st.refresh_errs ? 'bad' : 'dim'],
-            ['最後快照', ageTxt + ' <span class="cs-dim">前 · 間隔 ' + st.interval_sec + 's</span>', ageCls]
-        ];
-        el.innerHTML = cells.map(function (c) {
-            return '<div class="ops-stream-cell ' + c[2] + '">'
-                 + '<span class="lbl">' + c[0] + '</span>'
-                 + '<span class="val">' + c[1] + '</span></div>';
-        }).join('');
-    }
-    // Upstream websocket. Read separately from the fan-out below: "we are
-    // serving clients" and "we are receiving prices" are different questions,
-    // and the SSE side stays green while the feed is dead.
-    function renderWS(st) {
-        var el = document.getElementById('ops-health-ws');
-        if (!el) return;
-        if (!st) { el.innerHTML = '<span class="hint">n/a</span>'; return; }
-        // Connected is not the same as working: a dial can succeed and deliver
-        // nothing. Stale = up but no frame for >10s on a ~1Hz feed.
-        var stale = st.ws_up && st.ws_last_age_sec > 10;
-        var state = !st.running ? ['待機', 'dim']
-                  : !st.ws_up  ? ['斷線 · 走 REST 備援', 'bad']
-                  : stale      ? ['連線中但無資料', 'bad']
-                                : ['推流中', 'ok'];
-        var ageTxt = st.ws_last_age_sec < 0 ? '—' : st.ws_last_age_sec + 's';
-        var symCls = (st.ws_live_syms === st.ws_total_syms && st.ws_total_syms > 0) ? 'ok'
-                   : (st.ws_live_syms === 0 ? 'bad' : 'warn');
-        var cells = [
-            ['狀態', state[0], state[1]],
-            ['即時標的', st.ws_live_syms + ' / ' + st.ws_total_syms, symCls],
-            ['最後報價', ageTxt + ' <span class="cs-dim">前 · 約 1Hz</span>', stale ? 'bad' : 'ok'],
-            ['連線次數', st.ws_connects, 'dim'],
-            ['斷線次數', st.ws_drops, st.ws_drops > 0 ? 'warn' : 'ok']
-        ];
-        var html = cells.map(function (c) {
-            return '<div class="ops-stream-cell ' + c[2] + '">'
-                 + '<span class="lbl">' + c[0] + '</span>'
-                 + '<span class="val">' + c[1] + '</span></div>';
-        }).join('');
-        if (st.ws_last_err) {
-            html += '<div class="ops-stream-cell warn ops-stream-err">'
-                  + '<span class="lbl">最後斷線原因</span>'
-                  + '<span class="val">' + st.ws_last_err + '</span></div>';
-        }
-        el.innerHTML = html;
-    }
     // Exposure comes from /ops/balance, not /ops/services — it is two signed
-    // exchange calls and does not belong on the 10s services poll.
+    // exchange calls and does not belong on the services poll.
     function fmtU(v) {
         if (v === null || v === undefined) return '—';
         return Math.round(v).toLocaleString('en-US') + 'u';
@@ -417,42 +234,8 @@
         el.innerHTML = html;
     }
 
-    function renderMacro(st) {
-        var el = document.getElementById('ops-health-macro');
-        if (!el) return;
-        if (!st) { el.innerHTML = '<span class="hint">n/a</span>'; return; }
-        // Absent is normal, not a fault — the embedded calendar still gates.
-        var state = st.err ? ['讀取失敗 · 保留上一份', 'bad']
-                  : !st.present ? ['無檔案 · 只用內建行事曆', 'dim']
-                  : ['已載入', 'ok'];
-        var cells = [
-            ['狀態', state[0], state[1]],
-            ['新增封鎖', st.added || 0, (st.added > 0 ? 'ok' : 'dim')],
-            ['壓制內建', st.suppressed || 0, (st.suppressed > 0 ? 'warn' : 'dim')],
-            ['略過(有問題)', st.skipped || 0, (st.skipped > 0 ? 'bad' : 'ok')]
-        ];
-        var html = cells.map(function (c) {
-            return '<div class="ops-stream-cell ' + c[2] + '">'
-                 + '<span class="lbl">' + c[0] + '</span>'
-                 + '<span class="val">' + c[1] + '</span></div>';
-        }).join('');
-        // Problems are the point of `skipped` — a count with no reason is
-        // just a mystery.
-        (st.problems || []).forEach(function (p) {
-            html += '<div class="ops-stream-cell bad ops-stream-err">'
-                  + '<span class="lbl">問題</span><span class="val">' + p + '</span></div>';
-        });
-        if (st.err) {
-            html += '<div class="ops-stream-cell bad ops-stream-err">'
-                  + '<span class="lbl">錯誤</span><span class="val">' + st.err + '</span></div>';
-        }
-        html += '<div class="ops-stream-cell dim ops-stream-err">'
-              + '<span class="lbl">檔案</span><span class="val">' + (st.path || '—') + '</span></div>';
-        el.innerHTML = html;
-    }
-    // Its own timer, deliberately. fetchHealth is local (systemctl + .env) and
-    // polls every 30s; this is TWO SIGNED EXCHANGE CALLS and does not belong on
-    // that cadence. Equity does not move meaningfully in 30s when flat.
+    // Its own timer, deliberately: TWO SIGNED EXCHANGE CALLS, and equity does
+    // not move meaningfully in 30s when flat.
     function fetchExposure() {
         fetch('/ops/balance?_=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { return r.json(); })
@@ -462,7 +245,7 @@
     function fetchHealth() {
         fetch('/ops/services?_=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { return r.json(); })
-            .then(function (d) { renderHealth(d); renderWS(d && d.stream); renderStream(d && d.stream); renderMacro(d && d.macro_overlay); })
+            .then(renderHealth)
             .catch(function () { /* best-effort card */ });
     }
     document.getElementById('ops-ntfy-toggle').addEventListener('click', function () {
@@ -485,7 +268,6 @@
                     showToast(res.j.muted ? '推播已靜音' : '推播已恢復', 'ok');
                 }
                 fetchHealth();
-                fetchAll();
             })
             .catch(function (e) {
                 ntfyBusy = false;
@@ -646,7 +428,7 @@
     fetchZones();
     setInterval(fetchZones, 60000);
 
-    // Start / Stop (enabled on/off, live) · Restart (restart trading-monitor).
+    // Start / Stop (enabled on/off, live).
     document.querySelectorAll('[data-zone-action]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var act = btn.getAttribute('data-zone-action');

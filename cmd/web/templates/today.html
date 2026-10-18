@@ -31,10 +31,6 @@
   .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--sp-4);align-items:start}
   .today-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-4);box-shadow:var(--shadow-card)}
   .today-card h2{font-size:var(--fs-lg);font-weight:800;margin-bottom:var(--sp-3);display:flex;align-items:center;gap:var(--sp-2)}
-  .daemon-row{display:flex;gap:var(--sp-4);flex-wrap:wrap}
-  .daemon{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm)}
-  .dot{width:9px;height:9px;border-radius:var(--r-pill);display:inline-block}
-  .dot.up{background:var(--green)} .dot.down{background:var(--red)}
   .ot{display:flex;justify-content:space-between;align-items:center;padding:var(--sp-3) 0;border-bottom:1px solid var(--border)}
   .ot:last-child{border-bottom:none}
   .ot .sym{font-weight:700}
@@ -117,14 +113,11 @@
       {{else}}<div class="today-empty"><span class="i18n-en">Nothing pending.</span><span class="i18n-zh">沒有待決。</span></div>{{end}}
     </div>
 
-    <!-- Daemon health -->
+    <!-- Quick links (the daemon-health row that lived here is the alert
+         bell now: it pushes when something breaks instead of waiting to be
+         looked at). -->
     <div class="today-card">
-      <h2>🩺 <span class="i18n-en">Daemon health</span><span class="i18n-zh">Daemon 健康</span></h2>
-      <div class="daemon-row">
-        {{range .Daemons}}
-        <span class="daemon"><span class="dot {{if .active}}up{{else}}down{{end}}"></span>{{.name}} <span class="cs-dim">{{.state}}</span></span>
-        {{end}}
-      </div>
+      <h2>🧭 <span class="i18n-en">Go to</span><span class="i18n-zh">前往</span></h2>
       <div class="today-links">
         <a href="/scan">→ <span class="i18n-en">Scan</span><span class="i18n-zh">掃描</span></a>
         <a href="/chart">→ Chart</a>
