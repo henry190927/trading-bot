@@ -57,7 +57,7 @@
   </div>
 
   <div class="ops-health-loops">
-    <div class="ops-loops-title">trading-monitor 子迴圈 <span class="ops-svc-tag">● 推測(讀 .env) · ▣ 心跳(monitor 自己回報)</span></div>
+    <div class="ops-loops-title">trading-monitor 子迴圈 <span class="ops-svc-tag">monitor 自己回報的心跳</span></div>
     <div class="hint" id="ops-hb-summary">載入中…</div>
     <div class="ops-loops-grid" id="ops-health-loops"></div>
   </div>
@@ -248,14 +248,12 @@
     function renderHealth(d) {
         var wrap = document.getElementById('ops-health-svcs');
         wrap.innerHTML = (d.services || []).map(function (v) {
-            var cls = v.active ? 'on' : (v.state === 'failed' ? 'fail' : 'off');
+            var cls = v.active ? 'on' : (v.state === 'stale' ? 'fail' : 'off');
             return '<div class="ops-hsvc">'
                  + '<span class="ops-state-dot ' + cls + '"></span>'
                  + '<code class="ops-hsvc-name">' + v.unit + '</code>'
                  + '<span class="ops-hsvc-state ' + cls + '">' + (v.active ? 'ACTIVE' : (v.state || 'unknown')) + '</span>'
-                 + (v.since ? '<span class="ops-hsvc-since" title="上次進入 active 的時間起算 — 有人重啟過就會歸零">' + v.since + '</span>' : '')
-                 + '<span class="ops-hsvc-enabled" title="開機自動啟動">' + (v.enabled || '') + '</span>'
-                 + (v.read_only ? '<span class="ops-hsvc-ro" title="這個服務就是提供本頁的行程,不提供啟停按鈕">唯讀</span>' : '')
+                 + (v.since ? '<span class="ops-hsvc-since" title="從這個行程啟動起算 — 有人重啟過就會歸零">' + v.since + '</span>' : '')
                  + '</div>';
         }).join('') || '<div class="hint">無資料</div>';
 
@@ -284,47 +282,30 @@
         renderLoops(d);
     }
 
-    // Side-by-side, temporary (see cmd/web/ops_heartbeat.go): the dot is the
-    // inferred state from .env, the badge is what the monitor says it is
-    // doing. A row the two disagree on is flagged.
+    // The monitor's own report of its loops (cmd/web/ops_heartbeat.go).
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     }
     function renderLoops(d) {
         var hb = d.heartbeat || {};
         var sum = document.getElementById('ops-hb-summary');
-        var sd = hb.systemd_active ? 'ACTIVE' : 'inactive';
         if (!hb.present) {
-            sum.textContent = '⚠ ' + (hb.error || '讀不到心跳') + ' · systemctl: ' + sd;
+            sum.textContent = '⚠ ' + (hb.error || '讀不到心跳');
         } else if (!hb.alive) {
-            sum.textContent = '⚠ 心跳中斷 ' + hb.age_sec + 's(超過 60s 視為停止)· systemctl: ' + sd
-                + (hb.agree_systemd ? '' : ' ← 兩者不一致');
+            sum.textContent = '⚠ 心跳中斷 ' + hb.age_sec + 's(超過 60s 視為停止)— ssh trading-bot ops status';
         } else {
-            sum.textContent = '心跳 ✓ ' + hb.age_sec + 's 前 · pid ' + hb.pid + ' · 已跑 ' + (hb.uptime || '—')
-                + ' · ' + (hb.mismatches ? '⚠ 推測 vs 心跳 ' + hb.mismatches + ' 處不一致' : '推測 vs 心跳 全部一致')
-                + (hb.agree_systemd ? '' : ' · ⚠ systemctl 說 ' + sd);
+            sum.textContent = '心跳 ✓ ' + hb.age_sec + 's 前 · pid ' + hb.pid + ' · 已跑 ' + (hb.uptime || '—');
         }
-
-        var inferredReason = {};
-        (d.loops || []).forEach(function (l) { inferredReason[l.name] = l.reason; });
-        var label = { run: 'RUN', idle: 'IDLE', stalled: 'STALLED', off: 'OFF', missing: '—' };
+        var label = { run: 'RUN', idle: 'IDLE', stalled: 'STALLED', off: 'OFF' };
         var lw = document.getElementById('ops-health-loops');
         lw.innerHTML = (hb.loops || []).map(function (l) {
-            var inf = (l.inferred_on === true) ? 'on' : (l.inferred_on === false ? 'off' : 'none');
             var age = (l.age_sec >= 0 && l.state !== 'off') ? ' ' + l.age_sec + 's' : '';
-            var reason = l.reason || inferredReason[l.name] || '';
-            var flag = (l.agree === false) ? '<span class="ops-hb-flag" title="推測和心跳不一致">⚠</span>' : '';
-            return '<div class="ops-loop ' + (l.state === 'run' ? 'on' : 'off') + (l.agree === false ? ' mismatch' : '') + '"'
-                 + ' title="' + esc('推測: ' + (inferredReason[l.name] || '(舊卡片沒列這個迴圈)') + '\n心跳: ' + (l.reason || '—')) + '">'
-                 + (inf === 'none'
-                     ? '<span class="ops-state-dot ops-dot-none" title="舊卡片沒有列這個迴圈"></span>'
-                     : '<span class="ops-state-dot ' + inf + '" title="推測(.env)"></span>')
+            return '<div class="ops-loop ' + (l.state === 'run' ? 'on' : 'off') + '" title="' + esc(l.reason) + '">'
                  + '<code>' + esc(l.name) + '</code>'
-                 + '<span class="ops-hb-badge hb-' + l.state + '" title="心跳">' + label[l.state] + age + '</span>'
-                 + '<span class="ops-loop-reason">' + esc(reason) + '</span>'
-                 + flag
+                 + '<span class="ops-hb-badge hb-' + l.state + '">' + (label[l.state] || l.state) + age + '</span>'
+                 + '<span class="ops-loop-reason">' + esc(l.reason) + '</span>'
                  + '</div>';
-        }).join('');
+        }).join('') || '<div class="hint">無資料</div>';
     }
     // Thresholds: any drop at all is worth a warning colour (it means a client
     // fell behind a 3s interval), but only a sustained rate is actually bad.

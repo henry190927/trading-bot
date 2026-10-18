@@ -128,9 +128,9 @@ SSH 前後，它對主機能做的事：
 | 改寫 `.env`（存 API key 的檔案） | ✅ | ❌ | 執行期設定放 `monitor-config.json` |
 | `sudo systemctl start / stop / restart` | ✅ | ❌ | `ssh trading-bot ops restart …` |
 | 讀主機的 journal | ✅ | ❌ | `ops logs …`；zone 事件有自己的檔案 |
-| 唯讀的 `systemctl is-active` | ✅ | ✅ → ❌ | monitor 的心跳，並排觀察一天之後 |
+| 唯讀的 `systemctl is-active` | ✅ | ❌ | monitor 的心跳，並排觀察一天之後 |
 
-最後一列拿掉之後，web process 就完全不需要主機提供任何東西，這也是它能放進容器的前提。
+web 的程式現在完全沒有匯入 `os/exec`：它不需要主機提供任何東西，這也是它能放進容器的前提。
 
 > 💡 這叫**最小權限原則**。就算目前只有一個人在操作，把維運權限從 web 拿掉還是值得：
 > 重點不是「誰來操作」，而是「權限放在誰身上」。web 一旦有 bug 或被打穿，攻擊者拿到的
@@ -202,7 +202,7 @@ flowchart LR
 | **Web UI 綁 Tailscale IP，不綁 0.0.0.0** | 三層防禦（Tailscale CGNAT + ufw + 綁定位址），任一層被破還有兩層。**不需要應用層 auth，因為網路層已經用 WireGuard 強制了身分。** 網路原語夠強的時候就信任它，不要外掛一個弱的 auth 當安全劇場 |
 | **Range expansion 棒：投票 → 降級 → 再升級** | 原本是 vote；某次 backtest 出現標的-regime 依賴後降成只顯示；**後來因為一個 XAG 案例再升級** —— 引擎給了 9.0/10 的 LONG，同時偵測到一根 3-ATR 的看空 range-expansion 棒卻忽略它。後續 60 天 backtest：XAG 從 −8.65R 翻到 +0.66R。教訓：**單一 backtest 窗口有雜訊，有新證據時要重看舊決定** |
 | **服務控制走 SSH，不放在 web app 裡** | web 是最常接觸外部輸入的 process，而且存著交易所的 key。它以前會用 `sudo` 重啟服務、改寫 `.env` 來靜音推播、讀主機 journal。三件事都搬走了：重啟和日誌交給 SSH 上的 `ops`（Tailscale + 金鑰 + 密碼，比網頁更強的門），靜音改成執行期設定檔。`/ops` 頁面現在只改設定，不動 process |
-| **心跳由 daemon 自己寫，不靠 `systemctl is-active`，也不靠推測** | 見上面「Monitor 心跳」的譯註。並排觀察一天、每 10 分鐘取樣一次，確認一致之後才拿掉舊的 |
+| **心跳由 daemon 自己寫，不靠 `systemctl is-active`，也不靠推測** | 見上面「Monitor 心跳」的譯註。和舊卡片、systemd 並排觀察一天，每 10 分鐘取樣一次 —— 103 筆、0 處不一致 —— 才把兩者一起拿掉 |
 | **執行期設定放在 daemon 會重讀的檔案，秘密放 `.env`** | 沿用 zone 頻道原本就有的模式。靜音現在是每次推播前都會讀的一個 JSON 旗標 —— 不用重啟，web 也不再需要寫入存放 key 的檔案。設定檔解析失敗時推播維持**開啟**，因為裸倉警報走的是同一個頻道 |
 
 ## 上線之後才學到的事

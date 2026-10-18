@@ -122,10 +122,10 @@ it could do to the host, before and after moving service control to SSH:
 | Rewrite `.env` (the file holding the keys) | ✅ | ❌ | runtime settings in `monitor-config.json` |
 | `sudo systemctl start / stop / restart` | ✅ | ❌ | `ssh trading-bot ops restart …` |
 | Read the host journal | ✅ | ❌ | `ops logs …`; zone events in their own file |
-| Read-only `systemctl is-active` | ✅ | ✅ → ❌ | the monitor's heartbeat, after a one-day side-by-side |
+| Read-only `systemctl is-active` | ✅ | ❌ | the monitor's heartbeat, after a one-day side-by-side |
 
-Once the last row goes, the web process needs nothing from the host, which is
-what lets it move into a container.
+The web binary no longer imports `os/exec` at all: it needs nothing from the
+host, which is what lets it move into a container.
 
 ## Monitor heartbeat
 
@@ -188,7 +188,7 @@ latest example: it beat the baseline in all three windows and still failed.
 | **Web UI binds to Tailscale IP, NOT 0.0.0.0** | Three-layer defense (Tailscale CGNAT + ufw + bind-address) — any single breach still leaves two layers intact. No app-level auth needed because the network layer already enforces identity via Wireguard. Senior platform engineering: trust the network primitive when it's strong, don't bolt on weak auth as security theater. |
 | **Range expansion bars: voted, demoted, re-promoted** | Originally a vote; demoted to display-only after symbol-regime dependence showed up in one backtest; **re-promoted after an XAG case** where the engine gave a 9.0/10 LONG while a 3-ATR bearish range-expansion bar was being detected but ignored. Subsequent 60-day backtest validated: XAG flipped −8.65R → +0.66R. Lesson: a single backtest window is noisy; revisit decisions when new evidence shows up. |
 | **Service control on SSH, not in the web app** | The web service is the most exposed process and holds the exchange keys. It used to restart units with `sudo`, rewrite `.env` to mute pushes, and read the host journal. All three moved out: restarts and logs to `ops` over SSH (Tailscale + key + passphrase — a stronger door than a web page), muting to a runtime config file. The `/ops` page now changes settings, never processes. |
-| **A heartbeat the daemon writes, not `systemctl is-active` and not inference** | `/ops` used to decide which monitor loops were "on" by re-reading `.env` and re-deriving the monitor's gating — two copies of the same rules, kept in sync by hand. They drifted: a zone card read ON for a full day while the loop short-circuited every cycle. Now each loop reports itself; the reader only judges freshness. It also sees what systemd cannot: a process that is alive while one goroutine is stuck in a network call. Rolled out side by side with the old card for a day, sampled every 10 minutes, before the old one goes. |
+| **A heartbeat the daemon writes, not `systemctl is-active` and not inference** | `/ops` used to decide which monitor loops were "on" by re-reading `.env` and re-deriving the monitor's gating — two copies of the same rules, kept in sync by hand. They drifted: a zone card read ON for a full day while the loop short-circuited every cycle. Now each loop reports itself; the reader only judges freshness. It also sees what systemd cannot: a process that is alive while one goroutine is stuck in a network call. It ran beside the old card and systemd for a day, sampled every 10 minutes — 103 samples, 0 disagreements — before both were removed. |
 | **Runtime settings in a file the daemon re-reads, secrets in `.env`** | Same pattern the zone channel already used. A mute is now a JSON flag read on every send — no restart, and the web never needs write access to the file holding the keys. A config that fails to parse leaves push **on**, because the naked-position alarm shares the channel. |
 
 ## Production learnings

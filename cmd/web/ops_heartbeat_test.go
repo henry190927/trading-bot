@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -24,91 +26,82 @@ func TestBuildHeartbeatViewFresh(t *testing.T) {
 			"autoexec":   {Running: true, Idle: true, EverySec: 60, LastTick: ago(30 * time.Second)},
 			"confluence": {Running: false, Reason: "MONITOR_ZONE_ONLY=1"},
 			// 3×30s = 90s is under the 2m floor, so the threshold is 120s.
-			"bracket":  {Running: true, EverySec: 30, LastTick: ago(200 * time.Second)},
-			"oisample": {Running: true, EverySec: 300, LastTick: ago(60 * time.Second)},
+			"bracket": {Running: true, EverySec: 30, LastTick: ago(200 * time.Second)},
 		},
 	}
-	inferred := []monitorLoop{
-		{Name: "zonealert", On: true},
-		{Name: "autoexec", On: true},
-		{Name: "confluence", On: false},
-		{Name: "bracket", On: true},
-		{Name: "macrowarn", On: true}, // absent from the heartbeat
-	}
-	v := buildHeartbeatView(b, nil, inferred, true, hbNow)
+	v := buildHeartbeatView(b, nil, hbNow)
 
-	if !v.Present || !v.Alive || v.AgeSec != 5 || v.PID != 4242 || v.Uptime != "2h 0m" {
-		t.Fatalf("header = present:%v alive:%v age:%d pid:%d uptime:%q", v.Present, v.Alive, v.AgeSec, v.PID, v.Uptime)
+	if !v.Present || !v.Alive || v.AgeSec != 5 || v.PID != 4242 || v.Uptime != "2h 0m" || v.Error != "" {
+		t.Fatalf("header = %+v", v)
 	}
-	if !v.AgreeSystemd {
-		t.Errorf("alive heartbeat + active unit should agree")
-	}
-
-	type want struct {
-		state string
-		age   int
-		agree string // "y", "n", or "-" for nil
-	}
-	wants := []struct {
-		name string
-		want
+	want := []struct {
+		name, state string
+		age         int
 	}{
-		{"zonealert", want{"run", 10, "y"}},
-		{"autoexec", want{"idle", 30, "n"}},
-		{"confluence", want{"off", -1, "y"}},
-		{"bracket", want{"stalled", 200, "n"}},
-		{"macrowarn", want{"missing", -1, "n"}},
-		{"oisample", want{"run", 60, "-"}}, // heartbeat-only: shown, not compared
+		{"autoexec", "idle", 30},
+		{"bracket", "stalled", 200},
+		{"confluence", "off", -1},
+		{"zonealert", "run", 10},
 	}
-	if len(v.Loops) != len(wants) {
-		t.Fatalf("loops = %d, want %d", len(v.Loops), len(wants))
+	if len(v.Loops) != len(want) {
+		t.Fatalf("loops = %d, want %d", len(v.Loops), len(want))
 	}
-	for i, w := range wants {
-		got := v.Loops[i]
-		agree := "-"
-		if got.Agree != nil {
-			agree = map[bool]string{true: "y", false: "n"}[*got.Agree]
-		}
-		if got.Name != w.name || got.State != w.state || got.AgeSec != w.age || agree != w.agree {
-			t.Errorf("loop %d = {%s %s age=%d agree=%s}, want {%s %s age=%d agree=%s}",
-				i, got.Name, got.State, got.AgeSec, agree, w.name, w.state, w.age, w.agree)
+	for i, w := range want {
+		if l := v.Loops[i]; l.Name != w.name || l.State != w.state || l.AgeSec != w.age {
+			t.Errorf("loop %d = {%s %s %d}, want {%s %s %d}", i, l.Name, l.State, l.AgeSec, w.name, w.state, w.age)
 		}
 	}
-	if v.Mismatches != 3 {
-		t.Errorf("mismatches = %d, want 3 (autoexec, bracket, macrowarn)", v.Mismatches)
+	if active, state := monitorLiveness(v); !active || state != "active" {
+		t.Errorf("liveness = %v %q, want true active", active, state)
 	}
 }
 
-// A heartbeat older than MaxAge cannot vouch for its loops, so nothing is
-// compared — and it now disagrees with a unit systemd still calls active.
+// Older than heartbeat.MaxAge: the monitor is down or wedged, whatever its
+// last write said about the loops.
 func TestBuildHeartbeatViewStale(t *testing.T) {
-	b := heartbeat.Beat{
-		WrittenAt: ago(61 * time.Second),
-		Loops:     map[string]heartbeat.Loop{"zonealert": {Running: true, EverySec: 25, LastTick: ago(70 * time.Second)}},
-	}
-	v := buildHeartbeatView(b, nil, []monitorLoop{{Name: "zonealert", On: true}}, true, hbNow)
+	v := buildHeartbeatView(heartbeat.Beat{WrittenAt: ago(61 * time.Second)}, nil, hbNow)
 	if !v.Present || v.Alive || v.AgeSec != 61 {
 		t.Fatalf("present:%v alive:%v age:%d, want true false 61", v.Present, v.Alive, v.AgeSec)
 	}
-	if v.AgreeSystemd {
-		t.Errorf("stale heartbeat + active unit must be flagged as disagreeing")
-	}
-	if v.Loops[0].Agree != nil || v.Mismatches != 0 {
-		t.Errorf("stale heartbeat compared anyway: agree=%v mismatches=%d", v.Loops[0].Agree, v.Mismatches)
+	if active, state := monitorLiveness(v); active || state != "stale" {
+		t.Errorf("liveness = %v %q, want false stale", active, state)
 	}
 }
 
 func TestBuildHeartbeatViewNoFile(t *testing.T) {
 	err := fmt.Errorf("open monitor-heartbeat.json: %w", fs.ErrNotExist)
-	v := buildHeartbeatView(heartbeat.Beat{}, err, []monitorLoop{{Name: "bracket", On: true}}, false, hbNow)
+	v := buildHeartbeatView(heartbeat.Beat{}, err, hbNow)
 	if v.Present || v.Alive || !strings.Contains(v.Error, "沒有心跳檔") {
-		t.Fatalf("present:%v alive:%v error:%q", v.Present, v.Alive, v.Error)
+		t.Fatalf("view = %+v", v)
 	}
-	// Both sides say down: that is agreement, not an alarm.
-	if !v.AgreeSystemd {
-		t.Errorf("no heartbeat + inactive unit should agree")
+	if active, state := monitorLiveness(v); active || state != "unknown" {
+		t.Errorf("liveness = %v %q, want false unknown", active, state)
 	}
-	if l := v.Loops[0]; l.State != "missing" || l.Agree != nil {
-		t.Errorf("loop = %+v, want missing and uncompared", l)
+	// [] not null, so the page can iterate without a guard.
+	if b, _ := json.Marshal(v.Loops); string(b) != "[]" {
+		t.Errorf("loops json = %s, want []", b)
+	}
+}
+
+func TestBuildHeartbeatViewUnreadable(t *testing.T) {
+	v := buildHeartbeatView(heartbeat.Beat{}, errors.New("heartbeat: decode: unexpected EOF"), hbNow)
+	if v.Present || v.Error != "heartbeat: decode: unexpected EOF" {
+		t.Fatalf("view = %+v", v)
+	}
+}
+
+func TestServiceRows(t *testing.T) {
+	fresh := hbView{Present: true, Alive: true, Uptime: "3h 5m"}
+	rows := serviceRows(fresh, hbNow)
+	if len(rows) != 2 || rows[0].Unit != "trading-monitor" || !rows[0].Active || rows[0].Since != "3h 5m" {
+		t.Fatalf("monitor row = %+v", rows[0])
+	}
+	if rows[1].Unit != "trading-web" || !rows[1].Active || rows[1].State != "active" {
+		t.Fatalf("web row = %+v", rows[1])
+	}
+	// A dead monitor carries no uptime: "up 3h" next to STALE would be a lie.
+	stale := hbView{Present: true, Alive: false, Uptime: "3h 5m"}
+	if r := serviceRows(stale, hbNow)[0]; r.Active || r.State != "stale" || r.Since != "" {
+		t.Fatalf("stale monitor row = %+v", r)
 	}
 }

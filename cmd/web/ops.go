@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -59,24 +58,17 @@ type opsStatus struct {
 	MonitorMinRatio float64  `json:"monitor_min_ratio"` // 0 = disabled (always emitted so UI can distinguish "off" from "unset")
 }
 
-// readDaemonStatus checks the running systemd unit + the monitor's
-// MONITOR_* config in .env. Defaults baked into the binary apply when an
-// env var is missing.
+// readDaemonStatus reports a service's liveness — the monitor from its
+// heartbeat, the web from the fact that it is answering — plus the monitor's
+// MONITOR_* config from .env. Defaults baked into the binary apply when an
+// env var is missing. Nothing here asks systemd (see ops_heartbeat.go).
 func readDaemonStatus(service string) opsStatus {
 	st := opsStatus{Service: service, State: "unknown"}
-
-	// Unprivileged: is-active is a read-only D-Bus query. Keeping sudo here
-	// meant the status card depended on a blanket NOPASSWD grant.
-	//
-	// Bounded: this runs inline in a page render, and a wedged systemd would
-	// otherwise hang the request with no upper limit. 5s is far above the
-	// milliseconds a D-Bus read takes.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	out, _ := exec.CommandContext(ctx, "systemctl", "is-active", service).CombinedOutput()
-	state := strings.TrimSpace(string(out))
-	st.State = state
-	st.Active = state == "active"
+	if service == "trading-web" {
+		st.Active, st.State = true, "active"
+		return st
+	}
+	st.Active, st.State = monitorLiveness(readHeartbeatView(time.Now()))
 
 	if service != "trading-monitor" {
 		return st

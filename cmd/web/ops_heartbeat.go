@@ -1,23 +1,20 @@
-// Heartbeat view for the /ops health card.
+// Monitor heartbeat for /ops and /today.
 //
-// TEMPORARY SIDE-BY-SIDE. The monitor now writes a self-reported heartbeat
-// (package heartbeat). For one day /ops shows it next to the existing
-// inferred card (monitorLoops, which re-derives the monitor's gating from
-// .env) and counts where the two disagree. Once they have agreed for a day,
-// the inferred card and the systemctl status read are removed and this
-// becomes the only source.
+// The monitor writes its own state (package heartbeat); this file only judges
+// how fresh that statement is. It is the web service's ONLY view of the
+// monitor: it replaced `systemctl is-active` and the inferred loop card
+// (monitorLoops, which re-derived the monitor's gating from .env) after the
+// three ran side by side from 2026-10-17 17:54 to 2026-10-18 — 103 samples
+// ten minutes apart, 0 disagreements. Before that, testing the side-by-side
+// had already caught the inferred card wrong twice.
 //
-// A disagreement is not automatically a bug in either. monitorLoops reports
-// what the monitor will do on its NEXT start (it reads .env); the heartbeat
-// reports what the running process is doing NOW. An .env edit that has not
-// been followed by a restart shows up here as a mismatch, which is exactly
-// the kind of drift this view exists to surface.
+// With this, the web service asks the host nothing at all, which is what lets
+// it run in a container.
 package main
 
 import (
 	"errors"
 	"io/fs"
-	"sort"
 	"time"
 
 	"github.com/henry190927/trading-bot/heartbeat"
@@ -25,32 +22,20 @@ import (
 
 type hbLoopView struct {
 	Name     string `json:"name"`
-	State    string `json:"state"` // run | idle | stalled | off | missing
+	State    string `json:"state"` // run | idle | stalled | off
 	EverySec int    `json:"every_sec,omitempty"`
 	AgeSec   int    `json:"age_sec"` // seconds since last tick; -1 when it never ticked
 	Reason   string `json:"reason,omitempty"`
-
-	// Inferred is what monitorLoops says; nil for loops it does not cover.
-	// Agree is nil when there is nothing to compare, or the heartbeat is
-	// too old to be trusted.
-	Inferred *bool `json:"inferred_on,omitempty"`
-	Agree    *bool `json:"agree,omitempty"`
 }
 
 type hbView struct {
-	Present bool   `json:"present"` // a heartbeat file exists and parses
-	Alive   bool   `json:"alive"`   // written within heartbeat.MaxAge
-	AgeSec  int    `json:"age_sec"`
-	PID     int    `json:"pid,omitempty"`
-	Uptime  string `json:"uptime,omitempty"`
-	Error   string `json:"error,omitempty"`
-
-	// Service level: does systemd's view of the unit match the heartbeat's?
-	SystemdActive bool `json:"systemd_active"`
-	AgreeSystemd  bool `json:"agree_systemd"`
-
-	Loops      []hbLoopView `json:"loops"`
-	Mismatches int          `json:"mismatches"`
+	Present bool         `json:"present"` // a heartbeat file exists and parses
+	Alive   bool         `json:"alive"`   // written within heartbeat.MaxAge
+	AgeSec  int          `json:"age_sec"`
+	PID     int          `json:"pid,omitempty"`
+	Uptime  string       `json:"uptime,omitempty"`
+	Error   string       `json:"error,omitempty"`
+	Loops   []hbLoopView `json:"loops"`
 }
 
 // hbLoopState folds a loop's self-report into one display state. Stalled
@@ -69,66 +54,53 @@ func hbLoopState(l heartbeat.Loop, now time.Time) string {
 	}
 }
 
-// buildHeartbeatView compares the monitor's heartbeat with the inferred loop
-// card and with systemd. Pure, so the comparison rules are testable without
-// a file or a unit.
-func buildHeartbeatView(b heartbeat.Beat, readErr error, inferred []monitorLoop, systemdActive bool, now time.Time) hbView {
-	v := hbView{SystemdActive: systemdActive, Loops: []hbLoopView{}}
+// buildHeartbeatView turns a read of the heartbeat file into what the page
+// shows. Pure, so the rules are testable without a file.
+func buildHeartbeatView(b heartbeat.Beat, readErr error, now time.Time) hbView {
+	v := hbView{Loops: []hbLoopView{}}
 	switch {
 	case errors.Is(readErr, fs.ErrNotExist):
-		v.Error = "沒有心跳檔 — monitor 還是舊版,或從未啟動"
+		v.Error = "沒有心跳檔 — monitor 沒在跑,或從未啟動"
+		return v
 	case readErr != nil:
 		v.Error = readErr.Error()
-	default:
-		v.Present = true
-		v.Alive = b.Alive(now)
-		v.AgeSec = int(now.Sub(b.WrittenAt) / time.Second)
-		v.PID = b.PID
-		if !b.StartedAt.IsZero() {
-			v.Uptime = humanSince(now.Sub(b.StartedAt))
-		}
+		return v
 	}
-	v.AgreeSystemd = v.Alive == systemdActive
-
-	seen := map[string]bool{}
-	add := func(name string, inf *bool) {
-		seen[name] = true
-		lv := hbLoopView{Name: name, State: "missing", AgeSec: -1, Inferred: inf}
-		if l, ok := b.Loops[name]; ok && v.Present {
-			lv.State = hbLoopState(l, now)
-			lv.EverySec = l.EverySec
-			lv.Reason = l.Reason
-			if !l.LastTick.IsZero() {
-				lv.AgeSec = int(now.Sub(l.LastTick) / time.Second)
-			}
-		}
-		// Compare only when there is an opinion to compare against and the
-		// heartbeat is fresh enough to stand behind its own answer.
-		if inf != nil && v.Alive {
-			agree := *inf == (lv.State == "run")
-			lv.Agree = &agree
-			if !agree {
-				v.Mismatches++
-			}
+	v.Present = true
+	v.Alive = b.Alive(now)
+	v.AgeSec = int(now.Sub(b.WrittenAt) / time.Second)
+	v.PID = b.PID
+	if !b.StartedAt.IsZero() {
+		v.Uptime = humanSince(now.Sub(b.StartedAt))
+	}
+	for _, name := range b.Names() {
+		l := b.Loops[name]
+		lv := hbLoopView{Name: name, State: hbLoopState(l, now), EverySec: l.EverySec, AgeSec: -1, Reason: l.Reason}
+		if !l.LastTick.IsZero() {
+			lv.AgeSec = int(now.Sub(l.LastTick) / time.Second)
 		}
 		v.Loops = append(v.Loops, lv)
 	}
-
-	// The inferred card's order first, so the two columns line up with what
-	// the page used to show; heartbeat-only loops after, alphabetically.
-	for _, m := range inferred {
-		on := m.On
-		add(m.Name, &on)
-	}
-	extra := make([]string, 0, len(b.Loops))
-	for name := range b.Loops {
-		if !seen[name] {
-			extra = append(extra, name)
-		}
-	}
-	sort.Strings(extra)
-	for _, name := range extra {
-		add(name, nil)
-	}
 	return v
+}
+
+// readHeartbeatView reads the monitor's heartbeat file now.
+func readHeartbeatView(now time.Time) hbView {
+	b, err := heartbeat.Read(heartbeat.Path())
+	return buildHeartbeatView(b, err, now)
+}
+
+// monitorLiveness maps the heartbeat onto the unit-state words the cards
+// already use. "stale" is new: the file exists but is older than
+// heartbeat.MaxAge, i.e. the monitor died or is wedged — systemd's "active"
+// could never say the second half.
+func monitorLiveness(v hbView) (active bool, state string) {
+	switch {
+	case !v.Present:
+		return false, "unknown"
+	case v.Alive:
+		return true, "active"
+	default:
+		return false, "stale"
+	}
 }
