@@ -129,6 +129,9 @@
   </div>
 
     <div class="chart-controls-end">
+      {{/* Record the current structure read as a setup — same #cs-record-btn
+           the renderer wires, moved here from the structure card (mockup). */}}
+      <button type="button" class="ui-btn sm cs-record-btn" id="cs-record-btn" title="{{t "chart.recordHint"}}">{{template "icon" "flag"}}{{t "chart.record"}}</button>
       <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
               data-symbol="{{.Symbol}}" data-tf="{{.TF}}">{{t "chart.ui.ai"}} ▸</button>
       <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="{{t "chart.panelToggle"}}" aria-expanded="true" aria-label="{{t "chart.ui.panelAria"}}">⇥</button>
@@ -307,7 +310,6 @@
       <span class="cs-kv"><em>{{t "chart.hvnTarget"}}</em><span id="chart-hvn-body">—</span></span>
     </div>
     <div class="cs-levels" id="cs-levels"></div>
-    <button type="button" class="ui-btn ghost sm cs-record-btn" id="cs-record-btn" title="{{t "chart.recordHint"}}">{{template "icon" "flag"}}{{t "chart.record"}}</button>
   </section>
 
   {{/* Open interest, filled by loadBias from the same /api/chart/bias call. */}}

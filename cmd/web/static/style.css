@@ -4510,3 +4510,5 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .chart-more-menu .layer-chip-menuitem { justify-content: flex-start; }
 .chart-more-tz { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px; font-size: var(--fs-xs); color: var(--text-dim); }
 .chart-more-tz .chart-tz-select { width: 100%; }
+.chart-controls-end .cs-record-btn { height: 34px; margin-top: 0; white-space: nowrap; }
+@media (min-width: 721px) { .chart-controls-end .ai-analyze-btn { height: 34px; padding: 0 12px; border-radius: var(--r-sm); } }
