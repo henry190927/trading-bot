@@ -5,145 +5,131 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>verify exchange · trading-web</title>
+<title>{{t "tab.verify"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 {{template "topnav" .}}
-<main class="tips-main">
-  <h1 class="tips-h1">
-    🔎 <span class="i18n-en">Verify on exchange</span><span class="i18n-zh">交易所查證</span>
-    <span class="tips-sub">
-      <span class="i18n-en">every OPEN journal trade vs its ACTUAL BingX position + resting orders — trust the exchange, not local bookkeeping</span>
-      <span class="i18n-zh">每筆未平倉 journal 單 vs 交易所實際部位 + 掛單 —— 信交易所,別信本地帳本</span>
-    </span>
-  </h1>
 
-  <div class="stats-card">
-    {{if .NoClient}}
-    <p class="empty">BingX client not configured.</p>
-    {{else}}
-    <div class="at-state">
-      {{if .WarnN}}<span class="badge b-red">⚠ {{.WarnN}} <span class="i18n-en">mismatch</span><span class="i18n-zh">筆有落差</span></span>{{end}}
-      {{if .OrphanNakedN}}<span class="badge b-red">🚨 {{.OrphanNakedN}} <span class="i18n-en">NAKED, not in journal</span><span class="i18n-zh">筆裸倉且不在 journal</span></span>{{end}}
-      {{/* The green badge requires BOTH counts to be zero. It used to depend on
-           WarnN alone, and WarnN is computed only over journal rows — so a
-           flat journal with a naked exchange position rendered green. */}}
-      {{if and (not .WarnN) (not .OrphanNakedN)}}<span class="badge b-green">✓ <span class="i18n-en">all trades protected &amp; matched</span><span class="i18n-zh">全部對上、有防護</span></span>{{end}}
-      {{if .SessionWarnN}}<span class="badge b-yellow">⏰ {{.SessionWarnN}} <span class="i18n-en">stop inside the cash-open bar</span><span class="i18n-zh">筆停損在美股開盤根內</span></span>{{end}}
-      <a href="/ops/verify" class="badge b-blue" style="text-decoration:none">↻ <span class="i18n-en">re-check</span><span class="i18n-zh">重新查證</span></a>
-    </div>
-
-    {{range .Rows}}
-    <div class="stats-card" style="margin-top:.6rem;{{if .Warn}}border-left:3px solid var(--red){{else}}border-left:3px solid var(--green){{end}}">
-      <h2 class="section-title">#{{.ID}} {{.Symbol}} <span class="dir-{{.Side}}">{{.Side}}</span>
-        <span class="section-meta">journal: entry {{printf "%.2f" .Entry}} · stop {{printf "%.2f" .Stop}} · tp1 {{printf "%.2f" .TP1}} · tp2 {{printf "%.2f" .TP2}}</span>
-      </h2>
-      {{if .Warn}}<p class="glossary-hint" style="border-left:3px solid var(--red);padding-left:.6rem;color:var(--red)"><b>{{.Warn}}</b></p>{{end}}
-      {{if .SessionWarn}}<p class="glossary-hint" style="border-left:3px solid var(--yellow);padding-left:.6rem;color:var(--yellow)">⏰ {{.SessionWarn}}</p>{{end}}
-      <div class="at-state">
-        {{if .HasPosition}}<span class="badge b-green">✓ <span class="i18n-en">position</span><span class="i18n-zh">部位</span> {{printf "%.5f" .PosQty}} @ {{printf "%.2f" .PosEntry}}</span>{{else}}<span class="badge b-dim">— <span class="i18n-en">no position</span><span class="i18n-zh">無部位</span></span>{{end}}
-        {{if .HasStop}}<span class="badge b-green">🛡️ <span class="i18n-en">stop live</span><span class="i18n-zh">有停損</span></span>{{else if .PendingStop}}<span class="badge b-blue" title="bundled onto the resting entry — it activates the instant the order fills">⏳ <span class="i18n-en">stop bundled {{printf "%.4f" .PendingStop}}</span><span class="i18n-zh">綁定停損 {{printf "%.4f" .PendingStop}}</span></span>{{else}}<span class="badge b-red">🚨 <span class="i18n-en">NO STOP</span><span class="i18n-zh">無停損</span></span>{{end}}
-        {{if .HasTP}}<span class="badge b-blue">🎯 <span class="i18n-en">tp live</span><span class="i18n-zh">有 TP</span></span>{{end}}
-      </div>
-      {{if .HasPosition}}
-      <form class="pr-form" data-symbol="{{.Symbol}}" data-side="{{.Side}}"
-            data-qty="{{printf "%g" .PosQty}}" data-entry="{{printf "%g" .PosEntry}}"
-            data-jstop="{{printf "%g" .Stop}}" data-side-l="{{.Side}}" onsubmit="return false">
-        <div class="pr-row">
-          <label>stop
-            <input type="number" step="any" inputmode="decimal" name="stop"
-                   value="{{if .Stop}}{{printf "%g" .Stop}}{{end}}" placeholder="{{printf "%g" .Stop}}">
-          </label>
-          <label>tp
-            <input type="number" step="any" inputmode="decimal" name="tp"
-                   placeholder="{{if .TP1}}{{printf "%g" .TP1}}{{else}}—{{end}}">
-          </label>
-          <button type="button" class="badge b-blue pr-preview">
-            <span class="i18n-en">preview</span><span class="i18n-zh">預覽</span>
-          </button>
-        </div>
-        {{/* Quick-fills. Typing a price on a phone while a position is live is
-             the slowest part of this form, and the two values wanted most
-             often are already known: the stop the plan named, and the entry
-             (a break-even stop). */}}
-        <div class="pr-quick">
-          {{if .Stop}}<button type="button" class="pr-chip" data-fill="stop" data-val="{{printf "%g" .Stop}}">
-            <span class="i18n-en">plan {{printf "%g" .Stop}}</span><span class="i18n-zh">計畫 {{printf "%g" .Stop}}</span>
-          </button>{{end}}
-          {{if .PosEntry}}<button type="button" class="pr-chip" data-fill="stop" data-val="{{printf "%g" .PosEntry}}">
-            <span class="i18n-en">break-even {{printf "%g" .PosEntry}}</span><span class="i18n-zh">保本 {{printf "%g" .PosEntry}}</span>
-          </button>{{end}}
-          {{if .TP1}}<button type="button" class="pr-chip" data-fill="tp" data-val="{{printf "%g" .TP1}}">
-            <span class="i18n-en">tp1 {{printf "%g" .TP1}}</span><span class="i18n-zh">TP1 {{printf "%g" .TP1}}</span>
-          </button>{{end}}
-        </div>
-        {{/* What the typed number COSTS, computed from the live position size
-             rather than the journal's intended one. The decision this form
-             exists to support is "is this stop the right distance", and that
-             question is unanswerable from a price alone. */}}
-        <p class="pr-calc" aria-live="polite"></p>
-        <p class="pr-out glossary-hint" hidden></p>
-      </form>
-      {{end}}
-
-      {{if .Orders}}
-      <div class="dt-scroll">
-      <table class="dt">
-        <thead><tr><th>orderId</th><th>type</th><th>side</th><th>price</th><th>qty</th><th>reduceOnly</th></tr></thead>
-        <tbody>
-          {{range .Orders}}
-          <tr>
-            <td class="cs-dim">{{.OrderID}}</td>
-            <td>{{if or (eq .Type "STOP_MARKET") (eq .Type "STOP")}}<span class="badge b-red">{{.Type}}</span>{{else}}<span class="badge b-blue">{{.Type}}</span>{{end}}</td>
-            <td>{{.Side}}</td>
-            <td class="num">{{if .StopPrice}}{{printf "%.2f" .StopPrice}}{{else}}{{printf "%.2f" .Price}}{{end}}</td>
-            <td class="num cs-dim">{{printf "%.5f" .Quantity}}</td>
-            <td>{{if .ReduceOnly}}<span style="color:var(--green)">✓</span>{{else}}<span style="color:var(--red)">✗</span>{{end}}</td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-      </div>
-      {{else}}<p class="empty" style="margin:.4rem 0"><span class="i18n-en">no resting orders on the exchange</span><span class="i18n-zh">交易所沒有掛單</span></p>{{end}}
-    </div>
-    {{else}}
-    <p class="empty"><span class="i18n-en">No open journal trades to verify — see the exchange-side list below, which does not depend on the journal.</span><span class="i18n-zh">沒有未平倉的 journal 單可查證 —— 看下方交易所端的清單,那份不依賴 journal。</span></p>
-    {{end}}
-
-    {{/* Enumerated from the EXCHANGE, journal used only to exclude. This
-         section is why a flat journal can no longer render as all-clear. */}}
-    <h3 style="margin-top:1.2rem">
-      <span class="i18n-en">Exchange positions the journal does not know about</span><span class="i18n-zh">交易所有、journal 沒有的部位</span>
-    </h3>
-    {{if .Orphans}}
-    {{range .Orphans}}
-    <div class="verify-card{{if and (not .ReadErr) (not .HasStop)}} b-red{{end}}">
-      <div><strong>{{.Symbol}} {{.Side}}</strong> · qty {{printf "%g" .Qty}} @ {{fmtPrice .Entry}}
-        · <span class="i18n-en">notional</span><span class="i18n-zh">名目</span> {{printf "%.0f" .Notional}}u
-        · {{.Leverage}}x {{.MarginMode}}</div>
-      {{if .ReadErr}}
-        <p class="modal-warn">⚠ <span class="i18n-en">could not read resting orders — NOT proof of a stop</span><span class="i18n-zh">讀不到掛單 —— 這不等於有停損</span>: {{.ReadErr}}</p>
-      {{else if .HasStop}}
-        <p><span class="badge b-green">🛡️ <span class="i18n-en">protective stop live</span><span class="i18n-zh">有保護性停損</span></span>
-          <span class="i18n-en">but this position is not journaled — record it so the per-trade checks cover it.</span><span class="i18n-zh">但這張單沒有記在 journal,補記後逐筆檢查才會涵蓋它。</span></p>
-      {{else}}
-        <p class="modal-warn">🚨 <span class="i18n-en">NO protective stop on the exchange, and no journal row. Neither the per-trade check above nor the daemon's per-trade guard can see this.</span><span class="i18n-zh">交易所沒有任何保護性停損,journal 也沒有這筆。上方的逐筆檢查和 daemon 的逐筆守衛都看不到它。</span></p>
-      {{end}}
-    </div>
-    {{end}}
-    {{else}}
-    <p class="empty"><span class="i18n-en">None — every exchange position is accounted for in the journal.</span><span class="i18n-zh">沒有 —— 交易所的每個部位 journal 都有對應。</span></p>
-    {{end}}
-    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span class="i18n-en">live query to BingX (VPS whitelisted IP) · reduceOnly ✗ = order could open a position, not just close</span><span class="i18n-zh">即時查 BingX(VPS 白名單 IP)· reduceOnly ✗ = 該單可能開倉,不只平倉</span></p>
-    {{end}}
+{{/* Every OPEN journal trade against its ACTUAL BingX position and resting
+     orders — trust the exchange, not local bookkeeping. */}}
+<main class="ui-page">
+  {{if .NoClient}}
+  <div class="ui-banner warn">{{template "icon" "alert"}}<span>{{t "verify.noClient"}}</span></div>
+  {{else}}
+  <div class="ui-status">
+    {{if .WarnN}}<span class="ui-pill bad">{{template "icon" "alert"}}{{printf (t "verify.warnN") .WarnN}}</span>{{end}}
+    {{if .OrphanNakedN}}<span class="ui-pill bad">{{template "icon" "alert"}}{{printf (t "verify.orphanNakedN") .OrphanNakedN}}</span>{{end}}
+    {{/* Green requires BOTH counts to be zero. It used to depend on WarnN
+         alone, and WarnN is computed only over journal rows — so a flat
+         journal with a naked exchange position rendered green. */}}
+    {{if and (not .WarnN) (not .OrphanNakedN)}}<span class="ui-pill ok">{{template "icon" "check"}}{{t "verify.allOk"}}</span>{{end}}
+    {{if .SessionWarnN}}<span class="ui-pill warn">{{printf (t "verify.sessionN") .SessionWarnN}}</span>{{end}}
+    <span class="ui-grow"></span>
+    <span class="ui-dim ui-sm ui-num">{{.UpdatedUTC}}</span>
+    <a href="/ops/verify" class="ui-btn ghost sm">{{t "verify.recheck"}}</a>
   </div>
+
+  {{range .Rows}}
+  <section class="ui-card vx-card{{if .Warn.Code}} is-bad{{else}} is-ok{{end}}">
+    <header class="ui-card-h">
+      <h2><span class="ui-dim ui-num">#{{.ID}}</span> <span class="ui-sym">{{.Symbol}}</span></h2>
+      <span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span>
+      <span class="ui-dim ui-sm ui-num">{{t "verify.journal"}} · {{t "th.entry"}} {{fmtPx .Entry}} · {{t "trades.stop"}} {{fmtPx .Stop}} · TP1 {{fmtPx .TP1}} · TP2 {{fmtPx .TP2}}</span>
+    </header>
+    {{with .Warn}}{{if .Code}}<div class="ui-banner bad">{{template "icon" "alert"}}<b>{{if .OrderID}}{{printf (t (printf "verify.warn.%s" .Code)) .OrderID}}{{else}}{{t (printf "verify.warn.%s" .Code)}}{{end}}</b></div>{{end}}{{end}}
+    {{if .SessionWarn}}<div class="ui-banner warn">{{template "icon" "alert"}}<span>{{.SessionWarn}}</span></div>{{end}}
+    <div class="vx-state">
+      {{if .HasPosition}}<span class="ui-tag ok">{{t "verify.position"}} <span class="ui-num">{{printf "%.5f" .PosQty}} @ {{fmtPx .PosEntry}}</span></span>{{else}}<span class="ui-tag">{{t "verify.noPosition"}}</span>{{end}}
+      {{if .HasStop}}<span class="ui-tag ok">{{t "verify.stopLive"}}</span>{{else if .PendingStop}}<span class="ui-tag" title="{{t "verify.bundledHint"}}">{{t "verify.stopBundled"}} <span class="ui-num">{{fmtPx .PendingStop}}</span></span>{{else}}<span class="ui-tag bad">{{t "verify.noStop"}}</span>{{end}}
+      {{if .HasTP}}<span class="ui-tag ok">{{t "verify.tpLive"}}</span>{{end}}
+    </div>
+    {{if .HasPosition}}
+    <form class="pr-form" data-symbol="{{.Symbol}}" data-side="{{.Side}}"
+          data-qty="{{printf "%g" .PosQty}}" data-entry="{{printf "%g" .PosEntry}}"
+          data-jstop="{{printf "%g" .Stop}}" data-side-l="{{.Side}}" onsubmit="return false">
+      <div class="pr-row">
+        <label>{{t "trades.stop"}}
+          <input type="number" step="any" inputmode="decimal" name="stop"
+                 value="{{if .Stop}}{{printf "%g" .Stop}}{{end}}" placeholder="{{printf "%g" .Stop}}">
+        </label>
+        <label>TP
+          <input type="number" step="any" inputmode="decimal" name="tp"
+                 placeholder="{{if .TP1}}{{printf "%g" .TP1}}{{else}}—{{end}}">
+        </label>
+        <button type="button" class="ui-btn ghost sm pr-preview">{{t "verify.preview"}}</button>
+      </div>
+      {{/* Quick-fills: the two values wanted most often are already known —
+           the stop the plan named, and the entry (a break-even stop). */}}
+      <div class="pr-quick">
+        {{if .Stop}}<button type="button" class="pr-chip" data-fill="stop" data-val="{{printf "%g" .Stop}}">{{t "verify.chipPlan"}} {{printf "%g" .Stop}}</button>{{end}}
+        {{if .PosEntry}}<button type="button" class="pr-chip" data-fill="stop" data-val="{{printf "%g" .PosEntry}}">{{t "verify.chipBE"}} {{printf "%g" .PosEntry}}</button>{{end}}
+        {{if .TP1}}<button type="button" class="pr-chip" data-fill="tp" data-val="{{printf "%g" .TP1}}">TP1 {{printf "%g" .TP1}}</button>{{end}}
+      </div>
+      {{/* What the typed number COSTS, from the live position size rather
+           than the journal's intended one. */}}
+      <p class="pr-calc" aria-live="polite"></p>
+      <p class="pr-out" hidden></p>
+    </form>
+    {{end}}
+
+    {{if .Orders}}
+    <div class="dt-scroll">
+    <table class="dt">
+      <thead><tr><th>orderId</th><th>{{t "verify.th.type"}}</th><th>{{t "th.side"}}</th><th class="num">{{t "th.price"}}</th><th class="num">{{t "verify.th.qty"}}</th><th title="{{t "verify.reduceOnlyHint"}}">reduceOnly</th></tr></thead>
+      <tbody>
+        {{range .Orders}}
+        <tr>
+          <td class="ui-dim ui-num">{{.OrderID}}</td>
+          <td><span class="ui-tag{{if or (eq .Type "STOP_MARKET") (eq .Type "STOP")}} bad{{end}}">{{.Type}}</span></td>
+          <td>{{.Side}}</td>
+          <td class="num">{{if .StopPrice}}{{fmtPx .StopPrice}}{{else}}{{fmtPx .Price}}{{end}}</td>
+          <td class="num ui-dim">{{printf "%.5f" .Quantity}}</td>
+          <td>{{if .ReduceOnly}}<span class="ui-up">✓</span>{{else}}<span class="ui-down">✗</span>{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+    {{else}}<div class="ui-dim ui-sm">{{t "verify.noOrders"}}</div>{{end}}
+  </section>
+  {{else}}
+  <section class="ui-card"><div class="ui-dim">{{t "verify.noRows"}}</div></section>
+  {{end}}
+
+  {{/* Enumerated from the EXCHANGE, journal used only to exclude. This
+       section is why a flat journal can no longer render as all-clear. */}}
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{t "verify.orphansTitle"}}</h2><span class="ui-count">{{len .Orphans}}</span></header>
+    {{range .Orphans}}
+    <div class="vx-orphan{{if and (not .ReadErr) (not .HasStop)}} is-bad{{end}}">
+      <div><span class="ui-sym">{{.Symbol}}</span> <span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span>
+        <span class="ui-num ui-sm">{{printf "%g" .Qty}} @ {{fmtPx .Entry}} · {{t "verify.notional"}} {{printf "%.0f" .Notional}}u · {{.Leverage}}x {{.MarginMode}}</span></div>
+      {{if .ReadErr}}
+        <div class="ui-banner warn">{{template "icon" "alert"}}<span>{{t "verify.orphanReadErr"}} <code>{{.ReadErr}}</code></span></div>
+      {{else if .HasStop}}
+        <div class="ui-sm"><span class="ui-tag ok">{{t "verify.orphanStop"}}</span> {{t "verify.orphanStopHint"}}</div>
+      {{else}}
+        <div class="ui-banner bad">{{template "icon" "alert"}}<span>{{t "verify.orphanNaked"}}</span></div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="ui-dim ui-sm">{{t "verify.orphansNone"}}</div>
+    {{end}}
+  </section>
+
+  <p class="ui-sub" style="margin:0">{{t "verify.foot"}}</p>
+  {{end}}
 </main>
 
+<script>window.VX = {
+  stop: {{t "verify.js.stop"}}, lock: {{t "verify.js.lock"}}, be: {{t "verify.js.be"}},
+  position: {{t "verify.js.position"}}, mark: {{t "scan.mark"}}, locks: {{t "verify.js.locks"}}, ifFilled: {{t "verify.js.ifFilled"}},
+  send: {{t "verify.js.send"}}
+};</script>
 <style>
-.pr-form{margin:.5rem 0 .2rem;padding:.5rem .6rem;border-radius:6px;background:var(--wash-dim)}
+.pr-form{margin:0;padding:var(--sp-3);border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--border)}
 .pr-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end}
 /* Flexible, not fixed: this form's whole reason to exist is being usable
    from a phone when a limit fills while nobody is at a desk. A fixed 9rem
@@ -153,10 +139,9 @@
 .pr-row label{display:flex;flex-direction:column;font-size:.72rem;color:var(--text-dim);gap:.15rem;
   flex:1 1 7rem;min-width:0}
 .pr-row input{width:100%;min-width:0;padding:.4rem .45rem;font:inherit;font-size:.9rem;
-  background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px}
-.pr-row button{flex:0 0 auto;min-height:2.1rem;cursor:pointer;border:0;
-  padding:.4rem .8rem;font:inherit;font-size:.8rem}
-.pr-out{margin:.45rem 0 0;white-space:pre-wrap;font-size:.76rem}
+  background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--r-sm);font-family:var(--mono)}
+.pr-row button{flex:0 0 auto;min-height:32px}
+.pr-out{margin:.45rem 0 0;white-space:pre-wrap;font-size:.76rem;font-family:var(--mono)}
 .pr-quick{display:flex;flex-wrap:wrap;gap:.3rem;margin:.4rem 0 0}
 .pr-chip{padding:.22rem .5rem;font:inherit;font-size:.7rem;line-height:1.2;cursor:pointer;
   border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text-dim);
@@ -198,11 +183,11 @@
       var pct = Math.abs(stop - entry) / entry * 100;
       var usdt = qty * Math.abs(stop - entry);
       if (d > 0) {
-        parts.push('停損 <span class="num">' + pct.toFixed(2) + '%</span> → <span class="bad">' + fmtU(-usdt) + '</span>');
+        parts.push(VX.stop + ' <span class="num">' + pct.toFixed(2) + '%</span> → <span class="bad">' + fmtU(-usdt) + '</span>');
       } else if (d < 0) {
-        parts.push('鎖利 <span class="num">' + pct.toFixed(2) + '%</span> → <span class="num">' + fmtU(usdt) + '</span>');
+        parts.push(VX.lock + ' <span class="num">' + pct.toFixed(2) + '%</span> → <span class="num">' + fmtU(usdt) + '</span>');
       } else {
-        parts.push('保本 <span class="num">0.00u</span>');
+        parts.push(VX.be + ' <span class="num">0.00u</span>');
       }
     }
     if (tp > 0) {
@@ -253,17 +238,17 @@
     }
     if (j.stage === 'preview') {
       out.style.color = 'var(--text-dim)';
-      const L = [`position ${j.side} qty ${j.qty} @ ${j.entry}  ·  mark ${j.mark}`];
+      const L = [`${VX.position} ${j.side} qty ${j.qty} @ ${j.entry}  ·  ${VX.mark} ${j.mark}`];
       if (j.stop) L.push(`STOP_MARKET reduce-only  qty ${j.qty}  trigger ${j.stop}` +
-        (j.stop_locks_usdt ? `   [locks ${money(j.stop_locks_usdt)}]` : ''));
-      if (j.tp) L.push(`LIMIT reduce-only        qty ${j.qty}  price   ${j.tp}   [${money(j.tp_gain_usdt)} if filled]`);
+        (j.stop_locks_usdt ? `   [${VX.locks} ${money(j.stop_locks_usdt)}]` : ''));
+      if (j.tp) L.push(`LIMIT reduce-only        qty ${j.qty}  price   ${j.tp}   [${money(j.tp_gain_usdt)} ${VX.ifFilled}]`);
       out.textContent = L.join('\n');
       let go = form.querySelector('.pr-send');
       if (!go) {
         go = document.createElement('button');
         go.type = 'button';
-        go.className = 'badge b-red pr-send';
-        go.textContent = '⚠ SEND';
+        go.className = 'ui-btn sm ui-danger-solid pr-send';
+        go.textContent = VX.send;
         go.addEventListener('click', () => {
           go.disabled = true;
           post(form, true).then(({ status, j }) => render(form, out, status, j));

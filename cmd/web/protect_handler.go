@@ -81,7 +81,7 @@ func (s *server) handleOpsProtect(c *gin.Context) {
 		"entry": plan.Entry, "mark": plan.Mark, "hedge": plan.Hedge,
 		"stop": plan.Stop, "tp": plan.TP,
 		"stop_locks_usdt": plan.StopLocksUSDT, "tp_gain_usdt": plan.TPGainUSDT,
-		"faults": plan.Faults, "ok": plan.OK(),
+		"faults": protectFaults(s.translator(langOf(c)), plan.FaultMsgs), "ok": plan.OK(),
 	}
 
 	if !plan.OK() {
@@ -104,7 +104,7 @@ func (s *server) handleOpsProtect(c *gin.Context) {
 	// Always tell the caller to re-verify, including on a partial failure.
 	// A bundled SL silently failing to attach is exactly how a position has gone naked,
 	// so an order id in the response is not proof the exchange is holding it.
-	out["next"] = "re-open /ops/verify to confirm the exchange is actually holding these"
+	out["next"] = s.translator(langOf(c))("protect.next")
 	if len(res.Errors) > 0 && !res.Sent() {
 		c.JSON(http.StatusBadGateway, out)
 		return
@@ -131,3 +131,13 @@ func optionalPrice(raw string) (float64, error) {
 }
 
 var errNegativePrice = errors.New("price must be >= 0")
+
+// protectFaults renders the plan's refusals in the reader's language; never
+// nil, so the JSON is always an array.
+func protectFaults(tr func(string, ...any) string, fs []protect.Fault) []string {
+	out := make([]string, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, tr("protect."+f.Code, f.Args...))
+	}
+	return out
+}

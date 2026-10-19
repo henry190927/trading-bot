@@ -7185,3 +7185,15 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .val-factors .val-detail { white-space: normal; }
 .val-factors .val-detail code { font-size: var(--fs-xs); color: var(--text-dim); }
 @media (max-width: 640px) { .val-head { grid-template-columns: 1fr; } .val-score { grid-row: auto; text-align: left; } .val-axes { justify-content: flex-start; } }
+
+/* ---------- tools: verify on exchange ---------- */
+.ui-tag.bad { color: var(--red); background: var(--wash-red); border-color: transparent; }
+.ui-btn.ui-danger-solid { background: var(--red); border-color: var(--red); color: #fff; }
+.vx-card.is-bad { border-left: 3px solid var(--red); }
+.vx-card.is-ok { border-left: 3px solid var(--green); }
+.vx-card { display: flex; flex-direction: column; gap: var(--sp-3); }
+.vx-card .ui-card-h { flex-wrap: wrap; margin-bottom: 0; }
+.vx-state { display: flex; flex-wrap: wrap; gap: 6px; }
+.vx-orphan { display: flex; flex-direction: column; gap: 6px; padding: var(--sp-3) 0; border-top: 1px solid var(--border); }
+.vx-orphan:first-of-type { border-top: 0; padding-top: 0; }
+.vx-orphan.is-bad .ui-sym { color: var(--red); }

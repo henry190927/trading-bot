@@ -52,6 +52,38 @@ type Plan struct {
 	TPGainUSDT float64
 
 	Faults []string
+	// FaultMsgs carries each fault as a code plus its values, in the same
+	// order as Faults, so a caller can render it in its own language.
+	// Faults stays the English text the CLI prints.
+	FaultMsgs []Fault
+}
+
+// Fault is one refusal reason as a code and the values its sentence needs.
+type Fault struct {
+	Code string
+	Args []any
+}
+
+// EnglishFormat is the CLI wording of each fault code.
+var EnglishFormat = map[string]string{
+	"no-position":   "no open position on the exchange — nothing to protect",
+	"zero-qty":      "position quantity is 0 — nothing to protect",
+	"no-mark":       "live mark price unavailable — refusing to place without a reference price",
+	"nothing-asked": "give a stop, a tp, or both",
+	"bad-side":      "unexpected position side %q",
+	"stop-long":     "stop %.4f is at/above the live mark %.4f (long) — it would trigger immediately and close at market",
+	"stop-short":    "stop %.4f is at/below the live mark %.4f (short) — it would trigger immediately and close at market",
+	"tp-long":       "tp %.4f is at/below the live mark %.4f (long) — it would fill immediately instead of resting",
+	"tp-short":      "tp %.4f is at/above the live mark %.4f (short) — it would fill immediately instead of resting",
+}
+
+// English renders the fault the way the CLI prints it.
+func (f Fault) English() string { return fmt.Sprintf(EnglishFormat[f.Code], f.Args...) }
+
+func (p *Plan) fault(code string, args ...any) {
+	f := Fault{Code: code, Args: args}
+	p.FaultMsgs = append(p.FaultMsgs, f)
+	p.Faults = append(p.Faults, f.English())
 }
 
 // OK reports whether the plan is safe to send.
@@ -62,7 +94,7 @@ func (p Plan) OK() bool { return len(p.Faults) == 0 }
 func BuildPlan(pos *bingx.Position, mark, stop, tp float64) Plan {
 	p := Plan{Stop: stop, TP: tp, Mark: mark}
 	if pos == nil {
-		p.Faults = append(p.Faults, "no open position on the exchange — nothing to protect")
+		p.fault("no-position")
 		return p
 	}
 	p.Symbol, p.Side, p.Qty = pos.Symbol, pos.Side, pos.Quantity
@@ -73,16 +105,16 @@ func BuildPlan(pos *bingx.Position, mark, stop, tp float64) Plan {
 	p.Hedge = pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
 
 	if pos.Quantity <= 0 {
-		p.Faults = append(p.Faults, "position quantity is 0 — nothing to protect")
+		p.fault("zero-qty")
 	}
 	if mark <= 0 {
-		p.Faults = append(p.Faults, "live mark price unavailable — refusing to place without a reference price")
+		p.fault("no-mark")
 	}
 	if stop <= 0 && tp <= 0 {
-		p.Faults = append(p.Faults, "give a stop, a tp, or both")
+		p.fault("nothing-asked")
 	}
 	if pos.Side != "long" && pos.Side != "short" {
-		p.Faults = append(p.Faults, fmt.Sprintf("unexpected position side %q", pos.Side))
+		p.fault("bad-side", pos.Side)
 	}
 	if !p.OK() {
 		return p
@@ -91,9 +123,9 @@ func BuildPlan(pos *bingx.Position, mark, stop, tp float64) Plan {
 	if stop > 0 {
 		switch {
 		case pos.Side == "long" && stop >= mark:
-			p.Faults = append(p.Faults, fmt.Sprintf("stop %.4f is at/above the live mark %.4f (long) — it would trigger immediately and close at market", stop, mark))
+			p.fault("stop-long", stop, mark)
 		case pos.Side == "short" && stop <= mark:
-			p.Faults = append(p.Faults, fmt.Sprintf("stop %.4f is at/below the live mark %.4f (short) — it would trigger immediately and close at market", stop, mark))
+			p.fault("stop-short", stop, mark)
 		}
 		if locked, isLock := lockedProfit(pos.Side, pos.EntryPrice, stop, pos.Quantity); isLock {
 			p.StopLocksUSDT = locked
@@ -102,9 +134,9 @@ func BuildPlan(pos *bingx.Position, mark, stop, tp float64) Plan {
 	if tp > 0 {
 		switch {
 		case pos.Side == "long" && tp <= mark:
-			p.Faults = append(p.Faults, fmt.Sprintf("tp %.4f is at/below the live mark %.4f (long) — it would fill immediately instead of resting", tp, mark))
+			p.fault("tp-long", tp, mark)
 		case pos.Side == "short" && tp >= mark:
-			p.Faults = append(p.Faults, fmt.Sprintf("tp %.4f is at/above the live mark %.4f (short) — it would fill immediately instead of resting", tp, mark))
+			p.fault("tp-short", tp, mark)
 		}
 		gain := (tp - pos.EntryPrice) * pos.Quantity
 		if pos.Side == "short" {

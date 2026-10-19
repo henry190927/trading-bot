@@ -16,7 +16,7 @@ import (
 // these drive classifyVerify — the same function the handler calls — with
 // hand-built exchange payloads. The page's whole purpose is being trusted over
 // local bookkeeping, so a false "🛡️ stop live" is the failure that matters.
-func verifyVerdict(t journal.Trade, pos *bingx.Position, ords []bingx.OpenOrder) (bool, string) {
+func verifyVerdict(t journal.Trade, pos *bingx.Position, ords []bingx.OpenOrder) (bool, verifyWarn) {
 	return classifyVerify(t, pos, ords)
 }
 
@@ -43,8 +43,8 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 
 	t.Run("a genuine reduce-only stop reads protected", func(t *testing.T) {
 		hasStop, warn := verifyVerdict(vexTrade(), vexPos(), []bingx.OpenOrder{realStop})
-		if !hasStop || warn != "" {
-			t.Errorf("hasStop=%v warn=%q, want true and no warning", hasStop, warn)
+		if !hasStop || warn.Code != "" {
+			t.Errorf("hasStop=%v warn=%+v, want true and no warning", hasStop, warn)
 		}
 	})
 
@@ -58,8 +58,8 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 		if hasStop {
 			t.Error("a non-reduce-only STOP rendered as live protection")
 		}
-		if !strings.Contains(warn, "裸單") {
-			t.Errorf("warn = %q, want a naked warning", warn)
+		if warn.Code != "naked" {
+			t.Errorf("warn = %+v, want a naked warning", warn)
 		}
 	})
 
@@ -80,8 +80,8 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 		if hasStop {
 			t.Error("a ghost order id rendered as live protection")
 		}
-		if !strings.Contains(warn, "2094351178603393024") || !strings.Contains(warn, "裸單") {
-			t.Errorf("warn = %q, want a naked warning naming the ghost order", warn)
+		if warn.Code != "ghost-stop" || warn.OrderID != "2094351178603393024" {
+			t.Errorf("warn = %+v, want a naked warning naming the ghost order", warn)
 		}
 	})
 
@@ -94,8 +94,8 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 		if hasStop {
 			t.Error("hasStop true with no stop anywhere")
 		}
-		if !strings.Contains(warn, "也沒記停損價") {
-			t.Errorf("warn = %q, want the no-journal-stop variant", warn)
+		if warn.Code != "naked-no-stop" {
+			t.Errorf("warn = %+v, want the no-journal-stop variant", warn)
 		}
 	})
 
@@ -104,8 +104,8 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 			tr := vexTrade()
 			tr.Stop = stop
 			_, warn := verifyVerdict(tr, nil, nil)
-			if !strings.Contains(warn, "交易所沒有部位") {
-				t.Errorf("stop=%g: warn = %q, want the stale-journal warning", stop, warn)
+			if warn.Code != "stale" {
+				t.Errorf("stop=%g: warn = %+v, want the stale-journal warning", stop, warn)
 			}
 		}
 	})
@@ -118,8 +118,8 @@ func TestVerifyExchangeVerdicts(t *testing.T) {
 			Price: 79006, Quantity: 0.131, ReduceOnly: false,
 		}
 		hasStop, warn := verifyVerdict(tr, nil, []bingx.OpenOrder{entryOrder})
-		if hasStop || warn != "" {
-			t.Errorf("hasStop=%v warn=%q, want false and no warning for an unfilled limit", hasStop, warn)
+		if hasStop || warn.Code != "" {
+			t.Errorf("hasStop=%v warn=%+v, want false and no warning for an unfilled limit", hasStop, warn)
 		}
 	})
 }
@@ -146,14 +146,14 @@ func TestPendingEntryIsNotAStaleJournal(t *testing.T) {
 		t.Fatalf("fixture is not pending: open=%v filled=%v", pending.IsOpen(), pending.FilledAt)
 	}
 	_, warn := classifyVerify(pending, nil, nil)
-	if warn != "" {
-		t.Errorf("a resting entry warned: %q", warn)
+	if warn.Code != "" {
+		t.Errorf("a resting entry warned: %+v", warn)
 	}
 
 	// Once it fills, the same row with no position IS stale and must warn.
 	filled := pending
 	filled.FilledAt = time.Now().UTC()
-	if _, w := classifyVerify(filled, nil, nil); w == "" {
+	if _, w := classifyVerify(filled, nil, nil); w.Code == "" {
 		t.Error("a filled row with no position must still warn")
 	}
 }
@@ -289,22 +289,22 @@ func TestVerifyExchangeRendersOrphans(t *testing.T) {
 	if !strings.Contains(out, "</html>") {
 		t.Fatalf("page truncated — no </html>; last 200 bytes:\n%s", tail(out, 200))
 	}
-	if strings.Contains(out, `<div class="verify-card`) && !strings.Contains(out, "</div>") {
-		t.Errorf("verify-card opened but never closed — the 2026-09-18 truncation")
+	if strings.Contains(out, `<div class="vx-orphan`) && !strings.Contains(out, "</div>") {
+		t.Errorf("vx-orphan opened but never closed — the 2026-09-18 truncation")
 	}
 
 	// Each orphan must actually reach the page. Without this the test would
 	// pass against a template that renders no cards at all.
-	for _, want := range []string{"BTC", "0.0615", "76400", "4699", "125x", "ETH", "SOL"} {
+	for _, want := range []string{"BTC", "0.0615", "76,400", "4699", "125x", "ETH", "SOL"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("orphan card missing %q from the rendered page", want)
 		}
 	}
 
-	// The red border tracks the 🚨 branch and nakedN: naked only. An
+	// The red marking tracks the 🚨 branch and nakedN: naked only. An
 	// unreadable order book rendering as naked is the cry-wolf direction
 	// exchangeOrphans explicitly refuses.
-	if n := strings.Count(out, "verify-card b-red"); n != 1 {
+	if n := strings.Count(out, "vx-orphan is-bad"); n != 1 {
 		t.Errorf("b-red applied to %d cards, want exactly 1 (the naked BTC);"+
 			" a read error or a protected position must not paint red", n)
 	}

@@ -24,7 +24,7 @@ type verifyTrade struct {
 	PosQty, PosEntry      float64
 	Orders                []bingx.OpenOrder
 	HasStop, HasTP        bool
-	Warn                  string
+	Warn                  verifyWarn
 
 	// PendingStop is the stop BUNDLED onto a resting entry that has not
 	// filled yet. It is protection that exists on the exchange but is not a
@@ -172,7 +172,7 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 					}
 				}
 			}
-			if vt.Warn != "" {
+			if vt.Warn.Code != "" {
 				warnN++
 			}
 			// Cash-open-bar advisory: only meaningful once there IS a stop to
@@ -221,26 +221,34 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 // because a STOP that is not reduce-only (and so could OPEN a position) and
 // one belonging to the opposite book in hedge mode both rendered as
 // "🛡️ stop live" on the one surface meant to be trusted over the journal.
-func classifyVerify(t journal.Trade, pos *bingx.Position, ords []bingx.OpenOrder) (hasStop bool, warn string) {
+func classifyVerify(t journal.Trade, pos *bingx.Position, ords []bingx.OpenOrder) (hasStop bool, warn verifyWarn) {
 	d := bracket.Decide(t, pos, ords, bracket.ModeAlert)
 	hasStop = d.State == bracket.StateProtected
 	switch {
 	case d.State == bracket.StateNaked:
 		if d.GhostStopID != "" {
-			return hasStop, "⚠ journal 記有停損單 " + d.GhostStopID + ",但交易所沒有這張掛單 — 裸單!"
+			return hasStop, verifyWarn{Code: "ghost-stop", OrderID: d.GhostStopID}
 		}
-		return hasStop, "⚠ 有部位但交易所沒有停損單 — 裸單!"
+		return hasStop, verifyWarn{Code: "naked"}
 	case d.State == bracket.StateStale:
-		return hasStop, "⚠ journal 記為已成交,但交易所沒有部位(可能已平/已停損)"
+		return hasStop, verifyWarn{Code: "stale"}
 	case pos != nil && !hasStop:
 		// Decide returns skip for a trade with no journal stop, and a naked
 		// position on such a trade would otherwise render clean. A live trade
 		// was exactly this row: 100x, no stop recorded, none on the exchange,
 		// and it gave back 97% of the position's margin.
-		return hasStop, "⚠ 有部位但交易所沒有停損單 — 裸單!(journal 也沒記停損價)"
+		return hasStop, verifyWarn{Code: "naked-no-stop"}
 	case pos == nil && !t.FilledAt.IsZero():
 		// The stale-journal warning has to survive the skip states too.
-		return hasStop, "⚠ journal 記為已成交,但交易所沒有部位(可能已平/已停損)"
+		return hasStop, verifyWarn{Code: "stale"}
 	}
-	return hasStop, ""
+	return hasStop, verifyWarn{}
+}
+
+// verifyWarn is a row's mismatch as a dictionary code (verify.warn.<code>);
+// OrderID is set for ghost-stop, the journal's order the exchange lacks.
+// Empty Code = no mismatch.
+type verifyWarn struct {
+	Code    string
+	OrderID string
 }
