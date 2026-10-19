@@ -154,11 +154,11 @@ func (s *server) equityAtEntry(ctx context.Context) float64 {
 }
 
 // riskNote renders a verdict for the /journal flash banner.
-func riskNote(v risk.Verdict) string {
+func riskNote(tr func(string, ...any) string, v risk.Verdict) string {
 	var parts []string
 	if v.Enforced && v.LevAfter > 0 {
-		parts = append(parts, fmt.Sprintf("帳戶槓桿 %.1fx · 歸零距離 %.3f%%", v.LevAfter, v.KillDistancePct))
+		parts = append(parts, tr("risk.note", v.LevAfter, v.KillDistancePct))
 	}
-	parts = append(parts, v.Warnings...)
+	parts = append(parts, riskWarnings(tr, v)...)
 	return strings.Join(parts, " · ")
 }

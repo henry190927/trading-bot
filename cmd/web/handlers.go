@@ -29,6 +29,7 @@ import (
 	"github.com/henry190927/trading-bot/macro"
 	"github.com/henry190927/trading-bot/market"
 	"github.com/henry190927/trading-bot/oi"
+	"github.com/henry190927/trading-bot/protect"
 	"github.com/henry190927/trading-bot/signal"
 	"github.com/henry190927/trading-bot/validator"
 )
@@ -475,7 +476,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 			continue
 		}
 		if t.TP1Auto && t.TP1OrderID == "" {
-			status, msg := s.placeTP1OnBingX(ctx, t, "")
+			status, msg := s.placeTP1OnBingX(ctx, s.translator("en"), t, "") // log only
 			switch status {
 			case "ok":
 				log.Printf("auto-tp1: trade #%d %s %s → %s", t.ID, t.Symbol, t.Side, msg)
@@ -1078,11 +1079,11 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	// the user from recording the plan.
 	statuses := []string{}
 	if openPos {
-		st, msg := s.placeEntryOnBingX(c.Request.Context(), &trades[idx])
+		st, msg := s.placeEntryOnBingX(c.Request.Context(), s.translator(langOf(c)), &trades[idx])
 		statuses = append(statuses, "entry:"+st+":"+msg)
 	}
 	if autoTP1 {
-		st, msg := s.placeTP1OnBingX(c.Request.Context(), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+		st, msg := s.placeTP1OnBingX(c.Request.Context(), s.translator(langOf(c)), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
 		statuses = append(statuses, "tp1:"+st+":"+msg)
 	}
 	// Persist any orderIds that got written by the helpers.
@@ -1119,9 +1120,9 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 // is responsible for persisting the mutated trade back to the journal.
 // Returns (status, msg) where status is one of: "ok" / "skip" / "error".
 // Never panics; all failures are surfaced via msg.
-func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialStr string) (string, string) {
+func (s *server) placeTP1OnBingX(ctx context.Context, tr func(string, ...any) string, t *journal.Trade, partialStr string) (string, string) {
 	if t.TP1OrderID != "" {
-		return "skip", fmt.Sprintf("TP1 already placed (orderId=%s) — cancel on BingX first to re-place", t.TP1OrderID)
+		return "skip", tr("place.already-tp1", t.TP1OrderID)
 	}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
@@ -1130,7 +1131,7 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 	if partialStr != "" {
 		v, err := strconv.ParseFloat(partialStr, 64)
 		if err != nil || v <= 0 || v > 100 {
-			return "error", "tp1_partial_pct must be 1-100"
+			return "error", tr("place.bad-pct")
 		}
 		pct = v
 	}
@@ -1143,7 +1144,7 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 		return "error", "read positions: " + err.Error()
 	}
 	if pos == nil {
-		return "skip", fmt.Sprintf("no open %s position on BingX for %s — TP1 will be retried on next fill-detection sweep", t.Side, t.Symbol)
+		return "skip", tr("place.no-position-tp1", tr("place.side."+t.Side), t.Symbol)
 	}
 	// Sanity against the live MARK — see stopPlacementFault's note on why
 	// entry is the wrong reference. The journal form already validated the
@@ -1152,14 +1153,13 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 	if err != nil {
 		return "error", "read mark price: " + err.Error()
 	}
-	if fault := tpPlacementFault(t.Side, t.TP1, mark); fault != "" {
-		return "error", fault
+	if code, args := tpFault(t.Side, t.TP1, mark); code != "" {
+		return "error", tr("place."+code, args...)
 	}
 
 	qty := partialQty(t.Symbol, pos.Quantity, pct)
 	if qty <= 0 {
-		return "error", fmt.Sprintf("computed qty=%g <= 0 (%.0f%% of %g, floored to the %s lot step)",
-			qty, pct, pos.Quantity, t.Symbol)
+		return "error", tr("place.qty-zero-tp1", qty, pct, pos.Quantity, t.Symbol)
 	}
 	hedgeMode := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
 	res, err := s.client.PlaceReduceOnlyLimit(ctx, sym, t.Side, qty, t.TP1, hedgeMode)
@@ -1167,7 +1167,7 @@ func (s *server) placeTP1OnBingX(ctx context.Context, t *journal.Trade, partialS
 		return "error", "place TP1: " + err.Error()
 	}
 	t.TP1OrderID = res.OrderID
-	return "ok", fmt.Sprintf("TP1 placed on BingX — orderId=%s qty=%g @ %.4f (%.0f%% of %g)", res.OrderID, qty, t.TP1, pct, pos.Quantity)
+	return "ok", tr("place.ok-tp1", res.OrderID, qty, t.TP1, pct, pos.Quantity)
 }
 
 // qtyPrecision is the per-symbol qty step we floor placement size to.
@@ -1239,18 +1239,18 @@ func hedgeModeEnabled() bool {
 // order at t.Entry for the qty derived from t.MarginUSDT × t.Leverage / t.Entry
 // (floored to lot precision). On success, writes the orderId into
 // t.EntryOrderID. Returns (status, msg) for the /journal flash banner.
-func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (string, string) {
+func (s *server) placeEntryOnBingX(ctx context.Context, tr func(string, ...any) string, t *journal.Trade) (string, string) {
 	if t.EntryOrderID != "" {
-		return "skip", fmt.Sprintf("entry already placed (orderId=%s) — cancel on BingX first to re-place", t.EntryOrderID)
+		return "skip", tr("place.already-entry", t.EntryOrderID)
 	}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
 	}
 	if t.MarginUSDT <= 0 {
-		return "error", "margin_usdt must be > 0 to auto-open"
+		return "error", tr("place.margin-zero")
 	}
 	if t.Leverage < 1 {
-		return "error", "leverage must be >= 1 to auto-open"
+		return "error", tr("place.lev-zero")
 	}
 	sym, err := resolveWebSymbol(t.Symbol)
 	if err != nil {
@@ -1260,7 +1260,7 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 	prec := lotPrec(t.Symbol)
 	qty := floorTo(rawQty, prec)
 	if qty <= 0 {
-		return "error", fmt.Sprintf("computed qty=%g <= 0 (margin %.2f × lev %d / entry %.4f, floored to %d decimals)", qty, t.MarginUSDT, t.Leverage, t.Entry, prec)
+		return "error", tr("place.qty-zero-entry", qty, t.MarginUSDT, t.Leverage, t.Entry, prec)
 	}
 
 	hedge := hedgeModeEnabled()
@@ -1304,8 +1304,11 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 		t.EquityUSDT = s.equityAtEntry(ctx)
 	}
 	if verdict.Blocked {
-		return "error", "risk gate refused this order — " + verdict.Reason +
-			". Adjust margin/leverage, close something, or raise the cap in .env (RISK_MAX_ACCOUNT_LEV)."
+		reason := verdict.Reason
+		if verdict.ReasonMsg != nil {
+			reason = riskText(tr, *verdict.ReasonMsg)
+		}
+		return "error", tr("place.risk-refused", reason)
 	}
 
 	res, err := s.client.PlaceLimit(ctx, sym, t.Side, qty, t.Entry, bundledStop, bundledTP, hedge)
@@ -1316,15 +1319,14 @@ func (s *server) placeEntryOnBingX(ctx context.Context, t *journal.Trade) (strin
 	bundledMsg := ""
 	if bundledStop > 0 {
 		t.StopOrderID = "ATTACHED:" + res.OrderID
-		bundledMsg += fmt.Sprintf(" + SL bundled @ %.4f", t.Stop)
+		bundledMsg += tr("place.sl-bundled", t.Stop)
 	}
 	if bundledTP > 0 {
 		t.TP2OrderID = "ATTACHED:" + res.OrderID
-		bundledMsg += fmt.Sprintf(" + TP2 bundled @ %.4f", t.TP2)
+		bundledMsg += tr("place.tp2-bundled", t.TP2)
 	}
-	msg := fmt.Sprintf("entry placed — orderId=%s qty=%g @ %.4f (margin %.2f × %dx = %s notional)%s",
-		res.OrderID, qty, t.Entry, t.MarginUSDT, t.Leverage, usdt(notional), bundledMsg)
-	if note := riskNote(verdict); note != "" {
+	msg := tr("place.ok-entry", res.OrderID, qty, t.Entry, t.MarginUSDT, t.Leverage, usdt(notional), bundledMsg)
+	if note := riskNote(tr, verdict); note != "" {
 		msg += " · " + note
 	}
 	return "ok", msg
@@ -1370,19 +1372,34 @@ func stopPlacementFault(side string, stop, mark float64) string {
 // rest. The old version compared against entry, which both permitted this and
 // forbade a deliberate scale-out below entry.
 func tpPlacementFault(side string, tp, mark float64) string {
-	if tp <= 0 {
-		return "tp price must be > 0"
+	code, args := tpFault(side, tp, mark)
+	if code == "" {
+		return ""
 	}
-	if mark <= 0 {
-		return "live mark price unavailable — refusing to place a tp without a reference price"
+	return fmt.Sprintf(tpFaultEnglish[code], args...)
+}
+
+// tpFault is tpPlacementFault as a code (dictionary key place.<code>) and
+// its values, so the /journal flash can say it in the reader's language.
+func tpFault(side string, tp, mark float64) (string, []any) {
+	switch {
+	case tp <= 0:
+		return "tp-zero", nil
+	case mark <= 0:
+		return "tp-no-mark", nil
+	case side == "long" && tp <= mark:
+		return "tp-long", []any{tp, mark}
+	case side == "short" && tp >= mark:
+		return "tp-short", []any{tp, mark}
 	}
-	if side == "long" && tp <= mark {
-		return fmt.Sprintf("tp %.4f is at/below the live mark %.4f (long) — it would fill immediately instead of resting", tp, mark)
-	}
-	if side == "short" && tp >= mark {
-		return fmt.Sprintf("tp %.4f is at/above the live mark %.4f (short) — it would fill immediately instead of resting", tp, mark)
-	}
-	return ""
+	return "", nil
+}
+
+var tpFaultEnglish = map[string]string{
+	"tp-zero":    "tp price must be > 0",
+	"tp-no-mark": "live mark price unavailable — refusing to place a tp without a reference price",
+	"tp-long":    protect.EnglishFormat["tp-long"],
+	"tp-short":   protect.EnglishFormat["tp-short"],
 }
 
 // markFor reads the live mark used by the guards above. A failure is surfaced,
@@ -1611,7 +1628,7 @@ func (s *server) handleJournalUnwind(c *gin.Context) {
 		return
 	}
 
-	flash := fmt.Sprintf("UNWIND #%d:\n%s", id, strings.Join(msgs, "\n"))
+	flash := s.translator(langOf(c))("flash.unwind", id) + "\n" + strings.Join(msgs, "\n")
 	c.Redirect(http.StatusSeeOther, "/journal?tp1_status=ok&tp1_msg="+url.QueryEscape(flash))
 }
 
@@ -1731,7 +1748,7 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 
 	redirect := "/journal"
 	if len(cancelMsgs) > 0 {
-		flash := fmt.Sprintf("CLOSE #%d cancel results:\n%s", trades[idx].ID, strings.Join(cancelMsgs, "\n"))
+		flash := s.translator(langOf(c))("flash.closeCancel", trades[idx].ID) + "\n" + strings.Join(cancelMsgs, "\n")
 		redirect = "/journal?tp1_status=ok&tp1_msg=" + url.QueryEscape(flash)
 	}
 	c.Redirect(http.StatusSeeOther, redirect)
@@ -1950,7 +1967,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	// journal entries.
 	redirectURL := "/journal"
 	if autoTP1 {
-		status, msg := s.placeTP1OnBingX(c.Request.Context(), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
+		status, msg := s.placeTP1OnBingX(c.Request.Context(), s.translator(langOf(c)), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
 		if trades[idx].TP1OrderID != "" {
 			if err := journal.WriteAll("", trades); err != nil {
 				log.Printf("auto-tp1: post-place journal write failed (orderId=%s): %v", trades[idx].TP1OrderID, err)

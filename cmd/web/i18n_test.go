@@ -283,3 +283,32 @@ func TestRiskMessagesTranslated(t *testing.T) {
 		}
 	}
 }
+
+// Every format string quotes the same number of values in both languages. A
+// zh entry with one verb fewer prints "%!(EXTRA ...)" into an order-result
+// banner; one more prints "%!v(MISSING)".
+func TestFormatVerbsMatchAcrossLanguages(t *testing.T) {
+	dicts, _ := loadDicts(i18nFS)
+	verbs := regexp.MustCompile(`%(?:\[[0-9]+\])?[-+# 0]*[0-9]*(?:\.[0-9]+)?[dfsvgxq]`)
+	for k, en := range dicts["en"] {
+		zh, ok := dicts["zh"][k]
+		if !ok {
+			continue // TestI18nKeysPaired reports it
+		}
+		// "%%" is a literal percent; dropped first, or "%% from" reads as "% f".
+		count := func(f string) int { return len(verbs.FindAllString(strings.ReplaceAll(f, "%%", ""), -1)) }
+		if a, b := count(en), count(zh); a != b {
+			t.Errorf("%s: en quotes %d values, zh %d\n en %q\n zh %q", k, a, b, en, zh)
+		}
+	}
+}
+
+// The English place.tp-* entries are the sentences the sweep logs.
+func TestTPFaultEnglishMatchesDictionary(t *testing.T) {
+	dicts, _ := loadDicts(i18nFS)
+	for code, f := range tpFaultEnglish {
+		if got := dicts["en"]["place."+code]; got != f {
+			t.Errorf("en place.%s = %q, want %q", code, got, f)
+		}
+	}
+}
