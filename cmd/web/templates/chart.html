@@ -44,7 +44,6 @@
   <span class="hidden" id="chart-banner-score-tf">—</span>
 
   <div class="chart-layers" role="group" aria-label="{{t "chart.ui.layersAria"}}">
-    <span class="chart-layers-label">{{t "chart.ui.indicators"}}</span>
 
     <!-- Three category buttons — each opens a flyout listing the
          individual chips in that category. Mirrors the drawing
@@ -101,22 +100,31 @@
       </div>
     </div>
     <span class="chart-layers-group chart-layers-actions">
-      <button type="button" class="layer-chip layer-info" id="layers-info" title="{{t "chart.ui.glossTip"}}" aria-label="{{t "chart.ui.glossAria"}}">ⓘ</button>
-      <select id="chart-tz-select" class="layer-chip chart-tz-select" title="{{t "chart.ui.tzTip"}}" aria-label="{{t "chart.ui.tzAria"}}">
-        <option value="0">UTC</option>
-        <option value="8" selected>UTC+8 {{t "chart.ui.tz.tpe"}}</option>
-        <option value="9">UTC+9 {{t "chart.ui.tz.tyo"}}</option>
-        <option value="-4">UTC-4 {{t "chart.ui.tz.nyedt"}}</option>
-        <option value="-5">UTC-5 {{t "chart.ui.tz.nyest"}}</option>
-        <option value="1">UTC+1 {{t "chart.ui.tz.lon"}}</option>
-      </select>
+      {{/* The two actions used while reading stay on the bar; the rest
+           (glossary, timezone, clear, all) move into the ⋯ menu so the
+           controls fit one row, as in the mockup. Ids unchanged. */}}
       <button type="button" class="layer-chip layer-reset" id="layers-reset" title="{{t "chart.ui.fitTip"}}">⟲ {{t "chart.ui.fit"}}</button>
       <button type="button" class="layer-chip layer-eye" id="layers-eye" title="{{t "chart.ui.eyeTip"}}" aria-label="{{t "chart.ui.eyeAria"}}">
         <svg class="icon-eye-open"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         <svg class="icon-eye-off"   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
       </button>
-      <button type="button" class="layer-chip layer-clear" id="layers-clear" title="{{t "chart.ui.clearTip"}}">× {{t "chart.ui.clear"}}</button>
-      <button type="button" class="layer-chip layer-all" id="layers-all" title="{{t "chart.ui.allTip"}}">{{t "chart.ui.all"}}</button>
+      <div class="layer-menu-wrap">
+        <button type="button" class="layer-chip layer-menu-toggle chart-more-toggle" data-menu="more" aria-haspopup="menu" aria-expanded="false" title="{{t "chart.ui.more"}}" aria-label="{{t "chart.ui.more"}}">⋯</button>
+        <div class="layer-menu hidden chart-more-menu" data-menu-panel="more" role="menu">
+          <button type="button" class="layer-chip layer-chip-menuitem layer-info" id="layers-info" title="{{t "chart.ui.glossTip"}}">ⓘ {{t "chart.ui.glossary"}}</button>
+          <label class="chart-more-tz"><span>{{t "chart.ui.timezone"}}</span>
+          <select id="chart-tz-select" class="layer-chip chart-tz-select" title="{{t "chart.ui.tzTip"}}" aria-label="{{t "chart.ui.tzAria"}}">
+            <option value="0">UTC</option>
+            <option value="8" selected>UTC+8 {{t "chart.ui.tz.tpe"}}</option>
+            <option value="9">UTC+9 {{t "chart.ui.tz.tyo"}}</option>
+            <option value="-4">UTC-4 {{t "chart.ui.tz.nyedt"}}</option>
+            <option value="-5">UTC-5 {{t "chart.ui.tz.nyest"}}</option>
+            <option value="1">UTC+1 {{t "chart.ui.tz.lon"}}</option>
+          </select></label>
+          <button type="button" class="layer-chip layer-chip-menuitem layer-all" id="layers-all" title="{{t "chart.ui.allTip"}}">{{t "chart.ui.all"}}</button>
+          <button type="button" class="layer-chip layer-chip-menuitem layer-clear" id="layers-clear" title="{{t "chart.ui.clearTip"}}">× {{t "chart.ui.clear"}}</button>
+        </div>
+      </div>
     </span>
   </div>
 
@@ -2279,6 +2287,10 @@
             panel.classList.toggle('hidden', !willOpen);
             toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
         });
+    });
+    // The ⋯ menu holds one-shot actions: close it once one is used.
+    document.querySelectorAll('[data-menu-panel="more"] button').forEach(function (b) {
+        b.addEventListener('click', function () { closeAllLayerMenus(); });
     });
     // Any click outside a menu closes them all.
     document.addEventListener('click', function (ev) {

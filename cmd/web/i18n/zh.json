@@ -1058,5 +1058,8 @@
   "chart.js.oi.q.longs-unwinding": "多單出場",
   "chart.js.oi.belowThreshold": "1 小時內 OI 變化太小,不判讀",
   "chart.js.oi.total": "OI 總量",
-  "chart.js.bn.label": "Binance 參考"
+  "chart.js.bn.label": "Binance 參考",
+  "chart.ui.more": "更多",
+  "chart.ui.glossary": "名詞說明",
+  "chart.ui.timezone": "時區"
 }

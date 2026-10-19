@@ -4491,3 +4491,22 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 /* TF tiles inside the score card: no frame of their own, small label. */
 .chart-side > .chart-header .tf-bias-panel { border: 0; border-top: 1px solid var(--border); border-radius: 0; background: none; box-shadow: none; padding: var(--sp-3) 0 0; }
 .chart-side > .chart-header .tf-bias-panel .tf-bias-title { font-size: var(--fs-xs); font-weight: 500; color: var(--text-dim); }
+
+/* ---------- /chart toolbar v2: one row, mockup segments (desktop) ---------- */
+@media (min-width: 721px) {
+  .chart-controls { flex-wrap: nowrap; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+  .chart-controls > .chart-layers { border-left: 0; padding-left: 0; flex: 1 1 auto; display: flex; align-items: center; gap: var(--sp-2); flex-wrap: nowrap; }
+  .chart-controls-end { border-left: 0; padding-left: 0; }
+  .chart-controls .chart-select { height: 34px; padding: 0 10px; border-radius: var(--r-sm); font-family: var(--sans, inherit); font-size: var(--fs-base); }
+  .chart-controls .chart-tf-pills { display: inline-flex; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); }
+  .chart-controls .chart-tf-pills .tf-pill { height: 28px; min-width: 38px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-dim); font-family: var(--mono); font-size: var(--fs-sm); box-shadow: none; }
+  .chart-controls .chart-tf-pills .tf-pill:hover { color: var(--text); }
+  .chart-controls .chart-tf-pills .tf-pill.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); font-weight: 600; }
+  .chart-controls .layer-menu-toggle, .chart-controls .layer-reset, .chart-controls .layer-eye { height: 34px; border-radius: var(--r-sm); background: var(--surface-2); }
+  .chart-controls .chart-layers-actions { margin-left: auto; display: inline-flex; gap: var(--sp-2); border: 0; padding: 0; }
+  .chart-controls .chart-more-toggle { min-width: 34px; justify-content: center; font-size: var(--fs-md); }
+}
+.chart-more-menu { left: auto; right: 0; min-width: 210px; }
+.chart-more-menu .layer-chip-menuitem { justify-content: flex-start; }
+.chart-more-tz { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px; font-size: var(--fs-xs); color: var(--text-dim); }
+.chart-more-tz .chart-tz-select { width: 100%; }
