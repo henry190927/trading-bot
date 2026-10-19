@@ -111,49 +111,12 @@ body {
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-.topbar {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: var(--apptop-h); /* below the app shell's bar */
-    z-index: 10;
-}
 .brand {
     font-weight: 600;
     color: var(--cyan);
     font-size: var(--fs-lg);
 }
-.tf-picker {
-    flex: 1;
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-.tf-picker a, .tf-picker .tf-active {
-    display: inline-block;
-    padding: 0.4rem 0.7rem;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-dim);
-    text-decoration: none;
-    font-size: var(--fs-md);
-    min-width: 44px;
-    min-height: 36px;
-    line-height: 1.5;
-    text-align: center;
-}
-.tf-picker .tf-active {
-    background: var(--blue);
-    color: var(--on-accent);
-    border-color: var(--blue);
-    font-weight: 600;
-}
+
 .updated {
     color: var(--text-dim);
     font-size: var(--fs-sm);
@@ -163,27 +126,9 @@ body {
 /* In the tf-bar, the timestamp is absolute-positioned so the tf-picker
    centers within the FULL bar width instead of being pushed left by
    the timestamp on the right. */
-.tf-bar { position: relative; }
-.tf-bar .updated {
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-}
+
 /* On narrow viewports, drop the absolute positioning and let the
    timestamp wrap to its own centered row below the tf-picker. */
-@media (max-width: 600px) {
-    .tf-bar {
-        flex-wrap: wrap;
-        row-gap: 0.3rem;
-    }
-    .tf-bar .updated {
-        position: static;
-        transform: none;
-        flex-basis: 100%;
-        text-align: center;
-    }
-}
 
 main {
     max-width: 1440px;
@@ -198,26 +143,12 @@ main {
     padding: 1rem;
     margin-bottom: 1rem;
 }
-.symbol-card.has-plan {
-    border-color: var(--blue);
-}
 
-.card-head {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.5rem;
-}
 .sym {
     font-weight: 700;
     font-size: var(--fs-lg);
     color: var(--cyan);
     min-width: 3em;
-}
-.price-wrap {
-    color: var(--text-dim);
-    font-size: var(--fs-md);
 }
 
 .side-long { color: var(--green); background: var(--green-bg); }
@@ -233,51 +164,10 @@ main {
 .score.score-good { color: var(--green); background: var(--green-bg); font-weight: 600; }
 .score.score-borderline { color: var(--yellow); }
 .score.score-weak { color: var(--text-dim); }
-.score.score-mr {
-    color: var(--mr);
-    background: var(--mr-bg);
-    border: 1px solid var(--mr);
-    margin-right: 0.3rem;
-}
-.score.score-mom {
-    color: var(--blue);
-    background: var(--info-bg);
-    border: 1px solid var(--blue);
-    margin-right: 0.3rem;
-}
-.diag-score-axis {
-    display: inline-block;
-    padding: 0 0.4rem;
-    border-radius: 0.25rem;
-    font-family: ui-monospace, "SF Mono", monospace;
-    font-size: var(--fs-base);
-    margin-right: 0.3rem;
-}
-.diag-axis-mr  { color: var(--mr);       background: var(--mr-bg); }
-.diag-axis-mom { color: var(--blue);   background: var(--info-bg); }
-.score-axes {
-    display: flex;
-    gap: 0.4rem;
-    justify-content: center;
-    margin-top: 0.5rem;
-}
-.factor-axis {
-    display: inline-block;
-    padding: 0 0.35rem;
-    border-radius: 0.2rem;
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin: 0 0.3rem;
-    min-width: 2.4rem;
-    text-align: center;
-}
+
 .factor-axis-mr   { color: var(--mr);     background: var(--mr-bg); }
 .factor-axis-mom  { color: var(--blue); background: var(--info-bg); }
 .factor-axis-both { color: var(--text-dim); background: rgba(255,255,255,0.04); }
-.score-tag.score-tag-mr  { color: var(--mr);     background: var(--mr-bg); }
-.score-tag.score-tag-mom { color: var(--blue); background: var(--info-bg); }
 
 /* Copy-button overrides for score / diagnose pills — keep their colored
    backgrounds instead of the default surface-2, while inheriting the
@@ -289,52 +179,14 @@ button.copy-btn.score {
     border-radius: 4px;
     padding: 2px 8px;
 }
-button.copy-btn.score.score-mr   { background: var(--mr-bg); color: var(--mr);     border-color: var(--mr); }
-button.copy-btn.score.score-mom  { background: var(--info-bg); color: var(--blue); border-color: var(--blue); }
+
 button.copy-btn.score.score-good       { background: var(--green-bg); color: var(--green); border-color: var(--green); font-weight: 600; }
 button.copy-btn.score.score-borderline { color: var(--yellow); }
 button.copy-btn.score.score-weak       { color: var(--text-dim); }
 button.copy-btn.score:active           { background: var(--blue); color: var(--on-accent); }
-button.copy-btn.diag-score-axis,
-button.copy-btn.diag-score-axis.diag-axis-mr,
-button.copy-btn.diag-score-axis.diag-axis-mom {
-    min-height: 0;
-    min-width: 0;
-    padding: 1px 6px;
-    font-size: var(--fs-base);
-    border-radius: 0.25rem;
-    border: 1px solid transparent;
-}
-button.copy-btn.diag-axis-mr  { background: var(--mr-bg); color: var(--mr);     border-color: var(--mr); }
-button.copy-btn.diag-axis-mom { background: var(--info-bg); color: var(--blue); border-color: var(--blue); }
-button.copy-btn.diag-score, button.copy-btn.ot-ratio {
-    min-height: 0;
-    min-width: 0;
-    padding: 1px 6px;
-    font-size: var(--fs-md);
-    font-weight: 600;
-}
-button.copy-btn.poc-drift {
-    min-height: 0;
-    min-width: 0;
-    padding: 1px 6px;
-}
 
 /* Card summary — rule-based one-line read under the diagnose row. */
-.card-summary {
-    margin: 0.4rem 0 0.2rem;
-    padding: 0.4rem 0.6rem;
-    background: var(--surface-2);
-    border-left: 3px solid var(--blue);
-    border-radius: 0 4px 4px 0;
-    font-size: var(--fs-base);
-    line-height: 1.4;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.card-summary-text { color: var(--text); flex: 1 1 auto; }
+
 .ai-analyze-btn {
     background: transparent;
     border: 1px solid var(--blue);
@@ -368,13 +220,7 @@ button.copy-btn.poc-drift {
     color: var(--text-dim);
     font-size: var(--fs-sm);
 }
-.validate-actions {
-    display: flex;
-    gap: 0.6rem;
-    align-items: center;
-    flex-wrap: wrap;
-    margin: 0.6rem 0;
-}
+
 .ai-analyze-validate {
     font-size: var(--fs-base);
     padding: 6px 14px;
@@ -383,27 +229,7 @@ button.copy-btn.poc-drift {
    sub-totals. Uses the same blue accent as every other AI-analyze
    button across the app (dashboard cards, per-trade portfolio) so
    the action reads consistently regardless of where it's invoked. */
-.score-card .score-card-ai {
-    display: inline-flex;
-    align-items: center;
-    margin-top: 0.6rem;
-    padding: 4px 12px;
-    font-size: var(--fs-base);
-    font-weight: 600;
-    background: transparent;
-    border: 1px solid var(--blue);
-    color: var(--blue);
-    border-radius: 4px;
-    cursor: pointer;
-}
-.score-card .score-card-ai:hover {
-    background: var(--blue);
-    color: var(--on-accent);
-}
-.score-card .score-card-ai:disabled {
-    opacity: 0.5;
-    cursor: wait;
-}
+
 /* Bilingual toggle for AI responses — EN / 繁 chip pair rendered by
    /static/ai-render.js. Sits above the analysis body. Muted when
    inactive, blue-filled when active. Small — chip metaphor, not CTA. */
@@ -443,24 +269,6 @@ button.copy-btn.poc-drift {
 /* "copy row" — single-tap whole-line snapshot for pasting into trade notes.
    Distinct visual so it doesn't read as a per-value chip; muted by default,
    highlights blue on tap (inheriting .copy-btn:active). */
-button.copy-btn.copy-row {
-    min-height: 0;
-    min-width: 0;
-    padding: 2px 8px;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-dim);
-    background: transparent;
-    border: 1px dashed var(--border);
-    margin-left: 0.4rem;
-}
-button.copy-btn.copy-row:hover {
-    color: var(--blue);
-    border-color: var(--blue);
-    border-style: solid;
-}
 
 .meta {
     display: flex;
@@ -479,31 +287,6 @@ button.copy-btn.copy-row:hover {
 }
 .meta .copy-btn.small {
     margin-left: 0.25rem;
-}
-
-.hvn-row, .va-row {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    margin: 0.5rem 0;
-}
-.hvn-row .label, .va-row .label {
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-}
-.va-row .va-sep {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-}
-.va-row .va-edge {
-    border-color: rgba(192, 132, 252, 0.5);  /* match chart VA color */
-    color: #c084fc;
-}
-.hvn-row .label {
-    font-size: var(--fs-base);
-    color: var(--text-dim);
-    margin-right: 0.25rem;
 }
 
 .reason {
@@ -532,41 +315,6 @@ button.copy-btn.copy-row:hover {
 }
 .plan.sweep {
     border-left-color: var(--green);
-}
-.plan-head {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    flex-wrap: wrap;
-    font-size: var(--fs-base);
-}
-.plan-head .ord {
-    font-weight: 600;
-    padding: 2px 6px;
-    background: var(--surface);
-    border-radius: 3px;
-}
-.plan-head .anchor {
-    color: var(--text-dim);
-    font-style: italic;
-    flex: 1;
-}
-
-.plan-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.4rem 0.8rem;
-    align-items: center;
-}
-.plan-grid .lbl {
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-}
-.plan-note {
-    margin-top: 0.5rem;
-    color: var(--yellow);
-    font-size: var(--fs-base);
 }
 
 /* Click-to-copy button — the centerpiece of mobile UX. */
@@ -632,52 +380,10 @@ footer {
 
 /* Grouped nav (Phase 0): cluster links into Trade / Journal / Research /
    System with a subtle divider + tiny uppercase label. */
-.nav-group {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    padding-left: var(--sp-3);
-    margin-left: var(--sp-1);
-    border-left: 1px solid var(--border);
-}
-.nav-group-label {
-    font-size: var(--fs-xs);
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--text-dim);
-    opacity: .7;
-    margin-right: var(--sp-1);
-    user-select: none;
-}
+
 /* Burger — hidden on desktop, shown in the mobile media query. */
-.nav-burger {
-    display: none;
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: var(--r-sm);
-    font-size: var(--fs-lg);
-    line-height: 1;
-    padding: 4px 10px;
-    cursor: pointer;
-    margin-left: auto;
-}
 
 /* -------- journal stats card -------- */
-.stats-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-.stats-card h2 {
-    font-size: var(--fs-md);
-    color: var(--text-dim);
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
 
 /* -------- journal trade cards -------- */
 .empty {
@@ -686,169 +392,8 @@ footer {
     padding: 2rem 1rem;
     font-style: italic;
 }
-.trade-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left-width: 3px;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.75rem;
-}
-.trade-card.status-win { border-left-color: var(--green); }
-.trade-card.status-loss { border-left-color: var(--red); }
-.trade-card.status-open { border-left-color: var(--yellow); }
-.trade-card.status-flat { border-left-color: var(--text-dim); }
-.trade-card.status-other { border-left-color: var(--text-dim); }
-.trade-card.status-skip {
-    border-left-color: var(--text-dim);
-    opacity: 0.72;
-}
-.status-skip .trade-status::before {
-    content: "↛ ";
-}
-.trade-card.status-pending {
-    border-left-color: var(--yellow);
-}
-.status-pending .trade-status {
-    background: rgba(var(--yellow-rgb), 0.18);
-    color: var(--yellow);
-    border: 1px solid var(--yellow);
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    animation: pulse-pending 1.6s ease-in-out infinite;
-}
 
 /* Hero "pending" pill in the Portfolio header. */
-.pf-hero-pill.pf-pill-pending {
-    border-color: rgba(var(--yellow-rgb), 0.55);
-    background: rgba(var(--yellow-rgb), 0.08);
-}
-.pf-hero-pill.pf-pill-pending strong { color: var(--yellow); }
-
-.trade-head {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.5rem;
-    font-size: var(--fs-md);
-}
-.trade-id {
-    color: var(--text-dim);
-    font-family: ui-monospace, monospace;
-    font-size: var(--fs-base);
-}
-.trade-head .sym {
-    font-weight: 700;
-    color: var(--cyan);
-}
-.trade-head .tf {
-    background: var(--surface-2);
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: var(--fs-base);
-    color: var(--text-dim);
-    font-family: ui-monospace, monospace;
-}
-.trade-head .score-tag {
-    background: var(--surface-2);
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: var(--fs-base);
-    color: var(--blue);
-    font-family: ui-monospace, monospace;
-}
-.trade-status {
-    font-size: var(--fs-base);
-    padding: 1px 6px;
-    border-radius: 3px;
-    background: var(--surface-2);
-    color: var(--text-dim);
-    text-transform: lowercase;
-    margin-left: auto;
-}
-.status-win .trade-status { background: var(--green-bg); color: var(--green); }
-.status-loss .trade-status { background: var(--red-bg); color: var(--red); }
-.status-open .trade-status { color: var(--yellow); }
-.status-flat .trade-status { color: var(--text-dim); }
-
-.trade-r {
-    font-family: ui-monospace, "SF Mono", monospace;
-    font-weight: 700;
-    font-size: var(--fs-md);
-}
-.trade-r.r-pos { color: var(--green); }
-.trade-r.r-neg { color: var(--red); }
-
-.trade-prices {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 0.8rem;
-    margin: 0.5rem 0;
-}
-.trade-prices > span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-.trade-prices .lbl {
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.trade-times {
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-    font-variant-numeric: tabular-nums;
-    margin: 0.4rem 0;
-}
-.trade-times .lbl {
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    font-size: var(--fs-sm);
-}
-.trade-times .lbl.pending { color: var(--yellow); }
-.trade-times .time-pending {
-    color: var(--yellow);
-    font-style: italic;
-    font-weight: 600;
-}
-
-.trade-anchor {
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-    font-style: italic;
-    margin: 0.3rem 0;
-}
-.trade-anchor span { color: var(--cyan); font-style: normal; }
-.trade-ctx {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    margin: 0.2rem 0;
-    word-break: break-all;
-}
-.trade-ctx code {
-    background: var(--surface-2);
-    padding: 1px 5px;
-    border-radius: 3px;
-    color: var(--text);
-    font-size: var(--fs-sm);
-}
-.trade-note {
-    color: var(--text);
-    font-size: var(--fs-md);
-    background: var(--surface-2);
-    padding: 0.4rem 0.6rem;
-    border-radius: 4px;
-    margin-top: 0.4rem;
-}
-.trade-note.close { color: var(--text-dim); font-style: italic; }
 
 /* -------- forms -------- */
 .page-title {
@@ -857,28 +402,8 @@ footer {
     color: var(--cyan);
     margin-bottom: 1rem;
 }
-.form-error {
-    background: var(--red-bg);
-    color: var(--red);
-    border: 1px solid var(--red);
-    border-radius: 6px;
-    padding: 0.6rem 0.8rem;
-    margin-bottom: 1rem;
-    font-size: var(--fs-md);
-}
-/* TP1 flash banner — shown once on /journal after /journal/open. */
-.tp1-flash {
-    border-radius: 6px;
-    padding: 0.65rem 0.85rem;
-    margin-bottom: 1rem;
-    font-size: var(--fs-md);
-    border: 1px solid var(--border);
-}
-.tp1-ok    { background: var(--green-bg); color: var(--green); border-color: var(--green); }
-.tp1-skip  { background: var(--info-bg);          color: var(--blue);  border-color: var(--blue); }
-.tp1-error { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
-.tp1-flash strong { color: inherit; }
 
+/* TP1 flash banner — shown once on /journal after /journal/open. */
 
 /* /chart — full-page interactive Lightweight Charts view */
 .chart-main {
@@ -920,13 +445,7 @@ footer {
     color: var(--on-accent);
     border-color: var(--blue);
 }
-.chart-summary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    align-items: center;
-    margin-left: auto;
-}
+
 .chart-verdict {
     color: var(--text-dim);
     font-size: var(--fs-base);
@@ -949,14 +468,7 @@ footer {
 .chart-banner.band-neutral { border-color: var(--yellow); background: linear-gradient(90deg, rgba(var(--yellow-rgb),0.10), var(--surface-2)); }
 .chart-banner.band-avoid   { border-color: var(--red);    background: linear-gradient(90deg, rgba(var(--red-rgb),0.12), var(--surface-2)); }
 .chart-banner-action { flex: 1 1 60%; display: flex; flex-direction: column; gap: 0.15rem; }
-.chart-banner-score  { flex: 0 0 auto; text-align: right; min-width: 160px; display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
-.chart-banner-label {
-    color: var(--text-dim);
-    font-size: var(--fs-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 600;
-}
+
 .chart-banner-action-text {
     color: var(--text);
     font-size: var(--fs-lg);
@@ -1032,21 +544,7 @@ footer {
     background: var(--surface-2);
     flex-wrap: wrap;
 }
-.chart-header-left {
-    flex: 1 1 320px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 240px;
-}
-.chart-header-right {
-    flex: 0 1 340px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.25rem;
-    min-width: 220px;
-}
+
 .chart-header-symrow {
     display: flex;
     align-items: center;
@@ -1098,16 +596,7 @@ footer {
     color: var(--text);
     margin-left: 0.3rem;
 }
-.chart-header-scores {
-    display: flex;
-    gap: 0.35rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-.chart-header .chart-banner-score {
-    min-width: 0;
-    align-items: flex-end;
-}
+
 .chart-header .chart-banner-action {
     text-align: right;
     align-items: flex-end;
@@ -1737,34 +1226,7 @@ footer {
    the main chart above doesn't jump. Time-axis is hidden on the
    RSI chart itself — the main chart's axis at the top of the pane
    already labels the same times. */
-.chart-rsi-pane {
-    position: relative;
-    margin-top: 6px;
-    /* No padding — the RSI pane is now nested inside .chart-column
-       alongside .chart-plot-wrap, so their widths already match
-       exactly, keeping the RSI curve aligned with the main bars. */
-}
-.chart-rsi-pane.hidden { display: none; }
-.chart-rsi-label {
-    position: absolute;
-    top: 4px;
-    left: 8px;
-    z-index: 2;
-    color: var(--text-dim);
-    font-family: ui-monospace, "SF Mono", monospace;
-    font-size: var(--fs-sm);
-    padding: 1px 6px;
-    background: rgba(var(--bg-rgb),0.72);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-}
-.chart-rsi-canvas {
-    width: 100%;
-    height: 140px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-}
+
 /* Floating price marker on the chart right edge — tracks the cursor
    crosshair. The + button opens the quick-action modal so the user
    can record a trade / validate at the hovered price without leaving
@@ -1916,37 +1378,7 @@ footer {
 
 /* Drawing tool buttons — visually distinct from layer chips so users
    don't confuse toggle vs. one-shot action. */
-.chart-tools-group {
-    display: inline-flex;
-    gap: 0.3rem;
-    padding-right: 0.6rem;
-    border-right: 1px dashed var(--border);
-}
-.tool-chip {
-    background: transparent;
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 2px 8px;
-    font-size: var(--fs-sm);
-    font-family: ui-monospace, "SF Mono", monospace;
-    cursor: pointer;
-    transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
-}
-.tool-chip:hover { color: var(--text); }
-.tool-chip.is-active {
-    background: var(--yellow);
-    color: var(--on-accent);
-    border-color: var(--yellow);
-}
-.tool-chip.tool-clear {
-    color: var(--red);
-    border-color: rgba(var(--red-rgb),0.45);
-}
-.tool-chip.tool-clear:hover {
-    background: rgba(var(--red-rgb),0.10);
-    color: var(--red);
-}
+
 .chart-price-marker[hidden] { display: none; }
 .chart-price-marker-label { min-width: 60px; text-align: right; }
 .chart-price-plus {
@@ -2145,11 +1577,7 @@ footer {
     border-color: var(--blue);
 }
 .quick-go.btn-primary:hover:not(:disabled)   { background: var(--blue); }
-.quick-go.btn-secondary {
-    background: var(--surface-2);
-    color: var(--text);
-}
-.quick-go.btn-secondary:hover:not(:disabled) { background: var(--surface); }
+
 .quick-hint {
     margin: 0.8rem 0 0;
     color: var(--text-dim);
@@ -2333,53 +1761,6 @@ footer {
 }
 
 /* Page lead + inline field row (shared; the /onchain page that introduced them is gone) */
-.page-hint {
-    color: var(--text-dim);
-    font-size: var(--fs-md);
-    line-height: 1.5;
-    max-width: 720px;
-    margin-bottom: 1rem;
-}
-.field-row {
-    display: flex;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    align-items: flex-end;
-}
-.tradeable-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-.tradeable-chip {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.4rem 0.7rem;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-left-width: 3px;
-    border-radius: 4px 6px 6px 4px;
-    text-decoration: none;
-    color: var(--text);
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-base);
-    transition: background 100ms ease, border-color 100ms ease;
-}
-.tradeable-chip:hover {
-    background: rgba(255,255,255,0.05);
-    border-color: var(--blue);
-}
-.tradeable-chip.tradeable-long  { border-left-color: var(--green); }
-.tradeable-chip.tradeable-short { border-left-color: var(--red); }
-.tradeable-chip .tb-sym    { font-weight: 700; }
-.tradeable-chip .tb-side   { font-weight: 700; }
-.tradeable-chip.tradeable-long  .tb-side { color: var(--green); }
-.tradeable-chip.tradeable-short .tb-side { color: var(--red); }
-.tradeable-chip .tb-score  { color: var(--text-dim); font-size: var(--fs-base); }
-.tradeable-chip .tb-ratio  { color: var(--blue); }
-.tradeable-chip .tb-anchor { color: var(--text-dim); font-size: var(--fs-sm); font-style: italic; }
 
 /* Small count badge in the Symbol scan section title */
 
@@ -2521,129 +1902,13 @@ footer {
     line-height: 1.4;
 }
 
-.field-info {
-    background: var(--info-bg);
-    color: var(--blue);
-    border: 1px solid var(--blue);
-    border-radius: 6px;
-    padding: 0.6rem 0.8rem;
-    margin-bottom: 0.85rem;
-    font-size: var(--fs-md);
-}
-.field-info code {
-    background: rgba(255,255,255,0.06);
-    padding: 0.05rem 0.35rem;
-    border-radius: 3px;
-    font-size: 0.85em;
-}
-
-.checkbox-inline {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    user-select: none;
-}
-.checkbox-inline input[type="checkbox"] {
-    width: 1.1rem;
-    height: 1.1rem;
-    accent-color: var(--green);
-}
-
-.bingx-block {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.6rem 0.9rem 0.4rem;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-.bingx-block legend {
-    padding: 0 0.4rem;
-    font-size: var(--fs-base);
-    color: var(--text-dim);
-}
-
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-}
-.modal-overlay[hidden] { display: none; }
-.modal-dialog {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.2rem;
-    max-width: 480px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-.modal-dialog h3 {
-    margin: 0 0 0.6rem;
-    font-size: var(--fs-lg);
-}
-.modal-warn {
-    background: var(--yellow-bg);
-    color: var(--yellow);
-    border: 1px solid var(--yellow);
-    border-radius: 6px;
-    padding: 0.5rem 0.75rem;
-    margin: 0 0 0.8rem;
-    font-size: var(--fs-md);
-}
-.modal-dialog ul {
-    margin: 0 0 1rem;
-    padding-left: 1.2rem;
-    font-size: var(--fs-md);
-    line-height: 1.6;
-}
-.modal-dialog li {
-    font-variant-numeric: tabular-nums;
-    word-break: break-word;
-}
-.modal-dialog li.modal-override-warn {
-    color: var(--red);
-    background: var(--red-bg);
-    border: 1px solid var(--red);
-    border-radius: 4px;
-    padding: 0.35rem 0.5rem;
-    margin-left: -1rem;
-    font-weight: 600;
-    list-style: none;
-}
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.6rem;
-}
-.trade-form {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-}
 .field {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     min-width: 0;
 }
-.field-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.85rem;
-}
+
 .field label {
     color: var(--text-dim);
     font-size: var(--fs-base);
@@ -2685,10 +1950,6 @@ footer {
     border-color: var(--blue);
 }
 
-.radio-row {
-    display: flex;
-    gap: 0.5rem;
-}
 .radio {
     flex: 1;
     display: flex;
@@ -2709,11 +1970,6 @@ footer {
     background: var(--surface-2);
 }
 
-.form-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
 .btn-primary, .btn-cancel {
     flex: 1;
     border-radius: 6px;
@@ -2735,112 +1991,12 @@ footer {
     border-color: var(--blue);
 }
 .btn-primary:active { opacity: 0.8; }
-.btn-cancel {
-    background: var(--surface);
-    color: var(--text-dim);
-}
-
-.page-actions {
-    margin-bottom: 1rem;
-    display: flex;
-    justify-content: flex-end;
-}
-.page-actions .btn-primary {
-    flex: 0 0 auto;
-    padding: 0.5rem 1rem;
-    min-height: 40px;
-    font-size: var(--fs-md);
-}
 
 /* Record-trade button on dashboard plan cards */
-.record-btn {
-    margin-left: auto;
-    background: var(--blue);
-    color: var(--on-accent);
-    padding: 4px 10px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: var(--fs-base);
-    font-weight: 600;
-    white-space: nowrap;
-    min-height: 28px;
-    display: inline-flex;
-    align-items: center;
-}
-.record-btn:active { opacity: 0.8; }
 
 /* Close-trade button in journal-list open cards */
-.trade-actions {
-    margin-top: 0.6rem;
-    display: flex;
-    justify-content: flex-end;
-}
-.btn-close-trade {
-    background: var(--yellow);
-    color: var(--bg);
-    padding: 0.45rem 0.9rem;
-    border-radius: 5px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: var(--fs-md);
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-}
-.btn-close-trade:active { opacity: 0.8; }
 
 /* Trade-summary block on close page */
-.trade-summary {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.8rem 1rem;
-    margin-bottom: 1rem;
-}
-.trade-summary .row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 0.4rem;
-}
-.trade-summary .row.prices {
-    gap: 0.4rem 0.8rem;
-}
-.trade-summary .row.prices > span {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-}
-.trade-summary .row.times {
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-}
-.trade-summary .lbl {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.trade-summary .sym {
-    font-weight: 700;
-    font-size: var(--fs-lg);
-    color: var(--cyan);
-}
-.trade-summary .tf {
-    background: var(--surface-2);
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: var(--fs-base);
-    color: var(--text-dim);
-    font-family: ui-monospace, monospace;
-}
-.trade-summary .score-tag {
-    background: var(--surface-2);
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: var(--fs-base);
-    color: var(--blue);
-    font-family: ui-monospace, monospace;
-}
 
 /* Desktop nicety */
 @media (min-width: 768px) {
@@ -2850,64 +2006,6 @@ footer {
 /* --- Edit form (2B.4) --- */
 
 /* Allow side-by-side close + edit on open trades */
-.trade-actions { gap: 0.5rem; }
-
-.btn-edit {
-    background: var(--surface-2);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 0.45rem 0.9rem;
-    border-radius: 5px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: var(--fs-md);
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-}
-.btn-edit:active { opacity: 0.8; }
-
-.form-section {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 1.2rem 0 0.4rem 0;
-    padding-bottom: 0.3rem;
-    border-bottom: 1px solid var(--border);
-}
-.form-section .hint {
-    color: var(--text-dim);
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-    font-style: italic;
-    font-size: var(--fs-sm);
-    margin-left: 0.4rem;
-}
-
-.danger-form {
-    margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 1px dashed var(--border);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-}
-.btn-danger {
-    background: transparent;
-    color: var(--red);
-    border: 1px solid var(--red);
-    border-radius: 6px;
-    padding: 0.6rem 1.2rem;
-    font-size: var(--fs-md);
-    font-weight: 600;
-    cursor: pointer;
-    min-height: 44px;
-    font-family: inherit;
-}
-.btn-danger:active { background: var(--red-bg); }
 
 /* --- Partials calculator widget --- */
 
@@ -2985,20 +2083,6 @@ footer {
     border-color: var(--red);
 }
 
-.btn-secondary {
-    background: transparent;
-    color: var(--blue);
-    border: 1px solid var(--blue);
-    border-radius: 5px;
-    padding: 0.35rem 0.8rem;
-    font-size: var(--fs-base);
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    min-height: 36px;
-}
-.btn-secondary:active { opacity: 0.7; }
-
 .partials-summary {
     margin-top: 0.6rem;
     display: flex;
@@ -3036,123 +2120,6 @@ footer {
 
 /* --- Validate result page --- */
 
-.validate-header {
-    margin-bottom: 0.6rem;
-}
-.validate-head-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 0.3rem;
-}
-.validate-head-row .entry-tag {
-    margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-}
-.market-row {
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.market-diff {
-    margin-left: 0.4rem;
-}
-
-.score-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    margin: 0.8rem 0;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    border-left: 4px solid var(--border);
-}
-.score-card.verdict-strong  { border-left-color: var(--green); }
-.score-card.verdict-take    { border-left-color: var(--green); }
-.score-card.verdict-neutral { border-left-color: var(--yellow); }
-.score-card.verdict-weak    { border-left-color: var(--yellow); }
-.score-card.verdict-avoid   { border-left-color: var(--red); }
-
-.score-num {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-3xl);
-    font-weight: 700;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-}
-.score-card.verdict-strong  .score-num,
-.score-card.verdict-take    .score-num { color: var(--green); }
-.score-card.verdict-neutral .score-num,
-.score-card.verdict-weak    .score-num { color: var(--yellow); }
-.score-card.verdict-avoid   .score-num { color: var(--red); }
-
-.score-out {
-    color: var(--text-dim);
-    font-size: var(--fs-md);
-    font-weight: 400;
-    margin-left: 0.2rem;
-}
-.verdict-text {
-    color: var(--text);
-    font-weight: 600;
-    font-size: var(--fs-md);
-    flex: 1;
-}
-
-.btn-record-trade {
-    width: 100%;
-    margin: 0.4rem 0 1rem 0;
-}
-
-.validate-block {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.8rem 1rem;
-    margin-bottom: 0.8rem;
-}
-.validate-block h2 {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0 0 0.6rem 0;
-    font-weight: 600;
-}
-.validate-block h2 .hint {
-    color: var(--text-dim);
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-    font-style: italic;
-    font-size: var(--fs-sm);
-    margin-left: 0.4rem;
-}
-
-.kv-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: var(--fs-md);
-}
-.kv-row .lbl {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
 .reasons {
     margin: 0.5rem 0 0 0;
     padding: 0;
@@ -3162,57 +2129,6 @@ footer {
     padding: 0.2rem 0;
     font-size: var(--fs-md);
     line-height: 1.4;
-}
-.reason-plus { color: var(--green); }
-.reason-plus::before { content: "+ "; color: var(--green); font-weight: 600; }
-.reason-note { color: var(--cyan); }
-.reason-note::before { content: "· "; color: var(--cyan); }
-
-.plan-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem 0.8rem;
-    font-size: var(--fs-md);
-}
-.plan-grid > div {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    flex-wrap: wrap;
-}
-.plan-grid .lbl {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    min-width: 38px;
-}
-.plan-grid .mono {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-variant-numeric: tabular-nums;
-}
-.diff-small {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-variant-numeric: tabular-nums;
-}
-
-.proximity {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font-size: var(--fs-md);
-}
-.proximity li {
-    padding: 0.25rem 0;
-    line-height: 1.4;
-}
-.proximity li.dim { color: var(--text-dim); font-style: italic; }
-.proximity strong {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
 }
 
 .factors {
@@ -3245,387 +2161,39 @@ footer {
 .factor-pos .factor-pts { color: var(--green); }
 .factor-neg .factor-pts { color: var(--red); }
 .factor-zero .factor-pts { color: var(--text-dim); }
-.factor-name {
-    grid-area: name;
-    font-weight: 600;
-}
-.factor-detail {
-    grid-area: detail;
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-}
-
-.validate-footer-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-.validate-footer-actions .btn-primary,
-.validate-footer-actions .btn-cancel { flex: 1; }
 
 /* --- Diagnose-now row on dashboard cards --- */
 
-.diagnose-row {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--border);
-    border-radius: 6px;
-    padding: 0.4rem 0.6rem;
-    margin: 0.5rem 0;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    font-size: var(--fs-base);
-}
-.diagnose-row.verdict-strong  { border-left-color: var(--green); }
-.diagnose-row.verdict-take    { border-left-color: var(--green); }
-.diagnose-row.verdict-neutral { border-left-color: var(--yellow); }
-.diagnose-row.verdict-weak    { border-left-color: var(--yellow); }
-.diagnose-row.verdict-avoid   { border-left-color: var(--red); }
-
-.diag-label {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.diag-side {
-    padding: 0.1rem 0.4rem;
-    border-radius: 3px;
-    font-weight: 700;
-    font-size: var(--fs-sm);
-}
-.diag-score {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-}
-.diagnose-row.verdict-strong  .diag-score,
-.diagnose-row.verdict-take    .diag-score { color: var(--green); }
-.diagnose-row.verdict-neutral .diag-score,
-.diagnose-row.verdict-weak    .diag-score { color: var(--yellow); }
-.diagnose-row.verdict-avoid   .diag-score { color: var(--red); }
-
-.diag-verdict {
-    color: var(--text);
-    font-weight: 600;
-}
-.diag-link {
-    margin-left: auto;
-    color: var(--blue);
-    text-decoration: none;
-    font-size: var(--fs-md);
-    padding: 0 0.3rem;
-}
-.diag-link:active { opacity: 0.7; }
-
-.diag-flag {
-    flex-basis: 100%;
-    margin-top: 0.2rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-}
-.diag-flag.knife {
-    background: rgba(var(--red-rgb), 0.15);
-    color: var(--red);
-    border: 1px solid var(--red);
-}
-.diag-flag.squeeze {
-    background: rgba(var(--yellow-rgb), 0.15);
-    color: var(--yellow);
-    border: 1px solid var(--yellow);
-}
-
 /* Mini-chart container on dashboard symbol cards */
-.mini-chart {
-    width: 100%;
-    height: 130px;
-    margin: 0.55rem 0 0.45rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-    position: relative;
-}
-.mini-chart .uplot {
-    background: transparent !important;
-}
 
 /* Chart-style toggle (Line / Candles) sitting in the tf-bar */
-.chart-style-toggle {
-    display: inline-flex;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 2px;
-    margin-left: 0.4rem;
-}
-.cs-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-dim);
-    font-family: inherit;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    min-height: 28px;
-}
-.cs-btn:active { opacity: 0.7; }
-.cs-btn.active {
-    background: var(--surface-2);
-    color: var(--text);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
-}
 
 /* Per-card chart show/hide chevron, injected into .card-head */
-.chart-toggle {
-    margin-left: 0.4rem;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    border-radius: 5px;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    font-size: var(--fs-md);
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-.chart-toggle:hover { color: var(--text); }
-.chart-toggle:active { transform: scale(0.93); }
 
 /* close-bar reference next to live mark price */
-.close-ref {
-    margin-left: 0.4rem;
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    font-style: italic;
-    white-space: nowrap;
-}
-.close-ref .copy-btn {
-    font-style: normal;
-    font-size: var(--fs-sm);
-    padding: 0.05rem 0.3rem;
-    margin-left: 0.15rem;
-}
 
 /* ============================================================ */
 /* Portfolio page — hero, period stats, polished calendar, sections */
 /* ============================================================ */
 
-.pf-hero {
-    background: linear-gradient(140deg, var(--surface) 0%, var(--surface-2) 100%);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1rem 1.1rem 1.1rem;
-    margin-bottom: 0.9rem;
-    position: relative;
-    overflow: hidden;
-}
-.pf-hero::before {
-    content: "";
-    position: absolute;
-    top: -40%;
-    right: -10%;
-    width: 60%;
-    height: 180%;
-    background: radial-gradient(ellipse at center, rgba(var(--blue-rgb), 0.10), transparent 65%);
-    pointer-events: none;
-}
-.pf-hero-label {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 600;
-}
-.pf-hero-r {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-3xl);
-    font-weight: 700;
-    line-height: 1.05;
-    margin: 0.2rem 0 0.6rem;
-    font-variant-numeric: tabular-nums;
-}
-.pf-hero-r.r-pos  { color: var(--green); }
-.pf-hero-r.r-neg  { color: var(--red); }
-.pf-hero-r.r-zero { color: var(--text); }
-.pf-hero-unit {
-    font-size: var(--fs-lg);
-    color: var(--text-dim);
-    margin-left: 0.25rem;
-    font-weight: 600;
-}
-.pf-hero-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-}
-.pf-hero-pill {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0.25rem 0.6rem;
-    font-size: var(--fs-sm);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-.pf-hero-pill .lbl {
-    color: var(--text-dim);
-    font-size: var(--fs-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.pf-hero-pill strong {
-    color: var(--text);
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-variant-numeric: tabular-nums;
-}
-
 /* Period strip — today / week / month / all */
-
-.pf-periods {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
-    margin-bottom: 0.9rem;
-}
-@media (min-width: 480px) {
-    .pf-periods { grid-template-columns: repeat(4, 1fr); }
-}
-.pf-period {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.6rem 0.7rem;
-}
-.pf-period-label {
-    color: var(--text-dim);
-    font-size: var(--fs-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 600;
-}
-.pf-period-r {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-lg);
-    font-weight: 700;
-    margin: 0.15rem 0;
-    font-variant-numeric: tabular-nums;
-}
-.pf-period-r.r-pos  { color: var(--green); }
-.pf-period-r.r-neg  { color: var(--red); }
-.pf-period-r.r-zero { color: var(--text-dim); }
-.pf-period-n {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-}
 
 /* Portfolio sections — visual containers */
 
-.pf-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 0.85rem 1rem 1rem;
-    margin-bottom: 0.9rem;
-}
-.pf-section-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text);
-    font-size: var(--fs-md);
-    font-weight: 700;
-    margin: 0 0 0.7rem 0;
-    letter-spacing: 0.02em;
-}
-.pf-section-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-}
-.pf-section-dot.calendar { background: var(--blue); }
-.pf-section-dot.histo    { background: #c084fc; } /* soft purple */
-.pf-section-dot.journal  { background: var(--cyan); }
-.pf-section-dot.equity   { background: var(--green); }
-.pf-section-meta {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    margin-left: 0.3rem;
-}
-.pf-section-action {
-    margin-left: auto;
-    background: var(--blue);
-    color: var(--on-accent);
-    padding: 0.3rem 0.7rem;
-    border-radius: 5px;
-    text-decoration: none;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-}
-.pf-section-action:active { opacity: 0.8; }
+/* soft purple */
 
 /* Portfolio layout — single column on all screen sizes.
    The pf-main / pf-aside markup is still in place so we can re-enable a
    responsive 2-column variant later, but the default render is now a
    straight cascade (was 2-col @960px+ — felt off on desktop, reverted
    pending a proper layout rethink). */
-.pf-layout {
-    display: block;
-}
 
 /* Portfolio groups + tabs (narrative grouping under "Performance" / "Journal") */
 
 .pf-group {
     margin-bottom: 1.2rem;
 }
-.pf-group-title {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-weight: 700;
-    margin: 0 0 0.55rem 0.1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-.pf-group-title::before {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, var(--border), transparent);
-    margin-right: 0.4rem;
-}
-.pf-group-title::after {
-    content: "";
-    flex: 8;
-    height: 1px;
-    background: linear-gradient(90deg, var(--border) 0%, var(--border) 30%, transparent);
-}
 
-.pf-tabs {
-    display: flex;
-    gap: 0.3rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.25rem;
-    margin-bottom: 0.6rem;
-}
 .pf-tab {
     flex: 1;
     background: transparent;
@@ -3656,7 +2224,7 @@ footer {
 
 /* Equity curve */
 
-.pf-equity-stats { margin-bottom: 0.6rem; }  /* layout hook only — the tiles are .tile-row */
+  /* layout hook only — the tiles are .tile-row */
 
 .pf-equity-chart-wrap {
     /* Trend-driven color drives the SVG via `currentColor` */
@@ -3821,58 +2389,10 @@ footer {
 /* The pf-journal trade-card list shouldn't have its own extra padding — the
    pf-section wrapper already gives padding. Reset any external margins on
    the trade cards inside the journal section. */
-.pf-journal .trade-card:last-child { margin-bottom: 0; }
 
 /* Pager (journal pagination) */
-.pf-pager {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.3rem;
-    margin-top: 0.8rem;
-    flex-wrap: wrap;
-}
-.pf-page-num, .pf-page-arrow {
-    min-width: 32px;
-    height: 32px;
-    padding: 0 0.5rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    text-decoration: none;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-base);
-    font-weight: 600;
-}
-.pf-page-num:hover, .pf-page-arrow:not(.disabled):hover {
-    background: var(--surface-2);
-    color: var(--text);
-}
-.pf-page-num.active {
-    background: var(--blue);
-    color: var(--on-accent);
-    border-color: var(--blue);
-}
-.pf-page-arrow.disabled {
-    opacity: 0.3;
-    cursor: default;
-}
 
 /* --- R distribution histogram + daily-R calendar (journal page) --- */
-
-.stats-card .hint {
-    color: var(--text-dim);
-    font-style: italic;
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-    font-size: var(--fs-sm);
-    margin-left: 0.4rem;
-}
 
 .hist-grid {
     display: grid;
@@ -3994,137 +2514,14 @@ footer {
     color: var(--text-dim);
     justify-content: center;
 }
-.legend-swatch {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
-}
-.legend-swatch.empty { background: var(--bg); }
-.legend-swatch.pos { background: color-mix(in srgb, var(--green) var(--intensity), var(--bg)); }
-.legend-swatch.neg { background: color-mix(in srgb, var(--red) var(--intensity), var(--bg)); }
 
 /* --- Dashboard section split (open trades vs symbol scan) --- */
 
-.dashboard-section {
-    margin-bottom: 1.4rem;
-}
-.open-trades-section {
-    background: linear-gradient(180deg, rgba(var(--green-rgb), 0.04) 0%, transparent 100%);
-    border: 1px solid rgba(var(--green-rgb), 0.18);
-    border-radius: 12px;
-    padding: 0.6rem 0.8rem 0.8rem;
-}
-.symbols-section {
-    /* Visual breathing room above the symbol scan section */
-    border-top: 1px dashed var(--border);
-    padding-top: 0.9rem;
-}
-.section-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text);
-    font-size: var(--fs-md);
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    margin: 0 0 0.6rem 0;
-}
-.section-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-}
-.section-dot.live {
-    background: var(--green);
-    box-shadow: 0 0 8px rgba(var(--green-rgb), 0.7);
-    animation: pulse-live 2s ease-in-out infinite;
-}
-.section-dot.scan {
-    background: var(--blue);
-}
 @keyframes pulse-live {
     0%, 100% { opacity: 1; transform: scale(1); }
     50%      { opacity: 0.5; transform: scale(0.85); }
 }
-.section-count {
-    margin-left: 0.3rem;
-    background: var(--surface-2);
-    color: var(--text-dim);
-    border-radius: 999px;
-    padding: 1px 8px;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-}
-.section-meta {
-    margin-left: auto;
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-}
-.open-trade-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--text-dim);
-    border-radius: 8px;
-    padding: 0.7rem 0.85rem;
-    margin-bottom: 0.6rem;
-}
-.open-trade-card.r-pos  { border-left-color: var(--green); }
-.open-trade-card.r-neg  { border-left-color: var(--red); }
-.open-trade-card.r-zero { border-left-color: var(--text-dim); }
 
-.ot-head {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    font-size: var(--fs-md);
-    margin-bottom: 0.5rem;
-}
-.ot-id {
-    color: var(--text-dim);
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-base);
-}
-.ot-tf {
-    background: var(--surface-2);
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: var(--fs-sm);
-    color: var(--text-dim);
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-}
-.ot-elapsed {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    font-style: italic;
-}
-.ot-r {
-    margin-left: auto;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    font-size: var(--fs-md);
-}
-.ot-r.r-pos  { color: var(--green); }
-.ot-r.r-neg  { color: var(--red); }
-.ot-r.r-zero { color: var(--text-dim); }
-
-.ot-bar-wrap {
-    margin: 0.5rem 0;
-}
-.ot-bar {
-    position: relative;
-    height: 8px;
-    background: var(--surface-2);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 0.25rem;
-}
 .ot-bar-fill {
     position: absolute;
     top: 0;
@@ -4139,264 +2536,27 @@ footer {
     right: 50%;
     background: var(--red);
 }
-.ot-bar-center {
-    position: absolute;
-    left: 50%;
-    top: -2px;
-    bottom: -2px;
-    width: 2px;
-    background: var(--text-dim);
-    opacity: 0.5;
-}
-.ot-bar-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--fs-xs);
-    color: var(--text-dim);
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-}
-.ot-bar-stop  { color: var(--red); }
-.ot-bar-entry { color: var(--text); }
-.ot-bar-tp    { color: var(--green); }
-
-.ot-prices {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 0.8rem;
-    font-size: var(--fs-sm);
-    color: var(--text-dim);
-    margin: 0.4rem 0;
-}
-.ot-prices .copy-btn.small {
-    font-size: var(--fs-sm);
-    padding: 0.05rem 0.35rem;
-    margin-left: 0.15rem;
-}
-.ot-mark .copy-btn { color: var(--blue); border-color: var(--blue); }
-
-.ot-diagnose {
-    background: var(--surface-2);
-    padding: 0.35rem 0.6rem;
-    border-radius: 5px;
-    font-size: var(--fs-base);
-    margin: 0.4rem 0;
-    border-left: 3px solid var(--border);
-}
-.ot-diagnose.verdict-strong  { border-left-color: var(--green); }
-.ot-diagnose.verdict-take    { border-left-color: var(--green); }
-.ot-diagnose.verdict-neutral { border-left-color: var(--yellow); }
-.ot-diagnose.verdict-weak    { border-left-color: var(--yellow); }
-.ot-diagnose.verdict-avoid   { border-left-color: var(--red); }
-.ot-diagnose strong {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-variant-numeric: tabular-nums;
-}
-.ot-diagnose.verdict-strong  strong,
-.ot-diagnose.verdict-take    strong { color: var(--green); }
-.ot-diagnose.verdict-neutral strong,
-.ot-diagnose.verdict-weak    strong { color: var(--yellow); }
-.ot-diagnose.verdict-avoid   strong { color: var(--red); }
-
-.diag-flag.va {
-    background: rgba(192, 132, 252, 0.15);
-    color: #c084fc;
-    border: 1px solid rgba(192, 132, 252, 0.55);
-}
-.diag-flag.va-in {
-    background: rgba(var(--text-dim-rgb), 0.12);
-    color: var(--text-dim);
-    border: 1px solid rgba(var(--text-dim-rgb), 0.35);
-}
-.diag-flag.va-out {
-    background: rgba(192, 132, 252, 0.08);
-    color: #c084fc;
-    border: 1px dashed rgba(192, 132, 252, 0.55);
-}
-.diag-flag.poc-rising {
-    background: rgba(var(--green-rgb), 0.12);
-    color: var(--green);
-    border: 1px solid rgba(var(--green-rgb), 0.55);
-}
-.diag-flag.poc-falling {
-    background: rgba(var(--red-rgb), 0.12);
-    color: var(--red);
-    border: 1px solid rgba(var(--red-rgb), 0.55);
-}
 
 /* Diff-since-entry row — one-line summary of how the validator state
    has shifted since the user clicked +record. Surfaces the most
    actionable structural change so the trader doesn't have to mentally
    compare every chip. Tinted by direction of the /10 delta. */
-.ot-diff {
-    margin: 0.35rem 0 0;
-    padding: 0.32rem 0.55rem;
-    border-radius: 5px;
-    font-size: var(--fs-sm);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-dim);
-    background: rgba(var(--text-dim-rgb), 0.10);
-    border: 1px solid rgba(var(--text-dim-rgb), 0.30);
-}
-.ot-diff strong {
-    font-weight: 700;
-    color: var(--text);
-    margin: 0 0.15rem;
-}
-.ot-diff.diff-down {
-    color: var(--red);
-    background: rgba(var(--red-rgb), 0.10);
-    border-color: rgba(var(--red-rgb), 0.40);
-}
-.ot-diff.diff-down strong { color: var(--red); }
-.ot-diff.diff-up {
-    color: var(--green);
-    background: rgba(var(--green-rgb), 0.10);
-    border-color: rgba(var(--green-rgb), 0.40);
-}
-.ot-diff.diff-up strong { color: var(--green); }
 
 /* Pending open-trade card (recorded but entry hasn't filled yet) */
-.open-trade-card.status-pending {
-    border-left-color: var(--yellow);
-    background: linear-gradient(to right,
-        color-mix(in srgb, var(--yellow) 8%, var(--surface)),
-        var(--surface) 30%);
-    /* Safari-safe fallback handled by the base .open-trade-card bg */
-}
+
 @keyframes pulse-pending {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.55; }
 }
-.ot-pending-strip {
-    margin: 0.5rem 0 0.3rem;
-    padding: 0.4rem 0.55rem;
-    background: var(--surface-2);
-    border: 1px dashed rgba(var(--yellow-rgb), 0.4);
-    border-radius: 6px;
-    font-size: var(--fs-base);
-    color: var(--text-dim);
-    font-variant-numeric: tabular-nums;
-}
-.ot-pending-strip .copy-btn { color: var(--text); }
-.ot-pending-strip .dist-to-entry {
-    color: var(--yellow);
-    font-weight: 600;
-}
 
 /* POC-drift chip in the symbol-card meta row. Color follows trend
    direction; bolder border when stacked (POC50>POC100>POC200). */
-.poc-drift {
-    font-size: var(--fs-sm);
-    padding: 1px 6px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text-dim);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-.poc-drift.trend-rising  { color: var(--green); border-color: rgba(var(--green-rgb), 0.4); }
-.poc-drift.trend-falling { color: var(--red);   border-color: rgba(var(--red-rgb), 0.4); }
-.poc-drift.stacked       { font-weight: 700; }
 
 /* Info icon ('i') in section title → opens legend modal */
-.info-btn {
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text-dim);
-    font-family: ui-serif, Georgia, serif;
-    font-style: italic;
-    font-weight: 700;
-    font-size: var(--fs-base);
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-}
-.info-btn:hover { color: var(--text); border-color: var(--text-dim); }
-.info-btn:active { transform: scale(0.92); }
 
 /* Legend modal — same backdrop pattern as the chart modal but
    scrollable static-text content. */
-.legend-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 110;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-}
-.legend-modal.hidden { display: none; }
-.legend-modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.78);
-    backdrop-filter: blur(3px);
-}
-.legend-modal-card {
-    position: relative;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 0.7rem 0.9rem 1rem;
-    width: 92vw;
-    max-width: 720px;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.65);
-}
-.legend-modal-head {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.55rem;
-    padding-bottom: 0.55rem;
-    border-bottom: 1px solid var(--border);
-}
-.legend-modal-title {
-    color: var(--text);
-    font-weight: 700;
-    font-size: var(--fs-lg);
-    margin-right: auto;
-}
-.legend-modal-close {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 5px;
-    padding: 0.25rem 0.55rem;
-    font-family: inherit;
-    font-size: var(--fs-lg);
-    line-height: 1;
-    cursor: pointer;
-    min-height: 32px;
-    min-width: 32px;
-}
-.legend-modal-close:active { opacity: 0.7; }
-.legend-modal-body {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    color: var(--text);
-    font-size: var(--fs-md);
-    line-height: 1.5;
-}
-.legend-modal-body h3 {
-    color: var(--cyan);
-    font-size: var(--fs-md);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin: 1rem 0 0.4rem;
-}
-.legend-modal-body h3:first-child { margin-top: 0.2rem; }
+
 /* ── Legend modal body — two layout patterns ────────────────────────
    .legend-table  — for sections with consistent name+description rows
                     (chart lines, verdict colors). Renders as a real
@@ -4407,210 +2567,13 @@ footer {
                     descriptions (chip dictionaries). Each <dt> is a
                     bold term row, each <dd> is the explanation under-
                     neath. Wrapping is per-block, never cross-row.   */
-.legend-modal-body .legend-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0;
-}
-.legend-modal-body .legend-table td {
-    padding: 0.4rem 0.45rem;
-    vertical-align: middle;
-    border-bottom: 1px solid var(--border);
-    font-size: var(--fs-base);
-    line-height: 1.45;
-}
-.legend-modal-body .legend-table tr:last-child td { border-bottom: none; }
-.legend-modal-body .legend-table .lg-col-name {
-    white-space: nowrap;
-    width: 1%; /* hug content; description fills the rest */
-    color: var(--text);
-}
-.legend-modal-body .legend-table .lg-col-name b { color: var(--text); }
-.legend-modal-body .legend-table .lg-col-name .lg-swatch { margin-right: 0.4rem; }
-.legend-modal-body .legend-table tr td:nth-child(2) { color: var(--text-dim); }
-
-.legend-modal-body .legend-dl {
-    margin: 0;
-    padding: 0;
-}
-.legend-modal-body .legend-dl dt {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-top: 0.7rem;
-    font-size: var(--fs-md);
-    line-height: 1.35;
-    flex-wrap: wrap;
-}
-.legend-modal-body .legend-dl dt:first-child { margin-top: 0; }
-.legend-modal-body .legend-dl dd {
-    margin: 0.2rem 0 0 0;
-    padding-left: 0;
-    color: var(--text-dim);
-    font-size: var(--fs-base);
-    line-height: 1.55;
-}
-.legend-modal-body .legend-dl dt b,
-.legend-modal-body .legend-dl dd b { color: var(--text); }
-.legend-modal-body .legend-dl code,
-.legend-modal-body .legend-table code {
-    background: var(--surface-2);
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: var(--fs-base);
-}
-.legend-modal-body .lg-meta {
-    font-weight: 400;
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-}
-
-.lg-swatch {
-    display: inline-block;
-    width: 22px;
-    height: 12px;
-    border-radius: 3px;
-    flex: 0 0 auto;
-    vertical-align: middle;
-}
-.lg-poc200  { background: rgba(192, 132, 252, 0.85); }
-.lg-poc100  { background: rgba(192, 132, 252, 0.55); }
-.lg-poc50   { background: rgba(192, 132, 252, 0.35); }
-.lg-va      { background: rgba(192, 132, 252, 0.18); border: 1px dashed rgba(192, 132, 252, 0.55); }
-.lg-mark    { background: var(--yellow); }
-.lg-entry   { background: var(--blue); }
-.lg-stop    { background: var(--red); }
-.lg-tp      { background: var(--green); }
-.lg-knife   { background: rgba(var(--red-rgb), 0.15); border: 1px solid var(--red); }
-.lg-squeeze { background: rgba(var(--yellow-rgb), 0.15); border: 1px solid var(--yellow); }
-.lg-verdict-strong  { background: var(--green); }
-.lg-verdict-take    { background: rgba(var(--green-rgb), 0.6); }
-.lg-verdict-neutral { background: var(--yellow); }
-.lg-verdict-avoid   { background: var(--red); }
-.lg-rpos { background: var(--green); }
-.lg-rneg { background: var(--red); }
 
 /* Expand icon on each mini-chart (top-right). Click opens a fixed-size
    modal with the same data + reference lines for closer inspection. */
-.mini-chart { position: relative; }
-.mini-chart-expand {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border-radius: 5px;
-    border: 1px solid var(--border);
-    background: rgba(var(--bg-rgb), 0.85);
-    color: var(--text-dim);
-    font-size: var(--fs-md);
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 5;
-    backdrop-filter: blur(4px);
-}
-.mini-chart-expand:hover { color: var(--text); background: var(--surface); }
-.mini-chart-expand:active { transform: scale(0.93); }
 
 /* Fullscreen-ish chart modal. Fixed size (90vw × 65vh capped). */
-.chart-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-}
-.chart-modal.hidden { display: none; }
-.chart-modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(3px);
-}
-.chart-modal-card {
-    position: relative;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 0.55rem 0.7rem 0.6rem;
-    width: 92vw;
-    max-width: 1200px;
-    max-height: 96vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
-}
-.chart-modal-head {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.45rem;
-}
-.chart-modal-title {
-    color: var(--text);
-    font-weight: 700;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-lg);
-    margin-right: auto;
-}
-.chart-modal-close {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 5px;
-    padding: 0.25rem 0.55rem;
-    font-family: inherit;
-    font-size: var(--fs-lg);
-    line-height: 1;
-    cursor: pointer;
-    min-height: 32px;
-    min-width: 32px;
-}
-.chart-modal-close:active { opacity: 0.7; }
-.chart-modal-body {
-    flex: 1;
-    width: 100%;
-    height: 86vh;
-    min-height: 480px;
-    overflow: hidden;
-    background: var(--bg);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-}
-
-.ot-actions {
-    display: flex;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-}
-.ot-actions .btn-close-trade,
-.ot-actions .btn-edit {
-    flex: 1;
-    text-align: center;
-    font-size: var(--fs-base);
-    padding: 0.4rem 0.6rem;
-    min-height: 32px;
-}
 
 /* Leverage tag on journal trade cards */
-.lev-tag {
-    background: rgba(var(--blue-rgb), 0.12);
-    color: var(--blue);
-    border: 1px solid rgba(var(--blue-rgb), 0.5);
-    border-radius: 4px;
-    padding: 1px 5px;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-}
 
 /* Account-leverage and kill-distance tags on journal trade cards.
    Sits next to .lev-tag on purpose and must NOT look like it: .lev-tag is the
@@ -4622,81 +2585,16 @@ footer {
    Colours come from --*-rgb triples via rgba(), never color-mix(): iOS Safari
    below 16.4 renders no background at all for color-mix, and these tags are
    read on a phone more often than on a desk. */
-.acct-lev-tag,
-.kill-tag {
-    border-radius: 4px;
-    padding: 1px 5px;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: help;
-}
-.acct-lev-tag.kill-ok,
-.kill-tag.kill-ok {
-    background: rgba(var(--green-rgb), 0.12);
-    color: var(--green);
-    border: 1px solid rgba(var(--green-rgb), 0.45);
-}
-.acct-lev-tag.kill-warn,
-.kill-tag.kill-warn {
-    background: rgba(var(--yellow-rgb), 0.14);
-    color: var(--yellow);
-    border: 1px solid rgba(var(--yellow-rgb), 0.5);
-}
-.acct-lev-tag.kill-fatal,
-.kill-tag.kill-fatal {
-    background: rgba(var(--red-rgb), 0.16);
-    color: var(--red);
-    border: 1px solid rgba(var(--red-rgb), 0.6);
-}
 
 /* --- Ops control panel (Phase 2C) --- */
 
 /* Per-service block: groups title + status card + action buttons so
    trading-bot and trading-monitor render as two clear stacked sections. */
-.ops-svc-block {
-    margin-bottom: 1.2rem;
-}
-.ops-svc-title {
-    display: flex;
-    align-items: baseline;
-    gap: 0.55rem;
-    margin: 0 0 0.5rem 0;
-    font-size: var(--fs-md);
-    color: var(--text);
-}
-.ops-svc-name {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-weight: 700;
-}
-.ops-svc-tag {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    font-style: italic;
-}
-.ops-hint {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    margin-top: 0.4rem;
-}
-.ops-hint code {
-    background: var(--surface-2);
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: var(--fs-sm);
-}
 
 /* Inline TF picker — used in the Validate form. Pill buttons that
    feel like the dashboard's top-bar TF picker. Backed by hidden radios
    so the form posts a single `tf` field. */
-.tf-picker-inline {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.25rem;
-}
+
 .tf-pill {
     display: inline-flex;
     align-items: center;
@@ -4735,214 +2633,31 @@ footer {
 
 /* Mutex banner: shown when one daemon is active to remind the user the
    other can't be started until this one stops. Server-side also enforces. */
-.ops-mutex-warn {
-    background: rgba(var(--yellow-rgb), 0.10);
-    border: 1px dashed rgba(var(--yellow-rgb), 0.55);
-    border-radius: 8px;
-    padding: 0.55rem 0.75rem;
-    color: var(--yellow);
-    font-size: var(--fs-base);
-    margin: 0.5rem 0 1rem;
-}
-.ops-mutex-warn.hidden { display: none; }
-.ops-mutex-warn code {
-    background: var(--surface-2);
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: var(--fs-sm);
-}
 
 /* Monitor TF multi-select — checkbox grid */
-.ops-tf-checkboxes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    margin-top: 0.3rem;
-}
-.ops-tf-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.65rem;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    user-select: none;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-base);
-}
-.ops-tf-check input[type="checkbox"] {
-    accent-color: var(--blue);
-    width: 16px;
-    height: 16px;
-    margin: 0;
-    cursor: pointer;
-}
-.ops-tf-check:has(input:checked) {
-    background: rgba(var(--blue-rgb), 0.12);
-    border-color: var(--blue);
-    color: var(--text);
-}
 
 /* Disabled-button styling lives in the canonical .btn-ops block below
    (added 2026-06-09). This anchor comment kept so future readers know
    why this section is sparse. */
 
 /* Log tab switcher (trading-bot ↔ trading-monitor) */
-.ops-log-tabs {
-    display: flex;
-    gap: 0.3rem;
-    margin-bottom: 0.4rem;
-}
-.ops-log-tab {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    border-radius: 5px;
-    padding: 0.35rem 0.7rem;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-base);
-    cursor: pointer;
-}
-.ops-log-tab.active {
-    background: var(--surface-2);
-    color: var(--text);
-    border-color: var(--blue);
-}
 
-.ops-status-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.7rem 0.9rem;
-    margin-bottom: 0.8rem;
-}
-.ops-status-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-}
 .ops-state-flex { flex: 1; }
-
-.ops-state-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-.ops-state-dot.on  {
-    background: var(--green);
-    box-shadow: 0 0 8px rgba(var(--green-rgb), 0.6);
-}
-.ops-state-dot.off {
-    background: var(--text-dim);
-}
-.ops-state-dot.fail {
-    background: var(--red);
-    box-shadow: 0 0 8px rgba(var(--red-rgb), 0.6);
-}
 
 /* ── /ops health card ──────────────────────────────────────────────────
    "Is anything actually running?" — unit states, the monitor's live
    goroutines, and the push-mute switch, at the top of the page because it
    is the first thing worth knowing. */
-.ops-health {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.7rem 0.9rem;
-    margin-bottom: 1.2rem;
-}
-.ops-health .ops-svc-title { margin-bottom: 0.6rem; }
-.ops-health-svcs { display: flex; flex-direction: column; gap: 0.35rem; }
-.ops-hsvc {
-    display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
-    font-size: var(--fs-sm);
-}
-.ops-hsvc-name { font-weight: 700; }
-.ops-hsvc-state {
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.03em;
-}
-.ops-hsvc-state.on   { color: var(--green); }
-.ops-hsvc-state.off  { color: var(--text-dim); }
-.ops-hsvc-state.fail { color: var(--red); }
-.ops-hsvc-since {
-    font-variant-numeric: tabular-nums; color: var(--text-dim);
-    font-size: var(--fs-xs);
-}
-.ops-health-ntfy {
-    display: flex; align-items: center; gap: 0.6rem;
-    margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--border);
-}
+
 .ops-ntfy-state { font-weight: 700; font-size: var(--fs-sm); }
 .ops-ntfy-state.on  { color: var(--green); }
 .ops-ntfy-state.off { color: var(--yellow); }
 .ops-ntfy-note { margin-top: 0.3rem; line-height: 1.4; }
 
 .dt td.oi-armed { color: var(--yellow); font-weight: 600; }
-.dt td.oi-crowded { color: var(--yellow); }
-.dt td.oi-read { text-align: left; white-space: normal; min-width: 12rem; color: var(--text-dim); }
-.dt td.oi-read.oi-armed { color: var(--yellow); }
-.ops-health-loops { margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
-.ops-loops-title {
-    font-size: var(--fs-xs); color: var(--text-dim); font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;
-}
-.ops-loops-grid { display: flex; flex-direction: column; gap: 0.25rem; }
-.ops-loop {
-    display: flex; align-items: center; gap: 0.5rem; font-size: var(--fs-sm);
-}
-.ops-loop code { font-weight: 700; min-width: 6.5em; }
-.ops-loop.off code { color: var(--text-dim); }
-.ops-loop-reason { color: var(--text-dim); font-size: var(--fs-xs); }
+
 /* Monitor heartbeat loop states (cmd/web/ops_heartbeat.go). */
-.ops-hb-badge {
-    font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
-    min-width: 6.5em; color: var(--text-dim);
-}
-.ops-hb-badge.hb-run     { color: var(--green); }
-.ops-hb-badge.hb-idle    { color: var(--yellow); }
-.ops-hb-badge.hb-stalled { color: var(--red); }
 
-.ops-state-label {
-    font-weight: 700;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-base);
-    letter-spacing: 0.04em;
-}
-
-.ops-config-pill {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    background: var(--surface-2);
-    padding: 0.2rem 0.5rem;
-    border-radius: 999px;
-}
-.ops-config-pill strong {
-    color: var(--text);
-    margin-left: 0.25rem;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-}
-
-.ops-warn {
-    margin-top: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    background: rgba(var(--yellow-rgb), 0.1);
-    color: var(--yellow);
-    border: 1px solid var(--yellow);
-    border-radius: 5px;
-    font-size: var(--fs-base);
-}
-
-.ops-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
 .btn-ops {
     border: 1px solid var(--border);
     background: var(--surface-2);
@@ -4956,36 +2671,13 @@ footer {
     min-height: 52px;
     transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
 }
-.btn-ops.btn-start {
-    color: var(--green);
-    border-color: var(--green);
-}
-.btn-ops.btn-stop {
-    color: var(--red);
-    border-color: var(--red);
-}
-.btn-ops.btn-restart {
-    color: var(--yellow);
-    border-color: var(--yellow);
-}
 
 /* Hover effects — only on enabled buttons. Each role gets a tinted
    background matching its border color + a subtle lift shadow. */
 .btn-ops:not(:disabled):hover {
     transform: translateY(-1px);
 }
-.btn-ops.btn-start:not(:disabled):hover {
-    background: rgba(var(--green-rgb), 0.14);
-    box-shadow: 0 2px 8px rgba(var(--green-rgb), 0.18);
-}
-.btn-ops.btn-stop:not(:disabled):hover {
-    background: rgba(var(--red-rgb), 0.14);
-    box-shadow: 0 2px 8px rgba(var(--red-rgb), 0.18);
-}
-.btn-ops.btn-restart:not(:disabled):hover {
-    background: rgba(var(--yellow-rgb), 0.14);
-    box-shadow: 0 2px 8px rgba(var(--yellow-rgb), 0.18);
-}
+
 .btn-ops:active { transform: translateY(0); opacity: 0.7; }
 
 /* Disabled (mutex-blocked) styling */
@@ -4997,133 +2689,18 @@ footer {
     transform: none;
 }
 
-.ops-block {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.8rem 1rem;
-    margin-bottom: 0.8rem;
-}
-.ops-block h2 {
-    color: var(--text-dim);
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0 0 0.6rem 0;
-    font-weight: 600;
-}
-.ops-block h2 .hint {
-    color: var(--text-dim);
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-    font-style: italic;
-    font-size: var(--fs-sm);
-    margin-left: 0.3rem;
-}
-
-.ops-log-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 0.5rem;
-    font-size: var(--fs-base);
-}
-.ops-checkbox {
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    cursor: pointer;
-}
-.ops-checkbox input {
-    accent-color: var(--blue);
-}
-
-.ops-log-status {
-    margin-left: auto;
-    font-size: var(--fs-sm);
-    color: var(--text-dim);
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-}
-.ops-log-status.ok  { color: var(--green); }
-.ops-log-status.err { color: var(--red); }
-
-.ops-log {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.4rem 0.5rem;
-    height: 55vh;
-    overflow-y: auto;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-    font-size: var(--fs-sm);
-    line-height: 1.45;
-    color: var(--text-dim);
-    -webkit-overflow-scrolling: touch;
-}
-.ops-log-line {
-    padding: 1px 0;
-    white-space: pre-wrap;
-    word-break: break-all;
-    border-bottom: 1px solid rgba(255,255,255,0.02);
-}
-.ops-log-line.log-fired { color: var(--green); }
-.ops-log-line.log-skip  { color: var(--text-dim); opacity: 0.7; }
-.ops-log-line.log-err   { color: var(--red); }
-.ops-log-line.log-warn  { color: var(--yellow); }
-.ops-log-line.log-info  { color: var(--blue); }
-
-.ops-toast {
-    position: fixed;
-    left: 50%;
-    bottom: 1.5rem;
-    transform: translateX(-50%);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.55rem 0.9rem;
-    font-size: var(--fs-md);
-    font-weight: 600;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
-    z-index: 10;
-    max-width: 90vw;
-    text-align: center;
-}
-.ops-toast.ok  { border-color: var(--green); color: var(--green); }
-.ops-toast.err { border-color: var(--red);   color: var(--red); }
-.ops-toast.hidden { display: none; }
-
 /* ─────────────────────────────────────────────────────────────────────
    Mobile / small-viewport overflow fixes
    ───────────────────────────────────────────────────────────────────── */
 
 /* Topbars: keep items vertically centered. The tf-picker still scrolls
    sideways on phones; the main nav becomes a burger drawer (below). */
-.topbar { align-items: center; }
+
 .topnav { flex-wrap: wrap; }
-.tf-picker {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    flex-wrap: nowrap;
-    align-items: center;
-}
-.tf-picker { justify-content: center; }
-.tf-picker a, .tf-picker .tf-active {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-}
-.tf-picker::-webkit-scrollbar { height: 0; display: none; }
 
 /* Chart-style toggle lives at the right of the Symbol-scan header now,
    sitting next to the TF chip (which is already pushed right via
    .section-meta { margin-left:auto }). */
-.symbols-section .section-title { flex-wrap: wrap; }
-.symbols-section .section-title .chart-style-toggle {
-    margin-left: 0;
-}
 
 /* Status capsules: never let "falling knife" / "blow-off risk" / lev /
    side / score wrap mid-word. They flow inline and the parent's natural
@@ -5147,30 +2724,6 @@ footer {
 main { overflow-x: hidden; }
 
 /* -------- theme switcher toggle (injected by /static/theme.js) -------- */
-.theme-toggle {
-    margin-left: auto;
-    align-self: center;
-    background: var(--surface-2);
-    color: var(--blue);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-family: var(--mono);
-    font-size: var(--fs-sm);
-    line-height: 1.4;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: border-color 100ms ease, color 100ms ease;
-    -webkit-tap-highlight-color: transparent;
-}
-.theme-toggle:hover { border-color: var(--blue); color: var(--blue); }
-.theme-toggle.floating {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 8px);
-    right: 10px;
-    z-index: 50;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-}
 
 /* -------- /chart N 字 structure read-out panel -------- */
 .chart-struct-panel {
@@ -5322,32 +2875,19 @@ main { overflow-x: hidden; }
     border: 1px solid transparent;
 }
 .badge--lg      { font-size: var(--fs-base); font-weight: 600; letter-spacing: .02em; }
-.badge--outline { border-color: rgba(var(--tone-rgb, var(--text-dim-rgb)), .55); }
+
 .badge--dashed,
 .badge:is(.oc-skip, .va-out) { border-style: dashed; border-color: rgba(var(--tone-rgb, var(--text-dim-rgb)), .55); }
-.badge--caps    { text-transform: uppercase; letter-spacing: .05em; }
-.badge--pulse   { animation: pulse-pending 1.6s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .badge--pulse { animation: none; } }
 
 /* Tile — one KPI: dim caps label over a mono figure.
    .tile-row lays a set out; --flat drops the box for tiles that already
    sit inside a card (the /setups and /ops/autotrade summary rows). */
-.tile-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: var(--sp-2) var(--sp-4); align-items: start; }
+
 .tile {
     display: flex; flex-direction: column; gap: 2px; min-width: 0;
     padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md);
     background: rgba(var(--text-dim-rgb), .04);
 }
-.tile--flat { padding: 0; border: 0; background: none; }
-.tile-label {
-    color: var(--text-dim); font-size: var(--fs-xs); font-weight: 600;
-    text-transform: uppercase; letter-spacing: .05em;
-    white-space: nowrap;  /* one line, so values align across the row */
-}
-.tile-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-lg); }
-.tile-val.r-pos  { color: var(--green); }
-.tile-val.r-neg  { color: var(--red); }
-.tile-val.r-zero { color: var(--text-dim); }
 
 /* Banner — full-width notice above a section.
    --danger  blocking now (macro blackout active, a failed write)
@@ -5361,20 +2901,10 @@ main { overflow-x: hidden; }
     background: rgba(var(--tone-rgb, var(--text-dim-rgb)), .14);
     font-size: var(--fs-md); line-height: 1.4;
 }
-.banner--danger { --tone: var(--red);    --tone-rgb: var(--red-rgb);    color: var(--red); }
-.banner--warn   { --tone: var(--yellow); --tone-rgb: var(--yellow-rgb); color: var(--yellow); }
-.banner--ok     { --tone: var(--green);  --tone-rgb: var(--green-rgb); }
+
 .banner .hint   { color: inherit; opacity: .85; }
-.banner--rail {
-    border: 0; border-left: 3px solid var(--tone, var(--border)); border-radius: 0 var(--r-sm) var(--r-sm) 0;
-    background: linear-gradient(90deg, rgba(var(--tone-rgb, var(--text-dim-rgb)), .10), rgba(var(--blue-rgb), .08));
-}
-.banner--rail .hint { color: var(--text-dim); opacity: 1; font-size: var(--fs-base); }
-.banner-head  { display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-2); }
-.banner-title { font-weight: 700; font-size: var(--fs-md); color: var(--tone, var(--text)); }
 
 /* Inline spacing where badges trail other inline content. */
-.ot-diagnose .badge, .section-title .badge { margin-left: calc(var(--sp-1) + 2px); }
 
 /* -------- /setups forward-log table -------- */
 /* Canonical data table (.dt) — the ONLY data-table class. Variants are
@@ -5432,8 +2962,7 @@ main { overflow-x: hidden; }
   border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); }
 .at-pg:hover:not(:disabled) { border-color: var(--text-dim); }
 .at-pg:disabled { opacity: .35; cursor: default; }
-.dt td.cs-dim { color: var(--text-dim); }
-.dt .dir-neutral { color: var(--text-dim); }
+
 /* Numeric cell helper: mono + tabular + right-aligned. */
 .dt .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
 /* One horizontal-scroll strategy for wide tables. */
@@ -5454,15 +2983,7 @@ main { overflow-x: hidden; }
    --lg       headline table (home market overview): one step larger type.
    --cards    ≤640px rows collapse to labelled cards (needs td[data-label];
               see "Data-board mobile card-view"). */
-.dt--numeric th, .dt--numeric td { text-align: right; }
-.dt--numeric th:first-child, .dt--numeric td:first-child { text-align: left; }
-.dt--matrix th, .dt--matrix td { text-align: center; }
-.dt--matrix th:first-child, .dt--matrix td:first-child { text-align: left; }
-.dt--matrix td:first-child { font-weight: 600; }
-.dt--compact { font-size: var(--fs-sm); }
-.dt--compact th, .dt--compact td { padding: var(--sp-1) var(--sp-2); }
-.dt--lg { font-size: var(--fs-md); }
-.dt--lg th, .dt--lg td { padding: calc((var(--sp-2) + var(--sp-3)) / 2) var(--sp-3); }
+
 /* Text columns on a numeric board (TW name, trailing note) read left-to-right. */
 
 /* Phones: the first column (symbol / id) stays pinned while a wide table
@@ -5489,10 +3010,8 @@ main { overflow-x: hidden; }
         background: linear-gradient(var(--dt-hover), var(--dt-hover)) var(--dt-bg, var(--surface));
         box-shadow: inset 2px 0 0 var(--blue), inset -1px 0 0 var(--border);
     }
-    .dt--cards tbody tr:hover > td:first-child { box-shadow: none; }
+    
 }
-.setup-del { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; font-size: var(--fs-md); }
-.setup-del:hover { color: var(--red); }
 
 /* /chart struct-panel "記 setup" button */
 .cs-record-btn {
@@ -5526,84 +3045,18 @@ main { overflow-x: hidden; }
 .chart-one-liner .cs-record-btn:hover { background: var(--blue); color: var(--bg); }
 
 /* setups skip state + action buttons */
-.setup-actions { display: flex; gap: 0.4rem; align-items: center; }
-.setup-actions form { display: inline; }
-.setup-skip { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 4px; padding: 1px 7px; font-size: var(--fs-sm); cursor: pointer; }
-.setup-skip:hover { color: var(--yellow); border-color: var(--yellow); }
 
 /* -------- language toggle (injected by /static/i18n.js) -------- */
-.lang-toggle {
-    align-self: center;
-    background: var(--surface-2);
-    color: var(--blue);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 9px;
-    font-family: var(--cjk);
-    font-size: var(--fs-sm);
-    line-height: 1.4;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: border-color 100ms ease, color 100ms ease;
-    -webkit-tap-highlight-color: transparent;
-}
-.lang-toggle:hover { border-color: var(--blue); color: var(--blue); }
-.lang-toggle.floating {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 8px);
-    right: 76px;
-    z-index: 50;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-}
 
 /* -------- i18n CSS-based language toggle (long/formatted content) -------- */
 :root:not([data-lang="zh"]) .i18n-zh { display: none; }
 [data-lang="zh"] .i18n-en { display: none; }
 
 /* -------- /tips — expandable trading-tip cards -------- */
-.tips-main { max-width: 720px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
-.tips-h1 { font-size: var(--fs-xl); font-weight: 700; color: var(--text); display: flex; flex-direction: column; }
-.tips-h1 .tips-sub { font-size: var(--fs-base); font-weight: 400; color: var(--text-dim); margin-top: 0.25rem; }
-.tip-card {
-    margin-top: 1.1rem;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: linear-gradient(180deg, rgba(var(--blue-rgb),0.06), transparent 42%), var(--surface);
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-    transition: box-shadow 150ms ease, border-color 150ms ease;
-}
-.tip-card[open]  { border-color: var(--blue); box-shadow: 0 4px 18px rgba(0,0,0,0.35); }
-.tip-card:hover  { border-color: var(--blue); }
-.tip-summary {
-    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.7rem;
-    padding: 0.9rem 1rem; font-size: var(--fs-lg); font-weight: 600; color: var(--text);
-    -webkit-tap-highlight-color: transparent;
-}
-.tip-summary::-webkit-details-marker { display: none; }
+
 /* Phones: card titles drop one step (lg → md). At lg, a 340px card wraps most
    titles to a third line; weight 600 still carries the hierarchy over the
    md body steps, which are only visible once the card is open anyway. */
-@media (max-width: 640px) { .tip-summary { font-size: var(--fs-md); } }
-.tip-icon { font-size: var(--fs-xl); line-height: 1; flex: 0 0 auto; }
-.tip-title { flex: 1; }
-.tip-title em { color: var(--blue); font-style: normal; }
-.tip-chevron { color: var(--text-dim); transition: transform 200ms ease; flex: 0 0 auto; }
-.tip-card[open] .tip-chevron { transform: rotate(180deg); }
-.tip-body { padding: 0.2rem 1rem 1rem; }
-.tip-steps { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin: 0; padding: 0; counter-reset: tip; }
-.tip-step {
-    padding: 0.6rem 0.8rem; border-radius: 8px; border-left: 4px solid var(--border);
-    background: rgba(var(--text-dim-rgb), 0.06); font-size: var(--fs-md); line-height: 1.55; color: var(--text);
-}
-.tip-step b { color: var(--text); }
-.step-trend   { border-left-color: var(--green);  background: linear-gradient(90deg, var(--green-bg), transparent 72%); }
-.step-neutral { border-left-color: var(--yellow); background: linear-gradient(90deg, var(--yellow-bg), transparent 72%); }
-.step-agree   { border-left-color: var(--blue);   background: linear-gradient(90deg, rgba(var(--blue-rgb),0.12), transparent 72%); }
-.step-clash   { border-left-color: var(--red);    background: linear-gradient(90deg, var(--red-bg), transparent 72%); }
-.tip-foot { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px dashed var(--border); font-size: var(--fs-base); color: var(--text-dim); }
-.tip-foot b { color: var(--text); }
-.tips-more { margin-top: 1.2rem; color: var(--text-dim); font-size: var(--fs-base); text-align: center; font-style: italic; }
 
 /* ── Multi-TF bias table (/chart, top-right overlay) ────────────────
    Per-symbol composite vote {N-struct, POC regime, engine} per TF,
@@ -5721,48 +3174,16 @@ main { overflow-x: hidden; }
 .chart-ticker-item .tk-chg.tk-down { color: #ef5350; }
 
 /* ── Zone-fade alert card (/ops) ────────────────────────────────────── */
-#ops-zone-refresh { padding: .2rem .55rem; margin-left: .4rem; }
+
 .ops-zone-armed { margin-top: .5rem; display: flex; flex-direction: column; gap: 4px; }
-.ops-zone-hint { color: var(--text-dim); font-size: var(--fs-base); font-style: italic; }
-.ops-zone-row {
-  display: grid; grid-template-columns: 6.5em 3.5em 9em 6.5em 1fr; align-items: baseline;
-  gap: .5rem; padding: .3rem .5rem; border-radius: 6px; font-size: var(--fs-base);
-  background: rgba(255,255,255,0.03); border-left: 3px solid rgba(255,255,255,0.15);
-}
-.ops-zone-row .z-sym { font-weight: 700; }
-.ops-zone-row .z-dir { text-transform: uppercase; font-weight: 600; font-size: var(--fs-sm); }
-.ops-zone-row .z-band { font-variant-numeric: tabular-nums; }
-.ops-zone-row .z-note { color: var(--text-dim); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ops-zone-row.z-short { border-left-color: #ef5350; }
-.ops-zone-row.z-short .z-dir { color: #ef5350; }
-.ops-zone-row.z-long  { border-left-color: #26a69a; }
-.ops-zone-row.z-long  .z-dir { color: #26a69a; }
-.ops-zone-row.z-watch { border-left-color: #d8a657; }
+
 /* Trigger rule per row — a touch band and a close-confirmed band are not the
    same alert, so the list has to say which one is armed. */
-.ops-zone-row .z-trig {
-  font-size: var(--fs-xs); font-weight: 600; letter-spacing: .02em; text-align: center;
-  padding: .05rem .3rem; border-radius: 4px; color: var(--text-dim);
-  background: rgba(255,255,255,0.06);
-}
-.ops-zone-row .z-trig-close { color: #7fd6c2; background: rgba(38,166,154,0.16); }
-.ops-zone-row .z-trig-bad   { color: #ef9a9a; background: rgba(239,83,80,0.18); text-align: left; }
-.ops-zone-row.z-faulted { opacity: .7; border-left-color: #ef5350; }
-
-@media (max-width: 640px) {
-  /* 5 columns will not fit a phone — stack the metadata and let the note wrap
-     under it rather than truncating everything to nothing. */
-  .ops-zone-row { grid-template-columns: 6.5em 3.5em 1fr; }
-  .ops-zone-row .z-band { grid-column: 1 / -1; }
-  .ops-zone-row .z-trig { justify-self: start; }
-  .ops-zone-row .z-note { grid-column: 1 / -1; white-space: normal; }
-}
 
 /* ── Zone-fade alert: config + log (/ops) ───────────────────────────── */
-.ops-zone-autorow { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
-.ops-zone-autorow input { width: auto; }
+
 .ops-zone-logwrap { margin-top: .8rem; }
-.ops-zone-logbar { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-base); color: var(--text-dim); }
+
 .ops-zone-log {
   margin-top: .35rem; max-height: 200px; overflow: auto;
   background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08);
@@ -5771,7 +3192,6 @@ main { overflow-x: hidden; }
 }
 
 /* setups: real-outcome badge (path-dependent) additions */
-.oc-gap { color: #d8a657; font-weight: 700; cursor: help; margin-left: .1rem; }
 
 /* =====================================================================
    Fundamentals / TW / Calendar boards — moved out of page-local <style>
@@ -5790,26 +3210,6 @@ main { overflow-x: hidden; }
 .cal-row.is-past{opacity:.5}
 
 /* Market segmented toggle (US ⇄ TW) on the fundamentals boards. */
-.market-toggle {
-    display: inline-flex;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    overflow: hidden;
-    margin: 0 0 var(--sp-3);
-}
-.market-toggle a {
-    padding: var(--sp-2) var(--sp-4);
-    color: var(--text-dim);
-    text-decoration: none;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    background: var(--surface);
-}
-.market-toggle a + a { border-left: 1px solid var(--border); }
-.market-toggle a.active { background: var(--surface-2); color: var(--cyan); }
-
-
 
 /* =====================================================================
    Chart right-panel (Phase 2 crown jewel). chart-header + one-liner +
@@ -5858,14 +3258,7 @@ main { overflow-x: hidden; }
 .chart-side-toggle[aria-expanded="false"] { color: var(--cyan); border-color: var(--cyan); }
 /* header stacks vertically inside the narrow panel */
 .chart-side .chart-header { flex-direction: column; margin-bottom: 0; }
-.chart-side .chart-header-left,
-.chart-side .chart-header-right {
-    flex: 1 1 auto;
-    min-width: 0;
-    align-items: stretch;
-    width: 100%;
-}
-.chart-side .chart-header-right { align-items: stretch; }
+
 .chart-side .chart-one-liner { margin: 0; }
 .chart-side .chart-struct-panel { margin: 0; }
 
@@ -5908,14 +3301,11 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-card);
 }
-.stats-card { padding: var(--sp-5); margin-bottom: var(--sp-4); }
 
 /* Content width — free the boards/tips from the old 720px cage. */
-.tips-main { max-width: 1200px; padding: var(--sp-5) clamp(var(--sp-3), 4vw, var(--sp-6)) var(--sp-8); }
 
 /* Headings — bigger, bolder, friendly. */
-.tips-h1 { font-size: var(--fs-2xl); font-weight: 800; letter-spacing: -0.02em; gap: var(--sp-1); }
-.tips-h1 .tips-sub { font-size: var(--fs-md); }
+
 .page-title { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.02em; }
 
 /* Buttons — rounded, comfortable, filled primary. */
@@ -5934,14 +3324,12 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
 
 /* TF pills + segmented toggles — fully rounded chips. */
 .tf-pill, .tf-picker a, .tf-picker .tf-active { border-radius: var(--r-pill); }
-.market-toggle { border-radius: var(--r-pill); }
-.market-toggle a { padding: var(--sp-2) var(--sp-5); }
 
 /* Badges/chips — pill-soft. */
 .score { border-radius: var(--r-pill); }
 
 /* Topbar — cleaner, a hair taller, soft divider. */
-.topbar { padding: var(--sp-3) clamp(var(--sp-3), 4vw, var(--sp-6)); backdrop-filter: blur(8px); background: rgba(var(--bg-rgb), .82); }
+
 .brand { font-size: var(--fs-md); font-weight: 800; letter-spacing: -0.01em; }
 
 /* Data tables — rounded container feel via the scroll wrapper. */
@@ -5953,7 +3341,6 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
 
 /* --- reskin cont'd: headings + tab families that the first pass missed --- */
 /* Dashboard section headings */
-.section-title { font-size: var(--fs-lg); font-weight: 800; letter-spacing: -0.01em; }
 
 /* Nav "tabs" — rounded, soft hover, pill active */
 .topnav a { border-radius: var(--r-pill); padding: 6px 12px; transition: background var(--t-fast), color var(--t-fast); }
@@ -5977,14 +3364,7 @@ body { font-size: var(--fs-md); letter-spacing: -0.005em; }
    Uses the reclaimed desktop width (2-up on wide, 1-up on phone) instead of
    one tall stack. mini-charts read clientWidth on renderAll() at load, so they
    size to the grid cell correctly. */
-.symbols-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: var(--sp-4);
-    align-items: start;
-}
-.symbols-section > .section-title { grid-column: 1 / -1; }
-.symbols-section > .symbol-card { margin: 0; }
+
 .symbol-card .copy-btn.price { font-size: var(--fs-md); font-weight: 700; }
 
 /* =====================================================================
@@ -6128,42 +3508,6 @@ html[data-rail="narrow"] .rail-toggle .ico { transform: rotate(180deg); }
    to .dt--cards so setups / other .dt tables are untouched.
    ===================================================================== */
 
-@media (max-width: 640px) {
-    .dt-scroll:has(.dt--cards) { border: none; overflow: visible; }
-    .dt--cards thead { display: none; }
-    .dt--cards, .dt--cards tbody { display: block; width: 100%; }
-    .dt--cards tr {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2px var(--sp-3);
-        padding: var(--sp-3);
-        margin-bottom: var(--sp-3);
-        border: 1px solid var(--border);
-        border-radius: var(--r-md);
-        background: var(--surface);
-    }
-    .dt--cards td {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: var(--sp-2);
-        padding: 2px 0;
-        border: none;
-        white-space: normal;
-        font-size: var(--fs-sm);
-    }
-    .dt--cards td::before {
-        content: attr(data-label);
-        font-family: var(--sans);  /* label stays prose even when the value is .num (mono) */
-        color: var(--text-dim);
-        font-size: var(--fs-xs);
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        flex: 0 0 auto;
-    }
-    .dt--cards td[colspan] { grid-column: 1 / -1; }
-}
-
 /* =====================================================================
    Global polish (phase 3): toast · focus-visible ring · skeleton loaders.
    ===================================================================== */
@@ -6232,29 +3576,6 @@ select:focus-visible, textarea:focus-visible, summary:focus-visible,
 /* --- Density toggle (phase 3): cozy (default) <-> compact. html[data-density]
    set by the script in the shared topnav partial; button injects into
    #sidebar-foot next to theme/lang. Compact tightens the data tables. ----- */
-.density-toggle {
-    align-self: center;
-    background: var(--surface-2);
-    color: var(--blue);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-family: var(--mono);
-    font-size: var(--fs-sm);
-    line-height: 1.4;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: border-color 100ms ease, color 100ms ease;
-    -webkit-tap-highlight-color: transparent;
-}
-.density-toggle:hover { border-color: var(--blue); color: var(--blue); }
-.density-toggle.floating {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 8px);
-    right: 10px; z-index: 50;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-}
-.sidebar-foot .density-toggle { position: static; }
 
 /* Compact: tighten canonical data tables (biggest density win). Scoped to
    tables so cards/forms keep their comfortable spacing. */
@@ -6266,9 +3587,6 @@ html[data-density="compact"] .dt {
     font-size: var(--fs-xs);
 }
 /* Never compact the mobile card-view (it needs the roominess to read). */
-@media (max-width: 640px) {
-    html[data-density="compact"] .dt--cards td { padding: 2px 0; font-size: var(--fs-sm); }
-}
 
 /* =====================================================================
    Chart "crown jewel" — single-row control bar. .chart-toolbar (symbol/tf)
@@ -6339,22 +3657,6 @@ html[data-density="compact"] .dt {
    tablekit — sortable headers + pager (tablekit.js). Applied to the
    setups list + US/TW fundamental boards.
    ===================================================================== */
-.tk-sortable { cursor: pointer; user-select: none; -webkit-user-select: none; }
-.tk-sortable:hover { color: var(--text); }
-.tk-arrow { color: var(--blue); font-size: .8em; }
-.tablekit-pager {
-    display: flex; align-items: center; justify-content: center; gap: var(--sp-3);
-    margin: var(--sp-3) 0; color: var(--text-dim); font-size: var(--fs-sm);
-}
-.tablekit-pager .tk-btn {
-    background: var(--surface-2); color: var(--text);
-    border: 1px solid var(--border); border-radius: var(--r-sm);
-    padding: 4px 12px; cursor: pointer; font-size: var(--fs-sm);
-    -webkit-tap-highlight-color: transparent;
-}
-.tablekit-pager .tk-btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
-.tablekit-pager .tk-btn:disabled { opacity: .4; cursor: default; }
-.tk-range { font-variant-numeric: tabular-nums; }
 
 /* =====================================================================
    Chart control touch targets (audit B2). /chart is a live-trade surface;
@@ -6374,70 +3676,13 @@ html[data-density="compact"] .dt {
 
 /* audit C2: the ⓘ legend button is a 22px circle — bump the touch target on
    phones (visual size stays compact on desktop). */
-@media (max-width: 1023.98px) {
-    .info-btn { width: 32px; height: 32px; }
-}
 
 /* Scan divider label — separates the forward-log US-stock engine cards from
    the core 4 inside the .symbols-section grid (spans all columns). */
-.scan-section-label {
-    grid-column: 1 / -1;
-    display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap;
-    margin-top: var(--sp-2); padding-top: var(--sp-3);
-    border-top: 1px dashed var(--border);
-    font-size: var(--fs-sm); font-weight: 700; color: var(--text);
-    text-transform: uppercase; letter-spacing: .04em;
-}
-.scan-section-note {
-    font-weight: 400; text-transform: none; letter-spacing: 0;
-    color: var(--text-dim); font-size: var(--fs-xs);
-}
 
 /* =====================================================================
    Per-stock news drawer (/fundamentals) — click a ticker → Finnhub company-news
    ===================================================================== */
-.sym-news-link {
-    background: none; border: none; padding: 0; cursor: pointer;
-    color: var(--text); font: inherit; display: inline-flex; align-items: center; gap: 4px;
-    -webkit-tap-highlight-color: transparent;
-}
-.sym-news-link:hover { color: var(--blue); }
-.sym-news-link .sym-news-ico { font-size: .8em; opacity: .55; }
-.sym-news-link:hover .sym-news-ico { opacity: 1; }
-
-.news-backdrop {
-    position: fixed; inset: 0; z-index: 70;
-    background: rgba(0,0,0,.5); backdrop-filter: blur(2px);
-    display: flex; align-items: flex-start; justify-content: center; padding-top: 8vh;
-}
-.news-backdrop[hidden] { display: none; }
-.news-modal {
-    width: min(560px, 94vw); max-height: 80vh; display: flex; flex-direction: column;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-lg); box-shadow: var(--shadow-2); overflow: hidden;
-}
-.news-head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border);
-}
-.news-title { font-weight: 700; color: var(--text); font-size: var(--fs-md); }
-.news-close {
-    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
-    border-radius: var(--r-sm); cursor: pointer; width: 30px; height: 30px; line-height: 1;
-}
-.news-close:hover { color: var(--text); border-color: var(--blue); }
-.news-body { overflow-y: auto; padding: var(--sp-2) var(--sp-3); }
-.news-item {
-    display: flex; flex-direction: column; gap: 2px;
-    padding: var(--sp-3) var(--sp-2); border-bottom: 1px solid var(--border);
-    text-decoration: none; color: var(--text);
-}
-.news-item:last-child { border-bottom: none; }
-.news-item:hover { background: var(--row-hover); }
-.news-item-head { font-size: var(--fs-sm); line-height: 1.35; }
-.news-item-meta { font-size: var(--fs-xs); color: var(--text-dim); }
-.news-empty { color: var(--text-dim); font-size: var(--fs-sm); padding: var(--sp-4); text-align: center; }
-.news-loading { margin: var(--sp-3) var(--sp-2); }
 
 /* /calendar — earnings category badge (per-symbol earnings blackout, merged
    into the macro calendar). Purple to distinguish from macro categories. */
@@ -6460,18 +3705,6 @@ html[data-density="compact"] .dt {
 
 /* /ops honesty markers — a control that reads as a guard but isn't wired, or
    a config the running process can't consume. Yellow, never green. */
-.ops-inert-warn { margin-bottom: 0.6rem; line-height: 1.5; }
-.ops-caps-unenforced {
-    background: var(--wash-yellow); color: var(--yellow);
-    font-size: var(--fs-xs); font-weight: 700;
-    border-radius: var(--r-sm); padding: 1px 6px; margin-right: 0.4rem;
-}
-.ops-caps-vals { color: var(--text-dim); text-decoration: line-through; }
-.ops-caps-live { font-variant-numeric: tabular-nums; }
-.ops-caps-live strong { color: var(--text); }
-.ops-caps-warn { color: var(--yellow); font-weight: 700; }
-.ops-caps-note { margin-top: 0.3rem; line-height: 1.45; }
-.ops-na { color: var(--yellow); font-weight: 400; }
 
 /* HVN target line in the /chart tf-bias panel (nearest chip-concentration
    above/below = target reference; read-aid #2). */
@@ -6491,11 +3724,9 @@ html[data-density="compact"] .dt {
 .tf-bias-range.rzone-trend  { background: var(--wash-dim);   color: var(--text-dim); }
 
 /* ── Market overview table (dashboard) ────────────────────────────── */
-.market-overview .mkt-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .6rem; }
-.mkt-title { margin: 0; font-size: var(--fs-lg); }
+
 .mkt-tabs { display: flex; gap: .3rem; flex-wrap: wrap; }
-.mkt-tab { padding: .25rem .7rem; border: 1px solid var(--chip-border); background: var(--chip); color: var(--text-dim); border-radius: 999px; cursor: pointer; font-size: var(--fs-base); }
-.mkt-tab.active { color: var(--text); border-color: var(--blue); background: rgba(var(--blue-rgb), .12); }
+
 /* Ticker-strip tick flash. Lighter than the home table's (no travelling
    edge, lower alpha): the strip is chrome sitting above the chart, so the
    same intensity there would pull the eye off the price action. */
@@ -6504,12 +3735,6 @@ html[data-density="compact"] .dt {
 .chart-ticker-item .tk-px { border-radius: 4px; padding: 0 .18rem; font-variant-numeric: tabular-nums; }
 .chart-ticker-item .tk-px.tk-up-flash   { animation: tk-flash-up   .95s cubic-bezier(.22,.61,.36,1) both; }
 .chart-ticker-item .tk-px.tk-down-flash { animation: tk-flash-down .95s cubic-bezier(.22,.61,.36,1) both; }
-@media (prefers-reduced-motion: reduce) {
-  /* The strip flash is background-only already — no transform anywhere — so
-     there is nothing to remove. The previous rule here had the same
-     instant-animation defect as the home table and made it invisible for no
-     benefit. Left deliberately empty of overrides. */
-}
 
 /* Central-bank speech on /calendar. Promoted past the feed's own impact
    rating, so it needs to LOOK promoted — and the rating we are overriding is
@@ -6518,31 +3743,9 @@ html[data-density="compact"] .dt {
 .cal-feed-impact { color: var(--text-dim); text-decoration: line-through; font-size: var(--fs-sm); }
 
 /* ── Price fan-out stats (/ops health card) ──────────────────────────── */
-.ops-stream-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: .4rem; margin-top: .35rem;
-}
-.ops-stream-cell {
-  display: flex; flex-direction: column; gap: .1rem;
-  padding: .35rem .5rem; border-radius: 6px;
-  background: rgba(255,255,255,0.03); border-left: 3px solid var(--border);
-}
-.ops-stream-cell .lbl { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .02em; }
-.ops-stream-cell .val { font-size: var(--fs-md); font-weight: 600; font-variant-numeric: tabular-nums; }
-.ops-stream-cell.ok   { border-left-color: var(--green); }
-.ops-stream-cell.warn { border-left-color: #d8a657; }
-.ops-stream-cell.warn .val { color: #d8a657; }
-.ops-stream-cell.bad  { border-left-color: var(--red); background: rgba(var(--red-rgb),0.08); }
-.ops-stream-cell.bad .val { color: var(--red); }
-.ops-stream-cell.dim  { border-left-color: var(--border); }
-.ops-stream-bad { color: var(--red); }
+
 /* The last-drop reason is a sentence, not a number — let it span and wrap
    instead of being truncated inside a metric cell. */
-.ops-stream-cell.ops-stream-err { grid-column: 1 / -1; }
-.ops-stream-cell.ops-stream-err .val {
-  font-size: var(--fs-sm); font-weight: 500; white-space: normal;
-  word-break: break-word; font-variant-numeric: normal;
-}
 
 /* ── Price-tick flash (home market table) ────────────────────────────
    Coinglass-style: the price cell washes with colour on a tick, then fades
@@ -6637,10 +3840,9 @@ html[data-density="compact"] .dt {
 
 /* market-overview: push down + larger, more readable text */
 .market-overview { margin-top: 2.5rem; --dt-bg: var(--bg); }
-.mkt-title { font-size: var(--fs-lg); }
+
 .mkt-logo { width: 22px; height: 22px; }
 .mkt-ico { font-size: var(--fs-lg); }
-.mkt-tab { font-size: var(--fs-md); padding: .32rem .85rem; }
 
 /* Released figure vs forecast on /calendar. Colour carries the SURPRISE, not
    a market direction: a hot inflation print and a hot payrolls print are both
@@ -6658,22 +3860,10 @@ html[data-density="compact"] .dt {
 /* OI row in the /chart TF-bias strip. Colour marks a threshold crossing, not
    a market direction: "longs building" and "shorts building" are both past
    the same +2% bar and which way the tape takes it is not this row's claim. */
-.tf-bias-oi { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline;
-    font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
-    padding: 2px 6px; border-radius: 4px; margin-top: 4px;
-    background: var(--wash-dim); color: var(--text-dim); cursor: help; }
-.tf-bias-oi.oi-armed { background: var(--wash-yellow); color: var(--yellow); font-weight: 700; }
-.tf-bias-oi.oi-unwind { color: var(--text); }
-.tf-bias-oi .oi-verdict { font-size: var(--fs-xs); opacity: 0.95; }
 
 /* Binance cross-reference line under the chart's OI row. Deliberately quieter
    than the BingX row above it: it informs, it is not the book an order fills
    against. */
-.tf-bias-bn { font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
-    padding: 1px 6px; margin-top: 2px; border-radius: 4px;
-    background: var(--wash-dim); color: var(--text-dim); cursor: help;
-    border-left: 2px solid var(--border); }
-.tf-bias-bn.bn-crowd { color: var(--yellow); }
 
 /* =====================================================================
    Alert bell + notification panel (static/alerts.js, cmd/web/alerts.go).
@@ -6949,7 +4139,7 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .cs-score-num { font-family: var(--mono); font-variant-numeric: tabular-nums; line-height: 1; }
 .cs-score-num .chart-banner-score-num { font-size: var(--fs-3xl); font-weight: 600; }
 .cs-score-num small { font-size: var(--fs-sm); color: var(--text-dim); margin-left: 2px; }
-.cs-score-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-left: auto; justify-content: flex-end; }
+
 .chart-side .chart-banner-action { margin-top: var(--sp-3); text-align: left; }
 .chart-side .chart-banner-action-text { font-size: var(--fs-base); font-weight: 600; text-align: left; }
 .chart-side .chart-banner-note { font-size: var(--fs-xs); color: var(--text-dim); text-align: left; }
