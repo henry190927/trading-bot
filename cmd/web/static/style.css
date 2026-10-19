@@ -7081,3 +7081,29 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .tp-foot b { color: var(--text); }
 .tp-more { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); text-align: center; }
 @media (max-width: 640px) { .tp-grid { columns: 1; } }
+
+/* ---------- research: scan ---------- */
+.ui-seg a { display: inline-grid; place-items: center; height: 26px; padding: 0 var(--sp-3); border-radius: 6px; color: var(--text-dim); font-size: var(--fs-sm); font-family: var(--mono); text-decoration: none; }
+.ui-seg a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+.ui-pill.warn { background: var(--yellow-bg); color: var(--yellow); }
+.ui-tag.warn { color: var(--yellow); background: var(--yellow-bg); border-color: transparent; margin-right: 4px; }
+.scan-t .scan-group td { background: var(--surface-2); font-size: var(--fs-sm); padding-top: 6px; padding-bottom: 6px; }
+.scan-t .ui-trow.is-hot td:first-child { box-shadow: inset 3px 0 0 var(--green); }
+.scan-t .scan-score { margin: 0 4px; }
+.scan-t .verdict-strong, .scan-t .verdict-take { color: var(--green); }
+.scan-t .verdict-neutral { color: var(--text); }
+.scan-t .verdict-weak { color: var(--yellow); }
+.scan-t .verdict-avoid { color: var(--red); }
+.scan-t .score-good { color: var(--green); font-weight: 600; }
+.scan-t .score-weak { color: var(--text-dim); }
+.scan-detail-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-4); }
+.scan-h { margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.scan-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--sp-3); margin: 0; align-items: center; font-size: var(--fs-sm); }
+.scan-kv dt { color: var(--text-dim); }
+.scan-kv dd { margin: 0; white-space: normal; }
+.scan-log { font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.6; white-space: normal; }
+.scan-t .ui-tdetail td { white-space: normal; }
+.scan-kv .copy-btn { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 500; padding: 1px 8px; min-height: 0; height: auto; border-radius: 4px; margin: 1px 2px 1px 0; }
+.scan-kv .copy-btn.stop { color: var(--red); }
+.scan-kv .copy-btn.tp { color: var(--green); }
+.ui-side.neutral { background: var(--wash-dim); color: var(--text-dim); }

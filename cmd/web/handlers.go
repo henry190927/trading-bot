@@ -193,13 +193,6 @@ func (s *server) handleDashboard(c *gin.Context) {
 		return order[views[i].Symbol] < order[views[j].Symbol]
 	})
 
-	// Build open-trade cards (live status of journal entries that haven't
-	// been closed yet). Each open trade's diagnose is computed on its OWN
-	// TF (not the dashboard's selected TF) — so a 1h trade keeps showing
-	// its 1h-context diagnose even when the user switches the dashboard
-	// to 15m or 4h.
-	openTrades := s.buildOpenTradeCards(ctx, views)
-
 	// Disable client-side caching so the meta-refresh reload actually fetches
 	// fresh data (iOS Safari otherwise serves the page from cache on the
 	// next 60s tick if no Cache-Control is set).
@@ -300,7 +293,6 @@ func (s *server) handleDashboard(c *gin.Context) {
 		"CoreCount":       len(views),
 		"AltStart":        len(views) + len(stockViews),
 		"Tradeable":       tradeable,
-		"OpenTrades":      openTrades,
 		"Now":             time.Now().Format("2006-01-02 15:04:05"),
 		"TFOptions":       []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 		"MinTradeable":    minTradeable,
@@ -3002,6 +2994,16 @@ func templateFuncs() template.FuncMap {
 		},
 		"sideText": func(s signal.Side) string {
 			return s.String()
+		},
+		// sigSide is the dictionary suffix for a side: side.long / side.short / side.neutral.
+		"sigSide": func(s signal.Side) string {
+			switch s {
+			case signal.Long:
+				return "long"
+			case signal.Short:
+				return "short"
+			}
+			return "neutral"
 		},
 		"scoreClass": func(score, min int) string {
 			switch {

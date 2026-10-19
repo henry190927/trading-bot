@@ -5,672 +5,201 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<!-- Auto-refresh moved to JS (see refresh-mgr below) so modals can pause it. -->
-<!-- meta http-equiv="refresh" removed 2026-06-08 -->
-
-<title>trading-web · {{.TF}}</title>
+<title>{{t "tab.scan"}} · {{.TF}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
-<link rel="stylesheet" href="/static/uplot/uPlot.min.css">
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<header class="topbar tf-bar">
-  <nav class="tf-picker">
-    {{range .TFOptions}}
-      {{if eq . $.TF}}
-        <span class="tf-active">{{.}}</span>
-      {{else}}
-        <a href="/?tf={{.}}">{{.}}</a>
-      {{end}}
+{{/* One row per symbol on the chosen TF, every symbol on one screen. The
+     detail a row used to show as a card (levels, engine log, plan, AI) opens
+     underneath it. Open trades live on Today; one symbol in depth is /chart. */}}
+<main class="ui-page">
+  <div class="ui-status">
+    {{if .MacroActive}}
+      <span class="ui-pill bad">{{template "icon" "pause"}}{{t "today.blackout"}}</span>
+      <span><strong>{{.MacroActive.Name}}</strong> · {{t "cal.activeSub"}}</span>
+    {{else if .MacroUpcoming}}
+      <span class="ui-pill warn">{{template "icon" "alert"}}{{.MacroUpcoming.Name}}</span>
+      <span>{{printf (t "scan.blackoutIn") (fmtElapsed .MacroUpcomingIn)}}</span>
     {{end}}
-  </nav>
-  <div class="updated">{{.Now}}</div>
-</header>
-
-<main>
-
-{{if .MacroActive}}
-  <div class="banner banner--danger" role="alert">
-    <strong>⛔ MACRO BLACKOUT ACTIVE</strong> — {{.MacroActive.Name}}
-    <span class="hint">(window {{.MacroActive.BeforeMinutes}}min before / {{.MacroActive.AfterMinutes}}min after; signals suppressed)</span>
-  </div>
-{{else if .MacroUpcoming}}
-  <div class="banner banner--warn" role="status">
-    ⚠ Upcoming macro release: <strong>{{.MacroUpcoming.Name}}</strong>
-    <span class="hint">— blackout starts in {{fmtElapsed .MacroUpcomingIn}}</span>
-  </div>
-{{end}}
-
-{{if .Tradeable}}
-<section class="banner banner--rail b-green" role="status" aria-label="tradeable signals on this timeframe">
-  <div class="banner-head">
-    <span class="banner-title">⚡ Tradeable signals</span>
-    <span class="hint">TF {{.TF}} · engine score ≥ {{.MinTradeable}} · tap a row to jump to its card</span>
-  </div>
-  <div class="tradeable-list">
-    {{range .Tradeable}}
-      <a href="#card-{{.Short}}" class="tradeable-chip tradeable-{{if eq .Side "LONG"}}long{{else}}short{{end}}">
-        <span class="tb-sym">{{.Short}} {{.TF}}</span>
-        <span class="tb-side">{{.Side}}</span>
-        <span class="tb-score">MR {{.MRScore}} · MOM {{.MOMScore}} · total {{.Score}}</span>
-        {{if gt .Ratio 0.0}}<span class="tb-ratio">{{printf "%.1f" (score100 .Ratio)}}/100 {{.Verdict}}</span>{{end}}
-        {{if .Anchor}}<span class="tb-anchor">{{.Anchor}}</span>{{end}}
-      </a>
-    {{end}}
-  </div>
-</section>
-{{end}}
-
-{{if .OpenTrades}}
-<section class="dashboard-section open-trades-section">
-  <h2 class="section-title">
-    <span class="section-dot live"></span>
-    Open trades
-    <span class="section-count">{{len .OpenTrades}}</span>
-  </h2>
-  {{range .OpenTrades}}
-    <article class="open-trade-card {{if .Trade.IsPending}}status-pending{{else}}{{rClass .CurrentR}}{{end}}">
-      <div class="ot-head">
-        <span class="ot-id">#{{.Trade.ID}}</span>
-        <span class="sym">{{.Trade.Symbol}}</span>
-        <span class="badge badge--lg {{sideClassStr .Trade.Side}}">{{sideStr .Trade.Side}}</span>
-        {{if .Trade.Leverage}}<span class="lev-tag">{{.Trade.Leverage}}×</span>{{end}}
-        <span class="ot-tf">{{or .Trade.TF "—"}}</span>
-        {{if .Trade.IsPending}}
-          <span class="badge badge--outline badge--caps badge--pulse b-yellow">PENDING</span>
-          <span class="ot-elapsed" title="time since the plan was recorded">⏳ {{fmtElapsed .PendingSince}}</span>
-        {{else}}
-          <span class="ot-elapsed" title="time since fill">{{fmtElapsed .TimeElapsed}}</span>
-          <span class="ot-r {{rClass .CurrentR}}">{{fmtR .CurrentR}}R</span>
-        {{end}}
-      </div>
-      {{if .Trade.IsPending}}
-      <div class="ot-pending-strip" title="entry hasn't filled yet — auto-detected on each refresh">
-        waiting for entry @ <button class="copy-btn small" data-copy="{{fmtPrice .Trade.Entry}}">{{fmtPrice .Trade.Entry}}</button>
-        · mark {{fmtPrice .MarkPrice}}
-        · <span class="dist-to-entry">{{printf "%+.2f%%" .DistToEntryPct}} to entry</span>
-      </div>
-      {{else}}
-      <div class="ot-bar-wrap" title="position between stop (left, red) and TP2 (right, green)">
-        <div class="ot-bar">
-          <div class="ot-bar-fill {{if gt .CurrentR 0.0}}positive{{else}}negative{{end}}" style="width: {{if gt .CurrentR 0.0}}{{printf "%.0f" .PctToTP2}}{{else}}{{printf "%.0f" .PctToStop}}{{end}}%"></div>
-          <div class="ot-bar-center"></div>
-        </div>
-        <div class="ot-bar-labels">
-          <span class="ot-bar-stop">stop {{fmtPrice .Trade.Stop}}</span>
-          <span class="ot-bar-entry">entry {{fmtPrice .Trade.Entry}}</span>
-          <span class="ot-bar-tp">TP2 {{fmtPrice .Trade.TP2}}</span>
-        </div>
-      </div>
-      {{end}}
-      <div class="ot-prices">
-        <span class="ot-mark">mark <button class="copy-btn small" data-copy="{{fmtPrice .MarkPrice}}">{{fmtPrice .MarkPrice}}</button></span>
-        <span>TP1 <button class="copy-btn small tp" data-copy="{{fmtPrice .Trade.TP1}}">{{fmtPrice .Trade.TP1}}</button></span>
-        <span>TP2 <button class="copy-btn small tp" data-copy="{{fmtPrice .Trade.TP2}}">{{fmtPrice .Trade.TP2}}</button></span>
-        <span>stop <button class="copy-btn small stop" data-copy="{{fmtPrice .Trade.Stop}}">{{fmtPrice .Trade.Stop}}</button></span>
-      </div>
-      {{if .Diagnose}}
-        <div class="ot-diagnose {{verdictClass .Diagnose.Total}}">
-          live diagnose:
-          <span class="{{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
-          <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}/100" title="mean-reversion axis — tap to copy">MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}</button>
-          <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}/100" title="momentum axis — tap to copy">MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}</button>
-          <button type="button" class="copy-btn ot-ratio" data-copy="ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100" title="combined total — tap to copy"><strong>{{printf "%.1f" (score100 .Diagnose.Total)}}/100</strong></button>
-          {{verdictShort .Diagnose.Verdict}}
-          <button type="button"
-                  class="copy-btn copy-row"
-                  data-copy="#{{.Trade.ID}} {{.Trade.Symbol}} {{or .Trade.TF "—"}} {{sideStr .Trade.Side}} entry {{fmtPrice .Trade.Entry}} mark {{fmtPrice .MarkPrice}} R {{fmtSigned1 .CurrentR}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}} MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}} ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100 {{verdictShort .Diagnose.Verdict}}"
-                  title="copy whole-row snapshot for trade notes (id · symbol · TF · side · entry · mark · R · diagnose)">copy row</button>
-          {{if .Diagnose.AtVAH}}<span class="badge badge--outline va">at VAH</span>
-          {{else if .Diagnose.AtVAL}}<span class="badge badge--outline va">at VAL</span>
-          {{else if .Diagnose.OutsideVAUp}}<span class="badge badge--outline va-out">above VA</span>
-          {{else if .Diagnose.OutsideVADn}}<span class="badge badge--outline va-out">below VA</span>
-          {{else if .Diagnose.InsideVA}}<span class="badge badge--outline va-in">inside VA</span>{{end}}
-          {{if isPOCRising .Diagnose.POCMig.Trend}}<span class="badge badge--outline poc-rising">POC ↗</span>
-          {{else if isPOCFalling .Diagnose.POCMig.Trend}}<span class="badge badge--outline poc-falling">POC ↘</span>{{end}}
-          {{if .Diagnose.RecentFlashBarBearish}}<span class="badge badge--outline knife">⚠ falling knife</span>{{end}}
-          {{if .Diagnose.RecentFlashBarBullish}}<span class="badge badge--outline squeeze">⚠ blow-off risk</span>{{end}}
-        </div>
-        {{if .HasDiff}}
-          <div class="ot-diff diff-{{or .DiffClass "flat"}}" title="how the validator picture has shifted since you committed">
-            Δ /100 <strong>{{fmtSigned1 (score100 .ScoreDelta)}}</strong> vs entry · {{.DiffCause}}
-          </div>
-        {{end}}
-      {{end}}
-      <div class="ot-actions">
-        <a href="/journal/{{.Trade.ID}}/close" class="btn-close-trade">Close trade</a>
-        <a href="/journal/{{.Trade.ID}}/edit" class="btn-edit">Edit</a>
-      </div>
-    </article>
-  {{end}}
-</section>
-{{end}}
-
-<section class="dashboard-section symbols-section">
-  <h2 class="section-title">
-    <span class="section-dot scan"></span>
-    Symbol scan
-    <button type="button" class="info-btn" aria-label="legend" title="What do these chips and lines mean?">i</button>
-    <span class="section-meta">{{.TF}}</span>
-    {{if .Tradeable}}<span class="badge badge--outline b-green" title="tradeable signals on this TF">{{len .Tradeable}} tradeable</span>{{end}}
-    <div class="chart-style-toggle" role="group" aria-label="chart style">
-      <button type="button" class="cs-btn" data-mode="line" aria-pressed="false">Line</button>
-      <button type="button" class="cs-btn active" data-mode="candle" aria-pressed="true">Candles</button>
-    </div>
-  </h2>
-
-{{range $i, $v := .Symbols}}
-  {{if eq $i $.CoreCount}}
-  <div class="scan-section-label">
-    <span class="i18n-en">US stocks · forward-log</span><span class="i18n-zh">美股 · forward-log</span>
-    <span class="scan-section-note"><span class="i18n-en">engine only — not in daemon / ntfy</span><span class="i18n-zh">僅引擎讀盤 —— 不進 daemon / ntfy</span></span>
-  </div>
-  {{end}}
-  {{if eq $i $.AltStart}}
-  <div class="scan-section-label">
-    <span class="i18n-en">Alts · forward-log (StructMomentum)</span><span class="i18n-zh">Alt 幣 · forward-log(順勢結構)</span>
-    <span class="scan-section-note"><span class="i18n-en">SOL/LINK/SUI/HYPE = struct-momentum · NEAR = MR · not in daemon / ntfy</span><span class="i18n-zh">SOL/LINK/SUI/HYPE = 順勢結構 · NEAR = 均值回歸 · 不進 daemon / ntfy</span></span>
-  </div>
-  {{end}}
-  <section id="card-{{.Short}}" class="symbol-card {{if hasPlan .Signal}}has-plan{{end}}">
-    <div class="card-head">
-      <span class="sym">{{.Short}}</span>
-      <span class="price-wrap">
-        @ <button class="copy-btn price" data-copy="{{fmtPrice .Signal.Price}}">{{fmtPrice .Signal.Price}}</button>
-        {{if .ClosedClose}}
-          <span class="close-ref" title="last closed-bar close — what the engine evaluates against">
-            close <button class="copy-btn small" data-copy="{{fmtPrice .ClosedClose}}">{{fmtPrice .ClosedClose}}</button>
-          </span>
-        {{end}}
-      </span>
-      <span class="badge badge--lg {{sideClass .Signal.Side}}">{{sideText .Signal.Side}}</span>
-      <button type="button" class="copy-btn score score-mr" data-copy="MR {{.Signal.MRScore}}" title="mean-reversion votes (RSI / BOLL / Fib / sweep / divergence / MACD) — tap to copy">MR {{.Signal.MRScore}}</button>
-      <button type="button" class="copy-btn score score-mom" data-copy="MOM {{.Signal.MomentumScore}}" title="momentum votes (volume anomaly / structure / time-of-day / double-pattern) — tap to copy">MOM {{.Signal.MomentumScore}}</button>
-      <button type="button" class="copy-btn score {{scoreClass .Signal.Score $.MinTradeable}}" data-copy="total {{.Signal.Score}}" title="total = MR + MOM — tap to copy">total {{.Signal.Score}}</button>
-      <button type="button"
-              class="copy-btn copy-row"
-              data-copy="{{.Short}} {{$.TF}} {{sideText .Signal.Side}} @ {{fmtPrice .Signal.Price}} | MR {{.Signal.MRScore}} MOM {{.Signal.MomentumScore}} total {{.Signal.Score}}{{if .Signal.POCMig.POCShort}} | drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}{{end}}{{if .Diagnose}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}} MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}} ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100 {{verdictShort .Diagnose.Verdict}}{{end}}"
-              title="copy the whole-row snapshot in one paste (symbol · TF · side · price · MR · MOM · total · drift · diagnose)">copy row</button>
-    </div>
-
-    {{if .Err}}
-      <p class="err">⚠ {{.Err}}</p>
+    {{if .Tradeable}}
+      <span class="ui-pill ok">{{template "icon" "flag"}}{{printf (t "scan.tradeable") (len .Tradeable)}}</span>
     {{else}}
-
-    {{if .ChartJSON}}
-      <div class="mini-chart"
-           data-sym="{{.Short}}"
-           data-chart='{{.ChartJSON}}'></div>
+      <span class="ui-dim">{{t "scan.noneTradeable"}}</span>
     {{end}}
+    <span class="ui-dim ui-sm">{{printf (t "scan.rule") .MinTradeable}}</span>
+  </div>
 
-    <div class="meta">
-      <span>funding {{fmtPct .Context.FundingRate}}</span>
-      <span>OI {{fmtOI .Context.OpenInterest}}</span>
-      {{if .Signal.VP.POC}}
-        <span>POC <button class="copy-btn small" data-copy="{{fmtPrice .Signal.VP.POC}}">{{fmtPrice .Signal.VP.POC}}</button></span>
+  <section class="ui-card">
+  <header class="ui-card-h">
+    <nav class="ui-seg" aria-label="TF">
+      {{range .TFOptions}}<a href="/scan?tf={{.}}"{{if eq . $.TF}} class="on" aria-current="page"{{end}}>{{.}}</a>{{end}}
+    </nav>
+    <span class="ui-sub" style="margin:0">{{t "scan.expandHint"}}</span>
+    <span class="ui-num ui-dim ui-sm">{{.Now}}</span>
+  </header>
+  <div class="dt-scroll">
+  <table class="dt ui-trades scan-t">
+    <thead><tr>
+      <th>{{t "th.symbol"}}</th>
+      <th class="num">{{t "th.price"}}</th>
+      <th title="{{t "scan.engineHint"}}">{{t "scan.th.engine"}}</th>
+      <th class="num" title="{{t "scan.votesHint"}}">MR · MOM</th>
+      <th title="{{t "scan.nowHint"}}">{{t "scan.th.now"}}</th>
+      <th>VA</th>
+      <th>{{t "scan.th.poc"}}</th>
+      <th>{{t "scan.th.flags"}}</th>
+      <th>{{t "scan.th.plan"}}</th>
+      <th></th>
+    </tr></thead>
+    <tbody>
+    {{range $i, $v := .Symbols}}
+      {{if eq $i $.CoreCount}}
+      <tr class="scan-group"><td colspan="10"><b>{{t "scan.group.stocks"}}</b> <span class="ui-dim">· {{t "scan.group.stocksNote"}}</span></td></tr>
       {{end}}
-      {{if .Signal.POCMig.POCShort}}
-        <button type="button"
-                class="copy-btn small poc-drift trend-{{.Signal.POCMig.Trend}}{{if .Signal.POCMig.Stacked}} stacked{{end}}"
-                data-copy="drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}"
-                title="POC migration — where the volume-weighted &#34;fair price&#34; has moved.&#10;POC50  {{fmtPrice .Signal.POCMig.POCShort}}&#10;POC100 {{fmtPrice .Signal.POCMig.POCMed}}&#10;POC200 {{fmtPrice .Signal.POCMig.POCLong}}&#10;drift = (POC50 − POC200) / POC200{{if .Signal.POCMig.Stacked}}&#10;Stacked: POC50 &gt; POC100 &gt; POC200 — strong regime confirmation{{end}}&#10;Tap to copy">
-          drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}
-        </button>
+      {{if eq $i $.AltStart}}
+      <tr class="scan-group"><td colspan="10"><b>{{t "scan.group.alts"}}</b> <span class="ui-dim">· {{t "scan.group.altsNote"}}</span></td></tr>
       {{end}}
-    </div>
-
-    {{if and .Signal.VP.VAL .Signal.VP.VAH}}
-      <div class="va-row" title="Value Area: {{printf "%.0f" (mulPct .Signal.VP.VAPercent)}}% of volume between VAL and VAH">
-        <span class="label">VA</span>
-        <button class="copy-btn small va-edge" data-copy="{{fmtPrice .Signal.VP.VAL}}">{{fmtPrice .Signal.VP.VAL}}</button>
-        <span class="va-sep">↔</span>
-        <button class="copy-btn small va-edge" data-copy="{{fmtPrice .Signal.VP.VAH}}">{{fmtPrice .Signal.VP.VAH}}</button>
-      </div>
-    {{end}}
-
-    {{if .HVNValues}}
-      <div class="hvn-row">
-        <span class="label">HVN</span>
-        {{range .HVNValues}}
-          <button class="copy-btn small" data-copy="{{.}}">{{.}}</button>
-        {{end}}
-      </div>
-    {{end}}
-
-    {{if .Diagnose}}
-    <div class="diagnose-row {{verdictClass .Diagnose.Total}}">
-      <span class="diag-label">trade now?</span>
-      <span class="diag-side {{sideClassStr (sideStr .Diagnose.Side.String)}}">{{sideStr .Diagnose.Side.String}}</span>
-      <button type="button" class="copy-btn diag-score-axis diag-axis-mr" data-copy="MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}/100" title="mean-reversion axis (mr + shared factors) — tap to copy">MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}}</button>
-      <button type="button" class="copy-btn diag-score-axis diag-axis-mom" data-copy="MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}/100" title="momentum axis (mom + shared factors) — tap to copy">MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}}</button>
-      <button type="button" class="copy-btn diag-score" data-copy="ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100" title="combined total — all factors — tap to copy">{{printf "%.1f" (score100 .Diagnose.Total)}}/100</button>
-      <span class="diag-verdict">{{verdictShort .Diagnose.Verdict}}</span>
-      <a class="diag-link" href="{{diagnoseHref . $.TF}}" title="full validator breakdown">↗</a>
-      {{if .Diagnose.AtVAH}}<span class="diag-flag va">at VAH</span>
-      {{else if .Diagnose.AtVAL}}<span class="diag-flag va">at VAL</span>
-      {{else if .Diagnose.OutsideVAUp}}<span class="diag-flag va-out">above VA</span>
-      {{else if .Diagnose.OutsideVADn}}<span class="diag-flag va-out">below VA</span>
-      {{else if .Diagnose.InsideVA}}<span class="diag-flag va-in">inside VA</span>{{end}}
-      {{if isPOCRising .Diagnose.POCMig.Trend}}<span class="diag-flag poc-rising">POC ↗</span>
-      {{else if isPOCFalling .Diagnose.POCMig.Trend}}<span class="diag-flag poc-falling">POC ↘</span>{{end}}
-      {{if .Diagnose.RecentFlashBarBearish}}<span class="diag-flag knife">⚠ falling knife ({{.Diagnose.RecentFlashBarAge}} bar ago)</span>{{end}}
-      {{if .Diagnose.RecentFlashBarBullish}}<span class="diag-flag squeeze">⚠ blow-off risk ({{.Diagnose.RecentFlashBarAge}} bar ago)</span>{{end}}
-    </div>
-    {{end}}
-
-    {{if .Summary}}
-    <div class="card-summary" title="rule-based 1-line read of this card — Signal + Diagnose, no LLM. Tap Analyze ▸ for Anthropic-backed analysis.">
-      <span class="card-summary-text">{{.Summary}}</span>
-      <button type="button"
-              class="ai-analyze-btn"
-              data-symbol="{{.Short}}"
-              data-tf="{{$.TF}}"
-              title="LLM analysis using same context the per-trade Analyze button uses">AI analyze ▸</button>
-    </div>
-    <div class="ai-result hidden" data-result-for="{{.Short}}-{{$.TF}}"></div>
-    {{end}}
-
-    {{range .Signal.Reasons}}<div class="reason vote">+ {{.}}</div>{{end}}
-    {{range .Signal.Notes}}<div class="reason note">· {{.}}</div>{{end}}
-    {{range .Signal.Warnings}}<div class="reason warn">⚠ {{.}}</div>{{end}}
-
-    {{if hasPlan .Signal}}
-      <div class="plan {{if isSweepAnchor .Signal.Plan.Anchor}}sweep{{end}}">
-        <div class="plan-head">
-          <span class="ord">{{.Signal.Plan.OrderType}}</span>
-          <span class="{{sideClass .Signal.Side}}">{{sideText .Signal.Side}}</span>
-          <span class="anchor">{{.Signal.Plan.Anchor}}</span>
-          <a class="record-btn" href="{{recordHref . $.TF}}">+ record</a>
+      {{if .Err}}
+      <tr class="scan-err"><td><span class="ui-sym">{{.Short}}</span></td><td colspan="9" class="ui-down ui-sm">{{t "scan.err"}} · <code>{{.Err}}</code></td></tr>
+      {{else}}
+      {{$tradeable := and (ne (sigSide .Signal.Side) "neutral") (ge .Signal.Score $.MinTradeable)}}
+      <tr class="ui-trow{{if $tradeable}} is-hot{{end}}" id="row-{{.Short}}" data-row="{{.Short}}" tabindex="0" aria-expanded="false">
+        <td><span class="ui-sym">{{.Short}}</span></td>
+        <td class="num">{{fmtPx .Signal.Price}}</td>
+        <td><span class="ui-side {{sigSide .Signal.Side}}">{{t (printf "side.%s" (sigSide .Signal.Side))}}</span></td>
+        <td class="num"><span class="{{scoreClass .Signal.Score $.MinTradeable}}">{{.Signal.MRScore}} · {{.Signal.MomentumScore}}</span></td>
+        <td>{{with .Diagnose}}
+          <span class="ui-side {{sigSide .Side}}">{{t (printf "side.%s" (sigSide .Side))}}</span>
+          <b class="ui-num scan-score {{verdictClass .Total}}">{{printf "%.0f" (score100 .Total)}}</b>
+          <span class="ui-sm {{verdictClass .Total}}">{{t (printf "chart.js.verdict.%s" (verdictShort .Verdict))}}</span>
+        {{else}}<span class="ui-dim">—</span>{{end}}</td>
+        <td class="ui-sm">{{with .Diagnose}}{{if .AtVAH}}{{t "scan.va.atVAH"}}{{else if .AtVAL}}{{t "scan.va.atVAL"}}{{else if .OutsideVAUp}}<span class="ui-up">{{t "scan.va.above"}}</span>{{else if .OutsideVADn}}<span class="ui-down">{{t "scan.va.below"}}</span>{{else if .InsideVA}}<span class="ui-dim">{{t "scan.va.inside"}}</span>{{end}}{{end}}</td>
+        <td class="ui-num ui-sm">{{if .Signal.POCMig.POCShort}}<span class="{{if isPOCRising .Signal.POCMig.Trend}}ui-up{{else if isPOCFalling .Signal.POCMig.Trend}}ui-down{{else}}ui-dim{{end}}">{{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}</span>{{if .Signal.POCMig.Stacked}} <span class="ui-tag" title="{{t "scan.stackedHint"}}">{{t "scan.stacked"}}</span>{{end}}{{else}}<span class="ui-dim">—</span>{{end}}</td>
+        <td class="ui-sm">{{with .Diagnose}}{{if .RecentFlashBarBearish}}<span class="ui-tag warn" title="{{printf (t "scan.barsAgo") .RecentFlashBarAge}}">{{t "scan.knife"}}</span>{{end}}{{if .RecentFlashBarBullish}}<span class="ui-tag warn" title="{{printf (t "scan.barsAgo") .RecentFlashBarAge}}">{{t "scan.blowoff"}}</span>{{end}}{{end}}</td>
+        <td class="ui-sm">{{if hasPlan .Signal}}<span class="ui-tag">{{.Signal.Plan.OrderType}}</span> <span class="ui-num">{{fmtPx .Signal.Plan.Entry}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+        <td class="ui-chev" aria-hidden="true">›</td>
+      </tr>
+      <tr class="ui-tdetail" data-detail="{{.Short}}" hidden><td colspan="10">
+        <div class="ui-detail scan-detail">
+          <div class="scan-detail-cols">
+            <div>
+              <div class="ui-dim ui-sm scan-h">{{t "scan.levels"}}</div>
+              <dl class="scan-kv">
+                <dt>{{t "scan.mark"}}</dt><dd><button class="copy-btn" data-copy="{{fmtPrice .Signal.Price}}">{{fmtPx .Signal.Price}}</button></dd>
+                {{if .ClosedClose}}<dt title="{{t "scan.closeHint"}}">{{t "scan.close"}}</dt><dd><button class="copy-btn" data-copy="{{fmtPrice .ClosedClose}}">{{fmtPx .ClosedClose}}</button></dd>{{end}}
+                {{if .Signal.VP.POC}}<dt>POC</dt><dd><button class="copy-btn" data-copy="{{fmtPrice .Signal.VP.POC}}">{{fmtPx .Signal.VP.POC}}</button></dd>{{end}}
+                {{if and .Signal.VP.VAL .Signal.VP.VAH}}<dt>VAL · VAH</dt><dd><button class="copy-btn" data-copy="{{fmtPrice .Signal.VP.VAL}}">{{fmtPx .Signal.VP.VAL}}</button> <button class="copy-btn" data-copy="{{fmtPrice .Signal.VP.VAH}}">{{fmtPx .Signal.VP.VAH}}</button></dd>{{end}}
+                {{if .HVNValues}}<dt>HVN</dt><dd>{{range .HVNValues}}<button class="copy-btn small" data-copy="{{.}}">{{.}}</button> {{end}}</dd>{{end}}
+                <dt>{{t "th.funding"}}</dt><dd class="ui-num">{{fmtPct .Context.FundingRate}}</dd>
+                <dt>OI</dt><dd class="ui-num">{{fmtOI .Context.OpenInterest}}</dd>
+              </dl>
+            </div>
+            {{if hasPlan .Signal}}
+            <div>
+              <div class="ui-dim ui-sm scan-h">{{t "scan.plan"}} · <span class="ui-side {{sigSide .Signal.Side}}">{{t (printf "side.%s" (sigSide .Signal.Side))}}</span> <span class="ui-tag">{{.Signal.Plan.OrderType}}</span></div>
+              <dl class="scan-kv">
+                <dt>{{t "th.entry"}}</dt><dd><button class="copy-btn" data-copy="{{fmtPrice .Signal.Plan.Entry}}">{{fmtPx .Signal.Plan.Entry}}</button></dd>
+                <dt>{{t "trades.stop"}}</dt><dd><button class="copy-btn stop" data-copy="{{fmtPrice .Signal.Plan.StopLoss}}">{{fmtPx .Signal.Plan.StopLoss}}</button></dd>
+                {{if ge (len .Signal.Plan.TakeProfit) 1}}<dt>TP1 · 1R</dt><dd><button class="copy-btn tp" data-copy="{{fmtPrice (index .Signal.Plan.TakeProfit 0)}}">{{fmtPx (index .Signal.Plan.TakeProfit 0)}}</button></dd>{{end}}
+                {{if ge (len .Signal.Plan.TakeProfit) 2}}<dt>TP2 · 2R</dt><dd><button class="copy-btn tp" data-copy="{{fmtPrice (index .Signal.Plan.TakeProfit 1)}}">{{fmtPx (index .Signal.Plan.TakeProfit 1)}}</button></dd>{{end}}
+                {{if .Signal.Plan.Anchor}}<dt>{{t "trades.anchor"}}</dt><dd><code>{{.Signal.Plan.Anchor}}</code></dd>{{end}}
+              </dl>
+            </div>
+            {{end}}
+            {{if or .Signal.Reasons .Signal.Notes .Signal.Warnings}}
+            <div>
+              {{/* Engine output, verbatim: these lines are built with
+                   fmt.Sprintf in package signal and have no codes to
+                   translate from, so they are shown as a log. */}}
+              <div class="ui-dim ui-sm scan-h">{{t "scan.engineLog"}}</div>
+              <div class="scan-log">
+                {{range .Signal.Reasons}}<div class="ui-up">+ {{.}}</div>{{end}}
+                {{range .Signal.Notes}}<div class="ui-dim">· {{.}}</div>{{end}}
+                {{range .Signal.Warnings}}<div class="ui-warn">! {{.}}</div>{{end}}
+              </div>
+            </div>
+            {{end}}
+          </div>
+          <div class="ui-detail-actions">
+            <a class="ui-btn ghost" style="margin-top:0" href="/chart?symbol={{.Short}}&amp;tf={{$.TF}}">{{t "scan.openChart"}}</a>
+            {{if .Diagnose}}<a class="ui-btn ghost" style="margin-top:0" href="{{diagnoseHref . $.TF}}">{{t "scan.validate"}}</a>{{end}}
+            {{if hasPlan .Signal}}<a class="ui-btn" style="margin-top:0" href="{{recordHref . $.TF}}">{{template "icon" "plus"}}{{t "scan.record"}}</a>{{end}}
+            <button type="button" class="ui-btn ghost ai-analyze-btn" style="margin-top:0" data-symbol="{{.Short}}" data-tf="{{$.TF}}">{{t "trades.ai"}}</button>
+          </div>
+          <div class="ai-result hidden" data-result-for="{{.Short}}-{{$.TF}}"></div>
         </div>
-        <div class="plan-grid">
-          <span class="lbl">entry</span>
-          <button class="copy-btn big" data-copy="{{fmtPrice .Signal.Plan.Entry}}">{{fmtPrice .Signal.Plan.Entry}}</button>
-
-          <span class="lbl">stop</span>
-          <button class="copy-btn stop" data-copy="{{fmtPrice .Signal.Plan.StopLoss}}">{{fmtPrice .Signal.Plan.StopLoss}}</button>
-
-          {{if ge (len .Signal.Plan.TakeProfit) 1}}
-          <span class="lbl">TP1 (1R)</span>
-          <button class="copy-btn tp" data-copy="{{fmtPrice (index .Signal.Plan.TakeProfit 0)}}">{{fmtPrice (index .Signal.Plan.TakeProfit 0)}}</button>
-          {{end}}
-
-          {{if ge (len .Signal.Plan.TakeProfit) 2}}
-          <span class="lbl">TP2 (2R)</span>
-          <button class="copy-btn tp" data-copy="{{fmtPrice (index .Signal.Plan.TakeProfit 1)}}">{{fmtPrice (index .Signal.Plan.TakeProfit 1)}}</button>
-          {{end}}
-        </div>
-        {{if .Signal.Plan.Note}}<div class="plan-note">{{.Signal.Plan.Note}}</div>{{end}}
-      </div>
+      </td></tr>
+      {{end}}
     {{end}}
-
-    {{end}}{{/* if .Err */}}
+    </tbody>
+  </table>
+  </div>
   </section>
-{{end}}
-</section>{{/* /symbols-section */}}
 </main>
 
-<div class="legend-modal hidden" id="legend-modal">
-  <div class="legend-modal-backdrop"></div>
-  <div class="legend-modal-card">
-    <div class="legend-modal-head">
-      <span class="legend-modal-title">Dashboard legend</span>
-      <div class="ai-lang-toggle info-lang-toggle" role="group" aria-label="language">
-        <button type="button" class="ai-lang-btn" data-lang="zh-tw">繁</button>
-        <button type="button" class="ai-lang-btn" data-lang="en">EN</button>
-      </div>
-      <button type="button" class="legend-modal-close" aria-label="close">×</button>
-    </div>
-    <div class="legend-modal-body">
-
-      <div class="info-lang-view" data-lang-view="en">
-      <h3>Chart lines</h3>
-      <table class="legend-table">
-        <tbody>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc200"></span><b>POC200</b></td><td>Long-term Point of Control (~8d on 1h). The price with most accumulated volume.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc100"></span><b>POC100</b></td><td>Medium-window POC (~4d).</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc50"></span><b>POC50</b></td><td>Recent ~2-day POC. Usually closest to current price.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-va"></span><b>VAH / VAL</b></td><td>Value Area High / Low — band holding 70% of volume.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-mark"></span><b>mark</b></td><td>Live BingX mark price.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-entry"></span><b>entry</b></td><td>Engine's planned entry level.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-stop"></span><b>stop</b></td><td>Engine's stop level.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-tp"></span><b>TP1 / TP2</b></td><td>1R / 2R profit targets.</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Meta-row chips</h3>
-      <dl class="legend-dl">
-        <dt>POC</dt>
-        <dd>Primary 200-bar POC price; tap to copy.</dd>
-        <dt>VA</dt>
-        <dd>VAL ↔ VAH copy buttons (the 70% volume zone edges).</dd>
-        <dt>HVN</dt>
-        <dd>Top-5 secondary chip zones (high-volume nodes) inside the 200-bar profile.</dd>
-        <dt>drift ↗ / ↘ / →</dt>
-        <dd>POC migration across 50/100/200-bar windows. <code>(POC50 − POC200) / POC200</code> as %. <i>Rising</i> = bullish, <i>falling</i> = bearish, <i>flat</i> = chop. <b>Bold border</b> = stacked (POC50 &gt; POC100 &gt; POC200) = strong confirmation.</dd>
-      </dl>
-
-      <h3>Diagnose chips</h3>
-      <dl class="legend-dl">
-        <dt>at VAH / at VAL</dt>
-        <dd>Entry within 0.3% of the value-area edge. Best mean-rev rotation setups (target = POC).</dd>
-        <dt>inside VA</dt>
-        <dd>Entry inside [VAL, VAH] but not at an edge. Chop / equilibrium; weak edge either side.</dd>
-        <dt>above VA / below VA</dt>
-        <dd>Entry outside the value area. Either acceptance (new regime forming) or extension (reversion candidate).</dd>
-        <dt>POC ↗ / ↘</dt>
-        <dd>Current regime per POC migration.</dd>
-        <dt><span class="lg-swatch lg-knife"></span>⚠ falling knife</dt>
-        <dd>A big bearish range-expansion bar fired in the last 3 candles. Fighting fresh downward momentum is risky for longs.</dd>
-        <dt><span class="lg-swatch lg-squeeze"></span>⚠ blow-off risk</dt>
-        <dd>Same but bullish; risky for shorts.</dd>
-      </dl>
-
-      <h3>Score pills (tri-axis)</h3>
-      <dl class="legend-dl">
-        <dt><span class="score score-mr">MR N</span> <span class="lg-meta">(meta row, integer 0–6)</span></dt>
-        <dd><b>Mean-reversion votes</b>: RSI extreme, BOLL band touch, fib 0.618, sweep, RSI/CVD divergence, MACD cross, range expansion. Counter-trend / fade-the-extreme setups.</dd>
-        <dt><span class="score score-mom">MOM N</span> <span class="lg-meta">(meta row, integer 0–4)</span></dt>
-        <dd><b>Momentum / trend votes</b>: volume anomaly (BTC), LH-LL / HH-HL structure (ETH), NY-session bullish/bearish body (XAU), double-top / double-bottom retest (XAU). Per-symbol gating after backtest A/B — not every symbol enables every MOM vote.</dd>
-        <dt>total N <span class="lg-meta">(meta row, integer; total = MR + MOM)</span></dt>
-        <dd>Combined vote count. <b>3</b> is the engine's <code>MIN_SCORE</code> tradeable threshold (daemon + monitor filter on this). What the journal stores in the legacy <code>score</code> column.</dd>
-        <dt>X.X/100 <span class="lg-meta">(diagnose row, float 0–100)</span></dt>
-        <dd>Validator's <i>structural fit</i> for a specific entry at the current price, rescaled to /100. Weighted sum of ~20 factors: engine alignment (+20), sweep / fib / HVN proximity (+15–20), VA edge (+5), POC drift alignment (+5–7), minus penalties for entry chase, falling knife, counter-regime, inside-VA chop, etc.</dd>
-        <dt><span class="diag-score-axis diag-axis-mr">MR xx</span> <span class="diag-score-axis diag-axis-mom">MOM xx</span> <span class="lg-meta">(diagnose row sub-totals)</span></dt>
-        <dd><b>MR sub-total</b> = MR-tagged + shared factors capped /100. <b>MOM sub-total</b> = MOM-tagged + shared factors capped /100. Shared factors (engine alignment, fees, market chase) count toward both — these sub-totals are NOT additive to the combined /100.</dd>
-      </dl>
-
-      <h3>Sizing by axis (discretionary guide)</h3>
-      <p class="lg-meta">Use the tri-axis split to read what KIND of setup is firing, then size accordingly. Engine doesn't enforce these — they're a habit-formation aid.</p>
-      <table class="legend-table">
-        <thead>
-          <tr><th>Setup type</th><th>Reads as</th><th>Suggested size</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><b>MR high + MOM high</b></td><td>e.g. RSI oversold + LH-LL flipping to HH-HL</td><td>full size</td></tr>
-          <tr><td><b>MR high + MOM 0</b></td><td>pure mean-rev fade — backtest baseline scenario</td><td>default size</td></tr>
-          <tr><td><b>MR 0 + MOM high</b></td><td>XAU NY-session momentum, ETH structure flip</td><td>half size, tighter SL</td></tr>
-          <tr><td><b>⚠ Axis disagreement warning</b></td><td>MR says LONG, MOM says SHORT (or vice versa). Warning surfaces in Signal.Warnings.</td><td>skip, or fast scalp only</td></tr>
-          <tr><td><b>Both axes < 2</b></td><td>weak confluence, MIN_SCORE may not fire</td><td>skip</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Verdict colors</h3>
-      <table class="legend-table">
-        <tbody>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 75/100 — take it.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>55 – 75 — good setup.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>35 – 55 — marginal.</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 35 — skip.</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Open-trade card</h3>
-      <dl class="legend-dl">
-        <dt>Border color</dt>
-        <dd>Tracks current R: <span class="lg-swatch lg-rpos"></span> green if &gt; 0R, <span class="lg-swatch lg-rneg"></span> red if &lt; 0R.</dd>
-        <dt>Progress bar</dt>
-        <dd>Shows position between stop (left, red), entry (center), and TP2 (right, green).</dd>
-        <dt>Live diagnose</dt>
-        <dd>Re-runs the validator at the trade's <i>own</i> side, not the engine's preferred side — answers "is MY trade still good?", not "what's the best trade now?".</dd>
-      </dl>
-      </div><!-- /data-lang-view="en" -->
-
-      <div class="info-lang-view" data-lang-view="zh-tw" hidden>
-      <h3>圖表線條</h3>
-      <table class="legend-table">
-        <tbody>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc200"></span><b>POC200</b></td><td>長期 Point of Control（1h 上約 8 天）。累積成交量最集中的價位。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc100"></span><b>POC100</b></td><td>中期 POC（約 4 天）。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-poc50"></span><b>POC50</b></td><td>近期 ~2 天 POC。通常最接近當下價格。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-va"></span><b>VAH / VAL</b></td><td>Value Area 上緣 / 下緣 — 包住 70% 成交量的區間。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-mark"></span><b>mark</b></td><td>BingX 即時標記價。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-entry"></span><b>entry</b></td><td>Engine 規劃的進場點。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-stop"></span><b>stop</b></td><td>Engine 規劃的停損點。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-tp"></span><b>TP1 / TP2</b></td><td>1R / 2R 停利目標。</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Meta-row 標籤</h3>
-      <dl class="legend-dl">
-        <dt>POC</dt>
-        <dd>主要的 200-bar POC 價；點擊複製。</dd>
-        <dt>VA</dt>
-        <dd>VAL ↔ VAH 複製按鈕（70% 成交量區間的兩端）。</dd>
-        <dt>HVN</dt>
-        <dd>200-bar 分佈內 top-5 次要籌碼區（high-volume nodes）。</dd>
-        <dt>drift ↗ / ↘ / →</dt>
-        <dd>POC 在 50/100/200-bar 三個窗中的漂移。<code>(POC50 − POC200) / POC200</code> 百分比。<i>上升</i> = 看多、<i>下降</i> = 看空、<i>平</i> = 盤整。<b>粗邊框</b> = 疊態（POC50 &gt; POC100 &gt; POC200）= 強確認。</dd>
-      </dl>
-
-      <h3>Diagnose 標籤</h3>
-      <dl class="legend-dl">
-        <dt>at VAH / at VAL</dt>
-        <dd>Entry 在 value-area 邊緣 0.3% 內。最佳均值回歸型 setup（目標 = POC）。</dd>
-        <dt>inside VA</dt>
-        <dd>Entry 在 [VAL, VAH] 內但不在邊緣。盤整區 / 平衡；兩邊都沒 edge。</dd>
-        <dt>above VA / below VA</dt>
-        <dd>Entry 在 value area 之外。可能是接受期（新 regime 形成）或延伸過遠（反轉候選）。</dd>
-        <dt>POC ↗ / ↘</dt>
-        <dd>目前的 POC 漂移 regime。</dd>
-        <dt><span class="lg-swatch lg-knife"></span>⚠ falling knife</dt>
-        <dd>最近 3 根 K 線有一根大陰線範圍擴張。追這方向做多是接刀風險。</dd>
-        <dt><span class="lg-swatch lg-squeeze"></span>⚠ blow-off risk</dt>
-        <dd>同上但方向相反；做空的軋空風險。</dd>
-      </dl>
-
-      <h3>Score pills（三軸)</h3>
-      <dl class="legend-dl">
-        <dt><span class="score score-mr">MR N</span> <span class="lg-meta">(meta row, 整數 0–6)</span></dt>
-        <dd><b>Mean-reversion 票</b>：RSI 極值、BOLL 觸帶、fib 0.618、sweep、RSI/CVD 背離、MACD 交叉、range expansion。逆勢 / fade-extreme 型 setup。</dd>
-        <dt><span class="score score-mom">MOM N</span> <span class="lg-meta">(meta row, 整數 0–4)</span></dt>
-        <dd><b>Momentum / trend 票</b>：vol anomaly (BTC)、LH-LL / HH-HL 結構 (ETH)、NY 盤陽陰體 (XAU)、雙頂 / 雙底回測 (XAU)。經 backtest A/B 過的 per-symbol 開關，不是每個 symbol 都啟用每個 MOM vote。</dd>
-        <dt>total N <span class="lg-meta">(meta row, 整數；total = MR + MOM)</span></dt>
-        <dd>合計票數。<b>3</b> 是 engine 的 <code>MIN_SCORE</code> 執行門檻（daemon + monitor 都以此過濾)。Journal 舊 <code>score</code> 欄位存的值。</dd>
-        <dt>X.X/100 <span class="lg-meta">(diagnose row, 浮點 0–100)</span></dt>
-        <dd>Validator 對「這個 entry」的<i>結構適合度</i>,rescale 成 /100。~20 個 factor 的加權合：engine 一致 (+20)、sweep/fib/HVN 近距 (+15–20)、VA 邊緣 (+5)、POC 漂移一致 (+5–7)，減去追市、接刀、逆 regime、內盤整等扣分。</dd>
-        <dt><span class="diag-score-axis diag-axis-mr">MR xx</span> <span class="diag-score-axis diag-axis-mom">MOM xx</span> <span class="lg-meta">(diagnose row 分軸小計)</span></dt>
-        <dd><b>MR 小計</b> = MR-tagged + 共用 factor，capped /100。<b>MOM 小計</b> = MOM-tagged + 共用 factor，capped /100。共用 factor（engine 一致、fee、追市）算兩邊 — 因此小計不是總分的線性加總。</dd>
-      </dl>
-
-      <h3>依軸調整倉位（discretionary 指南)</h3>
-      <p class="lg-meta">用三軸分佈判斷這是<b>哪一類</b> setup 觸發，據此調整倉位大小。Engine 不強制執行 — 只是幫忙養成習慣。</p>
-      <table class="legend-table">
-        <thead>
-          <tr><th>Setup 類型</th><th>解讀</th><th>建議倉位</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><b>MR 高 + MOM 高</b></td><td>例：RSI 超賣 + LH-LL 翻 HH-HL</td><td>全倉</td></tr>
-          <tr><td><b>MR 高 + MOM 0</b></td><td>純均值回歸 fade — backtest 基線場景</td><td>預設倉</td></tr>
-          <tr><td><b>MR 0 + MOM 高</b></td><td>XAU NY 盤動能、ETH 結構翻轉</td><td>半倉、停損收緊</td></tr>
-          <tr><td><b>⚠ 軸線分歧警告</b></td><td>MR 說 LONG、MOM 說 SHORT（或反之）。警告寫在 Signal.Warnings。</td><td>跳過、或只做快 scalp</td></tr>
-          <tr><td><b>兩軸都 &lt; 2</b></td><td>confluence 弱，可能連 MIN_SCORE 都達不到</td><td>跳過</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Verdict 顏色</h3>
-      <table class="legend-table">
-        <tbody>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-strong"></span><b>STRONG</b></td><td>≥ 75/100 — 進場。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-take"></span><b>TAKE</b></td><td>55 – 75 — setup 尚可。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-neutral"></span><b>NEUTRAL / WEAK</b></td><td>35 – 55 — 邊際、猶豫。</td></tr>
-          <tr><td class="lg-col-name"><span class="lg-swatch lg-verdict-avoid"></span><b>AVOID</b></td><td>&lt; 35 — 跳過。</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Open-trade 卡片</h3>
-      <dl class="legend-dl">
-        <dt>邊框顏色</dt>
-        <dd>反映當下 R：<span class="lg-swatch lg-rpos"></span> 綠 = 獲利、<span class="lg-swatch lg-rneg"></span> 紅 = 回吐。</dd>
-        <dt>進度條</dt>
-        <dd>顯示位置介於 stop（左、紅）、entry（中）、TP2（右、綠）之間。</dd>
-        <dt>Live diagnose</dt>
-        <dd>Validator 以「這筆單自己的方向」重新評估，而非 engine 當下偏好的方向 — 回答的是「我這筆單還好嗎」而不是「現在最好的 trade 是什麼」。</dd>
-      </dl>
-      </div><!-- /data-lang-view="zh-tw" -->
-
-    </div>
-  </div>
-</div>
-
-<footer>
-  <span>auto-refresh every 30s (paused while a popup is open) · tap any price to copy</span>
-</footer>
-
+<script>window.SCAN_I18N = {loading: {{t "scan.aiLoading"}}, network: {{t "scan.aiNetwork"}}};</script>
 <script src="/static/copy.js"></script>
 <script src="/static/ai-render.js"></script>
-<script src="/static/uplot/uPlot.iife.min.js"></script>
-<script src="/static/mini-chart.js"></script>
 <script>
-// ── Refresh manager ─────────────────────────────────────────────────
-// Replaces the previous meta http-equiv refresh. JS-controlled so
-// modals (legend, chart-expand) can pause it while the user is reading.
-// Exposed on window so mini-chart.js's chart-modal can call into it.
-window.refreshMgr = (function () {
-    var INTERVAL_MS = 30000;
-    var pauseCount = 0;   // counter — multiple modals can stack
-    var timer = null;
-
-    function schedule() {
-        if (timer) return;
-        timer = setTimeout(function () { window.location.reload(); }, INTERVAL_MS);
-    }
-    function cancel() {
-        if (!timer) return;
-        clearTimeout(timer);
-        timer = null;
-    }
-    function pause() {
-        pauseCount++;
-        cancel();
-    }
-    function resume() {
-        if (pauseCount > 0) pauseCount--;
-        if (pauseCount === 0) {
-            // Start a fresh 30s clock; gives the user a predictable
-            // window after closing the modal to interact before reload.
-            schedule();
-        }
-    }
-    schedule();
-    return { pause: pause, resume: resume };
-})();
-
-// ── Legend modal open/close + EN/繁 toggle (uses refreshMgr to pause) ──
+/* The page reloads itself every 30s for fresh scans, but never while a row
+   is open: a reload would close it under the reader. */
 (function () {
-    var modal = document.getElementById('legend-modal');
-    var btn = document.querySelector('.info-btn');
-    if (!modal || !btn) return;
+  var INTERVAL_MS = 30000, timer = null;
+  function anyOpen() { return !!document.querySelector('.ui-tdetail:not([hidden])'); }
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(function () { if (anyOpen()) schedule(); else location.reload(); }, INTERVAL_MS);
+  }
+  schedule();
 
-    // Shared language key with the AI analysis modal — one
-    // preference propagates across the whole app.
-    var LS_KEY = 'ai-lang';
-    function preferredLang() {
-        try { var v = localStorage.getItem(LS_KEY); if (v === 'en' || v === 'zh-tw') return v; } catch (e) {}
-        return 'zh-tw';
+  document.querySelectorAll('.ui-trow').forEach(function (tr) {
+    function toggle() {
+      var d = document.querySelector('[data-detail="' + tr.dataset.row + '"]');
+      if (!d) return;
+      d.hidden = !d.hidden;
+      tr.classList.toggle('open', !d.hidden);
+      tr.setAttribute('aria-expanded', d.hidden ? 'false' : 'true');
+      if (d.hidden) schedule();
     }
-    function saveLang(v) { try { localStorage.setItem(LS_KEY, v); } catch (e) {} }
-    function applyLang(lang) {
-        modal.querySelectorAll('[data-lang-view]').forEach(function (v) {
-            v.hidden = (v.getAttribute('data-lang-view') !== lang);
-        });
-        modal.querySelectorAll('.info-lang-toggle .ai-lang-btn').forEach(function (b) {
-            b.classList.toggle('active', b.dataset.lang === lang);
-        });
-    }
-    applyLang(preferredLang());
-    modal.querySelectorAll('.info-lang-toggle .ai-lang-btn').forEach(function (b) {
-        b.addEventListener('click', function () {
-            var target = b.dataset.lang;
-            saveLang(target);
-            applyLang(target);
-        });
-    });
+    tr.addEventListener('click', function (e) { if (!e.target.closest('a,button')) toggle(); });
+    tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
 
-    function open()  {
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-        window.refreshMgr.pause();
-        applyLang(preferredLang()); // re-sync in case pref changed elsewhere while modal was closed
-    }
-    function close() {
-        if (modal.classList.contains('hidden')) return;
-        modal.classList.add('hidden');
-        document.body.style.overflow = '';
-        window.refreshMgr.resume();
-    }
-    btn.addEventListener('click', open);
-    modal.querySelector('.legend-modal-close').addEventListener('click', close);
-    modal.querySelector('.legend-modal-backdrop').addEventListener('click', close);
-    document.addEventListener('keydown', function (ev) {
-        if (ev.key === 'Escape' && !modal.classList.contains('hidden')) close();
-    });
-})();
-
-// ── AI analyze button (per symbol card) ─────────────────────────────
-// Mirrors the per-trade pattern in journal_list.html: first click POSTs
-// to /ai/analyze/symbol/:short/:tf, subsequent clicks toggle visibility.
-// Server-side cache by (short, tf, signal-hash) prevents re-billing.
-(function () {
-    // Track which panes are currently open. When count > 0, we pause the
-    // 30s auto-refresh so it doesn't wipe an analysis mid-read. Resume
-    // once all panes are closed again. Uses refreshMgr's pause counter,
-    // so it composes correctly with legend / chart modals.
-    var openPanes = 0;
-    function panePaused() { openPanes++; window.refreshMgr.pause(); }
-    function paneResumed() {
-        if (openPanes > 0) openPanes--;
-        window.refreshMgr.resume();
-    }
-
-    document.querySelectorAll('.ai-analyze-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var sym = btn.dataset.symbol;
-            var tf  = btn.dataset.tf;
-            var key = sym + '-' + tf;
-            var pane = document.querySelector('[data-result-for="' + key + '"]');
-            if (!pane) return;
-            if (!pane.classList.contains('hidden')) {
-                pane.classList.add('hidden');
-                if (pane.dataset.wasPaused === '1') {
-                    pane.dataset.wasPaused = '0';
-                    paneResumed();
-                }
-                return;
-            }
-            pane.classList.remove('hidden');
-            if (pane.dataset.wasPaused !== '1') {
-                pane.dataset.wasPaused = '1';
-                panePaused();
-            }
-            if (pane.dataset.loaded === '1') return;
-            pane.innerHTML =
-                '<div class="ai-loading">Querying Quant advisor for ' + sym + ' ' + tf + '…</div>' +
-                '<div class="skeleton skel-line w90"></div>' +
-                '<div class="skeleton skel-line w70"></div>' +
-                '<div class="skeleton skel-line w90"></div>' +
-                '<div class="skeleton skel-line w50"></div>';
-            btn.disabled = true;
-            fetch('/ai/analyze/symbol/' + sym + '/' + tf, { method: 'POST' })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                .then(function (res) {
-                    btn.disabled = false;
-                    if (!res.ok) {
-                        window.aiRender.renderInto(pane, { error: res.body.error || 'unknown error' });
-                        return;
-                    }
-                    window.aiRender.renderInto(pane, res.body);
-                    pane.dataset.loaded = '1';
-                })
-                .catch(function (err) {
-                    btn.disabled = false;
-                    window.aiRender.renderInto(pane, { error: 'network error: ' + err.message });
-                });
+  document.querySelectorAll('.ai-analyze-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var sym = btn.dataset.symbol, tf = btn.dataset.tf;
+      var pane = document.querySelector('[data-result-for="' + sym + '-' + tf + '"]');
+      if (!pane) return;
+      if (!pane.classList.contains('hidden') && pane.dataset.loaded === '1') { pane.classList.add('hidden'); return; }
+      pane.classList.remove('hidden');
+      if (pane.dataset.loaded === '1') return;
+      pane.innerHTML = '<div class="ai-loading">' + window.SCAN_I18N.loading + '</div>' +
+        '<div class="skeleton skel-line w90"></div><div class="skeleton skel-line w70"></div><div class="skeleton skel-line w50"></div>';
+      btn.disabled = true;
+      fetch('/ai/analyze/symbol/' + sym + '/' + tf, { method: 'POST' })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          btn.disabled = false;
+          if (!res.ok) { window.aiRender.renderInto(pane, { error: res.body.error || '?' }); return; }
+          window.aiRender.renderInto(pane, res.body);
+          pane.dataset.loaded = '1';
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          window.aiRender.renderInto(pane, { error: window.SCAN_I18N.network + ' ' + err.message });
         });
     });
+  });
+
+  // Arriving from a "tradeable" link (#row-BTC) opens that row.
+  if (location.hash.indexOf('#row-') === 0) {
+    var tr = document.getElementById(location.hash.slice(1));
+    if (tr) tr.click();
+  }
 })();
 </script>
 </body>
