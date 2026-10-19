@@ -5,120 +5,61 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>validate · trading-web</title>
+<title>{{t "tab.validate"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<main>
+<main class="ui-page">
+<form method="POST" action="/validate" class="ui-form">
+  {{if .Error}}<div class="ui-banner bad">{{template "icon" "alert"}}<span>{{t "common.error"}} <code>{{.Error}}</code></span></div>{{end}}
 
-<h1 class="page-title">Validate a proposed entry</h1>
-
-{{if .Error}}
-  <div class="form-error">⚠ {{.Error}}</div>
-{{end}}
-
-<form method="POST" action="/validate" class="trade-form">
-
-  <div class="field">
-    <label for="symbol">Symbol</label>
-    <select name="symbol" id="symbol" required>
-      <option value="">— pick —</option>
-      {{$cur := .Symbol}}
-      {{range .Symbols}}
-        <option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>
-      {{end}}
-    </select>
-  </div>
-
-  <div class="field">
-    <label>Side</label>
-    <div class="radio-row">
-      <label class="radio">
-        <input type="radio" name="side" value="long" {{if eq .Side "long"}}checked{{end}} required>
-        <span class="side-long">LONG</span>
-      </label>
-      <label class="radio">
-        <input type="radio" name="side" value="short" {{if eq .Side "short"}}checked{{end}}>
-        <span class="side-short">SHORT</span>
-      </label>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{t "val.formTitle"}}</h2><span class="ui-sub" style="margin:0">{{t "val.formSub"}}</span></header>
+    <div class="ui-f-row">
+      <div class="ui-f">
+        <label for="symbol">{{t "th.symbol"}}</label>
+        <select name="symbol" id="symbol" required>
+          <option value="">{{t "f.pick"}}</option>
+          {{$cur := .Symbol}}
+          {{range .Symbols}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>{{end}}
+        </select>
+      </div>
+      <div class="ui-f">
+        <span class="ui-f-l">{{t "th.side"}}</span>
+        <div class="ui-choice" role="radiogroup">
+          <label class="long"><input type="radio" name="side" value="long" {{if eq .Side "long"}}checked{{end}} required>{{t "f.long"}}</label>
+          <label class="short"><input type="radio" name="side" value="short" {{if eq .Side "short"}}checked{{end}}>{{t "f.short"}}</label>
+        </div>
+      </div>
     </div>
-  </div>
-
-  <div class="field">
-    <label for="entry">Entry price</label>
-    <input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required>
-  </div>
-
-  <div class="field">
-    <label>Timeframe</label>
-    <div class="tf-picker-inline" role="radiogroup" aria-label="timeframe">
-      {{$cur := .TF}}
-      {{range .TFOptions}}
-        <label class="tf-pill{{if eq . $cur}} active{{end}}">
-          <input type="radio" name="tf" value="{{.}}" {{if eq . $cur}}checked{{end}}>
-          <span>{{.}}</span>
-        </label>
-      {{end}}
+    <div class="ui-f-row">
+      <div class="ui-f">
+        <label for="entry">{{t "f.entryPrice"}}</label>
+        <input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required>
+      </div>
+      <div class="ui-f">
+        <label for="fee_bps">{{t "val.fee"}} <span class="ui-hint">{{t "val.feeHint"}}</span></label>
+        <input type="number" step="any" inputmode="decimal" name="fee_bps" id="fee_bps" value="{{.FeeBps}}">
+      </div>
     </div>
-  </div>
+    <div class="ui-f">
+      <span class="ui-f-l">TF</span>
+      <div class="ui-choice mono" role="radiogroup" aria-label="timeframe">
+        {{$tf := .TF}}
+        {{range .TFOptions}}<label><input type="radio" name="tf" value="{{.}}" {{if eq . $tf}}checked{{end}}>{{.}}</label>{{end}}
+      </div>
+    </div>
+  </section>
 
-  <div class="field">
-    <label for="fee_bps">Fee (bps RT)</label>
-    <input type="number" step="any" inputmode="decimal" name="fee_bps" id="fee_bps" value="{{.FeeBps}}">
+  <div class="ui-actions">
+    <a href="/chart" class="ui-btn ghost">{{t "f.cancel"}}</a>
+    <button type="submit" class="ui-btn">{{t "val.submit"}}</button>
   </div>
-
-  <div class="form-actions">
-    <a href="/" class="btn-cancel">Cancel</a>
-    <button type="submit" class="btn-primary">Score it →</button>
-  </div>
-
 </form>
-
 </main>
-
-<footer>
-  <span>scores entry confluence vs. engine + sweep / fib / BOLL / HVN context</span>
-</footer>
-
-<script>
-// Keep .active in sync with the radio's checked state — :has(input:checked)
-// covers modern browsers, this script handles the rest.
-(function () {
-    var pills = document.querySelectorAll('.tf-pill');
-
-    // Reconcile .active with the actual checked radio. Needed on initial
-    // load AND after bfcache restore (browser back button): the DOM may
-    // return with `.active` from the previous session's JS click while
-    // the checked radio is now a different pill, resulting in both pills
-    // looking blue. Reconcile on both DOMContentLoaded and pageshow.
-    function reconcile() {
-        pills.forEach(function (p) {
-            var radio = p.querySelector('input[type="radio"]');
-            if (radio && radio.checked) {
-                p.classList.add('active');
-            } else {
-                p.classList.remove('active');
-            }
-        });
-    }
-    reconcile();
-    window.addEventListener('pageshow', reconcile);
-
-    pills.forEach(function (p) {
-        var radio = p.querySelector('input[type="radio"]');
-        if (!radio) return;
-        radio.addEventListener('change', function () {
-            pills.forEach(function (x) { x.classList.remove('active'); });
-            p.classList.add('active');
-        });
-    });
-})();
-</script>
-
 </body>
 </html>

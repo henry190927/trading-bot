@@ -5,176 +5,120 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>validate · trading-web</title>
+<title>{{t "tab.validate"}} · {{.Short}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<main>
-
 {{$r := .R}}
+{{/* Scores are the validator's /10 shown as /100, the scale every other
+     page uses. Factor details and engine reasons are Sprintf'd in Go and
+     stay verbatim; names and labels come from the dictionary. */}}
+<main class="ui-page">
+  <section class="ui-card val-head">
+    <div class="val-id">
+      <span class="ui-sym val-sym">{{.Short}}</span>
+      <span class="ui-side {{sigSide $r.Side}}">{{t (printf "side.%s" (sigSide $r.Side))}}</span>
+      <span class="ui-tag">{{$r.Timeframe}}</span>
+      <span class="ui-dim">{{t "th.entry"}}</span> <button class="copy-btn val-px" data-copy="{{fmtPrice $r.Entry}}">{{fmtPx $r.Entry}}</button>
+      <span class="ui-dim">{{t "scan.mark"}}</span> <button class="copy-btn val-px" data-copy="{{fmtPrice $r.Price}}">{{fmtPx $r.Price}}</button>
+      <span class="ui-dim ui-sm">{{printf (t "val.vsMarket") (pctDiff $r.Entry $r.Price)}}</span>
+    </div>
+    <div class="val-score {{verdictClass $r.Total}}">
+      <div class="val-big ui-num">{{printf "%.0f" (score100 $r.Total)}}<small>/100</small></div>
+      <div class="val-verdict">{{t (printf "chart.js.verdict.%s" (verdictShort $r.Verdict))}}</div>
+      <div class="val-axes ui-sm">
+        <span class="ui-dim">{{t "chart.js.axis.mr"}}</span> <b class="ui-num">{{printf "%.0f" (score100 $r.TotalMR)}}</b>
+        <span class="ui-dim">{{t "chart.js.axis.mom"}}</span> <b class="ui-num">{{printf "%.0f" (score100 $r.TotalMOM)}}</b>
+      </div>
+    </div>
+    <div class="ui-actions val-actions">
+      <a href="/validate?symbol={{.Short}}&amp;side={{sigSide $r.Side}}&amp;entry={{fmtPrice $r.Entry}}&amp;tf={{$r.Timeframe}}" class="ui-btn ghost">{{t "val.tweak"}}</a>
+      <button type="button" class="ui-btn ghost ai-analyze-validate" data-short="{{.Short}}" data-tf="{{.TF}}" data-side="{{$r.Side.String}}" data-entry="{{printf "%.4f" $r.Entry}}">{{t "trades.ai"}}</button>
+      <a href="{{validateRecordHref $r .Short}}" class="ui-btn">{{template "icon" "plus"}}{{t "val.record"}}</a>
+    </div>
+  </section>
+  <div class="ai-result hidden" data-result-for="validate"></div>
 
-<section class="validate-header">
-  <div class="validate-head-row">
-    <span class="sym">{{.Short}}</span>
-    <span class="badge badge--lg {{sideClassStr (sideStr $r.Side.String)}}">{{sideStr $r.Side.String}}</span>
-    <span class="tf">{{$r.Timeframe}}</span>
-    <span class="entry-tag">entry <button class="copy-btn" data-copy="{{fmtPrice $r.Entry}}">{{fmtPrice $r.Entry}}</button></span>
+  {{if .SessionWarn}}<div class="ui-banner warn">{{template "icon" "alert"}}<span>{{.SessionWarn}}</span></div>{{end}}
+
+  <div class="val-grid">
+    <section class="ui-card">
+      <header class="ui-card-h"><h2>{{t "val.suggested"}}</h2><span class="ui-hint">{{t "val.suggestedHint"}}</span></header>
+      <dl class="scan-kv">
+        <dt>{{t "trades.stop"}}</dt><dd><button class="copy-btn stop" data-copy="{{fmtPrice $r.SuggStop}}">{{fmtPx $r.SuggStop}}</button></dd>
+        <dt>TP1</dt><dd><button class="copy-btn tp" data-copy="{{fmtPrice $r.SuggTP1}}">{{fmtPx $r.SuggTP1}}</button></dd>
+        <dt>TP2</dt><dd><button class="copy-btn tp" data-copy="{{fmtPrice $r.SuggTP2}}">{{fmtPx $r.SuggTP2}}</button></dd>
+        <dt>{{t "val.risk"}}</dt><dd class="ui-num">{{printf "%.4f" $r.Risk}}</dd>
+        <dt>{{t "val.feeR"}}</dt><dd class="ui-num">{{printf "%.2fR" $r.FeeR}}</dd>
+      </dl>
+    </section>
+
+    <section class="ui-card">
+      <header class="ui-card-h"><h2>{{t "val.engine"}}</h2>
+        <span class="ui-side {{sigSide $r.EngineSide}}">{{t (printf "side.%s" (sigSide $r.EngineSide))}}</span>
+        <span class="ui-dim ui-sm">{{t "val.votes"}} <b class="ui-num">{{$r.EngineScore}}</b> · MR {{$r.EngineMRScore}} · MOM {{$r.EngineMomentumScore}}</span>
+      </header>
+      {{if $r.EnginePlan.Entry}}
+      <dl class="scan-kv">
+        <dt>{{t "th.entry"}}</dt><dd><button class="copy-btn" data-copy="{{fmtPrice $r.EnginePlan.Entry}}">{{fmtPx $r.EnginePlan.Entry}}</button> <span class="ui-dim ui-sm">{{printf (t "val.vsYours") (pctDiff $r.Entry $r.EnginePlan.Entry)}}</span></dd>
+        <dt>{{t "trades.stop"}}</dt><dd><button class="copy-btn stop" data-copy="{{fmtPrice $r.EnginePlan.StopLoss}}">{{fmtPx $r.EnginePlan.StopLoss}}</button></dd>
+        {{if ge (len $r.EnginePlan.TakeProfit) 1}}<dt>TP1</dt><dd><button class="copy-btn tp" data-copy="{{fmtPrice (index $r.EnginePlan.TakeProfit 0)}}">{{fmtPx (index $r.EnginePlan.TakeProfit 0)}}</button></dd>{{end}}
+        {{if ge (len $r.EnginePlan.TakeProfit) 2}}<dt>TP2</dt><dd><button class="copy-btn tp" data-copy="{{fmtPrice (index $r.EnginePlan.TakeProfit 1)}}">{{fmtPx (index $r.EnginePlan.TakeProfit 1)}}</button></dd>{{end}}
+        {{if $r.EnginePlan.Anchor}}<dt>{{t "trades.anchor"}}</dt><dd><code>{{$r.EnginePlan.Anchor}}</code></dd>{{end}}
+      </dl>
+      {{else}}<div class="ui-dim ui-sm">{{t "val.noPlan"}}</div>{{end}}
+      {{if or $r.Reasons $r.Notes}}
+      <div class="scan-log">
+        {{range $r.Reasons}}<div class="ui-up">+ {{.}}</div>{{end}}
+        {{range $r.Notes}}<div class="ui-dim">· {{.}}</div>{{end}}
+      </div>
+      {{end}}
+    </section>
+
+    <section class="ui-card">
+      <header class="ui-card-h"><h2>{{t "val.levels"}}</h2></header>
+      <dl class="scan-kv">
+        {{if $r.NearestSweep}}<dt>{{t "val.sweep"}}</dt><dd>{{t (printf "val.sweep.%s" (sweepStr $r.NearestSweep.Side))}} <span class="ui-num">{{fmtPx $r.NearestSweep.Level}}</span> <span class="ui-dim ui-sm">{{pctDiff $r.NearestSweep.Level $r.Entry}}</span></dd>
+        {{else}}<dt>{{t "val.sweep"}}</dt><dd class="ui-dim">{{t "val.noSweep"}}</dd>{{end}}
+        {{if $r.NearestFib}}<dt>Fib {{printf "%.3f" $r.NearestFib.Ratio}}</dt><dd><span class="ui-num">{{fmtPx $r.NearestFib.Price}}</span> <span class="ui-dim ui-sm">{{pctDiff $r.NearestFib.Price $r.Entry}}</span></dd>{{end}}
+        {{if $r.BollLower}}<dt>BOLL</dt><dd><span class="ui-num">{{fmtPx $r.BollLower}}</span> <span class="ui-dim ui-sm">{{pctDiff $r.BollLower $r.Entry}}</span> · <span class="ui-num">{{fmtPx $r.BollUpper}}</span> <span class="ui-dim ui-sm">{{pctDiff $r.BollUpper $r.Entry}}</span></dd>{{end}}
+        {{if $r.VP.POC}}<dt>POC</dt><dd><span class="ui-num">{{fmtPx $r.VP.POC}}</span> <span class="ui-dim ui-sm">{{pctDiff $r.VP.POC $r.Entry}}</span></dd>
+        {{if $r.VP.HVN}}<dt>HVN</dt><dd class="ui-num">{{range $i, $h := $r.VP.HVN}}{{if $i}} · {{end}}{{fmtPx $h}}{{end}}</dd>{{end}}
+        <dt>{{t "val.hvnSides"}}</dt><dd>{{printf (t "val.hvnAboveBelow") $r.HVNsAbove $r.HVNsBelow}}</dd>{{end}}
+      </dl>
+    </section>
   </div>
-  <div class="market-row">
-    <span class="lbl">market</span> <button class="copy-btn" data-copy="{{fmtPrice $r.Price}}">{{fmtPrice $r.Price}}</button>
-    <span class="market-diff">your entry {{pctDiff $r.Entry $r.Price}} vs market</span>
-  </div>
-</section>
 
-<section class="score-card {{verdictClass $r.Total}}">
-  <div class="score-num">{{printf "%.1f" $r.Total}}<span class="score-out">/10</span></div>
-  <div class="verdict-text">{{$r.Verdict}}</div>
-  <div class="score-axes">
-    <span class="diag-score-axis diag-axis-mr" title="mean-reversion axis (mr + shared factors)">MR {{printf "%.1f" $r.TotalMR}}/10</span>
-    <span class="diag-score-axis diag-axis-mom" title="momentum axis (mom + shared factors)">MOM {{printf "%.1f" $r.TotalMOM}}/10</span>
-  </div>
-  <button type="button"
-          class="ai-analyze-btn ai-analyze-validate score-card-ai"
-          data-short="{{.Short}}"
-          data-tf="{{.TF}}"
-          data-side="{{$r.Side.String}}"
-          data-entry="{{printf "%.4f" $r.Entry}}"
-          title="LLM analysis of THIS proposed trade (not the engine's own plan)">AI analyze this trade ▸</button>
-</section>
-<div class="ai-result hidden" data-result-for="validate"></div>
-
-<a href="{{validateRecordHref $r .Short}}" class="btn-primary btn-record-trade">+ record this trade</a>
-
-<section class="validate-block">
-  <h2>Engine state</h2>
-  <div class="kv-row">
-    <span class="lbl">side</span>
-    <span class="badge badge--lg {{sideClassStr (sideStr $r.EngineSide.String)}}">{{sideStr $r.EngineSide.String}}</span>
-    <span class="lbl">score</span>
-    <span class="score-tag">{{$r.EngineScore}}</span>
-    <span class="lbl">breakdown</span>
-    <span class="score-tag score-tag-mr">MR {{$r.EngineMRScore}}</span>
-    <span class="score-tag score-tag-mom">MOM {{$r.EngineMomentumScore}}</span>
-  </div>
-  {{if $r.Reasons}}
-  <ul class="reasons">
-    {{range $r.Reasons}}<li class="reason-plus">{{.}}</li>{{end}}
-  </ul>
-  {{end}}
-  {{if $r.Notes}}
-  <ul class="reasons">
-    {{range $r.Notes}}<li class="reason-note">{{.}}</li>{{end}}
-  </ul>
-  {{end}}
-</section>
-
-{{if $r.EnginePlan.Entry}}
-<section class="validate-block">
-  <h2>Engine's own plan <span class="hint">(compare with yours)</span></h2>
-  <div class="plan-grid">
-    <div><span class="lbl">side</span> <span class="badge badge--lg {{sideClassStr (sideStr $r.EngineSide.String)}}">{{sideStr $r.EngineSide.String}}</span></div>
-    <div><span class="lbl">anchor</span> <span>{{$r.EnginePlan.Anchor}}</span></div>
-    <div><span class="lbl">entry</span> <button class="copy-btn" data-copy="{{fmtPrice $r.EnginePlan.Entry}}">{{fmtPrice $r.EnginePlan.Entry}}</button>
-      <span class="diff-small">{{pctDiff $r.Entry $r.EnginePlan.Entry}} vs yours</span></div>
-    <div><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice $r.EnginePlan.StopLoss}}">{{fmtPrice $r.EnginePlan.StopLoss}}</button></div>
-    {{if ge (len $r.EnginePlan.TakeProfit) 1}}
-      <div><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice (index $r.EnginePlan.TakeProfit 0)}}">{{fmtPrice (index $r.EnginePlan.TakeProfit 0)}}</button></div>
-    {{end}}
-    {{if ge (len $r.EnginePlan.TakeProfit) 2}}
-      <div><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice (index $r.EnginePlan.TakeProfit 1)}}">{{fmtPrice (index $r.EnginePlan.TakeProfit 1)}}</button></div>
-    {{end}}
-  </div>
-</section>
-{{end}}
-
-<section class="validate-block">
-  <h2>Suggested levels <span class="hint">(1.5×ATR risk)</span></h2>
-  <div class="plan-grid">
-    <div><span class="lbl">stop</span> <button class="copy-btn stop" data-copy="{{fmtPrice $r.SuggStop}}">{{fmtPrice $r.SuggStop}}</button></div>
-    <div><span class="lbl">TP1</span> <button class="copy-btn tp" data-copy="{{fmtPrice $r.SuggTP1}}">{{fmtPrice $r.SuggTP1}}</button></div>
-    <div><span class="lbl">TP2</span> <button class="copy-btn tp" data-copy="{{fmtPrice $r.SuggTP2}}">{{fmtPrice $r.SuggTP2}}</button></div>
-    <div><span class="lbl">risk</span> <span class="mono">{{printf "%.4f" $r.Risk}}</span></div>
-    <div><span class="lbl">fee_R</span> <span class="mono">{{printf "%.2fR" $r.FeeR}}</span></div>
-  </div>
-  {{/* Cash-open-bar advisory, shown BEFORE the trade rather than after the
-       fill. Empty for anything that is not a US-stock synthetic, or whose
-       suggested stop already clears the open bar's median range. */}}
-  {{if .SessionWarn}}
-  <p class="modal-warn">⚠ {{.SessionWarn}}</p>
-  {{end}}
-</section>
-
-<section class="validate-block">
-  <h2>Entry-level proximity</h2>
-  <ul class="proximity">
-    {{if $r.NearestSweep}}
-      <li>nearest sweep: <strong>{{sweepStr $r.NearestSweep.Side}}</strong> @ {{fmtPrice $r.NearestSweep.Level}}
-        <span class="diff-small">{{pctDiff $r.NearestSweep.Level $r.Entry}}</span></li>
-    {{else}}
-      <li class="dim">no recent sweeps detected</li>
-    {{end}}
-    {{if $r.NearestFib}}
-      <li>nearest fib {{printf "%.3f" $r.NearestFib.Ratio}}: {{fmtPrice $r.NearestFib.Price}}
-        <span class="diff-small">{{pctDiff $r.NearestFib.Price $r.Entry}}</span></li>
-    {{end}}
-    {{if $r.BollLower}}
-      <li>BOLL lower: {{fmtPrice $r.BollLower}} <span class="diff-small">{{pctDiff $r.BollLower $r.Entry}}</span>
-          &nbsp;·&nbsp; upper: {{fmtPrice $r.BollUpper}} <span class="diff-small">{{pctDiff $r.BollUpper $r.Entry}}</span></li>
-    {{end}}
-  </ul>
-</section>
-
-{{if $r.VP.POC}}
-<section class="validate-block">
-  <h2>HVN context</h2>
-  <ul class="proximity">
-    <li>POC @ <strong>{{fmtPrice $r.VP.POC}}</strong> <span class="diff-small">{{pctDiff $r.VP.POC $r.Entry}}</span></li>
-    {{if $r.VP.HVN}}
-      <li>top HVNs:
-        {{range $i, $h := $r.VP.HVN}}{{if $i}}, {{end}}{{fmtPrice $h}}{{end}}
-      </li>
-    {{end}}
-    <li>HVNs above entry: <strong>{{$r.HVNsAbove}}</strong> · below: <strong>{{$r.HVNsBelow}}</strong></li>
-  </ul>
-</section>
-{{end}}
-
-<section class="validate-block">
-  <h2>Factors <span class="hint">(sum = total score · axis = which sub-total it feeds)</span></h2>
-  <ul class="factors">
-    {{range $r.Factors}}
-      <li class="{{factorClass .Points}}">
-        <span class="factor-pts">{{factorSign .Points}}{{printf "%.1f" .Points}}</span>
-        <span class="factor-axis factor-axis-{{.Axis}}">{{.Axis}}</span>
-        <span class="factor-name">{{.Name}}</span>
-        <span class="factor-detail">— {{.Detail}}</span>
-      </li>
-    {{end}}
-  </ul>
-</section>
-
-<div class="validate-footer-actions">
-  <a href="/validate?symbol={{.Short}}&side={{sideStr $r.Side.String}}&entry={{fmtPrice $r.Entry}}&tf={{$r.Timeframe}}" class="btn-cancel">Tweak inputs</a>
-  <a href="{{validateRecordHref $r .Short}}" class="btn-primary">+ record this trade</a>
-</div>
-
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{t "val.factors"}}</h2><span class="ui-count">{{len $r.Factors}}</span><span class="ui-hint">{{t "val.factorsHint"}}</span></header>
+    <div class="dt-scroll">
+    <table class="dt val-factors">
+      <thead><tr><th class="num">{{t "val.pts"}}</th><th>{{t "val.axis"}}</th><th>{{t "val.factor"}}</th><th>{{t "val.detail"}}</th></tr></thead>
+      <tbody>
+      {{range $r.Factors}}
+        <tr>
+          <td class="num"><b class="{{if gt .Points 0.0}}ui-up{{else if lt .Points 0.0}}ui-down{{else}}ui-dim{{end}}">{{factorSign .Points}}{{printf "%.0f" (score100 .Points)}}</b></td>
+          <td><span class="ui-tag">{{t (printf "chart.js.axis.%s" .Axis)}}</span></td>
+          <td>{{t (printf "factor.%s" .Name)}}</td>
+          <td class="val-detail"><code>{{.Detail}}</code></td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+  </section>
 </main>
 
-<footer>
-  <span>scoring lives in <code>trading/validator</code> — shared with the CLI</span>
-</footer>
-
+<script>window.VAL_I18N = {loading: {{t "scan.aiLoading"}}, network: {{t "scan.aiNetwork"}}};</script>
 <script src="/static/copy.js"></script>
 <script src="/static/ai-render.js"></script>
 <script>
-// AI Analyze button — POSTs the proposed (short, tf, side, entry) to
-// /ai/analyze/validate, renders Quant response inline. Mirrors the
-// dashboard's per-card button (same pattern, different endpoint).
+// AI analysis of THIS proposed trade (not the engine's own plan): POSTs
+// (short, tf, side, entry) to /ai/analyze/validate and renders it inline.
 (function () {
     var btn = document.querySelector('.ai-analyze-validate');
     var pane = document.querySelector('[data-result-for="validate"]');
@@ -183,7 +127,7 @@
         if (!pane.classList.contains('hidden')) { pane.classList.add('hidden'); return; }
         pane.classList.remove('hidden');
         if (pane.dataset.loaded === '1') return;
-        pane.innerHTML = '<em class="ai-loading">Querying Quant advisor for the proposed trade…</em>';
+        pane.innerHTML = '<em class="ai-loading">' + window.VAL_I18N.loading + '</em>';
         btn.disabled = true;
         var fd = new URLSearchParams();
         fd.append('short', btn.dataset.short);
@@ -198,16 +142,13 @@
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
         .then(function (res) {
             btn.disabled = false;
-            if (!res.ok) {
-                window.aiRender.renderInto(pane, { error: res.body.error || 'unknown error' });
-                return;
-            }
+            if (!res.ok) { window.aiRender.renderInto(pane, { error: res.body.error || '?' }); return; }
             window.aiRender.renderInto(pane, res.body);
             pane.dataset.loaded = '1';
         })
         .catch(function (err) {
             btn.disabled = false;
-            window.aiRender.renderInto(pane, { error: 'network error: ' + err.message });
+            window.aiRender.renderInto(pane, { error: window.VAL_I18N.network + ' ' + err.message });
         });
     });
 })();

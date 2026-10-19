@@ -3346,7 +3346,7 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 	case "short":
 		side = signal.Short
 	default:
-		rerender("side must be long or short")
+		rerender(s.translator(langOf(c))("val.errSide"))
 		return
 	}
 	entry, err := parseFloatPositive(entryIn, "entry")
