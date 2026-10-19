@@ -5,60 +5,73 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>calendar · trading-web</title>
+<title>{{t "tab.calendar"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<main class="tips-main">
-  <h1 class="tips-h1">
-    <span class="i18n-en">Macro Calendar</span><span class="i18n-zh">總經行事曆</span>
-    <span class="tips-sub">
-      <span class="i18n-en">the curated high-impact events that drive the engine's blackout gate</span>
-      <span class="i18n-zh">驅動引擎 blackout gate 的精選高影響事件(看得到的就是會擋單的)</span>
-    </span>
-  </h1>
-
-  <div class="stats-card">
+{{/* Two layers on one page: the curated events gate the engine (blackout
+     windows), the live feed is display-only. Times lead with UTC+8. */}}
+<main class="ui-page">
+  <div class="ui-status">
     {{if .ActiveName}}
-    <div class="banner banner--danger">⛔ <span class="i18n-en">BLACKOUT ACTIVE</span><span class="i18n-zh">目前 BLACKOUT 中</span> — {{.ActiveName}} <span class="i18n-en">(engine signals suppressed)</span><span class="i18n-zh">(引擎訊號已停)</span></div>
+      <span class="ui-pill bad">{{template "icon" "pause"}}{{t "today.blackout"}}</span>
+      <span><strong>{{.ActiveName}}</strong> · {{t "cal.activeSub"}}</span>
+    {{else if .NextName}}
+      <span class="ui-pill ok">{{template "icon" "check"}}{{t "today.engineLive"}}</span>
+      <span>{{t "today.nextEvent"}} <strong>{{.NextName}}</strong> · <span class="ui-num">{{.NextWhen}}</span> · <span class="ui-num">{{if .NextDays}}{{printf (t "cal.inDays") .NextDays}}{{else}}{{t "cal.today"}}{{end}}</span></span>
+    {{else}}
+      <span class="ui-pill ok">{{template "icon" "check"}}{{t "today.engineLive"}}</span><span>{{t "today.noEvents"}}</span>
     {{end}}
-    {{if .NextName}}
-    <div class="banner banner--ok">▶ <span class="i18n-en">Next</span><span class="i18n-zh">下一個</span>: <strong>{{.NextName}}</strong> — {{.NextWhen}} (Asia/Taipei) · {{.NextDays}}d</div>
-    {{end}}
-
-    {{range .Months}}
-      <div class="cal-month">{{.Label}}</div>
-      {{range .Events}}
-      <div class="cal-row is-{{.Status}}">
-        <span class="badge badge--caps cat-{{.Cat}}">{{.Cat}}</span>
-        <span class="cal-when">{{.WhenUTC}}<br><span style="opacity:.7">{{.WhenTPE}} TPE</span></span>
-        <span class="cal-name">{{.Name}}</span>
-        {{if .Speaker}}
-        {{/* The feed rates these Low; we do not. Shown with its rating struck
-             through so the disagreement is visible rather than silently
-             overridden. */}}
-        <span class="cal-win"><span class="cal-speech-tag">🎙 央行發言</span> <span class="cal-feed-impact" title="ForexFactory 給的評級 — 對槓桿部位不適用">feed: {{.Impact}}</span></span>
-        {{else if eq .Cat "data"}}
-        <span class="cal-win">{{.Impact}}{{if .Actual}} · <b class="cal-act cal-{{.Surprise}}">actual {{.Actual}}</b>{{end}}{{if .Forecast}} · <b>fc</b> {{.Forecast}}{{end}}{{if .Previous}} · prev {{.Previous}}{{end}}{{if .Surprise}} <span class="cal-surp cal-{{.Surprise}}">{{if eq .Surprise "hot"}}<span class="i18n-en">above fc</span><span class="i18n-zh">高於預期</span>{{else if eq .Surprise "cool"}}<span class="i18n-en">below fc</span><span class="i18n-zh">低於預期</span>{{else}}<span class="i18n-en">in line</span><span class="i18n-zh">符合預期</span>{{end}}</span>{{end}}</span>
-        {{else}}
-        <span class="cal-win">blackout {{.Window}}</span>
-        {{end}}
-        <span class="badge st-{{.Status}}">{{if eq .Status "upcoming"}}{{.Days}}d{{else}}{{.Status}}{{end}}</span>
-      </div>
-      {{end}}
-    {{end}}
-
-    <p class="glossary-hint">
-      <span class="i18n-en">Curated high-impact list (CPI/FOMC/minutes/NFP/PPI/Jackson Hole) — the single source of truth for the engine blackout, not an exhaustive third-party feed. During a blackout the engine returns Flat (no signal). Times: US data in UTC + Asia/Taipei.</span>
-      <span class="i18n-zh">精選高影響清單(CPI/FOMC/會議紀要/NFP/PPI/Jackson Hole)—— 引擎 blackout 的單一資料源,非完整第三方 feed。blackout 期間引擎回 Flat(不出訊號)。時間:美國數據 UTC + 台北。</span>
-      <br>Updated: {{.UpdatedUTC}}
-    </p>
   </div>
+
+  {{$past := 0}}{{range .Months}}{{if .Past}}{{$past = len .Events | add $past}}{{end}}{{end}}
+  {{range .Months}}{{if not .Past}}
+  <section class="ui-card">
+    <header class="ui-card-h"><h2 class="ui-num">{{.Label}}</h2><span class="ui-count">{{len .Events}}</span></header>
+    <ul class="ui-list">
+      {{range .Events}}{{template "calRow" .}}{{end}}
+    </ul>
+  </section>
+  {{end}}{{end}}
+
+  {{if $past}}
+  <details class="ui-card cal-past">
+    <summary class="ui-card-h"><h2>{{t "cal.pastMonths"}}</h2><span class="ui-count">{{$past}}</span></summary>
+    {{range .Months}}{{if .Past}}
+    <h3 class="cal-past-h ui-num">{{.Label}}</h3>
+    <ul class="ui-list">
+      {{range .Events}}{{template "calRow" .}}{{end}}
+    </ul>
+    {{end}}{{end}}
+  </details>
+  {{end}}
+
+  <p class="ui-sub" style="margin:0">{{t "cal.howto"}} · {{t "today.updated"}} <span class="ui-num">{{.UpdatedUTC}}</span></p>
 </main>
 </body>
 </html>
+
+{{define "calRow"}}
+      <li class="ui-row cal2-row is-{{.Status}}">
+        <span class="ui-tag cal-cat cat-{{.Cat}}">{{t (printf "cal.cat.%s" .Cat)}}</span>
+        <span class="ui-num cal-when">{{.WhenTPE}}<small>UTC {{.WhenUTC}}</small></span>
+        <span class="ui-grow cal-name">{{.Name}}</span>
+        <span class="cal-detail ui-sm">
+        {{if .Speaker}}
+          {{/* The feed rates central-bank speakers Low; we do not. The
+               rating stays visible, struck through, so the override is
+               seen rather than silent. */}}
+          <span class="ui-down">{{t "cal.speech"}}</span> <s class="ui-dim" title="{{t "cal.feedRatingHint"}}">{{t "cal.feed"}}{{if .Impact}} {{t (printf "cal.imp.%s" .Impact)}}{{end}}</s>
+        {{else if eq .Cat "data"}}
+          {{if .Impact}}<span class="ui-dim">{{t (printf "cal.imp.%s" .Impact)}}</span>{{end}}{{if .Actual}} · <b class="cal-act cal-{{.Surprise}}">{{t "cal.actual"}} {{.Actual}}</b>{{end}}{{if .Forecast}} · {{t "cal.forecast"}} {{.Forecast}}{{end}}{{if .Previous}} · <span class="ui-dim">{{t "cal.previous"}} {{.Previous}}</span>{{end}}{{if .Surprise}} · <span class="cal-surp cal-{{.Surprise}}">{{t (printf "cal.surp.%s" .Surprise)}}</span>{{end}}
+        {{else}}
+          <span class="ui-dim">{{t "cal.window"}}</span> <span class="ui-num">{{.Window}}</span>
+        {{end}}
+        </span>
+        <span class="cal-st st-{{.Status}}">{{if eq .Status "upcoming"}}<span class="ui-num">{{if .Days}}{{printf (t "cal.inDays") .Days}}{{else}}{{t "cal.today"}}{{end}}</span>{{else}}{{t (printf "cal.st.%s" .Status)}}{{end}}</span>
+      </li>
+{{end}}

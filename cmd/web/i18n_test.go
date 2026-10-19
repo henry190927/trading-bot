@@ -217,6 +217,12 @@ func TestDynamicKeysExist(t *testing.T) {
 	for _, o := range []string{"", "win", "loss", "expired", "skip", "no-fill", "weird"} {
 		keys = append(keys, setupOutcomeKey(o))
 	}
+	for _, c := range []string{"fomc", "minutes", "cpi", "ppi", "nfp", "jackson", "earnings", "data", "speech", "other"} {
+		keys = append(keys, "cal.cat."+c)
+	}
+	for _, v := range []string{"st.past", "st.active", "st.upcoming", "imp.High", "imp.Medium", "imp.Low", "imp.Holiday", "surp.hot", "surp.cool", "surp.inline"} {
+		keys = append(keys, "cal."+v)
+	}
 	for _, l := range langs {
 		for _, k := range keys {
 			if _, ok := dicts[l][k]; !ok {

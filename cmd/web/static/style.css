@@ -7031,3 +7031,25 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ops-zone-log { margin: var(--sp-2) 0 0; max-height: 260px; overflow: auto; font-family: var(--mono); font-size: var(--fs-xs); white-space: pre-wrap; color: var(--text); }
 .ops-read { white-space: normal !important; min-width: 200px; font-size: var(--fs-sm); }
 .ui-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---------- research: calendar ---------- */
+.cal2-row .cal-cat { min-width: 5.5rem; text-align: center; }
+.cal2-row .cal-when { display: inline-flex; flex-direction: column; min-width: 7.5rem; line-height: 1.25; color: var(--text); font-size: var(--fs-sm); }
+.cal2-row .cal-when small { color: var(--text-dim); font-size: var(--fs-xs); }
+.cal2-row .cal-name { font-weight: 600; }
+.cal2-row .cal-detail { color: var(--text-dim); }
+.cal2-row .cal-st { min-width: 4.5rem; text-align: right; font-size: var(--fs-sm); color: var(--text-dim); }
+.cal2-row .cal-st.st-upcoming { color: var(--accent); font-weight: 600; }
+.cal2-row .cal-st.st-active { color: var(--red); font-weight: 700; }
+.cal2-row.is-past { opacity: .5; }
+.cal2-row.is-active { background: var(--wash-red); }
+.ui-tag.cat-fomc, .ui-tag.cat-minutes, .ui-tag.cat-speech { color: var(--red); background: var(--wash-red); border-color: transparent; }
+.ui-tag.cat-cpi, .ui-tag.cat-ppi { color: var(--yellow); border-color: currentColor; }
+.ui-tag.cat-nfp, .ui-tag.cat-earnings, .ui-tag.cat-data { color: var(--accent); }
+.ui-tag.cat-jackson { color: var(--blue); border-color: currentColor; }
+.cal2-row .cal-cat { width: 6.5rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cal-past > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+.cal-past > summary::-webkit-details-marker { display: none; }
+.cal-past > summary h2::before { content: "▸ "; color: var(--text-dim); }
+.cal-past[open] > summary h2::before { content: "▾ "; }
+.cal-past-h { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-sm); color: var(--text-dim); font-weight: 600; }

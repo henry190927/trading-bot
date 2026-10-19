@@ -48,6 +48,9 @@ type calEvent struct {
 type calMonth struct {
 	Label  string
 	Events []calEvent
+	// Past: every event in the month is over. The page folds those months
+	// away so the upcoming ones are what you see first.
+	Past bool
 }
 
 // surpriseOf compares a released figure against its forecast string.
@@ -125,7 +128,7 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 		ev := calEvent{
 			Name:    e.Name,
 			Cat:     categorizeEvent(e.Name),
-			WhenUTC: e.DatetimeUTC.Format("Jan 02 15:04"),
+			WhenUTC: e.DatetimeUTC.Format("01/02 15:04"),
 			WhenTPE: e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
 			Window:  fmt.Sprintf("−%dm / +%dm", e.BeforeMinutes, e.AfterMinutes),
 			Status:  statusOf(start, end),
@@ -145,7 +148,7 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 		ev := calEvent{
 			Name:    name,
 			Cat:     "earnings",
-			WhenUTC: e.DatetimeUTC.Format("Jan 02 15:04"),
+			WhenUTC: e.DatetimeUTC.Format("01/02 15:04"),
 			WhenTPE: e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
 			Window:  fmt.Sprintf("−%dm / +%dm", e.BeforeMinutes, e.AfterMinutes),
 			Status:  statusOf(start, end),
@@ -181,7 +184,7 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 		ev := calEvent{
 			Name:     name,
 			Cat:      cat,
-			WhenUTC:  e.DatetimeUTC.Format("Jan 02 15:04"),
+			WhenUTC:  e.DatetimeUTC.Format("01/02 15:04"),
 			WhenTPE:  e.DatetimeUTC.In(tpe).Format("01/02 15:04"),
 			Window:   e.Impact,
 			Status:   statusOf(e.DatetimeUTC, e.DatetimeUTC.Add(active)),
@@ -215,12 +218,18 @@ func (s *server) handleCalendarPage(c *gin.Context) {
 	var months []calMonth
 	curKey := ""
 	for _, it := range items {
-		key := it.dt.Format("2006-01")
+		// Grouped by the UTC+8 month, the same clock the rows lead with: a
+		// 07/31 18:00 UTC release is an August row.
+		key := it.dt.In(tpe).Format("2006-01") // numeric: reads the same in both languages
 		if key != curKey {
-			months = append(months, calMonth{Label: it.dt.Format("January 2006")})
+			months = append(months, calMonth{Label: key, Past: true})
 			curKey = key
 		}
-		months[len(months)-1].Events = append(months[len(months)-1].Events, it.ev)
+		m := &months[len(months)-1]
+		m.Events = append(m.Events, it.ev)
+		if it.ev.Status != "past" {
+			m.Past = false
+		}
 	}
 
 	var activeName, nextName, nextWhen string
