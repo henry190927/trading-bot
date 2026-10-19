@@ -242,6 +242,9 @@
     <div class="chart-header-ctx" id="chart-banner-ctx"></div>
   </section>
 
+  {{/* Order follows the mockup: score (with the per-TF tiles), plan,
+       factors, the structure read, open interest. Every id is unchanged,
+       so the renderer fills each element exactly as before. */}}
   <div class="chart-header" id="chart-header">
     <div class="cs-card-h">
       <h2>{{t "chart.engineScore"}}</h2>
@@ -259,7 +262,9 @@
       <div class="chart-banner-action-text" id="chart-banner-action-text">{{t "common.loading"}}</div>
       <div class="chart-banner-note" id="chart-banner-note"></div>
     </div>
-    <div class="chart-factors" id="chart-factors" aria-label="{{t "chart.factors"}}"></div>
+    <!-- TF bias tiles. Same #tf-bias id, so the renderer finds it unchanged;
+         the HVN and box lines it used to append now go to #cs-levels. -->
+    <div class="tf-bias-panel" id="tf-bias" aria-label="{{t "chart.ui.tfbiasAria"}}"></div>
   </div>
 
   {{/* The engine's plan for this symbol/TF — the same levels the plan
@@ -270,32 +275,35 @@
     <div class="cs-plan-anchor" id="cs-plan-anchor"></div>
   </section>
 
-  <div class="chart-one-liner" id="chart-oneliner">
-    <span id="chart-oneliner-text">{{t "common.loading"}}</span>
-    <button type="button" class="cs-record-btn" id="cs-record-btn" title="{{t "chart.recordHint"}}">{{t "chart.record"}}</button>
-  </div>
-  <div class="chart-hvn-panel hidden" id="chart-hvn-panel"
-       title="{{t "chart.hvnHint"}}">
-    <span class="cs-kv"><em>{{t "chart.hvnTarget"}}</em><span id="chart-hvn-body">—</span></span>
-  </div>
-  <div class="chart-struct-panel hidden" id="chart-struct-panel">
-    <span class="cs-lean" id="cs-lean">—</span>
-    <span class="cs-kv"><em>{{t "chart.ui.trend"}}</em><span id="cs-trend">—</span></span>
-    <span class="cs-kv"><em>{{t "chart.ui.event"}}</em><span id="cs-event">—</span></span>
-    <span class="cs-kv" id="cs-zone-wrap"><em>{{t "chart.pivotZone"}}</em><span id="cs-zone">—</span></span>
-    <span class="cs-kv" id="cs-inzone-wrap"><em>{{t "chart.ui.inzone"}}</em><span id="cs-inzone">—</span></span>
-    <span class="cs-kv" id="cs-tgt-wrap"><em>{{t "chart.ui.target"}}</em><span id="cs-target">—</span></span>
-  </div>
-    <!-- TF bias — moved out of the plot overlay 2026-09-12. It sat
-         absolutely positioned over the chart's top-left, which is where
-         the first bars of the visible range are, so the panel was covering
-         price to show a read ABOUT that price. Here it is a normal side
-         card and the plot is clean. Same #tf-bias id, so the renderer
-         finds it unchanged. -->
-    <div class="tf-bias-panel" id="tf-bias" aria-label="{{t "chart.ui.tfbiasAria"}}"></div>
-    {{/* Open interest, its own card (it used to sit inside the TF-bias
-         strip). Filled by loadBias from the same /api/chart/bias call. */}}
-    <section class="cs-card cs-oi" id="cs-oi" hidden></section>
+  <section class="cs-card cs-factors-card" id="cs-factors-card" hidden>
+    <div class="cs-card-h"><h2>{{t "chart.factors"}}</h2></div>
+    <div class="chart-factors" id="chart-factors" aria-label="{{t "chart.factors"}}"></div>
+  </section>
+
+  {{/* The structure read: the one-line summary, the N-struct panel, the HVN
+       target and the range box, with the record-a-setup action. */}}
+  <section class="cs-card cs-read">
+    <div class="cs-card-h"><h2>{{t "chart.readTitle"}}</h2></div>
+    <div class="chart-one-liner" id="chart-oneliner">
+      <span id="chart-oneliner-text">{{t "common.loading"}}</span>
+    </div>
+    <div class="chart-struct-panel hidden" id="chart-struct-panel">
+      <span class="cs-lean" id="cs-lean">—</span>
+      <span class="cs-kv"><em>{{t "chart.ui.trend"}}</em><span id="cs-trend">—</span></span>
+      <span class="cs-kv"><em>{{t "chart.ui.event"}}</em><span id="cs-event">—</span></span>
+      <span class="cs-kv" id="cs-zone-wrap"><em>{{t "chart.pivotZone"}}</em><span id="cs-zone">—</span></span>
+      <span class="cs-kv" id="cs-inzone-wrap"><em>{{t "chart.ui.inzone"}}</em><span id="cs-inzone">—</span></span>
+      <span class="cs-kv" id="cs-tgt-wrap"><em>{{t "chart.ui.target"}}</em><span id="cs-target">—</span></span>
+    </div>
+    <div class="chart-hvn-panel hidden" id="chart-hvn-panel" title="{{t "chart.hvnHint"}}">
+      <span class="cs-kv"><em>{{t "chart.hvnTarget"}}</em><span id="chart-hvn-body">—</span></span>
+    </div>
+    <div class="cs-levels" id="cs-levels"></div>
+    <button type="button" class="ui-btn ghost sm cs-record-btn" id="cs-record-btn" title="{{t "chart.recordHint"}}">{{template "icon" "flag"}}{{t "chart.record"}}</button>
+  </section>
+
+  {{/* Open interest, filled by loadBias from the same /api/chart/bias call. */}}
+  <section class="cs-card cs-oi" id="cs-oi" hidden></section>
   </aside>
   </div><!-- /chart-grid -->
   <script>
@@ -865,6 +873,19 @@
         "oi.age": {{t "chart.js.oi.age"}},
         "oi.howto": {{t "chart.js.oi.howto"}},
         "oi.notYet": {{t "chart.js.oi.notYet"}},
+        "oi.oiMove": {{t "chart.js.oi.oiMove"}},
+        "oi.priceMove": {{t "chart.js.oi.priceMove"}},
+        "oi.pxUp": {{t "chart.js.oi.pxUp"}},
+        "oi.pxDown": {{t "chart.js.oi.pxDown"}},
+        "oi.oiUp": {{t "chart.js.oi.oiUp"}},
+        "oi.oiDown": {{t "chart.js.oi.oiDown"}},
+        "oi.q.longs-building": {{t "chart.js.oi.q.longs-building"}},
+        "oi.q.shorts-building": {{t "chart.js.oi.q.shorts-building"}},
+        "oi.q.shorts-covering": {{t "chart.js.oi.q.shorts-covering"}},
+        "oi.q.longs-unwinding": {{t "chart.js.oi.q.longs-unwinding"}},
+        "oi.belowThreshold": {{t "chart.js.oi.belowThreshold"}},
+        "oi.total": {{t "chart.js.oi.total"}},
+        "bn.label": {{t "chart.js.bn.label"}},
         "bn.whales": {{t "chart.js.bn.whales"}},
         "bn.all": {{t "chart.js.bn.all"}},
         "bn.retailLong": {{t "chart.js.bn.retailLong"}},
@@ -2651,6 +2672,8 @@
                 });
             }
             var nChips = facEl.querySelectorAll('.factor-chip').length;
+            var facCard = document.getElementById('cs-factors-card');
+            if (facCard) facCard.hidden = nChips === 0;
             if (nChips > 2) {
                 var more = document.createElement('button');
                 more.type = 'button';
@@ -3171,7 +3194,7 @@
                 // OI row. A number and a verdict, deliberately not a
                 // sparkline — see computeChartOI for why the source cannot
                 // support a slope at chart resolution.
-                var oiHtml = '';
+                var oiHtml = '', lv = '';
                 if (d.oi && d.oi.oi) {
                     var o = d.oi, oTxt, oCls = 'oi-flat', oTip;
                     var fTxt = (typeof o.funding === 'number' && o.funding !== 0)
@@ -3195,10 +3218,39 @@
                         oTxt = 'OI —';
                         oTip = CT['oi.notYet'];
                     }
-                    oiHtml += '<div class="cs-card-h"><h2>' + CT['oi.title'] + '</h2></div>'
-                          + '<div class="cs-oi-body ' + oCls + '" title="' + oTip.replace(/"/g, '&quot;') + '">'
-                          + (o.reading ? '<b class="cs-oi-read">' + o.reading + '</b>' : '')
-                          + '<span class="cs-oi-num">' + oTxt + ' · ' + CT['ctx.funding'] + ' ' + fTxt + '</span></div>';
+                    // Header, then the reading, the two moves behind it, and the
+                    // standard four-way table with the current cell lit — so the
+                    // reading shows where it came from instead of being a bare label.
+                    var pctTxt = function (v) { return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%'; };
+                    var arrow = function (v) { return v > 0 ? '▲' : v < 0 ? '▼' : '·'; };
+                    var updn = function (v) { return v > 0 ? 'up' : v < 0 ? 'down' : ''; };
+                    oiHtml += '<div class="cs-card-h"><h2>' + CT['oi.title'] + '</h2><span class="ui-tag">1h</span>'
+                          + (o.ageMin != null ? '<span class="cs-oi-age">' + CT['oi.age'].replace('{m}', o.ageMin || 0) + '</span>' : '') + '</div>';
+                    if (o.static) {
+                        oiHtml += '<div class="cs-oi-note">' + CT['oi.staticTip'] + '</div>';
+                    } else if (typeof o.delta === 'number') {
+                        oiHtml += '<div class="cs-oi-body ' + oCls + '" title="' + oTip.replace(/"/g, '&quot;') + '">'
+                              + '<b class="cs-oi-read">' + (o.reading || CT['oi.noVerdict']) + '</b></div>';
+                        oiHtml += '<div class="cs-oi-moves">'
+                              + '<div><span>' + CT['oi.oiMove'] + '</span><b class="oi-n">' + arrow(o.delta) + ' ' + pctTxt(o.delta) + '</b></div>'
+                              + (typeof o.priceDelta === 'number'
+                                  ? '<div><span>' + CT['oi.priceMove'] + '</span><b class="' + updn(o.priceDelta) + '">' + arrow(o.priceDelta) + ' ' + pctTxt(o.priceDelta) + '</b></div>' : '')
+                              + '</div>';
+                        var q = o.quadrant || '';
+                        var cell = function (key) { return '<div class="q-cell q-' + key + (q === key ? ' on' : '') + '">' + CT['oi.q.' + key] + '</div>'; };
+                        oiHtml += '<div class="cs-oi-quad" title="' + CT['oi.howto'].replace(/"/g, '&quot;') + '">'
+                              + '<div></div><div class="q-h">' + CT['oi.pxUp'] + '</div><div class="q-h">' + CT['oi.pxDown'] + '</div>'
+                              + '<div class="q-h">' + CT['oi.oiUp'] + '</div>' + cell('longs-building') + cell('shorts-building')
+                              + '<div class="q-h">' + CT['oi.oiDown'] + '</div>' + cell('shorts-covering') + cell('longs-unwinding')
+                              + '</div>';
+                        if (!q || q === 'new-positions' || q === 'closing' || q === 'no-price') {
+                            oiHtml += '<div class="cs-oi-note">' + (q ? (o.reading || '') : CT['oi.belowThreshold']) + '</div>';
+                        }
+                    } else {
+                        oiHtml += '<div class="cs-oi-note">' + CT['oi.notYet'] + '</div>';
+                    }
+                    oiHtml += '<div class="cs-oi-meta">' + CT['ctx.funding'] + ' <b>' + fTxt + '</b> · ' + CT['oi.total'] + ' <b>'
+                          + (o.oi >= 1e9 ? (o.oi / 1e9).toFixed(2) + 'B' : o.oi >= 1e6 ? (o.oi / 1e6).toFixed(1) + 'M' : Math.round(o.oi).toLocaleString('en-US')) + '</b></div>';
                     // Binance cross-reference, its own line so it can never be
                     // mistaken for the BingX figure above. Different book —
                     // the entry fills against BingX's.
@@ -3218,7 +3270,7 @@
                     if (bnBits.length) {
                         var bnTip = CT['bn.tip'];
                         oiHtml += '<div class="cs-oi-bn' + (o.crowd ? ' bn-crowd' : '') + '" title="'
-                              + bnTip.replace(/"/g, '&quot;') + '">' + bnBits.join(' · ') + '</div>';
+                              + bnTip.replace(/"/g, '&quot;') + '"><span>' + CT['bn.label'] + '</span> ' + bnBits.join(' · ') + '</div>';
                     }
                 }
                 if (d.hvn && (d.hvn.above || d.hvn.below)) {
@@ -3226,15 +3278,17 @@
                     var hv = '';
                     if (d.hvn.above) hv += '↑' + fmtH(d.hvn.above);
                     if (d.hvn.below) hv += (hv ? '  ' : '') + '↓' + fmtH(d.hvn.below);
-                    html += '<div class="tf-bias-hvn" title="' + CT['hvn.stripTip'].replace(/"/g, '&quot;') + '">HVN ' + hv + '</div>';
+                    lv += '<div class="tf-bias-hvn" title="' + CT['hvn.stripTip'].replace(/"/g, '&quot;') + '">HVN ' + hv + '</div>';
                 }
                 if (d.range && d.range.lo) {
                     var rf = function (v) { return v >= 1000 ? v.toFixed(0) : (v >= 1 ? v.toFixed(2) : v.toFixed(4)); };
                     var rzcls = d.range.isRange ? ('rzone-' + d.range.zone) : 'rzone-trend';
-                    html += '<div class="tf-bias-range ' + rzcls + '" title="' + CT['range.tip'] + ' · ' + d.range.action + '">'
+                    lv += '<div class="tf-bias-range ' + rzcls + '" title="' + CT['range.tip'] + ' · ' + d.range.action + '">'
                           + CT['range.box'] + ' ' + rf(d.range.lo) + '–' + rf(d.range.hi) + ' ·' + d.range.pos + '%<br><span class="tf-range-act">' + d.range.action + '</span></div>';
                 }
                 el.innerHTML = html;
+                var lvEl = document.getElementById('cs-levels');
+                if (lvEl) lvEl.innerHTML = lv;
                 var oiCard = document.getElementById('cs-oi');
                 if (oiCard) { oiCard.innerHTML = oiHtml; oiCard.hidden = !oiHtml; }
             })

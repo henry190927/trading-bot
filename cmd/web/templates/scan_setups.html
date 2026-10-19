@@ -20,6 +20,8 @@
   {{if .Recorded}}<div class="ui-banner ok">{{template "icon" "check"}}<span>{{printf (t "live.recorded") .Recorded}} <a href="/setups">{{t "tab.setups"}} →</a></span></div>{{end}}
   {{if .RecErr}}<div class="ui-banner bad">{{template "icon" "alert"}}<span>{{t "live.recErr"}}</span></div>{{end}}
 
+  <p class="ui-sub live-lead">{{t "live.lead"}}</p>
+
   <div class="ui-status">
     <span class="ui-pill {{if .FiringN}}ok{{else}}idle{{end}}">{{template "icon" "flag"}}{{printf (t "live.firingN") .FiringN}}</span>
     {{if .UnarmedFireN}}<span class="ui-pill warn">{{printf (t "live.unarmedFireN") .UnarmedFireN}}</span>{{end}}
@@ -92,7 +94,7 @@
       <td class="num ui-up">{{fmtPx .TP}}</td>
       <td class="num">{{printf "%.1f" .RR}}</td>
       <td><span class="ui-tag{{if .Market}} warn{{end}}">{{if .Market}}MARKET{{else}}LIMIT{{end}}</span></td>
-      <td class="live-why"><code title="{{t "live.whyHint"}}">{{.Why}}</code></td>
+      <td class="live-why" title="{{.Why}}">{{range .Tags}}<span class="ui-tag why-{{.Code}}">{{whyTag .}}</span>{{else}}<code>{{.Why}}</code>{{end}}</td>
       <td>
         <form method="post" action="/scan/record" style="margin:0">
           <input type="hidden" name="symbol" value="{{.Symbol}}">

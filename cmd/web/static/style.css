@@ -3390,7 +3390,7 @@ html[data-rail="narrow"] { --rail-w: 64px; }
     transition: background var(--t-fast), color var(--t-fast);
 }
 .rail-toggle {
-    margin-top: auto; display: flex; align-items: center; gap: var(--sp-3); height: 36px; padding: 0 10px;
+    margin-top: auto; display: flex; align-items: center; justify-content: center; gap: var(--sp-3); width: 36px; height: 36px; padding: 0;
     border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-dim);
     font: inherit; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; cursor: pointer;
 }
@@ -4011,8 +4011,16 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ui-card .dt th { background: var(--surface); box-shadow: inset 0 -1px 0 var(--border); font-weight: 500; letter-spacing: 0; text-transform: none; font-size: var(--fs-xs); }
 .ui-card .dt th, .ui-card .dt td { padding: 8px var(--sp-4); }
 .ui-card .dt { --dt-zebra: transparent; }
-.ui-range { position: relative; display: inline-block; width: 110px; height: 4px; border-radius: 2px; background: var(--chip-border); vertical-align: middle; }
-.ui-range i { position: absolute; top: -3px; width: 2px; height: 10px; margin-left: -1px; border-radius: 1px; background: var(--text); }
+.ui-range { position: relative; display: inline-block; width: 120px; height: 4px; border-radius: 2px; background: var(--chip-border); vertical-align: middle; }
+.ui-range b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--blue); opacity: .45; }
+.ui-range i { position: absolute; top: -3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 2px var(--surface); }
+.mkt-rng { white-space: nowrap; }
+.mkt-rng .rg-lo, .mkt-rng .rg-hi { font-size: var(--fs-xs); color: var(--text-dim); display: inline-block; min-width: 4.5rem; }
+.mkt-rng .rg-lo { text-align: right; margin-right: 8px; }
+.mkt-rng .rg-hi { margin-left: 8px; }
+.mkt-rng .rg-pos { display: inline-block; min-width: 2.6rem; text-align: right; font-size: var(--fs-sm); color: var(--text-dim); }
+.mkt-rng .rg-pos.hi { color: var(--green); }
+.mkt-rng .rg-pos.lo { color: var(--red); }
 /* The legacy market block carried its own top margin; inside a ui-col the
    column gap spaces it. */
 .ui-card.market-overview { margin-top: 0; }
@@ -4184,10 +4192,10 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .cs-plan-anchor:empty { display: none; }
 /* TF bias: the five timeframes as tiles; title, alignment, HVN and range
    rows span the full width. */
-.chart-side > .tf-bias-panel { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.chart-side > .tf-bias-panel > :not(.tf-bias-row) { grid-column: 1 / -1; }
-.chart-side > .tf-bias-panel .tf-bias-title { font-size: var(--fs-base); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0; }
-.chart-side > .tf-bias-panel .tf-bias-row {
+.chart-side .tf-bias-panel { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.chart-side .tf-bias-panel > :not(.tf-bias-row) { grid-column: 1 / -1; }
+.chart-side .tf-bias-panel .tf-bias-title { font-size: var(--fs-base); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0; }
+.chart-side .tf-bias-panel .tf-bias-row {
     display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; margin: 0;
     border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-xs);
 }
@@ -4422,3 +4430,64 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .jf-danger .ui-btn { margin-top: 0; }
 .jf-sum { grid-template-columns: repeat(4, max-content 1fr); }
 @media (max-width: 640px) { .jf-sum { grid-template-columns: max-content 1fr; } }
+.live-lead { margin: 0; max-width: 980px; line-height: 1.6; }
+.live-t .live-why .ui-tag { margin: 1px 4px 1px 0; display: inline-block; }
+.live-t .ui-tag.why-htf-reject, .live-t .ui-tag.why-sweep-eqh, .live-t .ui-tag.why-box-top { color: var(--red); background: var(--wash-red); border-color: transparent; }
+.live-t .ui-tag.why-htf-hold, .live-t .ui-tag.why-sweep-eql, .live-t .ui-tag.why-box-bottom { color: var(--green); background: var(--wash-green); border-color: transparent; }
+
+/* Journal hero: both cards share one height. The periods sit in one row of
+   four instead of a 2x2 block, which was taller than the R card beside it
+   and left a gap under it. */
+.ui-cols-hero { align-items: stretch; }
+.ui-cols-hero > .ui-card { display: flex; flex-direction: column; justify-content: center; }
+.ui-cols-hero .ui-hero { margin-bottom: var(--sp-3); }
+.ui-cols-hero .ui-periods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); align-content: center; }
+.ui-cols-hero .ui-periods > div { padding-left: var(--sp-3); border-left: 1px solid var(--border); }
+.ui-cols-hero .ui-periods > div:first-child { padding-left: 0; border-left: 0; }
+.ui-cols-hero .ui-periods b { font-size: var(--fs-lg); }
+@media (max-width: 1100px) { .ui-cols-hero .ui-periods { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ui-cols-hero .ui-periods > div { padding-left: 0; border-left: 0; } }
+
+/* ---------- chart side panel v2: mockup order, OI table ---------- */
+.chart-side > .chart-header .tf-bias-panel { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.chart-side .cs-read { display: flex; flex-direction: column; gap: var(--sp-2); }
+.chart-side .cs-read .chart-one-liner { font-size: var(--fs-sm); line-height: 1.55; color: var(--text-dim); border: 0; background: none; padding: 0; margin: 0; }
+.chart-side .cs-read .chart-struct-panel, .chart-side .cs-read .chart-hvn-panel { border: 0; background: none; padding: 0; margin: 0; }
+.chart-side .cs-read .cs-levels:empty { display: none; }
+.chart-side .cs-read .cs-record-btn { align-self: flex-start; margin-top: var(--sp-1); }
+.cs-oi .cs-card-h { gap: var(--sp-2); }
+.cs-oi .cs-oi-age { margin-left: auto; font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-oi .cs-oi-read { font-size: var(--fs-md); }
+.cs-oi .oi-armed .cs-oi-read { color: var(--yellow); }
+.cs-oi-moves { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); margin: var(--sp-2) 0; }
+.cs-oi-moves > div { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: var(--r-sm); background: var(--surface-2); }
+.cs-oi-moves span { font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-oi-moves b { font-family: var(--mono); font-size: var(--fs-md); }
+.cs-oi-moves b.up { color: var(--green); }
+.cs-oi-moves b.down { color: var(--red); }
+.cs-oi-quad { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px; font-size: var(--fs-xs); }
+.cs-oi-quad .q-h { color: var(--text-dim); display: grid; place-items: center; padding: 2px 4px; }
+.cs-oi-quad .q-cell { display: grid; place-items: center; text-align: center; padding: 6px 4px; border-radius: 6px; border: 1px solid var(--border); color: var(--text-dim); }
+.cs-oi-quad .q-cell.on { color: var(--text); font-weight: 700; border-color: currentColor; }
+.cs-oi-quad .q-longs-building.on, .cs-oi-quad .q-shorts-covering.on { color: var(--green); background: var(--wash-green); }
+.cs-oi-quad .q-shorts-building.on, .cs-oi-quad .q-longs-unwinding.on { color: var(--red); background: var(--wash-red); }
+.cs-oi-note { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.5; }
+.cs-oi-meta { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-oi-meta b { font-family: var(--mono); color: var(--text); font-weight: 500; }
+.cs-oi .cs-oi-bn span { color: var(--text-dim); }
+
+/* Scan: the symbol is the link to its chart; the expanded row uses the full
+   table width, and a long AI read flows into two columns instead of one
+   narrow one with empty space beside it. */
+.scan-t .scan-sym { color: var(--text); text-decoration: none; border-bottom: 1px dashed var(--border); }
+.scan-t .scan-sym:hover { color: var(--blue); border-bottom-color: var(--blue); }
+.scan-detail { max-width: none; }
+.scan-detail .ai-result { margin: 0; }
+@media (min-width: 1200px) { .scan-detail .ai-result .ai-body { columns: 2 440px; column-gap: var(--sp-6, 2rem); } .scan-detail .ai-result .ai-body > * { break-inside: avoid-column; } }
+.tp-grid.is-split { columns: auto; display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); align-items: start; }
+.tp-grid.is-split .tp-col { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.tp-grid.is-split .tp-card { margin-bottom: 0; }
+.tp-grid.is-split .tp-sum::before { content: attr(data-n); }
+
+/* TF tiles inside the score card: no frame of their own, small label. */
+.chart-side > .chart-header .tf-bias-panel { border: 0; border-top: 1px solid var(--border); border-radius: 0; background: none; box-shadow: none; padding: var(--sp-3) 0 0; }
+.chart-side > .chart-header .tf-bias-panel .tf-bias-title { font-size: var(--fs-xs); font-weight: 500; color: var(--text-dim); }

@@ -68,7 +68,7 @@
       {{else}}
       {{$tradeable := and (ne (sigSide .Signal.Side) "neutral") (ge .Signal.Score $.MinTradeable)}}
       <tr class="ui-trow{{if $tradeable}} is-hot{{end}}" id="row-{{.Short}}" data-row="{{.Short}}" tabindex="0" aria-expanded="false">
-        <td><span class="ui-sym">{{.Short}}</span></td>
+        <td><a class="ui-sym scan-sym" href="/chart?symbol={{.Short}}&amp;tf={{$.TF}}" title="{{t "scan.openChart"}}">{{.Short}}</a></td>
         <td class="num">{{fmtPx .Signal.Price}}</td>
         <td><span class="ui-side {{sigSide .Signal.Side}}">{{t (printf "side.%s" (sigSide .Signal.Side))}}</span></td>
         <td class="num"><span class="{{scoreClass .Signal.Score $.MinTradeable}}">{{.Signal.MRScore}} · {{.Signal.MomentumScore}}</span></td>
@@ -125,7 +125,6 @@
             {{end}}
           </div>
           <div class="ui-detail-actions">
-            <a class="ui-btn ghost" style="margin-top:0" href="/chart?symbol={{.Short}}&amp;tf={{$.TF}}">{{t "scan.openChart"}}</a>
             {{if .Diagnose}}<a class="ui-btn ghost" style="margin-top:0" href="{{diagnoseHref . $.TF}}">{{t "scan.validate"}}</a>{{end}}
             {{if hasPlan .Signal}}<a class="ui-btn" style="margin-top:0" href="{{recordHref . $.TF}}">{{template "icon" "plus"}}{{t "scan.record"}}</a>{{end}}
             <button type="button" class="ui-btn ghost ai-analyze-btn" style="margin-top:0" data-symbol="{{.Short}}" data-tf="{{$.TF}}">{{t "trades.ai"}}</button>

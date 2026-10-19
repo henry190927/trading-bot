@@ -32,7 +32,7 @@
     {{range .Shell.Nav}}<a href="{{.Href}}" class="rail-item{{if .On}} on{{end}}"{{if .On}} aria-current="page"{{end}} title="{{t .Key}}">{{template "icon" .Icon}}<span>{{t .Key}}</span></a>
     {{end}}
   </nav>
-  <button type="button" class="rail-toggle" id="rail-toggle" data-collapse="{{t "nav.collapse"}}" data-expand="{{t "nav.expand"}}">{{template "icon" "collapse"}}<span>{{t "nav.collapse"}}</span></button>
+  <button type="button" class="rail-toggle" id="rail-toggle" title="{{t "nav.collapse"}}" aria-label="{{t "nav.collapse"}}" data-collapse="{{t "nav.collapse"}}" data-expand="{{t "nav.expand"}}">{{template "icon" "collapse"}}</button>
 </aside>
 <div class="rail-scrim" id="rail-scrim"></div>
 <header class="apptop">
@@ -60,7 +60,8 @@
     function mark() {
       var narrow = root.getAttribute('data-rail') === 'narrow';
       var label = narrow ? tg.dataset.expand : tg.dataset.collapse;
-      tg.querySelector('span').textContent = label; tg.title = label; tg.setAttribute('aria-label', label);
+      // Icon only: the label lives in the tooltip and for screen readers.
+      tg.title = label; tg.setAttribute('aria-label', label);
       tg.setAttribute('aria-expanded', narrow ? 'false' : 'true');
     }
     tg.addEventListener('click', function () {

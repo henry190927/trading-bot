@@ -8,6 +8,7 @@ package autostrat
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -29,7 +30,19 @@ type Trigger struct {
 	TP     float64
 	Market bool // true = marketable (fills at fire); false = resting limit
 	Why    string
+	// Tags is Why as labelled values, for a page to show as chips in its own
+	// language. Why stays the sentence the daemon logs and notifies with.
+	Tags []Tag
 }
+
+// Tag is one fact behind a trigger: a code and its values. Prices are
+// float64, percents and counts int, timeframes and anchors string.
+type Tag struct {
+	Code string
+	Args []any
+}
+
+func tag(code string, args ...any) Tag { return Tag{Code: code, Args: args} }
 
 // FireScore100 computes the validator structural-fit score (rescaled /100) for
 // an entry — a uniform quality number across ALL strategies. Best-effort: 0.
@@ -118,7 +131,8 @@ func evalHTFSNR(ctx context.Context, client *bingx.Client, sym market.Symbol, r 
 			}
 			return Trigger{Fire: true, Side: "short", Entry: bar.Close, Market: true,
 				Stop: stop, TP: bar.Close - rMult*risk,
-				Why: fmt.Sprintf("HTF-S/R fade: reject %s swing high %.4f", EngineBiasTF(tf), p.Price)}
+				Why:  fmt.Sprintf("HTF-S/R fade: reject %s swing high %.4f", EngineBiasTF(tf), p.Price),
+				Tags: []Tag{tag("htf-reject", string(EngineBiasTF(tf))), tag("swing-high", p.Price)}}
 		}
 		if wantLong && !p.IsTop && prev.Close > p.Price && bar.Low <= p.Price+tolAbs && bar.Close > p.Price {
 			stop := bar.Low - bufATR*a
@@ -128,7 +142,8 @@ func evalHTFSNR(ctx context.Context, client *bingx.Client, sym market.Symbol, r 
 			}
 			return Trigger{Fire: true, Side: "long", Entry: bar.Close, Market: true,
 				Stop: stop, TP: bar.Close + rMult*risk,
-				Why: fmt.Sprintf("HTF-S/R fade: hold %s swing low %.4f", EngineBiasTF(tf), p.Price)}
+				Why:  fmt.Sprintf("HTF-S/R fade: hold %s swing low %.4f", EngineBiasTF(tf), p.Price),
+				Tags: []Tag{tag("htf-hold", string(EngineBiasTF(tf))), tag("swing-low", p.Price)}}
 		}
 	}
 	return Trigger{}
@@ -162,7 +177,8 @@ func evalSweepReject(ctx context.Context, client *bingx.Client, sym market.Symbo
 			}
 			return Trigger{Fire: true, Side: "short", Entry: bar.Close, Market: true,
 				Stop: stop, TP: bar.Close - rMult*risk,
-				Why: fmt.Sprintf("sweep-reject EQH %.4f (band %.4f-%.4f, %dx)", p.Price, p.Lo, p.Hi, p.Touches)}
+				Why:  fmt.Sprintf("sweep-reject EQH %.4f (band %.4f-%.4f, %dx)", p.Price, p.Lo, p.Hi, p.Touches),
+				Tags: []Tag{tag("sweep-eqh", p.Price), tag("band", p.Lo, p.Hi), tag("touches", p.Touches)}}
 		}
 		if wantLong && p.Kind == signal.EQL && bar.Low < p.Lo && bar.Close > p.Hi {
 			stop := bar.Low - bufATR*a
@@ -172,7 +188,8 @@ func evalSweepReject(ctx context.Context, client *bingx.Client, sym market.Symbo
 			}
 			return Trigger{Fire: true, Side: "long", Entry: bar.Close, Market: true,
 				Stop: stop, TP: bar.Close + rMult*risk,
-				Why: fmt.Sprintf("sweep-reject EQL %.4f (band %.4f-%.4f, %dx)", p.Price, p.Lo, p.Hi, p.Touches)}
+				Why:  fmt.Sprintf("sweep-reject EQL %.4f (band %.4f-%.4f, %dx)", p.Price, p.Lo, p.Hi, p.Touches),
+				Tags: []Tag{tag("sweep-eql", p.Price), tag("band", p.Lo, p.Hi), tag("touches", p.Touches)}}
 		}
 	}
 	return Trigger{}
@@ -237,7 +254,8 @@ func evalEngine(ctx context.Context, client *bingx.Client, sym market.Symbol, r 
 	}
 	marketable := (side == "long" && s.Plan.Entry >= curPx) || (side == "short" && s.Plan.Entry <= curPx)
 	return Trigger{Fire: true, Side: side, Entry: s.Plan.Entry, Stop: s.Plan.StopLoss, TP: tp, Market: marketable,
-		Why: fmt.Sprintf("engine score %d — %s", s.Score, anchor)}
+		Why:  fmt.Sprintf("engine score %d — %s", s.Score, anchor),
+		Tags: []Tag{tag("engine-score", s.Score), tag("anchor", anchor)}}
 }
 
 // EngineBiasTF picks the higher-TF used for directional bias in the engine call.
@@ -283,12 +301,14 @@ func evalRangeEdge(ctx context.Context, client *bingx.Client, sym market.Symbol,
 	if wantLong && pos <= 0.34 && st.Trend != signal.StructDowntrend {
 		return Trigger{Fire: true, Side: "long", Entry: px, Market: true,
 			Stop: lo * (1 - stopBuf), TP: hi,
-			Why: fmt.Sprintf("box %.4f-%.4f pos %.0f%% bottom-third", lo, hi, pos*100)}
+			Why:  fmt.Sprintf("box %.4f-%.4f pos %.0f%% bottom-third", lo, hi, pos*100),
+			Tags: []Tag{tag("box", lo, hi), tag("box-pos", int(math.Round(pos*100))), tag("box-bottom")}}
 	}
 	if wantShort && pos >= 0.66 && st.Trend != signal.StructUptrend {
 		return Trigger{Fire: true, Side: "short", Entry: px, Market: true,
 			Stop: hi * (1 + stopBuf), TP: lo,
-			Why: fmt.Sprintf("box %.4f-%.4f pos %.0f%% top-third", lo, hi, pos*100)}
+			Why:  fmt.Sprintf("box %.4f-%.4f pos %.0f%% top-third", lo, hi, pos*100),
+			Tags: []Tag{tag("box", lo, hi), tag("box-pos", int(math.Round(pos*100))), tag("box-top")}}
 	}
 	return Trigger{}
 }

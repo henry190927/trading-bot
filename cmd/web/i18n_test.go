@@ -329,3 +329,23 @@ func TestParseFlash(t *testing.T) {
 		}
 	}
 }
+
+// Every trigger tag autostrat can emit has a dictionary entry (why.<code>).
+func TestWhyTagsTranslated(t *testing.T) {
+	dicts, _ := loadDicts(i18nFS)
+	raw, err := os.ReadFile("../../autostrat/eval.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	codes := regexp.MustCompile(`tag\("([a-z-]+)"`).FindAllStringSubmatch(string(raw), -1)
+	if len(codes) == 0 {
+		t.Fatal("found no tag(...) calls — the pattern no longer matches autostrat")
+	}
+	for _, m := range codes {
+		for _, l := range langs {
+			if _, ok := dicts[l]["why."+m[1]]; !ok {
+				t.Errorf("%s.json: no key why.%s", l, m[1])
+			}
+		}
+	}
+}

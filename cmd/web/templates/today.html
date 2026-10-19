@@ -99,7 +99,7 @@
           <table class="dt">
             <thead><tr>
               <th>{{t "th.symbol"}}</th><th class="num">{{t "th.price"}}</th><th class="num">24h</th>
-              <th class="num">{{t "th.funding"}}</th><th>{{t "th.range24"}}</th>
+              <th class="num">{{t "th.funding"}}</th><th title="{{t "mkt.rangeHint"}}">{{t "th.range24"}}</th>
             </tr></thead>
             <tbody id="mkt-body"><tr><td colspan="5" class="ui-dim">{{t "common.loading"}}</td></tr></tbody>
           </table>
@@ -169,6 +169,7 @@
   // animation either never starts or restarts from scratch every 10s. Building
   // in place also stops the 11 logo <img> elements from being recreated on
   // every tick.
+  var I18N_RG = {{t "mkt.rangeTip"}};
   var rowEls = {};      // symbol -> {tr, px, chg, fund, rng}
   var prevPx = {};      // symbol -> last price we displayed
   var builtKey = null;  // which row set is currently in the DOM
@@ -184,7 +185,8 @@
       // Where the price sits in its 24h range, as a marker on a bar; the
       // numbers move to the tooltip. 0% = at the low, 100% = at the high.
       pos:  (r.low24==null||r.high24==null||r.price==null||r.high24<=r.low24) ? null : Math.max(0, Math.min(100, (r.price-r.low24)/(r.high24-r.low24)*100)),
-      rng:  (r.low24==null||r.high24==null) ? '' : fmtPx(r.low24)+' – '+fmtPx(r.high24)
+      lo:   (r.low24==null) ? '' : fmtPx(r.low24),
+      hi:   (r.high24==null) ? '' : fmtPx(r.high24)
     };
   }
 
@@ -198,7 +200,7 @@
         '<td class="num mkt-px"><span class="mkt-px-val"></span></td>'+
         '<td class="num mkt-chg"></td>'+
         '<td class="num mkt-fund"></td>'+
-        '<td class="mkt-rng"><span class="ui-range"><i></i></span></td>'+
+        '<td class="mkt-rng"><span class="rg-lo ui-num"></span><span class="ui-range"><b></b><i></i></span><span class="rg-hi ui-num"></span><span class="rg-pos ui-num"></span></td>'+
       '</tr>';
     }).join('');
     rows.forEach(function(r){
@@ -248,9 +250,17 @@
       el.chg.className = c.chgc;
       if(el.fund.textContent !== c.fund){ el.fund.textContent = c.fund; }
       el.fund.className = c.fundc;
-      el.rng.title = c.rng;
-      var mk = el.rng.querySelector('i');
-      if(mk){ mk.style.display = c.pos==null ? 'none' : ''; if(c.pos!=null) mk.style.left = c.pos.toFixed(1) + '%'; }
+      // low ── fill to the price ── high, then where the price sits as a
+      // percent: 0% = at the 24h low, 100% = at the 24h high.
+      el.rng.querySelector('.rg-lo').textContent = c.lo;
+      el.rng.querySelector('.rg-hi').textContent = c.hi;
+      var mk = el.rng.querySelector('i'), fill = el.rng.querySelector('b'), pos = el.rng.querySelector('.rg-pos');
+      var ok = c.pos != null;
+      mk.style.display = fill.style.display = ok ? '' : 'none';
+      if(ok){ mk.style.left = c.pos.toFixed(1) + '%'; fill.style.width = c.pos.toFixed(1) + '%'; }
+      pos.textContent = ok ? Math.round(c.pos) + '%' : '';
+      pos.className = 'rg-pos ui-num ' + (!ok ? '' : c.pos >= 80 ? 'hi' : c.pos <= 20 ? 'lo' : '');
+      el.rng.title = ok ? I18N_RG.replace('{0}', Math.round(c.pos)) : '';
     });
   }
 

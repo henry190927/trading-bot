@@ -22,6 +22,7 @@ import (
 	"github.com/henry190927/trading-bot/ai"
 	"github.com/henry190927/trading-bot/alert"
 	"github.com/henry190927/trading-bot/analyzer"
+	"github.com/henry190927/trading-bot/autostrat"
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/fundamental"
 	"github.com/henry190927/trading-bot/indicator"
@@ -2874,7 +2875,8 @@ func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		// t is replaced per language by parsePages (i18n.go). This identity
 		// version only lets a template parse outside that path, e.g. tests.
-		"t": func(key string) string { return key },
+		"t":      func(key string) string { return key },
+		"whyTag": func(tg autostrat.Tag) string { return tg.Code },
 		// Four decimals is right for everything quoted at or above 1, and
 		// wrong below it: AKE quotes to SIX and rendered 0.054028 as "0.0540",
 		// so two distinct prices displayed as one. Sub-1 values get the full

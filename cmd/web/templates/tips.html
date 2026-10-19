@@ -526,5 +526,25 @@
   <p class="tp-more"><span class="i18n-en">More cards land here as we distill them.</span><span class="i18n-zh">之後萃取出的原則會陸續加成小卡。</span></p>
 </main>
 
+<script>
+/* Reading order is row by row (1 left, 2 right, 3 left …), but each side
+   stacks on its own so an open card never leaves a hole beside it. */
+(function () {
+  var grid = document.querySelector('.tp-grid');
+  if (!grid || window.matchMedia('(max-width: 640px)').matches) return;
+  var cards = Array.prototype.slice.call(grid.querySelectorAll(':scope > .tp-card'));
+  var cols = [document.createElement('div'), document.createElement('div')];
+  cols.forEach(function (c) { c.className = 'tp-col'; });
+  cards.forEach(function (card, i) {
+    // The number is fixed before the move: the CSS counter would renumber
+    // the cards in their new DOM order (1, 3, 5 … as 01, 02, 03).
+    var sum = card.querySelector('.tp-sum');
+    if (sum) sum.setAttribute('data-n', (i < 9 ? '0' : '') + (i + 1));
+    cols[i % 2].appendChild(card);
+  });
+  grid.classList.add('is-split');
+  grid.appendChild(cols[0]); grid.appendChild(cols[1]);
+})();
+</script>
 </body>
 </html>

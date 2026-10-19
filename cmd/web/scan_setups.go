@@ -57,6 +57,7 @@ type scanRow struct {
 	Side, Why                      string
 	Entry, Stop, TP, Score, RR     float64
 	Market                         bool
+	Tags                           []autostrat.Tag
 	// Armed distinguishes "auto is watching this and would take it" from
 	// "this strategy WOULD set up here, but no rule exists so nothing fires".
 	// Without the flag the page implied the system was watching the whole grid
@@ -199,6 +200,7 @@ func (s *server) evalScanRow(ctx context.Context, cand scanCandidate, sym market
 	}
 	row.Fire = true
 	row.Side, row.Entry, row.Stop, row.TP, row.Market, row.Why = trig.Side, trig.Entry, trig.Stop, trig.TP, trig.Market, trig.Why
+	row.Tags = trig.Tags
 	row.RR = scanRR(trig.Side, trig.Entry, trig.Stop, trig.TP)
 	row.Score = autostrat.FireScore100(ctx, s.client, sym, r.TF, trig.Side, trig.Entry)
 	return row

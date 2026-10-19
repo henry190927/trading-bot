@@ -30,6 +30,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
+
+	"github.com/henry190927/trading-bot/autostrat"
 )
 
 //go:embed i18n/*.json
@@ -71,6 +73,7 @@ func parsePages(fsys fs.FS, dicts map[string]map[string]string) (map[string]*tem
 			}
 			return key
 		}
+		funcs["whyTag"] = func(tg autostrat.Tag) string { return whyTagText(d, tg) }
 		t, err := template.New("").Funcs(funcs).ParseFS(fsys, "templates/*.html")
 		if err != nil {
 			return nil, err
@@ -231,4 +234,23 @@ func buildShell(path, here, lang string) shellData {
 		}
 	}
 	return sh
+}
+
+// whyTagText renders one trigger tag through the dictionary (why.<code>).
+// Prices arrive as float64 and are shown the way every price on the site
+// is (fmtPx), so the format strings use %s for them.
+func whyTagText(d map[string]string, tg autostrat.Tag) string {
+	f, ok := d["why."+tg.Code]
+	if !ok {
+		return tg.Code
+	}
+	args := make([]any, len(tg.Args))
+	for i, a := range tg.Args {
+		if v, isFloat := a.(float64); isFloat {
+			args[i] = fmtPx(v)
+		} else {
+			args[i] = a
+		}
+	}
+	return fmt.Sprintf(f, args...)
 }
