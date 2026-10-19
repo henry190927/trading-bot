@@ -5,202 +5,118 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>new trade · trading-web</title>
+<title>{{t "jf.newTitle"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 
 {{template "topnav" .}}
 
-<main>
+{{/* Field names and ids are the contract with handleJournalOpen and with the
+     scripts below (PnL preview, confirm dialog); only layout and words moved. */}}
+<main class="ui-page">
+<form method="POST" action="/journal/open" class="ui-form">
+  {{if .Error}}<div class="ui-banner bad">{{template "icon" "alert"}}<span>{{.Error}}</span></div>{{end}}
 
-<h1 class="page-title">Record a trade</h1>
-
-{{if .Error}}
-  <div class="form-error">⚠ {{.Error}}</div>
-{{end}}
-
-<form method="POST" action="/journal/open" class="trade-form">
-
-  <div class="field">
-    <label for="symbol">Symbol</label>
-    <select name="symbol" id="symbol" required>
-      <option value="">— choose —</option>
-      {{$cur := .Symbol}}
-      {{range .Symbols}}
-        <option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>
-      {{end}}
-    </select>
-  </div>
-
-  <div class="field">
-    <label>Side</label>
-    <div class="radio-row">
-      <label class="radio">
-        <input type="radio" name="side" value="long" {{if eq .Side "long"}}checked{{end}} required>
-        <span class="side-long">LONG</span>
-      </label>
-      <label class="radio">
-        <input type="radio" name="side" value="short" {{if eq .Side "short"}}checked{{end}}>
-        <span class="side-short">SHORT</span>
-      </label>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{t "jf.newTitle"}}</h2><span class="ui-hint">{{t "jf.tzHint"}}</span></header>
+    <div class="ui-f-row">
+      <div class="ui-f">
+        <label for="symbol">{{t "th.symbol"}}</label>
+        <select name="symbol" id="symbol" required>
+          <option value="">{{t "f.pick"}}</option>
+          {{$cur := .Symbol}}
+          {{range .Symbols}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>{{end}}
+        </select>
+      </div>
+      <div class="ui-f">
+        <span class="ui-f-l">{{t "th.side"}}</span>
+        <div class="ui-choice" role="radiogroup">
+          <label class="long"><input type="radio" name="side" value="long" {{if eq .Side "long"}}checked{{end}} required>{{t "f.long"}}</label>
+          <label class="short"><input type="radio" name="side" value="short" {{if eq .Side "short"}}checked{{end}}>{{t "f.short"}}</label>
+        </div>
+      </div>
     </div>
-  </div>
+    <div class="ui-f-row jf-prices">
+      <div class="ui-f"><label for="entry">{{t "th.entry"}}</label><input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required></div>
+      <div class="ui-f"><label for="stop">{{t "trades.stop"}}</label><input type="number" step="any" inputmode="decimal" name="stop" id="stop" value="{{.Stop}}" required></div>
+      <div class="ui-f"><label for="tp1">TP1</label><input type="number" step="any" inputmode="decimal" name="tp1" id="tp1" value="{{.TP1}}" required></div>
+      <div class="ui-f"><label for="tp2">TP2</label><input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}" required></div>
+    </div>
+    <div class="ui-f-row">
+      <div class="ui-f">
+        <label for="anchor">{{t "trades.anchor"}} <span class="ui-hint">{{t "jf.anchorHint"}}</span></label>
+        <input type="text" name="anchor" id="anchor" list="anchor-suggestions" value="{{.Anchor}}" autocomplete="off">
+        <datalist id="anchor-suggestions">{{range .Anchors}}<option value="{{.}}">{{end}}</datalist>
+      </div>
+      <div class="ui-f"><label for="tf">TF <span class="ui-hint">{{t "jf.tfHint"}}</span></label><input type="text" name="tf" id="tf" value="{{.TF}}" placeholder="1h"></div>
+      <div class="ui-f"><label for="score">{{t "trades.score"}} <span class="ui-hint">{{t "jf.scoreHint"}}</span></label><input type="text" name="score" id="score" value="{{.Score}}" placeholder="3"></div>
+      <div class="ui-f"><label for="analyzed_at">{{t "trades.analyzed"}} <span class="ui-hint">UTC+8</span></label><input type="datetime-local" name="analyzed_at" id="analyzed_at" value="{{.AnalyzedAt}}"></div>
+    </div>
+  </section>
 
-  <div class="field-row">
-    <div class="field">
-      <label for="entry">Entry</label>
-      <input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required>
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{t "jf.sizing"}}</h2></header>
+    <div class="ui-f-row">
+      <div class="ui-f"><label for="leverage">{{t "jf.leverage"}} <span class="ui-hint">{{t "jf.leverageHint"}}</span></label><input type="number" min="1" max="500" step="1" name="leverage" id="leverage" value="{{.Leverage}}" placeholder="0"></div>
+      <div class="ui-f"><label for="margin_usdt">{{t "jf.margin"}} <span class="ui-hint">{{t "jf.marginHint"}}</span></label><input type="number" min="0" step="any" inputmode="decimal" name="margin_usdt" id="margin_usdt" value="{{.MarginUSDT}}" placeholder="100"></div>
+      <div class="ui-f"><label for="tp1_partial_pct">{{t "jf.tp1Pct"}} <span class="ui-hint">{{t "jf.tp1PctHint"}}</span></label><input type="number" min="1" max="100" step="1" name="tp1_partial_pct" id="tp1_partial_pct" value="{{.TP1PartialPct}}" placeholder="50"></div>
     </div>
-    <div class="field">
-      <label for="stop">Stop</label>
-      <input type="number" step="any" inputmode="decimal" name="stop" id="stop" value="{{.Stop}}" required>
-    </div>
-  </div>
+    <label class="ui-check"><input type="checkbox" name="margin_override" id="margin_override" {{if .MarginOverride}}checked{{end}}><span>{{t "jf.override"}}<span class="ui-hint">{{t "jf.overrideHint"}}</span></span></label>
 
-  <div class="field-row">
-    <div class="field">
-      <label for="tp1">TP1</label>
-      <input type="number" step="any" inputmode="decimal" name="tp1" id="tp1" value="{{.TP1}}" required>
+    <!-- PnL preview, JS-driven: updates as entry/stop/tp/margin/leverage change. -->
+    <div class="pnl-preview jf-pnl" id="pnl-preview" hidden>
+      <div class="pnl-row"><span class="pnl-label">{{t "jf.pnl.qty"}}</span><span class="pnl-val" id="pnl-qty">—</span></div>
+      <div class="pnl-row"><span class="pnl-label">{{t "jf.pnl.notional"}}</span><span class="pnl-val" id="pnl-notional">—</span></div>
+      <div class="pnl-row pnl-tp1"><span class="pnl-label">{{t "jf.pnl.tp1"}}</span><span class="pnl-val" id="pnl-tp1">—</span></div>
+      <div class="pnl-row pnl-tp2"><span class="pnl-label">{{t "jf.pnl.tp2"}}</span><span class="pnl-val" id="pnl-tp2">—</span></div>
+      <div class="pnl-row pnl-stop"><span class="pnl-label">{{t "jf.pnl.stop"}}</span><span class="pnl-val" id="pnl-stop">—</span></div>
+      <div class="pnl-note">{{t "jf.pnl.note"}}</div>
     </div>
-    <div class="field">
-      <label for="tp2">TP2</label>
-      <input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}" required>
-    </div>
-  </div>
+  </section>
 
-  <div class="field">
-    <label for="anchor">Anchor <span class="hint">(tap for canonical labels)</span></label>
-    <input type="text" name="anchor" id="anchor" list="anchor-suggestions" value="{{.Anchor}}" autocomplete="off">
-    <datalist id="anchor-suggestions">
-      {{range .Anchors}}<option value="{{.}}">{{end}}
-    </datalist>
-  </div>
+  <section class="ui-card danger">
+    <header class="ui-card-h"><h2>{{t "jf.bingx"}}</h2><span class="ui-hint">{{t "jf.bingxHint"}}</span></header>
+    <label class="ui-check"><input type="checkbox" name="open_position" id="open_position"><span><b>{{t "jf.openPos"}}</b> — {{t "jf.openPosDesc"}}<span class="ui-hint ui-down">{{t "jf.openPosWarn"}}</span></span></label>
+    <label class="ui-check"><input type="checkbox" name="place_stop" id="place_stop"><span>{{t "jf.placeStop"}}<span class="ui-hint">{{t "jf.bundledHint"}}</span></span></label>
+    <label class="ui-check"><input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}><span>{{t "jf.placeTP1"}}<span class="ui-hint">{{t "jf.placeTP1Hint"}}</span></span></label>
+    <label class="ui-check"><input type="checkbox" name="place_tp2" id="place_tp2"><span>{{t "jf.placeTP2"}}<span class="ui-hint">{{t "jf.bundledHint"}}</span></span></label>
+  </section>
 
-  <div class="field-row">
-    <div class="field">
-      <label for="tf">TF <span class="hint">(or "15m,1h")</span></label>
-      <input type="text" name="tf" id="tf" value="{{.TF}}" placeholder="1h">
+  <section class="ui-card">
+    <div class="ui-f">
+      <label for="notes">{{t "trades.openNotes"}} <span class="ui-hint">{{t "jf.optional"}}</span></label>
+      <textarea name="notes" id="notes" rows="3" placeholder="{{t "jf.notesPh"}}">{{.Notes}}</textarea>
     </div>
-    <div class="field">
-      <label for="score">Score <span class="hint">(e.g. 3, v7.5)</span></label>
-      <input type="text" name="score" id="score" value="{{.Score}}" placeholder="3">
-    </div>
-  </div>
-
-  <div class="field-row">
-    <div class="field">
-      <label for="leverage">Leverage <span class="hint">(× — XAU 200, XAG 100 default)</span></label>
-      <input type="number" min="1" max="500" step="1" name="leverage" id="leverage" value="{{.Leverage}}" placeholder="0">
-    </div>
-    <div class="field">
-      <label for="analyzed_at">Analyzed at <span class="hint">(local)</span></label>
-      <input type="datetime-local" name="analyzed_at" id="analyzed_at" value="{{.AnalyzedAt}}">
-    </div>
-  </div>
-
-  <div class="field-row">
-    <div class="field">
-      <label for="margin_usdt">USDT margin <span class="hint">(collateral × leverage = notional; cap default $200, tick override below to exceed)</span></label>
-      <input type="number" min="0" step="any" inputmode="decimal" name="margin_usdt" id="margin_usdt" value="{{.MarginUSDT}}" placeholder="e.g. 100">
-    </div>
-    <div class="field">
-      <label for="tp1_partial_pct">TP1 partial % <span class="hint">(reduce-only at TP1)</span></label>
-      <input type="number" min="1" max="100" step="1" name="tp1_partial_pct" id="tp1_partial_pct" value="{{.TP1PartialPct}}" placeholder="50">
-    </div>
-  </div>
-
-  <div class="field">
-    <label class="checkbox-inline">
-      <input type="checkbox" name="margin_override" id="margin_override" {{if .MarginOverride}}checked{{end}}>
-      <span>Allow margin &gt; cap <span class="hint">(for this trade only; default cap from BINGX_MAX_MARGIN_USDT env, currently $200)</span></span>
-    </label>
-  </div>
-
-  <!-- PnL preview pane — JS-driven, updates as you type entry/stop/tp/margin/leverage. -->
-  <div class="pnl-preview" id="pnl-preview" hidden>
-    <div class="pnl-row"><span class="pnl-label">Qty</span><span class="pnl-val" id="pnl-qty">—</span></div>
-    <div class="pnl-row"><span class="pnl-label">Notional</span><span class="pnl-val" id="pnl-notional">—</span></div>
-    <div class="pnl-row pnl-tp1"><span class="pnl-label">TP1 (partial)</span><span class="pnl-val" id="pnl-tp1">—</span></div>
-    <div class="pnl-row pnl-tp2"><span class="pnl-label">TP2 (runner full)</span><span class="pnl-val" id="pnl-tp2">—</span></div>
-    <div class="pnl-row pnl-stop"><span class="pnl-label">Stop (full)</span><span class="pnl-val" id="pnl-stop">—</span></div>
-    <div class="pnl-note">
-      Gross PnL at exact fill. BingX's order-panel preview shows ~95% of these
-      values because it reserves ~5% of margin as an internal fee/maintenance
-      buffer. Actual settled PnL on close ≈ values here minus real maker/taker
-      fees (~0.04-0.10% × notional).
-    </div>
-  </div>
-
-  <fieldset class="bingx-block">
-    <legend>BingX auto-orders <span class="hint">(reduce-only safety enforced on stop/TP1/TP2)</span></legend>
-
-    <div class="field">
-      <label class="checkbox-inline">
-        <input type="checkbox" name="open_position" id="open_position">
-        <span><strong>Open position on BingX</strong> — place entry LIMIT now (requires margin + leverage)
-          <span class="hint">⚠ real money; shows confirm dialog before submit</span>
-        </span>
-      </label>
-    </div>
-
-    <div class="field">
-      <label class="checkbox-inline">
-        <input type="checkbox" name="place_stop" id="place_stop">
-        <span>Auto-place stop-loss <span class="hint">(bundled with entry — activates instantly when entry fills, full position close)</span></span>
-      </label>
-    </div>
-
-    <div class="field">
-      <label class="checkbox-inline">
-        <input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}>
-        <span>Auto-place TP1 partial reduce-only LIMIT <span class="hint">(placed by sweep after entry fills; partial %)</span></span>
-      </label>
-    </div>
-
-    <div class="field">
-      <label class="checkbox-inline">
-        <input type="checkbox" name="place_tp2" id="place_tp2">
-        <span>Auto-place TP2 runner <span class="hint">(bundled with entry — activates instantly when entry fills, full position close)</span></span>
-      </label>
-    </div>
-  </fieldset>
-
-  <div class="field">
-    <label for="notes">Notes <span class="hint">(optional)</span></label>
-    <textarea name="notes" id="notes" rows="3" placeholder="why you took this trade…">{{.Notes}}</textarea>
-  </div>
+  </section>
 
   <input type="hidden" name="signal_ctx" value="{{.SignalCtx}}">
 
-  <div class="form-actions">
-    <a href="/journal" class="btn-cancel">Cancel</a>
-    <button type="submit" class="btn-primary" id="submit-btn">Record trade</button>
+  <div class="ui-actions">
+    <a href="/journal" class="ui-btn ghost">{{t "f.cancel"}}</a>
+    <button type="submit" class="ui-btn" id="submit-btn">{{t "jf.submit"}}</button>
   </div>
-
 </form>
 
-<!-- Confirmation modal — shown by JS when open_position is checked at submit time. -->
-<div id="confirm-modal" class="modal-overlay" hidden>
-  <div class="modal-dialog">
-    <h3>Confirm BingX orders</h3>
-    <p class="modal-warn">⚠ This will send <strong>real orders</strong> to BingX. Review below before confirming.</p>
+<!-- Confirmation dialog, shown by JS when open_position is checked at submit. -->
+<div id="confirm-modal" class="ui-modal" hidden>
+  <div class="ui-modal-box" role="dialog" aria-modal="true">
+    <h3>{{t "jf.confirm.title"}}</h3>
+    <div class="ui-banner bad">{{template "icon" "alert"}}<span>{{t "jf.confirm.warn"}}</span></div>
     <ul id="confirm-list"></ul>
-    <div class="modal-actions">
-      <button type="button" class="btn-cancel" id="confirm-cancel">Cancel</button>
-      <button type="button" class="btn-primary" id="confirm-send">Send orders</button>
+    <div class="ui-actions">
+      <button type="button" class="ui-btn ghost" id="confirm-cancel">{{t "f.cancel"}}</button>
+      <button type="button" class="ui-btn ui-danger-solid" id="confirm-send">{{t "jf.confirm.send"}}</button>
     </div>
   </div>
 </div>
-
 </main>
 
-<footer>
-  <span>analyzed_at, opened_at, closed_at all in Asia/Taipei</span>
-</footer>
-
+<script>window.JF = {
+  override: {{t "jf.js.override"}}, setLev: {{t "jf.js.setLev"}}, placeLimit: {{t "jf.js.placeLimit"}},
+  bundled: {{t "jf.js.bundled"}}, slBundled: {{t "jf.js.slBundled"}}, tp2Bundled: {{t "jf.js.tp2Bundled"}}, tp1Sweep: {{t "jf.js.tp1Sweep"}}
+};</script>
 <script>
 // Pre-fill leverage with per-symbol defaults the user runs (XAU=200, XAG=100).
 // Only fills when blank, so an explicit user value is never clobbered.
@@ -334,6 +250,9 @@
 
     var MARGIN_CAP = 200;  // visual cue only — actual cap enforcement is server-side via BINGX_MAX_MARGIN_USDT
 
+    // fill replaces {0}, {1}, … in a dictionary string with the values.
+    function fill(f) { var a = arguments; return f.replace(/\{(\d)\}/g, function (_, i) { return a[+i + 1]; }); }
+
     function buildSummary() {
         list.innerHTML = '';
         var sym = gv('symbol');
@@ -353,18 +272,18 @@
         // Override warning floats to the top so the eye catches it before
         // the order list. Red bg, distinct from the amber default warn.
         if (override && isFinite(marginNum) && marginNum > MARGIN_CAP) {
-            add('⚠ MARGIN OVERRIDE — using ' + margin + ' USDT (default cap $' + MARGIN_CAP + ')', 'modal-override-warn');
+            add(fill(JF.override, margin, MARGIN_CAP), 'modal-override-warn');
         }
-        add('Set leverage: ' + sym + ' → ' + lev + 'x');
-        var entryLine = 'Place LIMIT ' + side.toUpperCase() + ' (open): margin=' + margin + ' USDT @ entry ' + entry;
+        add(fill(JF.setLev, sym, lev));
+        var entryLine = fill(JF.placeLimit, side.toUpperCase(), margin, entry);
         var bundled = [];
         if (gck('place_stop')) bundled.push('SL @ ' + stop);
         if (gck('place_tp2')) bundled.push('TP2 @ ' + tp2);
-        if (bundled.length) entryLine += ' [bundled: ' + bundled.join(', ') + ']';
+        if (bundled.length) entryLine += ' [' + JF.bundled + ': ' + bundled.join(', ') + ']';
         add(entryLine);
-        if (gck('place_stop'))  add('  → SL bundled with entry, activates on fill (full close at ' + stop + ')');
-        if (gck('place_tp2'))   add('  → TP2 bundled with entry, activates on fill (full close at ' + tp2 + ')');
-        if (gck('place_tp1'))   add('Then via sweep after fill: reduce-only LIMIT @ TP1 ' + tp1 + ' (' + partial + '% partial)');
+        if (gck('place_stop'))  add('  → ' + fill(JF.slBundled, stop));
+        if (gck('place_tp2'))   add('  → ' + fill(JF.tp2Bundled, tp2));
+        if (gck('place_tp1'))   add(fill(JF.tp1Sweep, tp1, partial));
     }
 })();
 </script>

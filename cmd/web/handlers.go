@@ -902,6 +902,7 @@ func (s *server) handleJournalNew(c *gin.Context) {
 // form is re-rendered with the user's values preserved and an error banner.
 // On success, redirect to /journal so the new entry shows at the top.
 func (s *server) handleJournalOpen(c *gin.Context) {
+	tr := s.translator(langOf(c))
 	// Pull all fields up-front so we can re-render on error.
 	symbol := strings.ToUpper(strings.TrimSpace(c.PostForm("symbol")))
 	side := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
@@ -933,7 +934,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	}
 
 	if symbol == "" || (side != "long" && side != "short") {
-		rerender("symbol and side are required")
+		rerender(tr("jf.err.symbolSide"))
 		return
 	}
 	entry, err := parseFloatPositive(entryStr, "entry")
@@ -973,11 +974,11 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 
 	// Sanity: directional consistency between entry/stop/TPs.
 	if stop > 0 && side == "long" && stop >= entry {
-		rerender("for a long, stop must be below entry")
+		rerender(tr("jf.err.longStop"))
 		return
 	}
 	if stop > 0 && side == "short" && stop <= entry {
-		rerender("for a short, stop must be above entry")
+		rerender(tr("jf.err.shortStop"))
 		return
 	}
 
@@ -997,7 +998,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	if leverageStr != "" {
 		n, err := strconv.Atoi(leverageStr)
 		if err != nil || n < 0 || n > 500 {
-			rerender("leverage must be an integer 0-500")
+			rerender(tr("jf.err.leverage"))
 			return
 		}
 		leverage = n
@@ -1022,18 +1023,18 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		}
 		marginOverride := c.PostForm("margin_override") == "on"
 		if marginUSDT <= 0 {
-			rerender("margin_usdt required when 'Open position on BingX' is checked")
+			rerender(tr("jf.err.marginNeeded"))
 			return
 		}
 		if marginUSDT > marginCap && !marginOverride {
-			rerender(fmt.Sprintf("margin_usdt %.2f exceeds BINGX_MAX_MARGIN_USDT=%.2f — tick 'Allow margin > cap' to override", marginUSDT, marginCap))
+			rerender(tr("jf.err.marginCap", marginUSDT, marginCap))
 			return
 		}
 		if marginUSDT > marginCap && marginOverride {
 			log.Printf("auto-open: margin override accepted (%.2f > cap %.2f) for %s %s", marginUSDT, marginCap, symbol, side)
 		}
 		if leverage < 1 {
-			rerender("leverage required when 'Open position on BingX' is checked")
+			rerender(tr("jf.err.levNeeded"))
 			return
 		}
 	}
@@ -1663,6 +1664,7 @@ func (s *server) handleJournalCloseForm(c *gin.Context) {
 
 // handleJournalClosePost processes the close form, computes realized R, writes.
 func (s *server) handleJournalClosePost(c *gin.Context) {
+	tr := s.translator(langOf(c))
 	t, idx, trades, err := s.loadTradeByID(c)
 	if err != nil {
 		s.page(c, http.StatusNotFound, "journal_close.html", gin.H{"Error": err.Error()})
@@ -1695,7 +1697,7 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 
 	// Closing produces a NEW outcome, so the legacy vocabulary is not offered.
 	if !journal.IsCloseOutcome(outcome) {
-		rerender("outcome must be " + journal.OutcomeList(journal.CloseOutcomes))
+		rerender(tr("jf.err.outcome", journal.OutcomeList(journal.CloseOutcomes)))
 		return
 	}
 	// no-fill: plan never triggered, so exit_price is irrelevant and R is
@@ -1767,6 +1769,7 @@ func (s *server) handleJournalEditForm(c *gin.Context) {
 // handleJournalEditPost applies field-by-field changes from the form. Handles
 // open↔closed transitions and auto-recomputes R when the trade is closed.
 func (s *server) handleJournalEditPost(c *gin.Context) {
+	tr := s.translator(langOf(c))
 	_, idx, trades, err := s.loadTradeByID(c)
 	if err != nil {
 		s.page(c, http.StatusNotFound, "journal_edit.html", editFormData(journal.Trade{}, err.Error()))
@@ -1791,7 +1794,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	sym := strings.ToUpper(strings.TrimSpace(c.PostForm("symbol")))
 	side := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
 	if sym == "" || (side != "long" && side != "short") {
-		rerender("symbol and side are required")
+		rerender(tr("jf.err.symbolSide"))
 		return
 	}
 
@@ -1827,11 +1830,11 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		return
 	}
 	if stop > 0 && side == "long" && stop >= entry {
-		rerender("for a long, stop must be below entry")
+		rerender(tr("jf.err.longStop"))
 		return
 	}
 	if stop > 0 && side == "short" && stop <= entry {
-		rerender("for a short, stop must be above entry")
+		rerender(tr("jf.err.shortStop"))
 		return
 	}
 
@@ -1876,8 +1879,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		// Editing an EXISTING row: a legacy outcome has to survive the save,
 		// or opening #53 and pressing Save silently reclassifies it.
 		if !journal.IsEditOutcome(outcome) {
-			rerender("outcome required when closed_at is set — one of " +
-				journal.OutcomeList(journal.CloseOutcomes))
+			rerender(tr("jf.err.outcomeClosed", journal.OutcomeList(journal.CloseOutcomes)))
 			return
 		}
 		if outcome == "no-fill" {
@@ -1900,7 +1902,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	if levStr := strings.TrimSpace(c.PostForm("leverage")); levStr != "" {
 		n, err := strconv.Atoi(levStr)
 		if err != nil || n < 0 || n > 500 {
-			rerender("leverage must be an integer 0-500")
+			rerender(tr("jf.err.leverage"))
 			return
 		}
 		leverage = n
@@ -1910,7 +1912,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	if mStr := strings.TrimSpace(c.PostForm("margin_usdt")); mStr != "" {
 		v, err := strconv.ParseFloat(mStr, 64)
 		if err != nil || v < 0 {
-			rerender("margin_usdt must be a non-negative number")
+			rerender(tr("jf.err.marginNeg"))
 			return
 		}
 		marginUSDT = v
@@ -2368,6 +2370,7 @@ func (s *server) handleJournalList(c *gin.Context) {
 		"Equity":       equity,
 		"TP1Status":    c.Query("tp1_status"), // "" / "ok" / "skip" / "error" — flash from /journal/open
 		"TP1Msg":       c.Query("tp1_msg"),
+		"Flash":        parseFlash(c.Query("tp1_msg")),
 	})
 }
 
@@ -5309,6 +5312,30 @@ func computeChartMarkers(candles []market.Candle) []map[string]any {
 		}
 		seen[key] = true
 		out = append(out, m)
+	}
+	return out
+}
+
+// flashLine is one line of the /journal order-result banner. /journal/open
+// packs each placement as "leg:status:message"; other flashes are plain
+// lines (Leg empty).
+type flashLine struct {
+	Leg, Status, Text string
+}
+
+func parseFlash(msg string) []flashLine {
+	var out []flashLine
+	for _, line := range strings.Split(msg, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) == 3 && (parts[0] == "entry" || parts[0] == "tp1") &&
+			(parts[1] == "ok" || parts[1] == "skip" || parts[1] == "error") {
+			out = append(out, flashLine{Leg: parts[0], Status: parts[1], Text: parts[2]})
+			continue
+		}
+		out = append(out, flashLine{Text: line})
 	}
 	return out
 }

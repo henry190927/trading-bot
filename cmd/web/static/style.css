@@ -7197,3 +7197,25 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .vx-orphan { display: flex; flex-direction: column; gap: 6px; padding: var(--sp-3) 0; border-top: 1px solid var(--border); }
 .vx-orphan:first-of-type { border-top: 0; padding-top: 0; }
 .vx-orphan.is-bad .ui-sym { color: var(--red); }
+
+/* ---------- journal: order-result flash ---------- */
+.ui-banner.flash { align-items: flex-start; }
+.ui-banner.flash .ico { margin-top: 2px; }
+.flash-lines { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.flash-lines > div { color: var(--text); font-size: var(--fs-sm); }
+.flash-text { font-family: var(--mono); font-size: var(--fs-xs); white-space: pre-wrap; word-break: break-word; }
+.ui-tag.flash-ok { color: var(--green); }
+.ui-tag.flash-skip { color: var(--yellow); }
+.ui-tag.flash-error { color: var(--red); }
+
+/* ---------- journal forms ---------- */
+.jf-prices { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.jf-pnl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2) var(--sp-4); padding: var(--sp-3); border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--border); }
+.jf-pnl[hidden] { display: none; }
+.jf-pnl .pnl-row { display: flex; flex-direction: column; gap: 2px; }
+.jf-pnl .pnl-label { font-size: var(--fs-xs); color: var(--text-dim); }
+.jf-pnl .pnl-val { font-family: var(--mono); font-size: var(--fs-base); }
+.jf-pnl .pnl-val.pnl-pos { color: var(--green); }
+.jf-pnl .pnl-val.pnl-neg { color: var(--red); }
+.jf-pnl .pnl-note { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.5; }
+.ui-modal-box .modal-override-warn { color: var(--red); font-weight: 700; }

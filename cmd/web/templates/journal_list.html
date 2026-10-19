@@ -17,7 +17,15 @@
 <main class="ui-page">
 
 {{if .TP1Status}}
-  <div class="tp1-flash tp1-{{.TP1Status}}" role="status"><strong>BingX TP1:</strong> {{.TP1Msg}}</div>
+  {{/* Order results from BingX. The sentences are localized where they are
+       made; exchange error text inside them stays verbatim. */}}
+  <div class="ui-banner flash {{if eq .TP1Status "error"}}bad{{else if eq .TP1Status "skip"}}warn{{else}}ok{{end}}" role="status">
+    {{template "icon" (or (and (eq .TP1Status "ok") "check") "alert")}}
+    <div class="flash-lines">
+      <b>{{t "flash.title"}}</b>
+      {{range .Flash}}<div>{{if .Leg}}<span class="ui-tag flash-{{.Status}}">{{t (printf "flash.leg.%s" .Leg)}} · {{t (printf "flash.st.%s" .Status)}}</span> {{end}}<span class="flash-text">{{.Text}}</span></div>{{end}}
+    </div>
+  </div>
 {{end}}
 
 {{if .Error}}

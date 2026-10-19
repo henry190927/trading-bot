@@ -312,3 +312,20 @@ func TestTPFaultEnglishMatchesDictionary(t *testing.T) {
 		}
 	}
 }
+
+func TestParseFlash(t *testing.T) {
+	got := parseFlash("entry:ok:entry placed — orderId=1 qty=0.5 @ 2400.0000\ntp1:skip:no open long position: x\nCLOSE #3 cancel results:")
+	want := []flashLine{
+		{Leg: "entry", Status: "ok", Text: "entry placed — orderId=1 qty=0.5 @ 2400.0000"},
+		{Leg: "tp1", Status: "skip", Text: "no open long position: x"},
+		{Text: "CLOSE #3 cancel results:"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d lines, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
