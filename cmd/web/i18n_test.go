@@ -15,6 +15,7 @@ import (
 
 	"github.com/henry190927/trading-bot/autotrade"
 	"github.com/henry190927/trading-bot/journal"
+	"github.com/henry190927/trading-bot/risk"
 )
 
 // A key in one dictionary and not the other is exactly the bug the server
@@ -252,5 +253,26 @@ func TestFactorNamesTranslated(t *testing.T) {
 	}
 	if n == 0 {
 		t.Fatal("found no Factor{...} literals — the pattern no longer matches validator")
+	}
+}
+
+// Every risk message code has a translation in each language, quoting the
+// same number of values as risk.EnglishFormat — a translation that drops or
+// adds a verb would print "%!" or lose a number in the refusal.
+func TestRiskMessagesTranslated(t *testing.T) {
+	dicts, _ := loadDicts(i18nFS)
+	verbs := regexp.MustCompile(`%[-+# 0]*[0-9]*(?:\.[0-9]+)?[dfsvgx]`)
+	for code, en := range risk.EnglishFormat {
+		want := len(verbs.FindAllString(en, -1))
+		for _, l := range langs {
+			f, ok := dicts[l]["risk."+code]
+			if !ok {
+				t.Errorf("%s.json: no risk.%s", l, code)
+				continue
+			}
+			if got := len(verbs.FindAllString(f, -1)); got != want {
+				t.Errorf("%s.json risk.%s quotes %d values, EnglishFormat %d", l, code, got, want)
+			}
+		}
 	}
 }

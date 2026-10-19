@@ -112,15 +112,20 @@ func (s *server) handleOpsEntry(c *gin.Context) {
 	// Size gate on the ACTUAL notional (floored qty x entry), same call the
 	// rest of the order path makes.
 	verdict, _ := s.checkNewPosition(ctx, plan.NotionalUSDT)
+	tr := s.translator(langOf(c))
+	reason := ""
+	if verdict.ReasonMsg != nil {
+		reason = riskText(tr, *verdict.ReasonMsg)
+	}
 	out["risk_gate"] = gin.H{
-		"blocked": verdict.Blocked, "reason": verdict.Reason,
-		"enforced": verdict.Enforced, "warnings": verdict.Warnings,
+		"blocked": verdict.Blocked, "reason": reason,
+		"enforced": verdict.Enforced, "warnings": riskWarnings(tr, verdict),
 		"lev_before": verdict.LevBefore, "lev_after": verdict.LevAfter,
 		"kill_distance_pct": verdict.KillDistancePct,
 	}
 	if verdict.Blocked {
 		out["stage"] = "refused"
-		out["faults"] = append(plan.Faults, "risk gate: "+verdict.Reason)
+		out["faults"] = append(plan.Faults, tr("risk.gatePrefix")+reason)
 		c.JSON(http.StatusBadRequest, out)
 		return
 	}

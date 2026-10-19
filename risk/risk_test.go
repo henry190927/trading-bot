@@ -263,3 +263,63 @@ func TestBlockedVerdictHasNoApprovalNoise(t *testing.T) {
 		t.Errorf("a blocked verdict also carried warnings %v", v.Warnings)
 	}
 }
+
+// Every message exists twice — English text for logs and pushes, code and
+// values for a UI — and the two must never say different things. This runs
+// one verdict per code and checks both the invariant and that the table has
+// no code Check can no longer produce.
+func TestMessagesCarryTheirCode(t *testing.T) {
+	missingPositions := flat(100)
+	missingPositions.UsedMargin = 50 // margin committed, but no positions listed
+	cases := []struct {
+		code string
+		l    Limits
+		e    Exposure
+		n    float64
+	}{
+		{"no-limits", Limits{}, flat(100), 10},
+		{"max-concurrent", Limits{MaxConcurrent: 1}, Exposure{OpenCount: 1, Legs: []string{"BTC LONG 900u"}}, 10},
+		{"max-notional", Limits{MaxNotionalUSDT: 1000}, Exposure{OpenNotional: 900, OpenCount: 1}, 200},
+		{"equity-unknown", Limits{MaxAccountLev: 10}, Exposure{}, 10},
+		{"equity-nonpositive", Limits{MaxAccountLev: 10}, flat(0), 10},
+		{"positions-missing", Limits{MaxAccountLev: 10}, missingPositions, 10},
+		{"max-account-leverage", Limits{MaxAccountLev: 10}, flat(100), 2000},  // 20x > 10x
+		{"warn-account-leverage", Limits{WarnAccountLev: 5}, flat(100), 1000}, // 10x > 5x, advisory
+	}
+	seen := map[string]bool{}
+	for _, tc := range cases {
+		v := Check(tc.l, tc.e, tc.n)
+		var msgs []Msg
+		if v.ReasonMsg != nil {
+			msgs = append(msgs, *v.ReasonMsg)
+			if v.Reason != v.ReasonMsg.English() {
+				t.Errorf("%s: Reason %q != ReasonMsg %q", tc.code, v.Reason, v.ReasonMsg.English())
+			}
+		}
+		if len(v.Warnings) != len(v.WarningMsgs) {
+			t.Fatalf("%s: %d warnings vs %d messages", tc.code, len(v.Warnings), len(v.WarningMsgs))
+		}
+		for i, m := range v.WarningMsgs {
+			msgs = append(msgs, m)
+			if v.Warnings[i] != m.English() {
+				t.Errorf("%s: Warnings[%d] %q != %q", tc.code, i, v.Warnings[i], m.English())
+			}
+		}
+		found := false
+		for _, m := range msgs {
+			seen[m.Code] = true
+			found = found || m.Code == tc.code
+			if strings.Contains(m.English(), "%!") {
+				t.Errorf("%s: format/args mismatch: %q", m.Code, m.English())
+			}
+		}
+		if !found {
+			t.Errorf("case %s produced %+v", tc.code, msgs)
+		}
+	}
+	for code := range EnglishFormat {
+		if !seen[code] {
+			t.Errorf("EnglishFormat has %q but no case reaches it", code)
+		}
+	}
+}

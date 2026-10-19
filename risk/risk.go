@@ -113,6 +113,13 @@ type Verdict struct {
 	Reason   string   // "" when not blocked
 	Warnings []string // advisory; present on allowed verdicts too
 
+	// The same messages as codes and values, for a UI that renders them in
+	// its own language. Reason == ReasonMsg.English() and Warnings[i] ==
+	// WarningMsgs[i].English(), always: both are built in one place (refuse,
+	// warn) from one format table.
+	ReasonMsg   *Msg  `json:",omitempty"`
+	WarningMsgs []Msg `json:",omitempty"`
+
 	// Enforced is false when the numbers could not be computed — equity
 	// unreadable, or the exchange contradicting itself. The candidate is
 	// ALLOWED in that case (see Check) and Warnings says why.
@@ -125,6 +132,47 @@ type Verdict struct {
 	// KillDistancePct is the adverse move that would zero the account with
 	// the new position on. 0 when not computable.
 	KillDistancePct float64
+}
+
+// Msg is one verdict message: a stable code, the values it quotes, and the
+// open positions it names (a refusal says what is already on, not only the
+// number it exceeded).
+type Msg struct {
+	Code string
+	Args []any
+	Legs []string
+}
+
+// EnglishFormat is the English sentence for each code — what Reason and
+// Warnings carry, and what logs and pushes print. A UI translation of a
+// code must quote the same values in the same order.
+var EnglishFormat = map[string]string{
+	"no-limits":             "no risk limits configured — set RISK_MAX_ACCOUNT_LEV / RISK_WARN_ACCOUNT_LEV / RISK_MAX_NOTIONAL_USDT / RISK_MAX_CONCURRENT",
+	"max-concurrent":        "max-concurrent: %d already open >= cap %d",
+	"max-notional":          "max-notional: %.0fu open + %.0fu new = %.0fu > cap %.0fu",
+	"equity-unknown":        "account equity could not be read — leverage limits NOT enforced for this order; check /ops/balance",
+	"equity-nonpositive":    "account equity reads %.2fu — leverage limits not applicable; the exchange will reject for insufficient margin",
+	"positions-missing":     "exchange reports %.2fu of used margin but returned NO positions — exposure is understated, leverage limits NOT enforced. Check /ops/verify.",
+	"max-account-leverage":  "max-account-leverage: %.0fu open + %.0fu new = %.0fu on %.2fu equity = %.1fx > cap %.1fx (kill distance %.3f%%)",
+	"warn-account-leverage": "account leverage would be %.1fx (%.0fu on %.2fu equity) — kill distance %.3f%%, warn threshold %.1fx",
+}
+
+// English renders the message as Reason / Warnings print it.
+func (m Msg) English() string {
+	return fmt.Sprintf(EnglishFormat[m.Code], m.Args...) + legsSuffix(m.Legs)
+}
+
+func (v *Verdict) refuse(code string, legs []string, args ...any) {
+	m := Msg{Code: code, Args: args, Legs: legs}
+	v.Blocked = true
+	v.ReasonMsg = &m
+	v.Reason = m.English()
+}
+
+func (v *Verdict) warn(code string, args ...any) {
+	m := Msg{Code: code, Args: args}
+	v.WarningMsgs = append(v.WarningMsgs, m)
+	v.Warnings = append(v.Warnings, m.English())
 }
 
 // Check decides whether a new position of newNotional USDT may be opened.
@@ -142,7 +190,7 @@ func Check(l Limits, e Exposure, newNotional float64) Verdict {
 		NotionalAfter:  e.OpenNotional + newNotional,
 	}
 	if !l.Enabled() {
-		v.Warnings = append(v.Warnings, "no risk limits configured — set RISK_MAX_ACCOUNT_LEV / RISK_WARN_ACCOUNT_LEV / RISK_MAX_NOTIONAL_USDT / RISK_MAX_CONCURRENT")
+		v.warn("no-limits")
 		return v
 	}
 
@@ -150,16 +198,12 @@ func Check(l Limits, e Exposure, newNotional float64) Verdict {
 	// limit that still binds when the balance read fails.
 	if l.MaxConcurrent > 0 && e.OpenCount >= l.MaxConcurrent {
 		v.Enforced = true
-		v.Blocked = true
-		v.Reason = fmt.Sprintf("max-concurrent: %d already open >= cap %d%s",
-			e.OpenCount, l.MaxConcurrent, legsSuffix(e.Legs))
+		v.refuse("max-concurrent", e.Legs, e.OpenCount, l.MaxConcurrent)
 		return v
 	}
 	if l.MaxNotionalUSDT > 0 && v.NotionalAfter > l.MaxNotionalUSDT {
 		v.Enforced = true
-		v.Blocked = true
-		v.Reason = fmt.Sprintf("max-notional: %.0fu open + %.0fu new = %.0fu > cap %.0fu%s",
-			e.OpenNotional, newNotional, v.NotionalAfter, l.MaxNotionalUSDT, legsSuffix(e.Legs))
+		v.refuse("max-notional", e.Legs, e.OpenNotional, newNotional, v.NotionalAfter, l.MaxNotionalUSDT)
 		return v
 	}
 
@@ -171,15 +215,13 @@ func Check(l Limits, e Exposure, newNotional float64) Verdict {
 
 	switch {
 	case !e.EquityKnown:
-		v.Warnings = append(v.Warnings,
-			"account equity could not be read — leverage limits NOT enforced for this order; check /ops/balance")
+		v.warn("equity-unknown")
 		return v
 	case e.Equity <= 0:
 		// A zero-equity account cannot open anything; BingX rejects it for
 		// insufficient margin. Duplicating that here would only replace a
 		// clear exchange error with a local one.
-		v.Warnings = append(v.Warnings,
-			fmt.Sprintf("account equity reads %.2fu — leverage limits not applicable; the exchange will reject for insufficient margin", e.Equity))
+		v.warn("equity-nonpositive", e.Equity)
 		return v
 	}
 
@@ -189,9 +231,7 @@ func Check(l Limits, e Exposure, newNotional float64) Verdict {
 	// enforce is right: the alternative is approving an order against an
 	// understated book.
 	if e.UsedMarginKnown && e.UsedMargin > 0 && e.OpenCount == 0 {
-		v.Warnings = append(v.Warnings, fmt.Sprintf(
-			"exchange reports %.2fu of used margin but returned NO positions — exposure is understated, leverage limits NOT enforced. Check /ops/verify.",
-			e.UsedMargin))
+		v.warn("positions-missing", e.UsedMargin)
 		return v
 	}
 
@@ -203,16 +243,12 @@ func Check(l Limits, e Exposure, newNotional float64) Verdict {
 	}
 
 	if l.MaxAccountLev > 0 && v.LevAfter > l.MaxAccountLev {
-		v.Blocked = true
-		v.Reason = fmt.Sprintf(
-			"max-account-leverage: %.0fu open + %.0fu new = %.0fu on %.2fu equity = %.1fx > cap %.1fx (kill distance %.3f%%)%s",
-			e.OpenNotional, newNotional, v.NotionalAfter, e.Equity, v.LevAfter, l.MaxAccountLev, v.KillDistancePct, legsSuffix(e.Legs))
+		v.refuse("max-account-leverage", e.Legs,
+			e.OpenNotional, newNotional, v.NotionalAfter, e.Equity, v.LevAfter, l.MaxAccountLev, v.KillDistancePct)
 		return v
 	}
 	if l.WarnAccountLev > 0 && v.LevAfter > l.WarnAccountLev {
-		v.Warnings = append(v.Warnings, fmt.Sprintf(
-			"account leverage would be %.1fx (%.0fu on %.2fu equity) — kill distance %.3f%%, warn threshold %.1fx",
-			v.LevAfter, v.NotionalAfter, e.Equity, v.KillDistancePct, l.WarnAccountLev))
+		v.warn("warn-account-leverage", v.LevAfter, v.NotionalAfter, e.Equity, v.KillDistancePct, l.WarnAccountLev)
 	}
 	return v
 }

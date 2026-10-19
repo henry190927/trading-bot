@@ -683,5 +683,15 @@
   "ops.aiNoModels": "No models available",
   "ops.aiSet": "Model set to",
   "ops.aiSaveFailed": "Save failed:",
-  "ops.netErr": "Network error:"
+  "ops.netErr": "Network error:",
+  "risk.no-limits": "No risk limits configured — set RISK_MAX_ACCOUNT_LEV / RISK_WARN_ACCOUNT_LEV / RISK_MAX_NOTIONAL_USDT / RISK_MAX_CONCURRENT",
+  "risk.max-concurrent": "Max concurrent: %d already open ≥ cap %d",
+  "risk.max-notional": "Max notional: %.0fu open + %.0fu new = %.0fu > cap %.0fu",
+  "risk.equity-unknown": "Account equity could not be read — leverage limits NOT enforced for this order; check account exposure in Settings",
+  "risk.equity-nonpositive": "Account equity reads %.2fu — leverage limits do not apply; the exchange will reject for insufficient margin",
+  "risk.positions-missing": "The exchange reports %.2fu of used margin but returned no positions — exposure is understated and leverage limits are NOT enforced. Check Exchange check.",
+  "risk.max-account-leverage": "Max account leverage: %.0fu open + %.0fu new = %.0fu on %.2fu equity = %.1f× > cap %.1f× (kill distance %.3f%%)",
+  "risk.warn-account-leverage": "Account leverage would be %.1f× (%.0fu on %.2fu equity) — kill distance %.3f%%, above the %.1f× warning",
+  "risk.legs": " [open: %s]",
+  "risk.gatePrefix": "Risk gate: "
 }

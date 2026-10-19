@@ -683,5 +683,15 @@
   "ops.aiNoModels": "沒有可用模型",
   "ops.aiSet": "模型已設為",
   "ops.aiSaveFailed": "儲存失敗:",
-  "ops.netErr": "網路錯誤:"
+  "ops.netErr": "網路錯誤:",
+  "risk.no-limits": "沒有設定任何風險上限:請設定 RISK_MAX_ACCOUNT_LEV / RISK_WARN_ACCOUNT_LEV / RISK_MAX_NOTIONAL_USDT / RISK_MAX_CONCURRENT",
+  "risk.max-concurrent": "同時持倉上限:已有 %d 個部位 ≥ 上限 %d",
+  "risk.max-notional": "名目上限:現有 %.0fu + 新單 %.0fu = %.0fu > 上限 %.0fu",
+  "risk.equity-unknown": "讀不到帳戶權益:這筆單的槓桿上限沒有被檢查;請看設定頁的帳戶曝險",
+  "risk.equity-nonpositive": "帳戶權益為 %.2fu:槓桿上限不適用,交易所會以保證金不足拒單",
+  "risk.positions-missing": "交易所回報已用保證金 %.2fu,卻沒有回傳任何部位:曝險被低估,槓桿上限沒有被檢查。請到「交易所查證」確認。",
+  "risk.max-account-leverage": "帳戶槓桿上限:現有 %.0fu + 新單 %.0fu = %.0fu,權益 %.2fu = %.1f× > 上限 %.1f×(歸零距離 %.3f%%)",
+  "risk.warn-account-leverage": "帳戶槓桿會到 %.1f×(%.0fu / 權益 %.2fu),歸零距離 %.3f%%,超過警戒值 %.1f×",
+  "risk.legs": " [持倉:%s]",
+  "risk.gatePrefix": "風險閘門擋下:"
 }

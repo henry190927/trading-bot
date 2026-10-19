@@ -58,10 +58,8 @@ func (s *server) handleOpsBalance(c *gin.Context) {
 	if legs == nil {
 		legs = []string{}
 	}
-	warnings := v.Warnings
-	if warnings == nil {
-		warnings = []string{}
-	}
+	// In the page's language, from the verdict's codes (i18n_risk.go).
+	warnings := riskWarnings(s.translator(langOf(c)), v)
 
 	c.JSON(http.StatusOK, gin.H{
 		"asset":            b.Asset,
