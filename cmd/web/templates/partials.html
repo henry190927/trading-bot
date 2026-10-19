@@ -301,3 +301,22 @@
 </div>
 </section>
 {{end}}
+
+{{/* ============================================================ */}}
+{{/* Multi-leg exit calculator shared by the journal edit and close forms;
+     driven by /static/partials.js through these ids. */}}
+{{define "partialsHelper"}}
+<details class="partials-helper jf-partials">
+  <summary>{{t "jf.partials"}} <span class="ui-hint">{{t "jf.partialsHint"}}</span></summary>
+  <div id="partials-rows">
+    <div class="partial-row">
+      <input type="number" step="any" min="0" max="100" class="partial-weight" placeholder="{{t "jf.p.size"}}" inputmode="decimal">
+      <input type="number" step="any" min="0" class="partial-price" placeholder="{{t "jf.p.price"}}" inputmode="decimal">
+      <button type="button" class="btn-remove-partial" aria-label="{{t "jf.p.remove"}}">×</button>
+    </div>
+  </div>
+  <button type="button" id="add-partial" class="ui-btn ghost sm">{{t "jf.p.add"}}</button>
+  <div id="partials-summary" class="partials-summary"></div>
+</details>
+<script>window.PARTIALS_I18N = {size: {{t "jf.p.size"}}, price: {{t "jf.p.price"}}, remove: {{t "jf.p.remove"}}, avg: {{t "jf.p.avg"}}, apply: {{t "jf.p.apply"}}, applied: {{t "jf.p.applied"}}};</script>
+{{end}}

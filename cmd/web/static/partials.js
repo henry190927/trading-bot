@@ -11,14 +11,17 @@
     var exitInput = document.getElementById('exit_price');
     var outcomeSel = document.getElementById('outcome');
     var closeNotes = document.getElementById('close_notes');
+    // Labels come from the page (server-side dictionary). The "legs: …" tag
+    // written into close_notes is data, not a label, and stays as is.
+    var L = window.PARTIALS_I18N || { size: '% size', price: 'exit price', remove: 'remove leg', avg: 'avg', apply: 'apply →', applied: '✓ applied' };
 
     function rowTemplate() {
         var d = document.createElement('div');
         d.className = 'partial-row';
         d.innerHTML =
-            '<input type="number" step="any" min="0" max="100" class="partial-weight" placeholder="% size" inputmode="decimal">' +
-            '<input type="number" step="any" min="0" class="partial-price" placeholder="exit price" inputmode="decimal">' +
-            '<button type="button" class="btn-remove-partial" aria-label="remove leg">×</button>';
+            '<input type="number" step="any" min="0" max="100" class="partial-weight" placeholder="' + L.size + '" inputmode="decimal">' +
+            '<input type="number" step="any" min="0" class="partial-price" placeholder="' + L.price + '" inputmode="decimal">' +
+            '<button type="button" class="btn-remove-partial" aria-label="' + L.remove + '">×</button>';
         return d;
     }
 
@@ -44,9 +47,9 @@
             ? ' <span class="partials-warn">(Σ ≠ 100%)</span>'
             : '';
         summary.innerHTML =
-            '<span>Σ ' + totW.toFixed(1) + '%' + warn + ' · avg <strong>' +
+            '<span>Σ ' + totW.toFixed(1) + '%' + warn + ' · ' + L.avg + ' <strong>' +
             avg.toFixed(4) + '</strong></span>' +
-            '<button type="button" id="apply-partials" class="btn-apply-partials">apply →</button>';
+            '<button type="button" id="apply-partials" class="ui-btn ghost sm btn-apply-partials">' + L.apply + '</button>';
         summary.dataset.avg = avg.toFixed(4);
         summary.dataset.legs = legs.join(', ');
     }
@@ -80,7 +83,7 @@
         var btn = document.getElementById('apply-partials');
         if (btn) {
             var orig = btn.textContent;
-            btn.textContent = '✓ applied';
+            btn.textContent = L.applied;
             btn.disabled = true;
             setTimeout(function () { btn.textContent = orig; btn.disabled = false; }, 1200);
         }
