@@ -295,21 +295,25 @@
        target and the range box, with the record-a-setup action. */}}
   <section class="cs-card cs-read">
     <div class="cs-card-h"><h2>{{t "chart.readTitle"}}</h2></div>
+    <div class="chart-struct-panel hidden" id="chart-struct-panel">
+      <span class="cs-lean" id="cs-lean">—</span>
+      <div class="cs-sec">{{t "chart.read.structure"}}</div>
+      <div class="cs-row"><em>{{t "chart.ui.trend"}}</em><span id="cs-trend">—</span></div>
+      <div class="cs-row"><em>{{t "chart.ui.event"}}</em><span id="cs-event">—</span></div>
+      <div class="cs-sec" id="cs-zone-sec">{{t "chart.pivotZone"}}</div>
+      <div class="cs-row" id="cs-zone-wrap"><em>{{t "chart.read.range"}}</em><span id="cs-zone">—</span></div>
+      <div class="cs-row" id="cs-inzone-wrap"><em>{{t "chart.ui.inzone"}}</em><span id="cs-inzone">—</span></div>
+      <div class="cs-row" id="cs-tgt-wrap"><em>{{t "chart.read.tgtInv"}}</em><span id="cs-target">—</span></div>
+    </div>
+    <div class="chart-hvn-panel hidden" id="chart-hvn-panel" title="{{t "chart.hvnHint"}}">
+      <div class="cs-sec">{{t "chart.hvnTarget"}}</div>
+      <div id="chart-hvn-body">—</div>
+    </div>
+    <div class="cs-levels" id="cs-levels"></div>
+    {{/* Vote count and POC drift: the engine's one-line read, as a footnote. */}}
     <div class="chart-one-liner" id="chart-oneliner">
       <span id="chart-oneliner-text">{{t "common.loading"}}</span>
     </div>
-    <div class="chart-struct-panel hidden" id="chart-struct-panel">
-      <span class="cs-lean" id="cs-lean">—</span>
-      <span class="cs-kv"><em>{{t "chart.ui.trend"}}</em><span id="cs-trend">—</span></span>
-      <span class="cs-kv"><em>{{t "chart.ui.event"}}</em><span id="cs-event">—</span></span>
-      <span class="cs-kv" id="cs-zone-wrap"><em>{{t "chart.pivotZone"}}</em><span id="cs-zone">—</span></span>
-      <span class="cs-kv" id="cs-inzone-wrap"><em>{{t "chart.ui.inzone"}}</em><span id="cs-inzone">—</span></span>
-      <span class="cs-kv" id="cs-tgt-wrap"><em>{{t "chart.ui.target"}}</em><span id="cs-target">—</span></span>
-    </div>
-    <div class="chart-hvn-panel hidden" id="chart-hvn-panel" title="{{t "chart.hvnHint"}}">
-      <span class="cs-kv"><em>{{t "chart.hvnTarget"}}</em><span id="chart-hvn-body">—</span></span>
-    </div>
-    <div class="cs-levels" id="cs-levels"></div>
   </section>
 
   {{/* Open interest, filled by loadBias from the same /api/chart/bias call. */}}
@@ -904,6 +908,12 @@
         "hvn.stripTip": {{t "chart.js.hvn.stripTip"}},
         "range.tip": {{t "chart.js.range.tip"}},
         "range.box": {{t "chart.js.range.box"}},
+        "read.nearHVN": {{t "chart.read.nearHVN"}},
+        "read.range": {{t "chart.read.range"}},
+        "read.pos": {{t "chart.read.pos"}},
+        "trend.HH-HL uptrend": {{t "chart.read.trendUp"}},
+        "trend.LH-LL downtrend": {{t "chart.read.trendDown"}},
+        "trend.neutral": {{t "chart.read.trendNeutral"}},
         "fav.none": {{t "chart.js.fav.none"}},
         "fav.showAll": {{t "chart.js.fav.showAll"}},
         "fav.onlyFavs": {{t "chart.js.fav.onlyFavs"}},
@@ -1639,7 +1649,7 @@
             leanEl.textContent = lean.txt + (leanLive ? ' ⏳' : '');
             leanEl.className = 'cs-lean ' + lean.cls + (leanLive ? ' unconfirmed' : '');
         }
-        csSet('cs-trend', s.trend || '—');
+        csSet('cs-trend', CT['trend.' + (s.trend || 'neutral')] || s.trend || '—');
         csSet('cs-event', hasEvent ? (s.event + (eventLive ? ' ⏳' : '')) : '—');
         csMark('cs-event', eventLive);
         if (s.zone) {
@@ -1660,10 +1670,11 @@
                 + (zoneDirectional ? '' : ' · ' + CT['zone.ref']));
             csSet('cs-inzone', (s.inZone ? CT['zone.in'] : CT['zone.out']) + (zoneLive ? ' ⏳' : ''));
             csMark('cs-inzone', zoneLive);
-            csSet('cs-target', csFmt(s.zone.target) + ' / inv ' + csFmt(s.zone.invalidate));
-            csShow('cs-zone-wrap', true); csShow('cs-inzone-wrap', true); csShow('cs-tgt-wrap', true);
+            var tgtEl = document.getElementById('cs-target');
+            if (tgtEl) tgtEl.innerHTML = '<b class="cs-up">' + csFmt(s.zone.target) + '</b> <span class="cs-dim">/</span> <b class="cs-down">' + csFmt(s.zone.invalidate) + '</b>';
+            csShow('cs-zone-wrap', true); csShow('cs-inzone-wrap', true); csShow('cs-tgt-wrap', true); csShow('cs-zone-sec', true);
         } else {
-            csShow('cs-zone-wrap', false); csShow('cs-inzone-wrap', false); csShow('cs-tgt-wrap', false);
+            csShow('cs-zone-wrap', false); csShow('cs-inzone-wrap', false); csShow('cs-tgt-wrap', false); csShow('cs-zone-sec', false);
         }
     }
     (function wireStructInfo() {
@@ -1809,18 +1820,21 @@
         var h = lastPlan && lastPlan.hvnTargets;
         if (!h) { wrap.classList.add('hidden'); return; }
         wrap.classList.remove('hidden');
+        // One row per node: price, R from the plan's entry, and whether
+        // anything sits in the way (clear air vs blocked by n nodes).
         var parts = [];
         (h.targets || []).forEach(function (t) {
-            var one = fmtPrice(t.price) + ' ' + t.r.toFixed(2) + 'R';
-            one += t.obstacles > 0 ? ' (' + CT['hvn.blocked'].replace('{n}', t.obstacles) + ')' : ' (' + CT['hvn.clear'] + ')';
-            if (t.isPOC) one += ' ★POC';
-            parts.push(t.clean ? '<b>' + one + '</b>' : one);
+            parts.push('<div class="hvn-row' + (t.clean ? ' clean' : '') + '">'
+                + '<b class="hvn-px">' + fmtPrice(t.price) + '</b>'
+                + '<span class="hvn-r">' + t.r.toFixed(2) + 'R</span>'
+                + '<span class="hvn-tag">' + (t.obstacles > 0 ? CT['hvn.blocked'].replace('{n}', t.obstacles) : CT['hvn.clear']) + '</span>'
+                + (t.isPOC ? '<span class="hvn-poc">POC</span>' : '') + '</div>');
         });
         // The server's two fixed notes (chart_hvn_targets.go), in the page
         // language: clear air ahead, or every node sits behind another.
-        if (h.note) parts.push('<i>' + (h.clearAhead ? CT['hvn.noteClear']
-            : (h.note.indexOf('no unobstructed') === 0 ? CT['hvn.noteBlocked'] : h.note)) + '</i>');
-        body.innerHTML = parts.join(' · ') || '—';
+        if (h.note) parts.push('<div class="hvn-note">' + (h.clearAhead ? CT['hvn.noteClear']
+            : (h.note.indexOf('no unobstructed') === 0 ? CT['hvn.noteBlocked'] : h.note)) + '</div>');
+        body.innerHTML = parts.join('') || '—';
     }
 
     // ── Open positions overlay ─────────────────────────────────────
@@ -3292,13 +3306,14 @@
                     var hv = '';
                     if (d.hvn.above) hv += '↑' + fmtH(d.hvn.above);
                     if (d.hvn.below) hv += (hv ? '  ' : '') + '↓' + fmtH(d.hvn.below);
-                    lv += '<div class="tf-bias-hvn" title="' + CT['hvn.stripTip'].replace(/"/g, '&quot;') + '">HVN ' + hv + '</div>';
+                    lv += '<div class="cs-sec">HVN</div><div class="cs-row" title="' + CT['hvn.stripTip'].replace(/"/g, '&quot;') + '"><em>' + CT['read.nearHVN'] + '</em><span class="cs-mono">' + hv + '</span></div>';
                 }
                 if (d.range && d.range.lo) {
                     var rf = function (v) { return v >= 1000 ? v.toFixed(0) : (v >= 1 ? v.toFixed(2) : v.toFixed(4)); };
                     var rzcls = d.range.isRange ? ('rzone-' + d.range.zone) : 'rzone-trend';
-                    lv += '<div class="tf-bias-range ' + rzcls + '" title="' + CT['range.tip'] + ' · ' + d.range.action + '">'
-                          + CT['range.box'] + ' ' + rf(d.range.lo) + '–' + rf(d.range.hi) + ' ·' + d.range.pos + '%<br><span class="tf-range-act">' + d.range.action + '</span></div>';
+                    lv += '<div class="cs-sec">' + CT['range.box'] + '</div>'
+                          + '<div class="cs-row" title="' + CT['range.tip'] + '"><em>' + CT['read.range'] + '</em><span class="cs-mono">' + rf(d.range.lo) + '–' + rf(d.range.hi) + '</span></div>'
+                          + '<div class="cs-row"><em>' + CT['read.pos'] + '</em><span><b class="cs-mono">' + d.range.pos + '%</b> <span class="cs-act ' + rzcls + '">' + d.range.action + '</span></span></div>';
                 }
                 el.innerHTML = html;
                 var lvEl = document.getElementById('cs-levels');

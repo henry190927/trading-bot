@@ -4512,3 +4512,41 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .chart-more-tz .chart-tz-select { width: 100%; }
 .chart-controls-end .cs-record-btn { height: 34px; margin-top: 0; white-space: nowrap; }
 @media (min-width: 721px) { .chart-controls-end .ai-analyze-btn { height: 34px; padding: 0 12px; border-radius: var(--r-sm); } }
+
+/* ---------- /chart structure-read card: sections of label/value rows ---------- */
+.chart-side .cs-read { gap: 0; }
+.chart-side .cs-read .chart-struct-panel { display: flex; flex-direction: column; gap: 0; }
+.chart-side .cs-read .chart-struct-panel.hidden, .chart-side .cs-read .chart-hvn-panel.hidden { display: none; }
+.chart-side .cs-read .cs-lean { align-self: flex-start; margin-bottom: var(--sp-2); }
+.cs-read .cs-sec { margin: var(--sp-3) 0 4px; font-size: var(--fs-xs); font-weight: 600; color: var(--text-dim); letter-spacing: .02em; }
+.cs-read .chart-struct-panel > .cs-sec:first-of-type { margin-top: 0; }
+.cs-read .cs-row { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); align-items: baseline; gap: var(--sp-2); padding: 4px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+.cs-read .cs-sec + .cs-row { border-top: 0; }
+.cs-read .cs-row.hidden { display: none; }
+.cs-read .cs-row > em { font-style: normal; color: var(--text-dim); font-size: var(--fs-xs); }
+.cs-read .cs-row > span { color: var(--text); min-width: 0; }
+.cs-read .cs-mono, .cs-read #cs-zone, .cs-read #cs-target { font-family: var(--mono); }
+.cs-read .cs-up { color: var(--green); font-weight: 600; } .cs-read .cs-down { color: var(--red); font-weight: 600; } .cs-read .cs-dim { color: var(--text-dim); }
+.cs-read .unconfirmed { opacity: .65; }
+.cs-read .hvn-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: baseline; gap: var(--sp-2); padding: 4px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+.cs-read .hvn-row:first-child { border-top: 0; }
+.cs-read .hvn-px { font-family: var(--mono); font-weight: 500; color: var(--text-dim); }
+.cs-read .hvn-row.clean .hvn-px { color: var(--text); font-weight: 700; }
+.cs-read .hvn-r { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-read .hvn-tag { font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-read .hvn-row.clean .hvn-tag { color: var(--green); }
+.cs-read .hvn-poc { font-size: var(--fs-xs); font-weight: 700; color: var(--blue); }
+.cs-read .hvn-note { margin-top: 4px; font-size: var(--fs-xs); color: var(--text-dim); }
+.cs-read .cs-act { font-size: var(--fs-xs); padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+.cs-read .cs-act.rzone-bottom { color: var(--green); background: var(--wash-green); }
+.cs-read .cs-act.rzone-top { color: var(--red); background: var(--wash-red); }
+.cs-read .cs-act.rzone-middle { color: var(--yellow); background: var(--yellow-bg); }
+.cs-read .cs-act.rzone-trend { color: var(--text-dim); background: var(--wash-dim); }
+.cs-read .cs-levels:empty { display: none; }
+.chart-side .cs-read .chart-one-liner { margin-top: var(--sp-3); padding-top: var(--sp-2); border-top: 1px dashed var(--border); font-size: var(--fs-xs); }
+/* The old strip styles centre and wrap their children; in the card every
+   row spans the full width. */
+.chart-side .cs-read .chart-struct-panel { align-items: stretch; flex-wrap: nowrap; }
+.chart-side .cs-read .chart-hvn-panel:not(.hidden) { display: block; }
+.chart-side .cs-read .chart-hvn-panel b.hvn-px { color: var(--text-dim); }
+.chart-side .cs-read .chart-hvn-panel .hvn-row.clean b.hvn-px { color: var(--text); }

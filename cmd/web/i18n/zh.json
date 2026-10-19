@@ -1061,5 +1061,13 @@
   "chart.js.bn.label": "Binance 參考",
   "chart.ui.more": "更多",
   "chart.ui.glossary": "名詞說明",
-  "chart.ui.timezone": "時區"
+  "chart.ui.timezone": "時區",
+  "chart.read.structure": "結構",
+  "chart.read.range": "區間",
+  "chart.read.tgtInv": "目標 / 失效",
+  "chart.read.nearHVN": "上下最近 HVN",
+  "chart.read.pos": "位置",
+  "chart.read.trendUp": "上升 (HH-HL)",
+  "chart.read.trendDown": "下降 (LH-LL)",
+  "chart.read.trendNeutral": "中性"
 }

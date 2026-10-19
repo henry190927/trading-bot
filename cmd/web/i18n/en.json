@@ -1061,5 +1061,13 @@
   "chart.js.bn.label": "Binance ref",
   "chart.ui.more": "More",
   "chart.ui.glossary": "Glossary",
-  "chart.ui.timezone": "Time zone"
+  "chart.ui.timezone": "Time zone",
+  "chart.read.structure": "Structure",
+  "chart.read.range": "Range",
+  "chart.read.tgtInv": "Target / invalid",
+  "chart.read.nearHVN": "Nearest HVN ↑↓",
+  "chart.read.pos": "Position",
+  "chart.read.trendUp": "Up (HH-HL)",
+  "chart.read.trendDown": "Down (LH-LL)",
+  "chart.read.trendNeutral": "Neutral"
 }
