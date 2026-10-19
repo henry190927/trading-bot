@@ -55,7 +55,7 @@ func AppendEvent(path string, e Event) error {
 		return err
 	}
 	if _, err := f.Write(append(data, '\n')); err != nil {
-		f.Close()
+		_ = f.Close() // the write error is the one worth returning
 		return err
 	}
 	return f.Close()
@@ -75,7 +75,7 @@ func RecentEvents(path string, n int) (events []Event, skipped int, err error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // read-only: nothing to flush
 
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)

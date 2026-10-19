@@ -217,9 +217,9 @@ func Write(path string, b Beat) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmp.Name()) // no-op once the rename has succeeded
+	defer func() { _ = os.Remove(tmp.Name()) }() // no-op once the rename has succeeded
 	if _, err := tmp.Write(append(data, '\n')); err != nil {
-		tmp.Close()
+		_ = tmp.Close() // the write error is the one worth returning
 		return err
 	}
 	if err := tmp.Close(); err != nil {
