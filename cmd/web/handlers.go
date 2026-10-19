@@ -3097,6 +3097,7 @@ func templateFuncs() template.FuncMap {
 		},
 		"outcomeKey":      outcomeKey,
 		"strategyKey":     strategyKey,
+		"liveRows":        liveRows,
 		"setupOutcomeKey": setupOutcomeKey,
 		"leanKey":         leanKey,
 		"outcomeText": func(t journal.Trade) string {

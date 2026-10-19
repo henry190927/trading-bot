@@ -564,7 +564,7 @@ func (s *server) handleSetupsList(c *gin.Context) {
 // knownStrategies are the Setup.Strategy codes with a dictionary entry
 // (strat.<code>). A code outside it renders as strat.other rather than as a
 // missing key.
-var knownStrategies = []string{"mr", "struct-momentum", "sweep-reject", "struct-reclaim", "range-edge"}
+var knownStrategies = []string{"mr", "struct-momentum", "sweep-reject", "struct-reclaim", "range-edge", "engine", "htf-snr"}
 
 func strategyKey(code string) string {
 	for _, k := range knownStrategies {

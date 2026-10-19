@@ -221,6 +221,15 @@ func scanRR(side string, entry, stop, tp float64) float64 {
 	return reward / risk
 }
 
+// liveTableData feeds the shared table on /ops/scan; Armed decides whether a
+// recorded row is marked "unarmed" in its note.
+type liveTableData struct {
+	Rows  []scanRow
+	Armed bool
+}
+
+func liveRows(rows []scanRow, armed bool) liveTableData { return liveTableData{rows, armed} }
+
 func (s *server) renderScan(c *gin.Context, rows []scanRow) {
 	// Firing rows are split by whether auto is armed. A page that mixed them
 	// would read as "the system will take these", when half of them are

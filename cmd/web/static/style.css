@@ -7107,3 +7107,25 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .scan-kv .copy-btn.stop { color: var(--red); }
 .scan-kv .copy-btn.tp { color: var(--green); }
 .ui-side.neutral { background: var(--wash-dim); color: var(--text-dim); }
+
+/* ---------- shared: banner, small button, ok tag ---------- */
+.ui-banner { display: flex; align-items: center; gap: var(--sp-2); padding: 10px var(--sp-4); border-radius: var(--r-md, 10px); font-size: var(--fs-base); border: 1px solid transparent; }
+.ui-banner .ico { width: 16px; height: 16px; flex: 0 0 auto; }
+.ui-banner.ok { background: var(--wash-green); color: var(--green); }
+.ui-banner.bad { background: var(--wash-red); color: var(--red); }
+.ui-banner.warn { background: var(--yellow-bg); color: var(--yellow); }
+.ui-banner a { color: inherit; font-weight: 600; }
+.ui-pill.idle { background: var(--wash-dim); color: var(--text-dim); }
+.ui-tag.ok { color: var(--green); background: var(--wash-green); border-color: transparent; }
+.ui-btn.sm { height: 26px; padding: 0 10px; font-size: var(--fs-sm); margin-top: 0; }
+.ui-btn.sm .ico { width: 14px; height: 14px; }
+
+/* ---------- tools: live setups ---------- */
+.live-t .live-why { white-space: normal; min-width: 14rem; }
+.live-t .live-why code { font-size: var(--fs-xs); color: var(--text-dim); }
+.live-grid > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+.live-grid > summary::-webkit-details-marker { display: none; }
+.live-grid > summary h2::before { content: "▸ "; color: var(--text-dim); }
+.live-grid[open] > summary h2::before { content: "▾ "; }
+.live-grid[open] > summary { margin-bottom: var(--sp-3); }
+.live-unarmed td { color: var(--text-dim); }

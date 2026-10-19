@@ -5,142 +5,111 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>current setups · trading-web</title>
+<title>{{t "tab.live"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 {{template "topnav" .}}
-<main class="tips-main">
-  <h1 class="tips-h1">
-    🎯 <span class="i18n-en">Current setups</span><span class="i18n-zh">當下 setups</span>
-    <span class="tips-sub">
-      <span class="i18n-en">every auto rule's trigger evaluated on the current closed bar — what could fire right now (same logic as the paper daemon)</span>
-      <span class="i18n-zh">每條 auto 規則在「當前收 K」上的觸發評估 —— 現在四種策略誰會進場(跟 paper daemon 同一套邏輯)</span>
-    </span>
-  </h1>
 
-  <div class="stats-card">
-    {{if .Recorded}}<div class="banner banner--ok">✓ <span class="i18n-en">Recorded setup</span><span class="i18n-zh">已記錄 setup</span> #{{.Recorded}} → <a href="/setups">/setups</a></div>{{end}}
-    {{if .RecErr}}<div class="banner banner--danger">⚠ <span class="i18n-en">record failed</span><span class="i18n-zh">記錄失敗</span></div>{{end}}
-    <div class="at-state">
-      <span class="badge {{if .FiringN}}b-green{{else}}b-dim{{end}}">{{.FiringN}} <span class="i18n-en">armed &amp; firing</span><span class="i18n-zh">上膛且觸發</span></span>
-      <span class="badge b-dim">{{.Watching}} <span class="i18n-en">rules armed</span><span class="i18n-zh">規則上膛中</span></span>
-      <span class="badge {{if .UnarmedFireN}}b-yellow{{else}}b-dim{{end}}">{{.UnarmedFireN}} <span class="i18n-en">firing but UNARMED</span><span class="i18n-zh">觸發但沒上膛</span></span>
-      <span class="badge b-dim">{{.GridN}} <span class="i18n-en">cells scanned</span><span class="i18n-zh">格子已掃</span></span>
-    </div>
+{{/* Every auto rule's trigger on the current closed bar, plus the
+     (symbol x strategy) cells no rule covers. Armed and unarmed firing rows
+     stay in separate tables on purpose: mixed, they would read as "the system
+     will take these" when nothing watches the unarmed half. */}}
+<main class="ui-page">
+  {{if .Recorded}}<div class="ui-banner ok">{{template "icon" "check"}}<span>{{printf (t "live.recorded") .Recorded}} <a href="/setups">{{t "tab.setups"}} →</a></span></div>{{end}}
+  {{if .RecErr}}<div class="ui-banner bad">{{template "icon" "alert"}}<span>{{t "live.recErr"}}</span></div>{{end}}
 
+  <div class="ui-status">
+    <span class="ui-pill {{if .FiringN}}ok{{else}}idle{{end}}">{{template "icon" "flag"}}{{printf (t "live.firingN") .FiringN}}</span>
+    {{if .UnarmedFireN}}<span class="ui-pill warn">{{printf (t "live.unarmedFireN") .UnarmedFireN}}</span>{{end}}
+    <span class="ui-dim">{{printf (t "live.grid") .Watching .UnarmedN}}</span>
+    <span class="ui-grow"></span>
+    <span class="ui-dim ui-sm">{{t "live.cached"}} · <span class="ui-num">{{.UpdatedUTC}}</span></span>
+  </div>
+
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{t "live.armedTitle"}}</h2><span class="ui-count">{{.FiringN}}</span><span class="ui-sub" style="margin:0">{{t "live.armedSub"}}</span></header>
     {{if .Firing}}
-    <h2 class="section-title" style="margin-top:.6rem">🟢 <span class="i18n-en">Firing now</span><span class="i18n-zh">現在有 setup</span></h2>
-    <div class="dt-scroll">
-    <table class="dt">
-      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>side</th><th title="validator /100">評分</th><th>entry</th><th>stop</th><th>tp</th><th>R:R</th><th>mode</th><th>記</th><th>why</th></tr></thead>
-      <tbody>
-        {{range .Firing}}
-        <tr>
-          <td><strong>{{.Symbol}}</strong></td>
-          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
-          <td class="cs-dim">{{.TF}}</td>
-          <td class="dir-{{.Side}}">{{.Side}}</td>
-          <td class="num">{{if .Score}}<span style="color:{{if ge .Score 60.0}}var(--green){{else if lt .Score 40.0}}var(--red){{else}}var(--text){{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-          <td class="num">{{printf "%.4f" .Entry}}</td>
-          <td class="num">{{printf "%.4f" .Stop}}</td>
-          <td class="num">{{printf "%.4f" .TP}}</td>
-          <td class="num">{{printf "%.1f" .RR}}</td>
-          <td>{{if .Market}}<span class="badge b-yellow">market</span>{{else}}<span class="badge b-blue">limit</span>{{end}}</td>
-          <td>
-            <form method="post" action="/scan/record" style="margin:0">
-              <input type="hidden" name="symbol" value="{{.Symbol}}">
-              <input type="hidden" name="tf" value="{{.TF}}">
-              <input type="hidden" name="strategy" value="{{.Strategy}}">
-              <input type="hidden" name="side" value="{{.Side}}">
-              <input type="hidden" name="entry" value="{{printf "%.4f" .Entry}}">
-              <input type="hidden" name="stop" value="{{printf "%.4f" .Stop}}">
-              <input type="hidden" name="tp" value="{{printf "%.4f" .TP}}">
-              <input type="hidden" name="score" value="{{printf "%.0f" .Score}}">
-              <input type="hidden" name="why" value="{{.Why}}">
-              <button type="submit" class="setup-skip" title="記進 /setups forward-log">⚑ 記</button>
-            </form>
-          </td>
-          <td class="cs-dim">{{.Why}}</td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
-    </div>
+      {{template "liveTable" (liveRows .Firing true)}}
     {{else}}
-    <p class="empty"><span class="i18n-en">Nothing setting up right now — all rules are watching but none triggered on the current closed bar. Check back after the next close.</span><span class="i18n-zh">上膛的規則都沒有觸發（當前收 K）。下一根收盤後再看 —— 下面「未上膛」那區可能還有東西。</span></p>
+      <div class="ui-empty"><div class="ui-dim">{{t "live.armedNone"}}</div></div>
     {{end}}
+  </section>
 
-    {{if .UnarmedFiring}}
-    {{/* Kept in a SEPARATE table from the armed rows on purpose. Mixing them
-         would read as "the system will take these", when nothing is watching
-         half of them. This section is exactly the 30-of-44 grid the page used
-         to omit entirely. */}}
-    <h2 class="section-title" style="margin-top:1rem">🟡 <span class="i18n-en">Setting up, but auto is NOT armed here</span><span class="i18n-zh">有 setup,但 auto 沒有這條規則</span></h2>
-    <p class="glossary-hint" style="margin:-.2rem 0 .5rem">
-      <span class="i18n-en">These strategy/symbol combinations are not in autotrade.json, so <b>nothing will fire</b> — they are read-only ideas. Unarmed cells default to 1h and borrow the strategy's configured stop settings.</span>
-      <span class="i18n-zh">這些 策略/標的 組合<b>不在</b> autotrade.json 裡,所以<b>不會有任何單</b> —— 純讀的想法。未上膛的格子預設 1h,停損設定沿用該策略已設定的值。</span>
-    </p>
+  {{if .UnarmedFiring}}
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{t "live.unarmedTitle"}}</h2><span class="ui-count">{{.UnarmedFireN}}</span><span class="ui-sub" style="margin:0">{{t "live.unarmedSub"}}</span></header>
+    {{template "liveTable" (liveRows .UnarmedFiring false)}}
+  </section>
+  {{end}}
+
+  <details class="ui-card live-grid">
+    <summary class="ui-card-h"><h2>{{t "live.gridTitle"}}</h2><span class="ui-count">{{.GridN}}</span><span class="ui-sub" style="margin:0">{{t "live.gridSub"}}</span></summary>
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>side</th><th title="validator /100">評分</th><th>entry</th><th>stop</th><th>tp</th><th>R:R</th><th>mode</th><th>記</th><th>why</th></tr></thead>
-      <tbody>
-        {{range .UnarmedFiring}}
-        <tr style="opacity:.82">
-          <td><strong>{{.Symbol}}</strong> <span class="badge b-dim" title="autotrade.json 沒有這條規則">未上膛</span></td>
-          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
-          <td class="cs-dim">{{.TF}}</td>
-          <td class="dir-{{.Side}}">{{.Side}}</td>
-          <td class="num">{{if .Score}}<span style="color:{{if ge .Score 60.0}}var(--green){{else if lt .Score 40.0}}var(--red){{else}}var(--text){{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="cs-dim">—</span>{{end}}</td>
-          <td class="num">{{printf "%.4f" .Entry}}</td>
-          <td class="num">{{printf "%.4f" .Stop}}</td>
-          <td class="num">{{printf "%.4f" .TP}}</td>
-          <td class="num">{{printf "%.1f" .RR}}</td>
-          <td>{{if .Market}}<span class="badge b-yellow">market</span>{{else}}<span class="badge b-blue">limit</span>{{end}}</td>
-          <td>
-            <form method="post" action="/scan/record" style="margin:0">
-              <input type="hidden" name="symbol" value="{{.Symbol}}">
-              <input type="hidden" name="tf" value="{{.TF}}">
-              <input type="hidden" name="strategy" value="{{.Strategy}}">
-              <input type="hidden" name="side" value="{{.Side}}">
-              <input type="hidden" name="entry" value="{{printf "%.4f" .Entry}}">
-              <input type="hidden" name="stop" value="{{printf "%.4f" .Stop}}">
-              <input type="hidden" name="tp" value="{{printf "%.4f" .TP}}">
-              <input type="hidden" name="score" value="{{printf "%.0f" .Score}}">
-              <input type="hidden" name="why" value="unarmed · {{.Why}}">
-              <button type="submit" class="setup-skip" title="記進 /setups forward-log">⚑ 記</button>
-            </form>
-          </td>
-          <td class="cs-dim">{{.Why}}</td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
-    </div>
-    {{end}}
-
-    <h2 class="section-title" style="margin-top:1rem"><span class="i18n-en">Whole grid</span><span class="i18n-zh">全部格子</span> <span class="section-meta">{{.Watching}} armed · {{.UnarmedN}} unarmed</span></h2>
-    <div class="dt-scroll">
-    <table class="dt">
-      <thead><tr><th>sym</th><th>strat</th><th>tf</th><th>auto</th><th>rule-side</th><th>status</th></tr></thead>
+      <thead><tr><th>{{t "th.symbol"}}</th><th>{{t "live.th.strategy"}}</th><th>TF</th><th>{{t "live.th.auto"}}</th><th>{{t "live.th.ruleSide"}}</th><th>{{t "live.th.status"}}</th></tr></thead>
       <tbody>
         {{range .Rows}}
-        <tr{{if not .Armed}} style="opacity:.65"{{end}}>
-          <td><strong>{{.Symbol}}</strong></td>
-          <td><span class="badge {{if eq .Strategy "engine"}}b-blue{{else}}b-dim{{end}}">{{.Strategy}}</span></td>
-          <td class="cs-dim">{{.TF}}</td>
-          <td>{{if .Armed}}<span class="badge b-green" title="autotrade.json 有這條規則,會真的下單">上膛</span>{{else}}<span class="badge b-dim" title="沒有規則 — 純讀,不會下單">未上膛</span>{{end}}</td>
-          <td class="cs-dim">{{.RuleSide}}</td>
-          <td>{{if .Fire}}<span class="badge {{if .Armed}}b-green{{else}}b-yellow{{end}}">{{if .Armed}}🟢{{else}}🟡{{end}} {{.Side}} setup</span>{{else}}<span class="cs-dim">— 監控中</span>{{end}}</td>
+        <tr{{if not .Armed}} class="live-unarmed"{{end}}>
+          <td><span class="ui-sym">{{.Symbol}}</span></td>
+          <td>{{t (strategyKey .Strategy)}}</td>
+          <td class="ui-num ui-dim">{{.TF}}</td>
+          <td>{{if .Armed}}<span class="ui-tag ok" title="{{t "live.armedHint"}}">{{t "live.armed"}}</span>{{else}}<span class="ui-tag" title="{{t "live.unarmedHint"}}">{{t "live.unarmed"}}</span>{{end}}</td>
+          <td class="ui-dim">{{if .RuleSide}}{{t (printf "side.%s" .RuleSide)}}{{end}}</td>
+          <td>{{if .Fire}}<span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span> {{t "live.fires"}}{{else}}<span class="ui-dim">{{t "live.watching"}}</span>{{end}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
     </div>
-    <p class="glossary-hint" style="margin-top:.6rem">Updated: {{.UpdatedUTC}} · <span class="i18n-en">cached 20s · read-only preview of what the auto rules would place · not the paper log (that's <a href="/ops/autotrade">/ops/autotrade</a>)</span><span class="i18n-zh">快取 20s · 唯讀預覽 · <b>上膛</b>=autotrade.json 有規則,會真的下單;<b>未上膛</b>=只是評估,不會有單 · 已開單紀錄在 <a href="/ops/autotrade">/ops/autotrade</a></span></p>
-  </div>
+  </details>
+
+  <p class="ui-sub" style="margin:0">{{t "live.foot"}} <a href="/ops/autotrade">{{t "tab.auto"}} →</a></p>
 </main>
 </body>
 </html>
+
+{{define "liveTable"}}
+<div class="dt-scroll">
+<table class="dt live-t">
+  <thead><tr>
+    <th>{{t "th.symbol"}}</th><th>{{t "live.th.strategy"}}</th><th>TF</th><th>{{t "th.side"}}</th>
+    <th class="num" title="{{t "live.scoreHint"}}">/100</th>
+    <th class="num">{{t "th.entry"}}</th><th class="num">{{t "trades.stop"}}</th><th class="num">TP</th><th class="num">R:R</th>
+    <th>{{t "live.th.mode"}}</th><th>{{t "live.th.why"}}</th><th></th>
+  </tr></thead>
+  <tbody>
+  {{range .Rows}}
+    <tr>
+      <td><span class="ui-sym">{{.Symbol}}</span></td>
+      <td>{{t (strategyKey .Strategy)}}</td>
+      <td class="ui-num ui-dim">{{.TF}}</td>
+      <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
+      <td class="num">{{if .Score}}<b class="{{if ge .Score 60.0}}ui-up{{else if lt .Score 40.0}}ui-down{{end}}">{{printf "%.0f" .Score}}</b>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+      <td class="num">{{fmtPx .Entry}}</td>
+      <td class="num ui-down">{{fmtPx .Stop}}</td>
+      <td class="num ui-up">{{fmtPx .TP}}</td>
+      <td class="num">{{printf "%.1f" .RR}}</td>
+      <td><span class="ui-tag{{if .Market}} warn{{end}}">{{if .Market}}MARKET{{else}}LIMIT{{end}}</span></td>
+      <td class="live-why"><code title="{{t "live.whyHint"}}">{{.Why}}</code></td>
+      <td>
+        <form method="post" action="/scan/record" style="margin:0">
+          <input type="hidden" name="symbol" value="{{.Symbol}}">
+          <input type="hidden" name="tf" value="{{.TF}}">
+          <input type="hidden" name="strategy" value="{{.Strategy}}">
+          <input type="hidden" name="side" value="{{.Side}}">
+          <input type="hidden" name="entry" value="{{printf "%.4f" .Entry}}">
+          <input type="hidden" name="stop" value="{{printf "%.4f" .Stop}}">
+          <input type="hidden" name="tp" value="{{printf "%.4f" .TP}}">
+          <input type="hidden" name="score" value="{{printf "%.0f" .Score}}">
+          <input type="hidden" name="why" value="{{if not $.Armed}}unarmed · {{end}}{{.Why}}">
+          <button type="submit" class="ui-btn ghost sm" title="{{t "live.recordHint"}}">{{template "icon" "plus"}}{{t "live.record"}}</button>
+        </form>
+      </td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
