@@ -188,20 +188,55 @@ func MaxLeverageForOpenBar(equity, margin, medianOpenPct, riskFrac float64) floa
 // untilOpen <= 0 means the open bar is already in progress or unknown, which
 // is the MOST dangerous case, not a reason to stay quiet.
 func StopWarning(entry, stop, medianOpenPct float64, samples int, untilOpen time.Duration) string {
-	if entry <= 0 || stop <= 0 || medianOpenPct <= 0 || samples < MinSamples {
+	w, ok := CheckStop(entry, stop, medianOpenPct, samples, untilOpen)
+	if !ok {
 		return ""
+	}
+	return w.English()
+}
+
+// StopWarn is the advisory as values, so a caller can render it in its own
+// language; English is the CLI's and the daemon's wording.
+type StopWarn struct {
+	StopPct   float64       // stop distance from entry, %
+	MedianPct float64       // median cash-open-bar range, %
+	Samples   int           // open bars behind the median
+	UntilOpen time.Duration // <= 0: the open bar is in progress or unknown
+}
+
+// Ratio is how many times the stop distance fits inside the median range.
+func (w StopWarn) Ratio() float64 { return w.MedianPct / w.StopPct }
+
+// Wait is the coarse time-to-open, "" when the open is already in progress.
+func (w StopWarn) Wait() string {
+	if w.UntilOpen <= 0 {
+		return ""
+	}
+	return humanDur(w.UntilOpen)
+}
+
+// CheckStop is StopWarning without the sentence: ok is false when there is
+// nothing to say.
+func CheckStop(entry, stop, medianOpenPct float64, samples int, untilOpen time.Duration) (StopWarn, bool) {
+	if entry <= 0 || stop <= 0 || medianOpenPct <= 0 || samples < MinSamples {
+		return StopWarn{}, false
 	}
 	stopPct := math.Abs(entry-stop) / entry * 100
 	if stopPct <= 0 || stopPct >= medianOpenPct {
-		return ""
+		return StopWarn{}, false
 	}
+	return StopWarn{StopPct: stopPct, MedianPct: medianOpenPct, Samples: samples, UntilOpen: untilOpen}, true
+}
+
+// English is the advisory in the wording the CLI and the daemon print.
+func (w StopWarn) English() string {
 	when := "the cash open is already in progress"
-	if untilOpen > 0 {
-		when = "next cash open in " + humanDur(untilOpen)
+	if d := w.Wait(); d != "" {
+		when = "next cash open in " + d
 	}
 	return fmt.Sprintf(
 		"stop is %.3f%% from entry, inside the cash-open bar's median range of %.2f%% (1/%.1f of it, n=%d) — %s, and that bar's ordinary travel reaches this stop in either direction. Close before the open, or widen beyond %.2f%%.",
-		stopPct, medianOpenPct, medianOpenPct/stopPct, samples, when, medianOpenPct)
+		w.StopPct, w.MedianPct, w.Ratio(), w.Samples, when, w.MedianPct)
 }
 
 // humanDur renders a wait the way the warning reads best: coarse, because the

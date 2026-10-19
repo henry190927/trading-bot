@@ -796,5 +796,8 @@
   "live.whyHint": "策略原文輸出",
   "live.record": "記錄",
   "live.recordHint": "記進模擬單 forward-log",
-  "live.foot": "唯讀預覽:auto 規則現在會下什麼單;實際的 paper 紀錄在"
+  "live.foot": "唯讀預覽:auto 規則現在會下什麼單;實際的 paper 紀錄在",
+  "sess.warn": "停損距進場 %.3f%%,落在開盤 K 的中位波幅 %.2f%% 之內(只有它的 1/%.1f,n=%d)— %s,這根 K 的正常擺動不論方向都會掃到這個停損。開盤前平倉,或把停損放寬到 %.2f%% 以外。",
+  "sess.inProgress": "美股開盤 K 正在進行",
+  "sess.nextOpen": "距下次美股開盤 %s"
 }

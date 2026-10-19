@@ -184,7 +184,7 @@ func (s *server) handleVerifyExchange(c *gin.Context) {
 				if ref <= 0 {
 					ref = vt.Entry
 				}
-				if w := s.sessionStopWarning(ctx, sym, ref, vt.Stop, time.Now()); w != "" {
+				if w := s.sessionStopWarning(ctx, s.translator(langOf(c)), sym, ref, vt.Stop, time.Now()); w != "" {
 					vt.SessionWarn = w
 					sessionWarnN++
 				}

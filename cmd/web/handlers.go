@@ -1443,7 +1443,9 @@ func (s *server) placeStopOnBingX(ctx context.Context, t *journal.Trade) (string
 	if ref <= 0 {
 		ref = t.Entry
 	}
-	if w := s.sessionStopWarning(ctx, sym, ref, t.Stop, time.Now()); w != "" {
+	// This message only reaches the server log (the auto-place sweep), so it
+	// stays in English.
+	if w := s.sessionStopWarning(ctx, s.translator("en"), sym, ref, t.Stop, time.Now()); w != "" {
 		msg += " · ⚠ " + w
 	}
 	return "ok", msg
@@ -3385,7 +3387,7 @@ func (s *server) runValidate(c *gin.Context, symIn, sideIn, entryIn, tfIn, feeIn
 	// after the fill cannot be acted on. Checked against SuggStop because
 	// /validate takes no stop of its own: the question it can answer is
 	// "would an ATR-appropriate stop survive the open bar on this symbol".
-	sessWarn := s.sessionStopWarning(ctx, sym, entry, res.SuggStop, time.Now())
+	sessWarn := s.sessionStopWarning(ctx, s.translator(langOf(c)), sym, entry, res.SuggStop, time.Now())
 	s.page(c, http.StatusOK, "validate_result.html", gin.H{
 		"R":           res,
 		"TF":          tfStr,
@@ -3454,7 +3456,7 @@ func (s *server) handleAPIChartValidate(c *gin.Context) {
 	// after the fill cannot be acted on. Checked against SuggStop because
 	// /validate takes no stop of its own: the question it can answer is
 	// "would an ATR-appropriate stop survive the open bar on this symbol".
-	sessWarn := s.sessionStopWarning(ctx, sym, entry, res.SuggStop, time.Now())
+	sessWarn := s.sessionStopWarning(ctx, s.translator(langOf(c)), sym, entry, res.SuggStop, time.Now())
 
 	// Slim payload — only the fields the modal actually renders.
 	// Full result (reasons/notes/factor breakdown) can be surfaced

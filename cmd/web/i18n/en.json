@@ -796,5 +796,8 @@
   "live.whyHint": "strategy output, verbatim",
   "live.record": "Record",
   "live.recordHint": "add to the setups forward-log",
-  "live.foot": "Read-only preview of what the auto rules would place; the actual paper log is on"
+  "live.foot": "Read-only preview of what the auto rules would place; the actual paper log is on",
+  "sess.warn": "stop is %.3f%% from entry, inside the cash-open bar's median range of %.2f%% (1/%.1f of it, n=%d) — %s, and that bar's ordinary travel reaches this stop in either direction. Close before the open, or widen beyond %.2f%%.",
+  "sess.inProgress": "the cash open is already in progress",
+  "sess.nextOpen": "next cash open in %s"
 }

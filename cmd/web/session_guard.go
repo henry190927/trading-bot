@@ -78,13 +78,26 @@ func (s *server) openBarBaseline(ctx context.Context, sym market.Symbol) (float6
 	return pct, n
 }
 
-// sessionStopWarning renders the advisory for one trade, or "" when there is
-// nothing to say (not a stock, no stop, thin history, or a stop already wider
-// than the open bar).
-func (s *server) sessionStopWarning(ctx context.Context, sym market.Symbol, entry, stop float64, now time.Time) string {
+// sessionStopWarning renders the advisory for one trade in the reader's
+// language, or "" when there is nothing to say (not a stock, no stop, thin
+// history, or a stop already wider than the open bar).
+func (s *server) sessionStopWarning(ctx context.Context, tr func(string, ...any) string, sym market.Symbol, entry, stop float64, now time.Time) string {
 	pct, n := s.openBarBaseline(ctx, sym)
 	if pct <= 0 {
 		return ""
 	}
-	return session.StopWarning(entry, stop, pct, n, session.NextCashOpen(now).Sub(now))
+	w, ok := session.CheckStop(entry, stop, pct, n, session.NextCashOpen(now).Sub(now))
+	if !ok {
+		return ""
+	}
+	return sessionWarnText(tr, w)
+}
+
+// sessionWarnText is session.StopWarn.English through the dictionary.
+func sessionWarnText(tr func(string, ...any) string, w session.StopWarn) string {
+	when := tr("sess.inProgress")
+	if d := w.Wait(); d != "" {
+		when = tr("sess.nextOpen", d)
+	}
+	return tr("sess.warn", w.StopPct, w.MedianPct, w.Ratio(), w.Samples, when, w.MedianPct)
 }
