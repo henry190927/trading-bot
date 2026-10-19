@@ -8,7 +8,6 @@
 <title>{{t "chart.ui.title"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
-<script src="/static/i18n.js" defer></script>
 </head>
 <body>
 
@@ -2623,10 +2622,9 @@
                 var pts = document.createElement('span');
                 pts.className = 'factor-pts';
                 pts.textContent = (pos ? '+' : '') + Math.round(f.points) + ' ';
-                // Name goes through i18n: data-i18n lets i18nApply() re-translate
-                // it live on a language toggle; window.t sets the initial text.
+                // CF is the server-rendered factor dictionary for this page's
+                // language; an unknown name shows as the validator wrote it.
                 var nm = document.createElement('span');
-                nm.setAttribute('data-i18n', f.name);
                 nm.textContent = CF[f.name] || f.name;
                 chip.appendChild(pts);
                 chip.appendChild(nm);
