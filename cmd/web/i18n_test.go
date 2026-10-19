@@ -241,7 +241,8 @@ func TestFactorNamesTranslated(t *testing.T) {
 	if len(files) == 0 {
 		t.Fatal("no validator sources found")
 	}
-	re := regexp.MustCompile(`Factor\{"([^"]+)"`)
+	// \s*: several factors open the literal on its own line (Factor{\n "name",).
+	re := regexp.MustCompile(`Factor\{\s*"([^"]+)"`)
 	n := 0
 	for _, f := range files {
 		if strings.HasSuffix(f, "_test.go") {
