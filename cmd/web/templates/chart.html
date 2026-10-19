@@ -897,7 +897,6 @@
         "oi.q.shorts-building": {{t "chart.js.oi.q.shorts-building"}},
         "oi.q.shorts-covering": {{t "chart.js.oi.q.shorts-covering"}},
         "oi.q.longs-unwinding": {{t "chart.js.oi.q.longs-unwinding"}},
-        "oi.belowThreshold": {{t "chart.js.oi.belowThreshold"}},
         "oi.total": {{t "chart.js.oi.total"}},
         "bn.label": {{t "chart.js.bn.label"}},
         "bn.whales": {{t "chart.js.bn.whales"}},
@@ -3271,9 +3270,6 @@
                               + '<div class="q-h">' + CT['oi.oiUp'] + '</div>' + cell('longs-building') + cell('shorts-building')
                               + '<div class="q-h">' + CT['oi.oiDown'] + '</div>' + cell('shorts-covering') + cell('longs-unwinding')
                               + '</div>';
-                        if (!q || q === 'new-positions' || q === 'closing' || q === 'no-price') {
-                            oiHtml += '<div class="cs-oi-note">' + (q ? (o.reading || '') : CT['oi.belowThreshold']) + '</div>';
-                        }
                     } else {
                         oiHtml += '<div class="cs-oi-note">' + CT['oi.notYet'] + '</div>';
                     }

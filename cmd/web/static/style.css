@@ -4550,3 +4550,13 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .chart-side .cs-read .chart-hvn-panel:not(.hidden) { display: block; }
 .chart-side .cs-read .chart-hvn-panel b.hvn-px { color: var(--text-dim); }
 .chart-side .cs-read .chart-hvn-panel .hvn-row.clean b.hvn-px { color: var(--text); }
+.live-t { table-layout: fixed; width: 100%; }
+.live-t td, .live-t th { overflow: hidden; text-overflow: ellipsis; }
+.live-t td.live-why { white-space: normal; overflow: visible; }
+.live-t td:nth-child(2) { white-space: nowrap; }
+.live-t td:last-child { overflow: visible; text-align: right; }
+.live-t .ui-tag { font-size: 10.5px; }
+.ui-card .live-t th, .ui-card .live-t td { padding-left: 8px; padding-right: 8px; }
+.ui-card .live-t th:first-child, .ui-card .live-t td:first-child { padding-left: var(--sp-4); }
+.ui-card .live-t th:last-child, .ui-card .live-t td:last-child { padding-right: var(--sp-4); }
+.live-t td.num { text-overflow: clip; }

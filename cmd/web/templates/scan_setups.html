@@ -75,6 +75,13 @@
 {{define "liveTable"}}
 <div class="dt-scroll">
 <table class="dt live-t">
+  {{/* Fixed column widths, shared by the armed and unarmed tables, so the
+       two line up column for column instead of each sizing to its own data. */}}
+  <colgroup>
+    <col style="width:6%"><col style="width:9.5%"><col style="width:3.5%"><col style="width:4.5%"><col style="width:4.5%">
+    <col style="width:8.5%"><col style="width:8.5%"><col style="width:8.5%"><col style="width:4%"><col style="width:7%">
+    <col><col style="width:8.5%">
+  </colgroup>
   <thead><tr>
     <th>{{t "th.symbol"}}</th><th>{{t "live.th.strategy"}}</th><th>TF</th><th>{{t "th.side"}}</th>
     <th class="num" title="{{t "live.scoreHint"}}">/100</th>
