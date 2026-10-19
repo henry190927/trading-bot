@@ -5,7 +5,7 @@
 <script>(function(){try{var t=localStorage.getItem("tw-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>tips · trading-web</title>
+<title>{{t "tab.tips"}} · trading-web</title>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 <script src="/static/i18n.js" defer></script>
@@ -14,77 +14,75 @@
 
 {{template "topnav" .}}
 
-<main class="tips-main">
-  <h1 class="tips-h1">
-    <span class="i18n-en">Trading Tips</span><span class="i18n-zh">交易小卡</span>
-    <span class="tips-sub"><span class="i18n-en">principles distilled from your own trades</span><span class="i18n-zh">從你自己的交易萃取的原則</span></span>
-  </h1>
+<main class="ui-page tp-page">
+  <p class="ui-sub tp-lead"><span class="i18n-en">Principles distilled from your own trades — click a card to open it.</span><span class="i18n-zh">從你自己的交易萃取的原則 — 點卡片展開。</span></p>
+  <div class="tp-grid">
 
   <!-- Card 1: Engine vs N-struct regime decision -->
-  <details class="tip-card" open>
-    <summary class="tip-summary">
-      <span class="tip-icon">🧭</span>
-      <span class="tip-title">
+  <details class="tp-card" open>
+    <summary class="tp-sum">
+      <span class="tp-icon">🧭</span>
+      <span class="tp-title">
         <span class="i18n-en">Engine vs N-struct? Ask <em>regime</em> first</span>
         <span class="i18n-zh">Engine vs N-struct?先問 <em>regime</em></span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-trend">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>Clear trend</b> (HH-HL / LH-LL) or breakout → lean <b>N-struct</b>. The engine (mean-reversion) lags here.</span>
           <span class="i18n-zh"><b>趨勢明確</b>(HH-HL / LH-LL)或突破 → 偏向 <b>N struct</b>。engine(均值回歸)在這裡會慢半拍。</span>
         </li>
-        <li class="tip-step step-neutral">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>Neutral chop</b> → lean <b>engine</b>. N-struct's pivot/CHoCH throws a lot of fakes.</span>
           <span class="i18n-zh"><b>neutral 拉鋸</b> → 偏向 <b>engine</b>。N struct 的樞紐/CHoCH 假訊號多。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Both agree</b> → highest confidence (e.g. #11 engine TAKE + N-struct → +2.76R).</span>
           <span class="i18n-zh"><b>兩者同意</b> → 最高信心(例:#11 engine TAKE + N struct → +2.76R)。</span>
         </li>
-        <li class="tip-step step-clash">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>They clash</b> → decide by <b>regime</b> + your own read. Don't let one indicator veto the other.</span>
           <span class="i18n-zh"><b>兩者衝突</b> → 用 <b>regime</b> + 你的讀盤裁決。別讓單一指標否決另一個。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 From your forward-log: neutral chop went <b>0/7</b>. Real filter = regime, not engine-vs-struct.</span>
         <span class="i18n-zh">📊 出自你的 forward-log:neutral 拉鋸 <b>0/7</b>。真正的 filter 是 regime,不是 engine vs struct。</span>
       </p>
     </div>
   </details>
 
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🎚️</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🎚️</span>
+      <span class="tp-title">
         <span class="i18n-en">Price pierced the BB? <em>Reversal or trap depends on regime</em></span>
         <span class="i18n-zh">價格溢軌破 BB?<em>反轉還是陷阱,看 regime</em></span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-agree">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Range / neutral regime → YES, fade it.</b> A BB pierce = statistical overextension → high odds of snapping back to the mean. This is exactly the engine's BB-touch vote (and why MR wins on ETH).</span>
           <span class="i18n-zh"><b>盤整 / neutral regime → YES,可以 fade。</b> 溢軌 = 統計上過度延伸 → 高機率彈回均值。這就是引擎「BB 觸帶」那一票在做的事(也是 MR 在 ETH 會贏的原因)。</span>
         </li>
-        <li class="tip-step step-clash">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Strong trend → NO, it's a trap.</b> Price <em>walks the band</em> — it rides the edge for many bars while the band expands. Fading the first pierce = standing in front of the train (why MR loses on SOL → we built StructMomentum to go WITH it).</span>
           <span class="i18n-zh"><b>強趨勢 → NO,是陷阱。</b> 價格會<em>沿著軌道走</em>——貼著邊界跑很多根、布林還擴張。去 fade 第一次溢軌 = 站在火車前面(所以 MR 在 SOL 慘賠 → 我們才做 StructMomentum 順勢)。</span>
         </li>
-        <li class="tip-step step-neutral">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>How to tell the regime:</b> structure (neutral = fade OK; HH-HL / LH-LL trend = don't) + band width (flat/contracting = range; expanding = trend).</span>
           <span class="i18n-zh"><b>怎麼分辨 regime:</b> 結構(neutral = 可 fade;HH-HL / LH-LL 趨勢 = 別 fade)+ 帶寬(平/縮 = 區間;擴張 = 趨勢)。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>BB alone is weak.</b> The engine never votes on BB alone — it needs <b>BB + RSI extreme + sweep + divergence</b> confluence. Strongest fade = a pierce that <b>immediately reclaims back inside</b> the band (failed breakout), NOT price accelerating outside it (that's trend).</span>
           <span class="i18n-zh"><b>只靠 BB 太弱。</b> 引擎從不單靠 BB —— 要 <b>BB + RSI 極值 + sweep + 背離</b> 共振。最強的 fade 是溢軌後<b>立刻收回帶內</b>(失敗突破),不是價格加速衝出帶外(那是趨勢)。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📐 In a trend the band edge is <b>evidence of momentum, not a reversal signal.</b></span>
         <span class="i18n-zh">📐 在趨勢裡,布林邊界是<b>動能的證據,不是反轉的訊號</b>。</span>
       </p>
@@ -92,70 +90,70 @@
   </details>
 
   <!-- Card 2: No-fill discipline — biggest leak (31% no-fill) -->
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">📐</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">📐</span>
+      <span class="tp-title">
         <span class="i18n-en">Reading the regime: <em>measure range expansion, not the trend label</em></span>
         <span class="i18n-zh">判讀 regime:<em>量 range 擴張,別看 trend 標籤</em></span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>The <code>trend</code> label LAGS — do not time entries with it.</b> Reconstructed from the live series: at 8/20 08:00, in the middle of a <b>+17.16%</b> twelve-bar run, <code>trend</code> still read <code>neutral</code>. It only printed <code>HH-HL uptrend</code> at 8/20 20:00 — twelve hours later, after the move was over. By the time it names a trend you are chasing.</span>
           <span class="i18n-zh"><b><code>trend</code> 標籤是落後的 —— 不要用它抓進場。</b> 從實際序列重建:8/20 08:00,在一段 12 根 <b>+17.16%</b> 的行情正中間,<code>trend</code> 還是 <code>neutral</code>。它到 8/20 20:00 才印出 <code>HH-HL uptrend</code> —— 晚了 12 小時,行情走完了。等它說出趨勢,你已經在追。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>Step 1 — range expansion is the regime switch.</b> Average 1h range over the last 12 bars, against the prior baseline. <b>8/19 20:00 → 8/20 08:00 went 0.39% → 2.61%, a 6.7× jump.</b> Under ~1.5× you are in a range regime whatever the price level suggests; over ~2.5× fade nothing, the edges will not hold.</span>
           <span class="i18n-zh"><b>第 1 步 —— range 擴張才是 regime 開關。</b> 近 12 根的平均 1h range,對比前一段基線。<b>8/19 20:00 → 8/20 08:00 從 0.39% 跳到 2.61%,6.7 倍。</b> 低於約 1.5 倍就是區間 regime,價位看起來多高多低都一樣;高於約 2.5 倍就什麼都不要 fade,邊緣守不住。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>Step 2 — directional consistency picks the side.</b> Count up-closes vs down-closes over the same 12 bars. <b>8/20 was 10 up / 2 down.</b> A 6/6 or 4/8 split is a turn inside a range, not a trend — no matter how far price has travelled.</span>
           <span class="i18n-zh"><b>第 2 步 —— 方向一致性決定哪一邊。</b> 同樣 12 根,數陽線對陰線。<b>8/20 是 10 陽 / 2 陰。</b> 6/6 或 4/8 是區間內的轉向不是趨勢,不管價格走了多遠。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Step 3 — read <code>event</code>, not <code>trend</code>, and read it as confirmation.</b> BOS / CHoCH lead the label by hours. Then: a bounce into a pool with <b>no</b> structure event is a liquidity grab — fade it. A bounce that prints <b>CHoCH-up AND holds its Protected low on a retest</b> is a character change — do not fade it.</span>
           <span class="i18n-zh"><b>第 3 步 —— 讀 <code>event</code> 不是 <code>trend</code>,而且當「確認」讀。</b> BOS / CHoCH 領先標籤好幾個小時。然後:反彈進池子但<b>沒有</b>結構事件 = 流動性獵取,可以 fade;反彈<b>印出 CHoCH-up 且回測守住 Protected</b> = 性格轉變,不要 fade。</span>
         </li>
-        <li class="tip-step step-neutral">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>Default to RANGE.</b> It is the base rate, your engine is a mean-reversion engine and the n=574 sweep-reject edge is built on range behaviour, and a trend regime announces itself with expansion you can measure in one line. Assuming trend by default makes you chase in the 90% of hours that are not trending.</span>
           <span class="i18n-zh"><b>預設假設「區間」。</b> 它是基準率;你的引擎就是均值回歸引擎、n=574 的 sweep-reject 邊建立在區間行為上;而趨勢 regime 會用一行就能量出來的擴張自己宣告。預設趨勢會讓你在 90% 不是趨勢的小時裡追高殺低。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">⚠️ <b>Nothing in the system computes this yet.</b> The engine has a per-BAR range-expansion vote at 1.5× (one bar vs the 20-bar mean) — a different scale from the 12-bar regime read above. Directional consistency is not computed anywhere. These numbers came from an ad-hoc probe over the live series; treat the card as the procedure, not as a readout.</span>
         <span class="i18n-zh">⚠️ <b>系統目前沒有在算這個。</b> 引擎有一個<b>逐棒</b>的 range 擴張投票(門檻 1.5 倍,單根對 20 根均值)—— 跟上面那個 12 根的 regime 讀數是不同尺度。方向一致性全庫沒有實作。上面的數字來自對實際序列的一次性探測;這張卡是「步驟」,不是儀表板。</span>
       </p>
     </div>
   </details>
 
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🎣</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🎣</span>
+      <span class="tp-title">
         <span class="i18n-en">Pullback limits won't fill in a trend — stop parking them</span>
         <span class="i18n-zh">趨勢盤掛回撤限價會落空 — 別空等</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-trend">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-trend">
           <span class="i18n-en">When drift is <b>stacked</b> (POC50&gt;100&gt;200) or price is trending, a pullback-limit entry often <b>never fills</b> — price runs without the retrace you waited for.</span>
           <span class="i18n-zh">當 drift <b>stacked</b>(POC50&gt;100&gt;200)或價格在趨勢中,回撤限價常常<b>填不到</b> — 價格沒回撤就直接噴走。</span>
         </li>
-        <li class="tip-step step-clash">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Low-conviction plans (total 3, MOM 0)</b> are the worst offenders — the engine's mean-reversion pullback rarely materializes in a drifting tape.</span>
           <span class="i18n-zh"><b>低信心 plan(total 3、MOM 0)</b>最容易落空 — 均值回歸的回撤在 drift 盤很少真的發生。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Fix:</b> in a stacked / trending regime, take a <b>market entry</b> (accept a slightly worse price) or <b>skip</b>. Reserve pullback-limits for neutral / range regimes.</span>
           <span class="i18n-zh"><b>修法:</b>stacked / 趨勢 regime 就 <b>market 進</b>(接受稍差價位)或<b>跳過</b>。回撤限價留給 neutral / range。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 From your journal: <b>16 of 51 trades (31%) were no-fills</b> — 10 explicitly "price never pulled back", 7 were total-3/MOM-0 limits.</span>
         <span class="i18n-zh">📊 出自你的 journal:<b>51 筆有 16 筆(31%)no-fill</b> — 10 筆明講「沒回撤到 entry」,7 筆是 total-3/MOM-0 限價。</span>
       </p>
@@ -163,70 +161,70 @@
   </details>
 
   <!-- Card 3: Don't fade a stacked regime -->
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">📦</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">📦</span>
+      <span class="tp-title">
         <span class="i18n-en">Reading OI: <em>it says how many, never whose</em></span>
         <span class="i18n-zh">判讀 OI:<em>它說「有多少」,從不說「是誰的」</em></span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-neutral">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>Every contract has a long AND a short.</b> So open interest carries no direction on its own — it counts positions that EXIST. It moves only when one is opened or closed, never when one changes hands: both sides opening → OI up; both closing → OI down; one opening while the other closes → OI flat. <b>OI says new-or-old; price says whose.</b></span>
           <span class="i18n-zh"><b>每一張合約必然有一個多方和一個空方。</b> 所以 OI 本身不帶方向 —— 它數的是「存在的倉位」。它只在開倉或平倉時變動,換手不算:兩邊都開新倉 → OI 增;兩邊都平 → OI 減;一邊開一邊平 → OI 不變。<b>OI 說「新舊」,價格說「是誰的」。</b></span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>The four quadrants.</b> <code>OI↑ + price↑</code> = new longs, the healthiest continuation up. <code>OI↑ + price↓</code> = new shorts, the healthiest continuation down — <em>and simultaneously squeeze fuel</em>. <code>OI↓ + price↑</code> = shorts covering, the rally is burning its fuel. <code>OI↓ + price↓</code> = longs capitulating, the drop is burning its fuel.</span>
           <span class="i18n-zh"><b>四象限。</b> <code>OI↑ + 價格↑</code> = 新多單,最健康的續漲。<code>OI↑ + 價格↓</code> = 新空單,最健康的續跌 —— <em>同時是擠壓燃料</em>。<code>OI↓ + 價格↑</code> = 空單回補,漲勢在燒燃料。<code>OI↓ + 價格↓</code> = 多單投降,跌勢在燒燃料。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>A falling-OI move is the weaker one.</b> A rally on shrinking OI is shorts buying back — when they finish there is no bid left. A rally on growing OI is new money, and that can keep going. Same logic inverted for a sell-off.</span>
           <span class="i18n-zh"><b>OI 減的行情比較弱。</b> 上漲配 OI 減 = 空單在回補,補完就沒有買盤了。上漲配 OI 增 = 真的有新錢進來,那才能延續。下跌同理反過來。</span>
         </li>
-        <li class="tip-step step-clash">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>OI says how many, funding says who is paying.</b> They only mean something together: <code>OI↑ + price↓ + funding NEGATIVE</code> = shorts are both numerous and paying to hold = textbook squeeze setup. <code>OI↑ + price↓ + funding POSITIVE</code> = shorts are building but longs still pay = far less crowded than it looks. Thresholds the engine uses: OI ±2%, funding ±0.05% crowded / ±0.10% extreme.</span>
           <span class="i18n-zh"><b>OI 說「有多少」,funding 說「誰在付錢」。</b> 兩個合起來才有意義:<code>OI↑ + 價格↓ + funding 為負</code> = 空單又多又在付錢 = 教科書擠壓設定。<code>OI↑ + 價格↓ + funding 為正</code> = 空單在建但多方還在付錢 = 沒有看起來那麼擠。引擎用的門檻:OI ±2%、funding ±0.05% 擁擠 / ±0.10% 極端。</span>
         </li>
-        <li class="tip-step step-clash">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>⚠ Do NOT read a slope off the 5-minute samples.</b> BingX republishes open interest roughly every 10 minutes: measured on our own store, <b>44% of consecutive 5-minute samples are byte-identical</b> (112 of 254 on ETH). Those zeros are "the venue has not updated", not "nobody opened a position". Any "one bucket carried 54% of the build" read off raw 5-minute steps is measuring the publication cadence, not a whale. Dedupe repeated readings before computing any rate.</span>
           <span class="i18n-zh"><b>⚠ 不要用 5 分鐘取樣去讀斜率。</b> BingX 大約每 10 分鐘才重新發布一次 OI:量我們自己的 store,<b>連續 5 分鐘樣本有 44% 是完全相同的數字</b>(ETH 254 格裡 112 格)。那些「0」的意思是「交易所還沒更新」,不是「沒有人開倉」。任何從原始 5 分鐘級距讀出來的「某一格佔了 54% 的堆積量」都是在量發布頻率,不是在量巨鯨。要算任何速率之前,先把重複值去掉。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 The /ops card does the quadrant for the whole roster with mark price from the same window. The 7 NCCO*/NCSK* synthetics publish a FIXED open interest — one distinct value across 30 samples — so their OI column reads <code>n/a</code> by design; their funding is real. And this is BingX's book only, not the market's.</span>
         <span class="i18n-zh">📊 /ops 那張卡會對整個 roster 做四象限判讀,用同一個窗口的標記價。七個 NCCO*/NCSK* 合成合約的 OI 是<b>固定值</b>(30 次取樣只有一個相異值),所以它們的 OI 欄按設計顯示 <code>n/a</code>;funding 則是真的。另外這只是 BingX 一家的帳本,不是全市場。</span>
       </p>
     </div>
   </details>
 
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🛑</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🛑</span>
+      <span class="tp-title">
         <span class="i18n-en">Don't fade a stacked regime — MR longs need range</span>
         <span class="i18n-zh">別逆勢 fade stacked 盤 — MR 做多要 range</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en">A mean-reversion <b>long into a stacked-down regime gets run over</b> — "price broke down, downtrend continued". The engine's MR edge assumes a range, not a trend.</span>
           <span class="i18n-zh">MR <b>做多逆一個 stacked-down regime 會被輾</b> —「broke down、downtrend continued」。MR 的邊際假設是 range,不是趨勢。</span>
         </li>
-        <li class="tip-step step-neutral">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>Check regime first:</b> stacked drift (POC ladder aligned) = trade <b>with</b> it; flat / non-stacked = mean-reversion is safe.</span>
           <span class="i18n-zh"><b>先看 regime:</b>stacked drift(POC 梯對齊)= <b>順勢</b>做;flat / non-stacked = 才適合回歸。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en">If you must counter-trend, <b>wait for a structural signal</b> (BOS / CHoCH / sweep) confirming the turn — don't fade on RSI alone.</span>
           <span class="i18n-zh">真要逆勢,<b>等結構訊號</b>(BOS / CHoCH / 掃單)確認轉折 — 別只靠 RSI 就 fade。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 From your journal: <b>4 of 10 stops</b> were counter-trend positions run over by continuation (#10 / 26 / 27 / 47).</span>
         <span class="i18n-zh">📊 出自你的 journal:<b>10 筆停損有 4 筆</b>是逆勢單被延續打掉(#10 / 26 / 27 / 47)。</span>
       </p>
@@ -234,31 +232,31 @@
   </details>
 
   <!-- Card 4: Defensive close on counter-signal -->
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🛡️</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🛡️</span>
+      <span class="tp-title">
         <span class="i18n-en">Counter-signal against you? Close — don't wait for the stop</span>
         <span class="i18n-zh">對手訊號出現?防禦性平倉 — 別等停損</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en">Holding a short while a <b>double-bottom + RSI bull-div forms against you</b> = ignoring the tape. That's a full −1R you could have cut.</span>
           <span class="i18n-zh">抱空單卻讓 <b>double bottom + RSI bull div 在對面成形</b> = 無視盤面。那是本可砍掉的 −1R。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en">When structure <b>flips against your position</b> (opposite BOS/CHoCH, divergence, pivot reclaim), take the defensive exit — a give-back beats a full stop.</span>
           <span class="i18n-zh">當結構<b>對你的部位反轉</b>(反向 BOS/CHoCH、背離、樞紐收復),防禦性出場 — 讓一點利也比吃滿停損好。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en">This is <b>+EV even when price later returns to target</b> — you're paying for tail-risk insurance, not chasing perfection.</span>
           <span class="i18n-zh">就算之後價格又回到 target,這仍是 <b>+EV</b> — 你買的是尾部風險保險,不是追求完美。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 #23 held too long into a bull-div → full −1R. #51 closed defensively pre-CPI → +2.76R.</span>
         <span class="i18n-zh">📊 #23 抱太久遇 bull div → 吃滿 −1R;#51 CPI 前防禦平倉 → +2.76R。</span>
       </p>
@@ -266,31 +264,31 @@
   </details>
 
   <!-- Card 5: Flatten/size-down into scheduled macro -->
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">📅</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">📅</span>
+      <span class="tp-title">
         <span class="i18n-en">Flatten or size down into scheduled macro</span>
         <span class="i18n-zh">排程 macro 事件前:減碼或清倉</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en">A short into a <b>geopolitical headline reversed straight into the stop</b> (#17). Scheduled catalysts (CPI / FOMC / geopolitics) can gap through any technical level.</span>
           <span class="i18n-zh">空單遇<b>地緣新聞直接反轉打停損</b>(#17)。排程催化(CPI / FOMC / 地緣)能跳過任何技術位。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en">Before a known event: <b>cut size, tighten, or flatten</b>. The +2.76R defensive close pre-CPI (#51) is the mirror image done right.</span>
           <span class="i18n-zh">已知事件前:<b>減碼、收緊、或清倉</b>。#51 CPI 前 +2.76R 防禦平倉就是做對的鏡像。</span>
         </li>
-        <li class="tip-step step-neutral">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>Don't widen stops</b> to "survive" the event — that just enlarges the loss. Reduce exposure instead.</span>
           <span class="i18n-zh"><b>別靠加寬停損</b>「撐過」事件 — 那只是放大虧損。該做的是降曝險。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 #17 (geopolitical reversal) = −1R; #51 (pre-CPI defensive close) = +2.76R.</span>
         <span class="i18n-zh">📊 #17(地緣反轉)= −1R;#51(CPI 前防禦平倉)= +2.76R。</span>
       </p>
@@ -298,155 +296,155 @@
   </details>
 
   <!-- Card 6: Stop-then-reverse — fix execution, not stop width -->
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🔧</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🔧</span>
+      <span class="tp-title">
         <span class="i18n-en">Stopped then reversed? Fix execution, not stop width</span>
         <span class="i18n-zh">被掃後反轉?修執行,別加寬停損</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en">Half your stops were "hit stop, <b>then</b> price pulled back / reversed". The instinct is to <b>widen the stop — wrong</b>. A wider stop just loses more on the trades that keep going.</span>
           <span class="i18n-zh">一半的停損是「打停損<b>後</b>價格又回來 / 反轉」。直覺是<b>加寬停損 — 錯</b>。加寬只會在真的續跌的單上賠更多。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>The real fix:</b> check TP-limit fill mechanics (did your entry / TP actually rest correctly?) and whether a macro event caused the sweep.</span>
           <span class="i18n-zh"><b>真正的修法:</b>查 TP-limit 成交機制(你的 entry / TP 真的正確掛著嗎?)+ 是否 macro 事件造成那次掃單。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en">Closed-bar evaluation stays canonical — the leak is at the <b>execution layer</b> (market entry, timeout fallback), not the stop distance.</span>
           <span class="i18n-zh">closed-bar 判定維持不變 — 漏在<b>執行層</b>(market 進、timeout fallback),不在停損距離。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 From your journal: <b>5 of 10 stops</b> were stop-then-reverse (#5 / 8 / 10 / 17 / 19).</span>
         <span class="i18n-zh">📊 出自你的 journal:<b>10 筆停損有 5 筆</b> stop-then-reverse(#5 / 8 / 10 / 17 / 19)。</span>
       </p>
     </div>
   </details>
 
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🪝</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🪝</span>
+      <span class="tp-title">
         <span class="i18n-en">Don't put the stop at the invalidate — it's a sweep magnet</span>
         <span class="i18n-zh">止損別貼 invalidate —— 那是掃損磁鐵</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Touch-entry into the pivot zone + stop just past the invalidate = you ARE the liquidity.</b> The invalidate line only breaks structure on a <em>close</em>, but intrabar wicks routinely spear through it to grab stops, then reverse.</span>
           <span class="i18n-zh"><b>樞紐區觸價進 + 止損貼 invalidate = 你就是被掃的流動性。</b> invalidate 只有<em>收盤</em>破才算結構失效,但盤中影線常常插穿它去吃停損、再反轉。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Fix:</b> enter on <b>close-reclaim confirmation</b> (a bar closes back below/above after tagging the zone — so you're positioned AFTER the sweep), and place the hard stop <b>beyond the sweep high/low</b> (invalidate + buffer / past the swing), not on the line itself.</span>
           <span class="i18n-zh"><b>修法:</b>等<b>收回確認</b>才進(碰過區後一根收回,你就站在 sweep <em>之後</em>),硬止損放在 <b>sweep 高/低之外</b>(invalidate + 緩衝 / 過 swing),不是貼在線上。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>Not "widen the stop" — reposition it.</b> Same direction, same target, only the entry timing + stop location change → the difference between −1R and +4R.</span>
           <span class="i18n-zh"><b>不是「拉寬」,是「換位置」。</b> 同方向同目標,只改進場時機 + 止損位 → 就是 −1R 和 +4R 的差別。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 Live example (ETH, PCE day): zone-touch short 2461–2465 stop 2472 → swept by the 2474.6 wick (−1R). Confirmed short after the 2467.7 close, stop above 2474.6 → rode to 2428 (≈+4R). Ties to your "stop-then-reverse = fix execution, not stop width".</span>
         <span class="i18n-zh">📊 活例(ETH,PCE 當天):樞紐觸價空 2461–2465、止損 2472 → 被 2474.6 插針掃(−1R)。等 2467.7 收盤確認後空、止損放 2474.6 上 → 吃到 2428(≈+4R)。呼應你「stop-then-reverse = 修執行,不是拉寬停損」。</span>
       </p>
     </div>
   </details>
 
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🎯</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🎯</span>
+      <span class="tp-title">
         <span class="i18n-en">Trade the edges of a range, never the middle</span>
         <span class="i18n-zh">箱體只做邊,不做中</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Mid-range entry (pos ~50%) has no edge.</b> You're close to BOTH stop and target, so normal chop shakes you out — the "awkward entry" feeling is real, it's a structural problem, not bad luck.</span>
           <span class="i18n-zh"><b>箱中進場(pos ~50%)沒有 edge。</b> 離止損和目標都近,一般洗盤就把你甩出去——那種「尷尬」的感覺是真的,是結構問題不是運氣。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Only act at the edges:</b> long the bottom third, short the top third. Middle = hang a "no-trade" sign and wait.</span>
           <span class="i18n-zh"><b>只在邊緣動手:</b>下緣三分做多、上緣三分做空。中間 = 掛「不交易」牌,等。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en">Can't reach the edge? Then there's no trade — patience is the position.</span>
           <span class="i18n-zh">摸不到邊?那就沒有單——空手等待也是一種部位。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 ETH long entered 2463 at box pos ~47% (middle) → chopped, nearly stopped, scratched near breakeven. Good management rescued a bad entry.</span>
         <span class="i18n-zh">📊 ETH 多進在 2463、箱體 pos ~47%(中間)→ 被洗、差點停損、勉強保本出。是好管理救了爛進場。</span>
       </p>
     </div>
   </details>
 
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🔄</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🔄</span>
+      <span class="tp-title">
         <span class="i18n-en">Reverse only when a level breaks — not when price wiggles</span>
         <span class="i18n-zh">反手 = 位階作廢才反,不是價格晃</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Frequent reversals = reacting to the last candle.</b> Flipping because price moved 15 pts against you pays spread + fees and never lets a thesis play out.</span>
           <span class="i18n-zh"><b>頻繁反手 = 在反應上一根 K。</b> 因為它逆你走 15 點就翻,付了價差 + 手續費,又不讓任何劇本走完。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Reverse only when your pre-defined invalidation breaks on a close.</b> Write that line down BEFORE you enter — the flip trigger is a level, not a feeling.</span>
           <span class="i18n-zh"><b>只有進場前定好的作廢線被收盤攻破才反手。</b> 進場前就把那條線寫死——反手觸發是「位階」,不是「感覺」。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>One regime, one thesis, one side.</b> Don't buy the middle and simultaneously plan to short slightly higher — that's two half-theses colliding.</span>
           <span class="i18n-zh"><b>一個 regime、一個劇本、一邊。</b> 別「中間買多、又計劃小漲一點反手空」——那是兩個半套劇本對撞。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 Same session: short → flip long 2463 → plan flip short 2481. Each flip chased the last move instead of a level. Manage the leak: define the flip level up front.</span>
         <span class="i18n-zh">📊 同一場:空 → 反手多 2463 → 又計劃反手空 2481。每次翻都在追上一個動作、不是位階。修法:進場前就定好反手位。</span>
       </p>
     </div>
   </details>
 
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">⏱️</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">⏱️</span>
+      <span class="tp-title">
         <span class="i18n-en">Confirm on the setup's timeframe — not a faster one, not the live tick</span>
         <span class="i18n-zh">確認要看「setup 的 TF」收盤 —— 不是更快的、更不是即時跳</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-agree">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Confirmation TF = the TF the level is drawn on.</b> A 1h EQH/pivot breakout confirms on the <b>1h close</b>; a 15m setup on the 15m close; a 4h level on the 4h close. Higher TF = stronger but slower.</span>
           <span class="i18n-zh"><b>確認 TF = 那個價位所在的 TF。</b> 1h 的 EQH/樞紐突破 → 看 <b>1h 收盤</b>;15m setup → 15m 收;4h → 4h 收。TF 越高越強但越慢。</span>
         </li>
-        <li class="tip-step step-clash">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Entering on the live tick = zero confirmation = too early.</b> The wick that pokes the level and reverses is the trap; the CLOSE is the truth.</span>
           <span class="i18n-zh"><b>用即時跳進場 = 零確認 = 進太快。</b> 戳一下就反轉的插針是陷阱,<b>收盤</b>才是真相。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>Want to enter early?</b> Use the 15m close as a scout entry BUT with a tighter stop, and bail immediately if the setup-TF (1h) close rejects the level.</span>
           <span class="i18n-zh"><b>想早進?</b> 可用 15m 收當前哨,但<b>止損收緊</b>,而且 setup TF(1h)收盤若拒絕該價位就<b>立刻認錯</b>。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 Live example: entered a 1h EQH breakout @2531 on the live tick (1:15am), before any close. The 15m (1:30) was borderline; the <b>1h close (2:00) printed 2517 — below 2531 = failed breakout</b>, then dumped to 2487. Waiting for the 1h close = don't take it.</span>
         <span class="i18n-zh">📊 活例:1h EQH 突破 @2531 用即時跳進(1:15am),還沒任何收盤。15m(1:30)模稜;<b>1h 收(2:00)= 2517,在 2531 之下 = 假突破</b>,接著插到 2487。等 1h 收盤 = 根本不會進。</span>
       </p>
@@ -454,35 +452,35 @@
   </details>
 
   <!-- Card 12: Opening prices as institutional anchors -->
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🕛</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🕛</span>
+      <span class="tp-title">
         <span class="i18n-en">Session opens = institutional anchors: bias filter + S/R + magnet</span>
         <span class="i18n-zh">開盤價 = 機構錨點:偏見過濾 + S/R + 回歸磁鐵</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-agree">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Bias filter</b>: price above BOTH daily &amp; weekly open → long only; below both → short only. The open is the intraday/intraweek bull-bear divider — algos and desks anchor to it.</span>
           <span class="i18n-zh"><b>偏見過濾</b>:站上日開<b>且</b>週開 → 只做多;都在下 → 只做空。開盤價是當日/當週的多空分界,算法跟機構都錨定它。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>S/R reaction</b>: opens act as support/resistance — trade the bounce or rejection off them. A close back above/below an open = character shift (reclaim = bullish).</span>
           <span class="i18n-zh"><b>S/R 反應</b>:開盤價當支撐/壓力,做反彈或拒絕。收回站上/跌破開盤價 = 性格轉變(收復=轉多)。</span>
         </li>
-        <li class="tip-step step-neutral">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>Mean-reversion magnet</b>: when price extends far from an open, it tends to revert and test it — use the open as a TP or a fade reference, not a chase.</span>
           <span class="i18n-zh"><b>回歸磁鐵</b>:價格離開盤價太遠 → 常回測它 → 拿開盤價當 TP 或 fade 參考,別追。</span>
         </li>
-        <li class="tip-step step-clash">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Session framing + clusters</b>: London (07:00 UTC) &amp; NY (13:00 UTC) opens frame each session — watch the "open → sweep → reverse" killzone. When several opens cluster at one price, that's a stronger wall.</span>
           <span class="i18n-zh"><b>場次框架 + 群聚</b>:倫敦(07:00 UTC)/紐約(13:00 UTC)開框各場次,盯「開盤→掃單→反轉」killzone。多條開盤價擠在同一價 = 更強的牆。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 #59 BTC long entered AT the weekly open 77718 (S/R bounce). Note: daily open = Asia open (both 00:00 UTC) — same line. The 開盤線 layer is now ON by default on /chart.</span>
         <span class="i18n-zh">📊 #59 BTC 多就是進在週開 77718(S/R 反彈)。注意:日開 = 亞洲開(都是 00:00 UTC)同一條。/chart 的「開盤線」圖層已預設開啟。</span>
       </p>
@@ -490,42 +488,43 @@
   </details>
 
   <!-- Card 13: read was right, execution wasn't — location / size / breakeven -->
-  <details class="tip-card">
-    <summary class="tip-summary">
-      <span class="tip-icon">🎯</span>
-      <span class="tip-title">
+  <details class="tp-card">
+    <summary class="tp-sum">
+      <span class="tp-icon">🎯</span>
+      <span class="tp-title">
         <span class="i18n-en">Read right ≠ traded well: location · size · breakeven</span>
         <span class="i18n-zh">讀對盤 ≠ 做得好:點位 · size · 移保本</span>
       </span>
-      <span class="tip-chevron" aria-hidden="true">▾</span>
+      <span class="tp-chev" aria-hidden="true">▾</span>
     </summary>
-    <div class="tip-body">
-      <ol class="tip-steps">
-        <li class="tip-step step-clash">
+    <div class="tp-body">
+      <ol class="tp-steps">
+        <li class="tp-step is-clash">
           <span class="i18n-en"><b>Location — don't enter the MIDDLE of a box.</b> A level can be real (a reclaim line / EQH edge) yet sit in no-man's-land between the base below and the wall above. Enter long there and both sides whipsaw you.</span>
           <span class="i18n-zh"><b>點位 —— 別進箱體中段。</b>一個層級可以是真的(收回線 / EQH 頂緣),卻夾在「下方基底 ↔ 上方硬牆」的正中間。在那做多,兩面都洗你。</span>
         </li>
-        <li class="tip-step step-agree">
+        <li class="tp-step is-agree">
           <span class="i18n-en"><b>Enter the EDGE:</b> long a bounce off the base (support / weekly-daily open) OR a hold after breaking the wall — not the middle. If you're between two magnets, wait for one to resolve.</span>
           <span class="i18n-zh"><b>進邊緣:</b>做多就進「基底反彈」(支撐 / 週開日開)或「突破牆後站穩」—— 不進中段。夾在兩個磁鐵之間,等其中一邊選完再進。</span>
         </li>
-        <li class="tip-step step-trend">
+        <li class="tp-step is-trend">
           <span class="i18n-en"><b>Size so you can hold the plan.</b> Oversized leverage (125× on a big notional) makes a 0.5% wiggle a big $ swing → 患得患失 → you break your own rules (don't cut when you should, don't move the stop). The read was right; the SIZE hijacked the execution. Right-size = calm = disciplined.</span>
           <span class="i18n-zh"><b>Size 要讓你守得住計畫。</b>過大槓桿(大名目 125×)讓 0.5% 波動變成大額跳動 → 患得患失 → 破自己的規則(該砍不砍、停損不移)。讀盤對,是 SIZE 綁架了執行。合理 size = 心態穩 = 守紀律。</span>
         </li>
-        <li class="tip-step step-neutral">
+        <li class="tp-step is-neutral">
           <span class="i18n-en"><b>Failed first continuation → move stop to breakeven.</b> Entry fills, price pokes up ONCE and fails — that failed re-test is the signal to lock breakeven. Then a later wick to your original stop just scratches instead of hurting.</span>
           <span class="i18n-zh"><b>首次續攻失敗 → 停損移保本。</b>成交後戳上去「一次」就失敗 —— 那次失敗的再測就是移保本的訊號。之後插針到原停損只是平手,不會痛。</span>
         </li>
       </ol>
-      <p class="tip-foot">
+      <p class="tp-foot">
         <span class="i18n-en">📊 #60 BTC long 78303 (an EQH-band top, but mid-range between base 77638 &amp; wall 78727), 125×: read the base→W→breakout perfectly, but entered the middle, oversized, no breakeven after the failed poke → nearly gave back the prior day's profit on a wick, salvaged +247pts by a disciplined exit. Lesson wasn't the read — it was location + size + breakeven.</span>
         <span class="i18n-zh">📊 #60 BTC 多 78303(EQH 頂緣,但夾在基底 77638 ↔ 牆 78727 中段),125×:基底→W→突破全讀對,但進中段、size 過大、失敗沒移保本 → 一根插針差點賠光前一天利潤,靠紀律出場救回 +247 點。教訓不在讀盤 —— 在點位 + size + 移保本。</span>
       </p>
     </div>
   </details>
 
-  <p class="tips-more"><span class="i18n-en">More cards land here as we distill them.</span><span class="i18n-zh">之後萃取出的原則會陸續加成小卡。</span></p>
+  </div>
+  <p class="tp-more"><span class="i18n-en">More cards land here as we distill them.</span><span class="i18n-zh">之後萃取出的原則會陸續加成小卡。</span></p>
 </main>
 
 </body>
