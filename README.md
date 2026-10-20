@@ -21,55 +21,101 @@ CLIs and the web UI address any of the 14 contracts `market.Resolve` knows.
 | **Runs** | Two containers (Docker Compose) on one Oracle Cloud Always Free VM (1 GB RAM), reachable only over Tailscale and SSH |
 | **Does** | Detect → score → record / execute (paper-first) → alert |
 | **Discipline** | Every strategy change goes through a 60/90/120-day A/B, and the ship gate is code (`shipgate`), not a habit |
-| **Size** | 35 importable packages + 28 commands · 247 Go files, 83 of them tests · ~54k lines · `go test -race ./...` clean |
+| **Size** | 35 importable packages + 28 commands · 253 Go files, 87 of them tests · ~55k lines · `go test -race ./...` clean |
 | **Ships as** | `FROM scratch` images (web 28.7 MB, monitor 7.4 MB) built by CI per commit, deployed with Docker Compose behind a manual approval ([`docs/operations.md`](docs/operations.md#deploying)) |
 
 ---
 
 ## Architecture
 
+Colour is the role: **grey** the outside world, **indigo** the importable
+packages (data flows down, never back up), **green** the two running
+services, **amber** state on disk, **pink** the operator.
+
 ```mermaid
 flowchart TB
-    subgraph External["🌐 External"]
-        bx[(BingX REST + WebSocket)]
-        others[(Finnhub · Gemini)]
+    subgraph External["External sources"]
+        direction LR
+        bx[("BingX<br/>REST + WS")]:::ext
+        bn[("Binance<br/>futures")]:::ext
+        cal[("ForexFactory<br/>BLS")]:::ext
+        fh[("Finnhub")]:::ext
+        llm[("Gemini<br/>Anthropic")]:::ext
+        bx ~~~ bn ~~~ cal ~~~ fh ~~~ llm
     end
 
-    subgraph Core["🧠 35 importable packages — data flows down, never back up"]
-        datain["Data in — bingx · market · econcal · earnings · fundamental · macro"]
-        math["Pure math — indicator"]
-        detect["Detection — signal · analyzer · zone · session"]
-        decide["Decision + risk — validator · risk · shipgate · bracket · protect"]
-        exec["Execution — autostrat · autotrade, paper-first"]
+    subgraph Core["35 importable packages — data flows one way"]
+        direction LR
+        datain["Data in<br/>bingx · binfut · market<br/>econcal · bls · earnings<br/>fundamental · macro · oi"]:::core
+        math["Pure math<br/>indicator"]:::core
+        detect["Detection<br/>signal · analyzer<br/>zone · session"]:::core
+        decide["Decision + risk<br/>validator · risk · shipgate<br/>bracket · protect"]:::core
+        exec["Execution<br/>autostrat · autotrade<br/>paper-first"]:::core
         datain --> math --> detect --> decide --> exec
     end
 
-    subgraph VPS["☁️ Oracle Cloud Always Free VM — $0/mo"]
-        web["trading-web<br/>Gin · SSE · gRPC"]
-        monitor["trading-monitor<br/>zone alerts · autoexec · naked-position guard · macro warn"]
-        store[("/opt/trading — flat files")]
+    subgraph VPS["Oracle Cloud VM · 1 GB · $0/month"]
+        direction LR
+        web["trading-web<br/>UI zh/en · alert engine<br/>SSE + gRPC, one price hub"]:::svc
+        store[("/opt/trading<br/>CSV · JSON · JSONL")]:::store
+        monitor["trading-monitor<br/>zone alerts · autoexec<br/>naked-position guard<br/>macro warn · OI sampler"]:::svc
+        web <--> store <--> monitor
     end
 
-    subgraph Edge["📱 Operator — iPhone / Mac"]
-        push["ntfy app"]
-        safari["Safari — web UI"]
-        sshc["SSH — ops CLI"]
-        grpcc["gRPC client"]
-        claude["Claude Desktop — cmd/mcp"]
+    subgraph Edge["Operator"]
+        direction LR
+        browser["Browser<br/>over Tailscale"]:::user
+        push["ntfy<br/>on the phone"]:::user
+        ssh["SSH<br/>ops CLI"]:::user
+        mcp["Claude Desktop<br/>cmd/mcp"]:::user
+        browser ~~~ push ~~~ ssh ~~~ mcp
     end
 
-    bx --> datain
-    others --> datain
-    detect --> monitor
-    exec --> monitor
-    decide --> web
-    web <--> store
-    monitor <--> store
-    monitor -->|"alerts via ntfy.sh"| push
-    web <-->|HTTP over Tailscale| safari
-    web <-->|"gRPC, same hub as SSE"| grpcc
-    VPS <-->|"SSH: ops status · logs · restart"| sshc
-    store -.->|synced journal copy| claude
+    External --> Core
+    Core -->|"web: score · validate · plan<br/>monitor: triggers · guard"| VPS
+    VPS -->|"pages · pushes · status · synced journal"| Edge
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef core fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef svc fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef store fill:#fff7ed,stroke:#f59e0b,color:#78350f
+    classDef user fill:#fdf2f8,stroke:#ec4899,color:#831843
+```
+
+### From a closed bar to a protected position
+
+The manual path, the one the operator takes on `/chart`. Every hop that can
+refuse an order does so before anything reaches the exchange, and after the
+fill the exchange, not the journal, is what gets checked.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant UI as /chart
+    participant Eng as signal + validator
+    participant Risk as risk gate
+    participant BX as BingX
+    participant J as journal.csv
+    participant Mon as monitor · bracket guard
+
+    UI->>Eng: closed bars only (live = backtest)
+    Eng-->>UI: score /100 · factors · plan · structure read
+    Op->>UI: + at a price → validate
+    UI->>Eng: score this entry
+    Eng-->>UI: verdict · suggested stop / TP · cash-open warning
+    Op->>UI: record trade (open position ticked)
+    UI->>Risk: notional / equity, account leverage, concurrent cap
+    alt refused
+        Risk-->>UI: reason, in the page language
+    else allowed
+        UI->>BX: LIMIT entry + bundled stop / TP2 (reduce-only)
+        UI->>J: row with order ids
+    end
+    loop every 30 s
+        Mon->>BX: positions + resting orders
+        Mon-->>Op: ntfy if a position has no reduce-only stop
+    end
+    Op->>UI: /ops/verify · exchange vs journal
 ```
 
 ## On the VPS: who reads and writes what
@@ -150,6 +196,62 @@ A file older than 60 seconds means the whole daemon is down, whatever the loops
 say. `stalled` is the case `systemctl is-active` cannot see: the process is
 alive, one goroutine is stuck.
 
+## The web app
+
+Five sections, each a set of tabs; the bell sits in every page header. Pages
+render on the server in Chinese or English from two dictionaries — no client
+translation layer, no mixed-language pages.
+
+```mermaid
+flowchart TB
+    shell(["Sidebar · ⌘K · theme · zh/en · bell"]):::user
+    shell --> today["Today<br/>dashboard · live setups"]:::svc
+    shell --> chart["Chart<br/>chart · validate"]:::svc
+    shell --> port["Portfolio<br/>trades · setups · auto-trade · exchange check"]:::svc
+    shell --> research["Research<br/>calendar · scan · tips"]:::svc
+    shell --> settings["Settings<br/>ops · alerts"]:::svc
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef core fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef svc fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef store fill:#fff7ed,stroke:#f59e0b,color:#78350f
+    classDef user fill:#fdf2f8,stroke:#ec4899,color:#831843
+```
+
+- **Server-side i18n, tested.** Tests fail the build when a template uses an
+  unknown key, when the two dictionaries disagree on keys, or when a format
+  string quotes a different number of values in each language.
+- **Messages carry codes, not sentences.** Risk refusals, the cash-open stop
+  advisory, protect faults and order results are values plus a code; the page
+  renders them in its language and the English entry is pinned by a test to
+  the exact sentence the CLI prints.
+- **Two themes, one layout.** Dark and light are colour tokens only.
+
+## Alerts
+
+The web service evaluates its rules every 15 seconds and hands the engine the
+conditions that are true this round. The engine owns everything after that:
+one incident per key, hysteresis so a value on a threshold does not flap, and
+an append-only JSONL log the state is rebuilt from on start.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> pending: condition true
+    pending --> [*]: false before FireAfter rounds
+    pending --> open: true FireAfter rounds in a row
+    open --> open: still true (detail updates)
+    open --> resolved: absent ResolveAfter rounds
+    open --> held: rule could not judge this round
+    held --> open: judged again
+    resolved --> [*]
+```
+
+Acknowledging is not resolving: an acknowledged alert stays open until its
+condition clears. Critical alerts also go to the phone when they fire and when
+they resolve — except "monitor down", which `daemon-watch` already pushes from
+outside both containers; two pushes for one outage teach you to ignore both.
+Rules: [`docs/alerts.md`](docs/alerts.md).
+
 ## How a strategy change ships
 
 ```mermaid
@@ -168,6 +270,26 @@ failed criterion rather than the first, and has an **absolute floor** — median
 R/trade must clear zero however the baseline did — because a purely relative
 gate cannot say "neither of these should be traded". FVG continuation is the
 latest example: it beat the baseline in all three windows and still failed.
+
+### How code ships
+
+```mermaid
+flowchart LR
+    push["push to main"]:::user --> check["check<br/>vet · test -race"]:::core
+    check --> images["images<br/>web + monitor<br/>FROM scratch"]:::core
+    images --> gate{"manual approval<br/>production env"}:::store
+    gate --> deploy["deploy<br/>docker compose on the VM"]:::svc
+    deploy --> verify["ops status<br/>deployed commit · /health"]:::svc
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef core fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef svc fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef store fill:#fff7ed,stroke:#f59e0b,color:#78350f
+    classDef user fill:#fdf2f8,stroke:#ec4899,color:#831843
+```
+
+A newer push cancels a run still waiting for approval, and two deploys never
+run at once, so what reaches production is the latest approved commit —
+`ops status` prints which one.
 
 ---
 
@@ -210,13 +332,13 @@ latest example: it beat the baseline in all three windows and still failed.
 
 | Layer | Packages | Responsibility |
 |---|---|---|
-| **Data in** | `bingx` (REST + WebSocket + paginated klines), `market` (Symbol/Candle types, 14 contracts incl. NCCO* metals and NCSK* stock synthetics), `econcal`, `earnings`, `fundamental`, `macro`, `dxy` | Every external read. `market.Resolve` is the single symbol map — the canonical one, after three stale copies caused outages. |
+| **Data in** | `bingx` (REST + WebSocket + paginated klines), `binfut` (Binance futures cross-reference), `market` (Symbol/Candle types, 14 contracts incl. NCCO* metals and NCSK* stock synthetics), `econcal`, `bls`, `earnings`, `fundamental`, `macro`, `dxy`, `oi` (open-interest samples) | Every external read. `market.Resolve` is the single symbol map — the canonical one, after three stale copies caused outages. |
 | **Pure math** | `indicator` | Stateless: RSI, BOLL, MACD, ATR, Fibonacci, volume profile (HVN/POC). No I/O, no clock. |
 | **Detection** | `signal` (confluence voting, N字 BOS/CHoCH structure, EQH/EQL liquidity pools, session opens, shelves), `analyzer` (sweep + reclaim, divergence, CVD, double patterns), `zone` (pivot-zone bands, manual + auto-derived), `session` (US cash-open bar modelling) | Turns candles into named events. **Closed bars only** — the forming bar is never read, which is what keeps live and backtest identical. |
 | **Decision + risk** | `validator` (/10 discretionary score), `risk` (notional/equity, kill distance), `shipgate` (PASS/FAIL/UNDECIDED), `bracket` (naked-position guard), `protect` (stop management) | Scores a proposal and refuses bad ones. `shipgate` is the notable one: the ship criteria are CODE, not a habit — see below. |
-| **Execution** | `autostrat` (rule → trigger), `autotrade` (paper fires, dedup into one-position-per-rule, global caps) | Paper-first and non-negotiably so. Live requires config master ON, paper OFF, **and** an env kill-switch. |
+| **Execution** | `autostrat` (rule → trigger, with labelled reasons), `entryplan`, `autotrade` (paper fires, dedup into one-position-per-rule, global caps) | Paper-first and non-negotiably so. Live requires config master ON, paper OFF, **and** an env kill-switch. |
 | **Record** | `journal` | 30-column CSV, versioned by column count, auto-migrating v1→v9 on read. |
-| **Output** | `notify` (stdout / macOS / ntfy fan-out), `ansi`, `ai` (Gemini/Anthropic, dry-run aware) | |
+| **Output** | `notify` (stdout / macOS / ntfy fan-out), `alert` (incidents: dedup, hysteresis, JSONL event log), `ansi`, `ai` (Gemini/Anthropic, dry-run aware), `grpcsrv` (MarketData service) | |
 | **Config + runtime** | `config` (`.env` loader), `monitorcfg` (settings the panel changes at runtime), `heartbeat` (loops' self-reported state) | Every data path is env-overridable, which is what makes a fixture-backed demo instance cheap. |
 
 | Commands (28) | |
@@ -255,7 +377,7 @@ before it:
 | Layer | Choice |
 |---|---|
 | Language | **Go 1.25** — static binaries, trivial cross-compile |
-| Web | Gin + `html/template`, server-rendered, no JS framework; assets via `//go:embed` |
+| Web | Gin + `html/template`, server-rendered in zh/en from two dictionaries, no JS framework; dark/light colour tokens; assets and fonts via `//go:embed` |
 | Service API | **gRPC** — unary + server-streaming on the same hub as SSE ([`docs/grpc.md`](docs/grpc.md)) |
 | Persistence | Flat files: CSV journal (auto-migrated v1→v9, 30 columns), JSON config, JSONL event logs |
 | Push | ntfy.sh, behind a pluggable `Notifier` with `Multi` fan-out and a runtime mute |

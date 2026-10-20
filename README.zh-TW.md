@@ -24,7 +24,7 @@ CLI 和 web UI 可以指定 `market.Resolve` 認得的全部 14 個合約。
 | **跑在哪** | 一台 Oracle Cloud Always Free VM（1 GB RAM）上的兩個容器（Docker Compose），只能透過 Tailscale 和 SSH 連到 |
 | **做什麼** | 偵測 → 打分 → 記錄／執行（paper-first）→ 推播 |
 | **紀律** | 每個策略改動都要過 60/90/120 天的 A/B，而且上線閘門是程式（`shipgate`），不是習慣 |
-| **規模** | 35 個可匯入的 package + 28 個 command · 247 個 Go 檔，其中 83 個是測試 · 約 54k 行 · `go test -race ./...` 乾淨 |
+| **規模** | 35 個可匯入的 package + 28 個 command · 253 個 Go 檔，其中 87 個是測試 · 約 55k 行 · `go test -race ./...` 乾淨 |
 | **怎麼出貨** | `FROM scratch` 映像（web 28.7 MB、monitor 7.4 MB），CI 依 commit 建置，人工核准後用 Docker Compose 部署（[`docs/operations.md`](docs/operations.md#deploying)） |
 
 > 💡 這個專案真正的重點不是「會不會賺錢」，而是**每一個策略改動都要通過 60/90/120 天
@@ -35,49 +35,96 @@ CLI 和 web UI 可以指定 `market.Resolve` 認得的全部 14 個合約。
 
 ## 架構
 
+顏色代表角色：**灰色**是外部世界，**靛藍**是可匯入的 package（資料只往下流，不回頭），
+**綠色**是兩個常駐服務，**橘色**是磁碟上的狀態，**粉紅**是操作者。
+
 ```mermaid
 flowchart TB
-    subgraph External["🌐 外部"]
-        bx[(BingX REST + WebSocket)]
-        others[(Finnhub · Gemini)]
+    subgraph External["外部資料源"]
+        direction LR
+        bx[("BingX<br/>REST + WS")]:::ext
+        bn[("Binance<br/>期貨")]:::ext
+        cal[("ForexFactory<br/>BLS")]:::ext
+        fh[("Finnhub")]:::ext
+        llm[("Gemini<br/>Anthropic")]:::ext
+        bx ~~~ bn ~~~ cal ~~~ fh ~~~ llm
     end
 
-    subgraph Core["🧠 35 個可匯入的 package — 資料往下流，不回頭"]
-        datain["資料進入 — bingx · market · econcal · earnings · fundamental · macro"]
-        math["純數學 — indicator"]
-        detect["偵測 — signal · analyzer · zone · session"]
-        decide["決策 + 風控 — validator · risk · shipgate · bracket · protect"]
-        exec["執行 — autostrat · autotrade，paper-first"]
+    subgraph Core["35 個可匯入的 package — 資料只往一個方向流"]
+        direction LR
+        datain["資料進入<br/>bingx · binfut · market<br/>econcal · bls · earnings<br/>fundamental · macro · oi"]:::core
+        math["純數學<br/>indicator"]:::core
+        detect["偵測<br/>signal · analyzer<br/>zone · session"]:::core
+        decide["決策 + 風控<br/>validator · risk · shipgate<br/>bracket · protect"]:::core
+        exec["執行<br/>autostrat · autotrade<br/>paper-first"]:::core
         datain --> math --> detect --> decide --> exec
     end
 
-    subgraph VPS["☁️ Oracle Cloud Always Free VM — $0/月"]
-        web["trading-web<br/>Gin · SSE · gRPC"]
-        monitor["trading-monitor<br/>zone 警報 · autoexec · 裸倉守衛 · macro 預警"]
-        store[("/opt/trading — 純檔案")]
+    subgraph VPS["Oracle Cloud VM · 1 GB · $0/月"]
+        direction LR
+        web["trading-web<br/>中英 UI · 告警引擎<br/>SSE + gRPC 共用一個價格 hub"]:::svc
+        store[("/opt/trading<br/>CSV · JSON · JSONL")]:::store
+        monitor["trading-monitor<br/>zone 警報 · autoexec<br/>裸倉守衛<br/>macro 預警 · OI 取樣"]:::svc
+        web <--> store <--> monitor
     end
 
-    subgraph Edge["📱 操作者 — iPhone / Mac"]
-        push["ntfy app"]
-        safari["Safari — web UI"]
-        sshc["SSH — ops 指令"]
-        grpcc["gRPC client"]
-        claude["Claude Desktop — cmd/mcp"]
+    subgraph Edge["操作者"]
+        direction LR
+        browser["瀏覽器<br/>經 Tailscale"]:::user
+        push["手機上的 ntfy"]:::user
+        ssh["SSH<br/>ops 指令"]:::user
+        mcp["Claude Desktop<br/>cmd/mcp"]:::user
+        browser ~~~ push ~~~ ssh ~~~ mcp
     end
 
-    bx --> datain
-    others --> datain
-    detect --> monitor
-    exec --> monitor
-    decide --> web
-    web <--> store
-    monitor <--> store
-    monitor -->|"經 ntfy.sh 推播"| push
-    web <-->|HTTP over Tailscale| safari
-    web <-->|"gRPC，和 SSE 同一個 hub"| grpcc
-    VPS <-->|"SSH：ops status · logs · restart"| sshc
-    store -.->|同步過來的 journal 副本| claude
+    External --> Core
+    Core -->|"web：打分 · 驗證 · 計畫<br/>monitor：觸發 · 守衛"| VPS
+    VPS -->|"頁面 · 推播 · 狀態 · 同步的 journal"| Edge
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef core fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef svc fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef store fill:#fff7ed,stroke:#f59e0b,color:#78350f
+    classDef user fill:#fdf2f8,stroke:#ec4899,color:#831843
 ```
+
+### 從一根收盤 K 到一個有防護的部位
+
+這是操作者在 `/chart` 上走的手動路徑。每一個會拒單的關卡都在送到交易所**之前**；
+成交之後被檢查的是交易所，不是 journal。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as 操作者
+    participant UI as /chart
+    participant Eng as signal + validator
+    participant Risk as 風險閘門
+    participant BX as BingX
+    participant J as journal.csv
+    participant Mon as monitor · 裸倉守衛
+
+    UI->>Eng: 只讀收盤 K（live = backtest）
+    Eng-->>UI: /100 分 · 評分因子 · 計畫 · 盤勢
+    Op->>UI: 在價格上按 + → 驗證
+    UI->>Eng: 替這個進場打分
+    Eng-->>UI: 判讀 · 建議停損 / TP · 開盤 K 警告
+    Op->>UI: 記錄交易（勾選開倉）
+    UI->>Risk: 名目 / 權益、帳戶槓桿、同時持倉上限
+    alt 擋下
+        Risk-->>UI: 原因，用頁面的語言
+    else 放行
+        UI->>BX: LIMIT 進場 + 綁定停損 / TP2（reduce-only）
+        UI->>J: 寫入一列，含 order id
+    end
+    loop 每 30 秒
+        Mon->>BX: 部位 + 掛單
+        Mon-->>Op: 部位沒有 reduce-only 停損就推 ntfy
+    end
+    Op->>UI: /ops/verify · 交易所 vs journal
+```
+
+> 💡 最後兩步是這張圖的重點。綁定的停損曾經**靜默地沒掛上**，journal 卻寫著
+> ATTACHED。所以成交之後信的是交易所：守衛每 30 秒去問交易所，查證頁也是直接讀交易所。
 
 ## VPS 上：誰讀、誰寫哪個檔案
 
@@ -163,6 +210,60 @@ stateDiagram-v2
 > 它們真的不同步過：zone 頻道被關掉時，那張卡片顯示 ON 整整一天。讓 daemon 自己說，
 > 推測的那份就可以整個刪掉。
 
+## Web app
+
+五個區塊，每個區塊底下是幾個分頁；每一頁的頂端都有告警鈴鐺。頁面在伺服器端依兩份字典
+渲染成中文或英文 —— 沒有前端翻譯層，也不會有中英混雜的頁面。
+
+```mermaid
+flowchart TB
+    shell(["側欄 · ⌘K · 主題 · 中/英 · 鈴鐺"]):::user
+    shell --> today["今日<br/>總覽 · 即時機會"]:::svc
+    shell --> chart["圖表<br/>圖表 · 驗證"]:::svc
+    shell --> port["投資組合<br/>交易紀錄 · 模擬單 · 自動交易 · 交易所查證"]:::svc
+    shell --> research["研究<br/>行事曆 · 掃描 · 交易小卡"]:::svc
+    shell --> settings["設定<br/>維運 · 告警"]:::svc
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef core fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef svc fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef store fill:#fff7ed,stroke:#f59e0b,color:#78350f
+    classDef user fill:#fdf2f8,stroke:#ec4899,color:#831843
+```
+
+- **伺服器端 i18n，有測試把關。** 模板用了不存在的 key、兩份字典的 key 對不上、或某個
+  格式字串在兩種語言裡帶的參數數量不同，測試都會失敗。
+- **訊息帶的是代碼，不是句子。** 風控拒單、開盤 K 停損警告、protect 的拒絕原因、下單
+  結果都是「代碼 + 數值」，頁面用自己的語言渲染；英文字典由測試鎖定成和 CLI 印出來的
+  句子一字不差。
+- **兩個主題，一種版面。** 深色和淺色只差顏色 token。
+
+## 告警
+
+web 服務每 15 秒評估一次規則，把「這一輪為真的狀況」交給告警引擎。之後的事都歸引擎管：
+同一個 key 只會有一個事件、用遲滯避免數值在門檻附近來回跳、每一次變化都 append 到一個
+JSONL 檔，啟動時從它重建狀態。
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> pending: 條件為真
+    pending --> [*]: 還沒滿 FireAfter 輪就變假
+    pending --> open: 連續 FireAfter 輪為真
+    open --> open: 仍為真（細節更新）
+    open --> resolved: 連續 ResolveAfter 輪不再出現
+    open --> held: 這一輪規則無法判斷
+    held --> open: 恢復判斷
+    resolved --> [*]
+```
+
+確認（ack）不等於解除：確認過的告警會一直開著，直到條件真的消失。critical 等級的告警在
+觸發和解除時也會推到手機 —— 只有「monitor 掛了」例外，因為 `daemon-watch` 已經從兩個
+容器之外推過一次；同一個故障推兩次，只會讓人學會兩個都忽略。規則：[`docs/alerts.md`](docs/alerts.md)。
+
+> 💡 告警取代的是「狀態頁」。狀態頁只有在有人看的時候才有用；事件會記下什麼時候開始、
+> 持續多久、有沒有人看到。凌晨 3 點裸倉守衛卡住 4 分鐘，到 3:05 狀態頁上已經看不出來，
+> 告警會留著。
+
 ## 策略怎麼上線
 
 ```mermaid
@@ -182,6 +283,25 @@ flowchart LR
 
 > 💡 最後那條是整包東西的重點。一個**純相對**的閘門只會挑出比較不爛的那個；絕對地板
 > 就是為了讓它能說「都不要」而加的。
+
+### 程式怎麼上線
+
+```mermaid
+flowchart LR
+    push["push 到 main"]:::user --> check["check<br/>vet · test -race"]:::core
+    check --> images["映像<br/>web + monitor<br/>FROM scratch"]:::core
+    images --> gate{"人工核准<br/>production 環境"}:::store
+    gate --> deploy["部署<br/>VM 上的 docker compose"]:::svc
+    deploy --> verify["ops status<br/>部署的 commit · /health"]:::svc
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef core fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef svc fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef store fill:#fff7ed,stroke:#f59e0b,color:#78350f
+    classDef user fill:#fdf2f8,stroke:#ec4899,color:#831843
+```
+
+較新的 push 會取消還在等核准的那次執行，而且兩個部署不會同時跑，所以上到生產環境的
+一定是最新一個被核准的 commit —— `ops status` 會印出是哪一個。
 
 ---
 
@@ -228,13 +348,13 @@ flowchart LR
 
 | 層 | Package | 責任 |
 |---|---|---|
-| **資料進入** | `bingx`（REST + WebSocket + 分頁 K 線）、`market`（Symbol/Candle 型別，14 個合約）、`econcal`、`earnings`、`fundamental`、`macro`、`dxy` | 所有對外讀取。`market.Resolve` 是**唯一**的 symbol 對照表 |
+| **資料進入** | `bingx`（REST + WebSocket + 分頁 K 線）、`binfut`（Binance 期貨交叉參考）、`market`（Symbol/Candle 型別，14 個合約）、`econcal`、`bls`、`earnings`、`fundamental`、`macro`、`dxy`、`oi`（未平倉量取樣） | 所有對外讀取。`market.Resolve` 是**唯一**的 symbol 對照表 |
 | **純數學** | `indicator` | 無狀態：RSI、BOLL、MACD、ATR、Fibonacci、volume profile（HVN/POC）。沒有 I/O、沒有時鐘 |
 | **偵測** | `signal`、`analyzer`、`zone`、`session` | 把 K 線變成有名字的事件。**只讀收盤棒** |
 | **決策 + 風控** | `validator`（`/10` 分）、`risk`、`shipgate`、`bracket`（裸倉守衛）、`protect`（停損管理） | 給提案打分，並拒絕不該做的 |
-| **執行** | `autostrat`（規則 → 觸發）、`autotrade`（紙上開單、一規則一部位、全域上限） | **Paper-first，沒得商量** |
+| **執行** | `autostrat`（規則 → 觸發，附標籤化的原因）、`entryplan`、`autotrade`（紙上開單、一規則一部位、全域上限） | **Paper-first，沒得商量** |
 | **紀錄** | `journal` | 30 欄 CSV，用欄位數當版本，讀取時自動遷移 v1→v9 |
-| **輸出** | `notify`（stdout / macOS / ntfy 扇出，可執行期靜音）、`ansi`、`ai` | |
+| **輸出** | `notify`（stdout / macOS / ntfy 扇出，可執行期靜音）、`alert`（事件：去重、遲滯、JSONL 事件紀錄）、`ansi`、`ai`、`grpcsrv`（MarketData 服務） | |
 | **設定 + 執行期** | `config`（`.env` 載入）、`monitorcfg`（面板在執行期改的設定）、`heartbeat`（迴圈自我回報） | **每一個資料路徑都可以用 env 覆寫** |
 
 ### 三個承重的不變式
@@ -293,7 +413,7 @@ OFF、**而且** env kill-switch 打開。任何一道沒開就不會有真單�
 | 層 | 選擇 |
 |---|---|
 | 語言 | **Go 1.25** —— 靜態 binary，交叉編譯很簡單 |
-| Web | Gin + `html/template`，server-side render，沒有 JS framework；資源用 `//go:embed` 嵌進 binary |
+| Web | Gin + `html/template`，server-side render，依兩份字典輸出中文或英文，沒有 JS framework；深淺兩套顏色 token；資源和字型用 `//go:embed` 嵌進 binary |
 | 服務 API | **gRPC** —— unary + server-streaming，和 SSE 共用同一個 hub（[`docs/grpc.md`](docs/grpc.md)） |
 | 持久化 | 純檔案：CSV journal（自動遷移 v1→v9，30 欄）、JSON 設定、JSONL 事件紀錄 |
 | 推播 | ntfy.sh，透過可插拔的 `Notifier` + `Multi` 扇出，可執行期靜音 |

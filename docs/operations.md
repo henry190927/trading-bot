@@ -219,18 +219,24 @@ A mute also silences the naked-position alarm — the confirm dialog says so.
 `http://<tailscale-ip>:8080`, mobile-first, server-rendered (Gin +
 `html/template`, templates and CSS embedded with `//go:embed`).
 
-| Route | Page |
-|---|---|
-| `/` | Dashboard — engine snapshot per symbol, tap-to-copy price levels |
-| `/chart` | Chart — the live-trade surface: levels, structure, and recording a trade from a price |
-| `/journal`, `/journal/new`, `/journal/:id/edit`, `/journal/:id/close` | Portfolio — trades, stats, the partials calculator for multi-leg exits |
-| `/validate` | Score a proposed entry |
-| `/setups`, `/scan` | Setup tracking with the path-dependent real outcome; current setups |
-| `/today` | Today — open trades, macro gaps, pending setups |
-| `/tips` | Lessons distilled from the journal |
-| `/calendar` | Macro calendar (curated events gate the engine; the live feed is display-only) |
-| `/alerts` (and the 🔔 on every page) | In-app alerts — see [alerts.md](alerts.md) |
-| `/ops`, `/ops/autotrade`, `/ops/verify` | Operations — see [Operating](#operating) |
+| Section | Route | Page |
+|---|---|---|
+| Today | `/` (also `/today`) | Open trades, today's R, macro gaps the blackout does not cover, pending setups, market table |
+| | `/ops/scan` | Live setups — every auto rule (and every unarmed strategy × symbol cell) evaluated on the latest closed bar |
+| Chart | `/chart` | The live-trade surface: candles, score /100, plan, factors, structure read, OI; `+` at a price to validate or record |
+| | `/validate` | Score a proposed entry |
+| Portfolio | `/journal`, `/journal/new`, `/journal/:id/edit`, `/journal/:id/close` | Trades and stats; the partials calculator for multi-leg exits |
+| | `/setups` | Setup tracking with the path-dependent real outcome |
+| | `/ops/autotrade` | Paper auto-trade log, caps replay |
+| | `/ops/verify` | Every open trade against its actual BingX position and orders; attach a stop/TP |
+| Research | `/calendar` | Macro calendar (curated events gate the engine; the live feed is display-only) |
+| | `/scan` | One row per symbol on a chosen TF, expandable |
+| | `/tips` | Lessons distilled from the journal |
+| Settings | `/ops` | Push, channels, runtime settings — see [Operating](#operating) |
+| | `/alerts` (and the 🔔 on every page) | In-app alerts — see [alerts.md](alerts.md) |
+
+Every page renders in Chinese or English on the server; `/lang/zh` and
+`/lang/en` set the `lang` cookie and return to the page.
 
 Add it to the iPhone home screen from Safari's share menu for a full-screen
 app.
