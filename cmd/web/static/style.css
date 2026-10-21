@@ -4581,3 +4581,31 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ui-card .live-t th:first-child, .ui-card .live-t td:first-child { padding-left: var(--sp-4); }
 .ui-card .live-t th:last-child, .ui-card .live-t td:last-child { padding-right: var(--sp-4); }
 .live-t td.num { text-overflow: clip; }
+
+/* /chart position card: stop → entry → TP track scaled in R. */
+.cs-pos .pos-item + .pos-item { border-top: 1px solid var(--border); padding-top: var(--sp-3); margin-top: var(--sp-3); }
+.pos-head { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-md); }
+.pos-tf { color: var(--text-dim); font-size: var(--fs-sm); }
+.pos-r { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; font-size: var(--fs-lg); }
+.pos-state { color: var(--text-dim); font-size: var(--fs-sm); margin-left: auto; }
+.pos-r + .pos-state { margin-left: 0; }
+.pos-sub { color: var(--text-dim); font-size: var(--fs-sm); margin-top: var(--sp-1); }
+.pos-track { position: relative; height: 8px; margin: 14px 0 6px; border-radius: 4px;
+  background: rgba(127, 127, 127, 0.18); }
+.pos-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.pos-fill.up { background: var(--green); }
+.pos-fill.down { background: var(--red); }
+.pos-tick { position: absolute; top: -3px; width: 2px; height: 14px; margin-left: -1px; background: var(--text-dim); }
+.pos-tick.tp { background: var(--green); }
+.pos-mark { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  border: 2px solid var(--surface); }
+.pos-mark.up { background: var(--green); }
+.pos-mark.down { background: var(--red); }
+.pos-lbls { position: relative; height: 2.6em; font-size: var(--fs-xs); color: var(--text-dim);
+  font-variant-numeric: tabular-nums; line-height: 1.3; }
+.pos-lbl { position: absolute; top: 0; white-space: nowrap; }
+.pos-lbl.l-mid { transform: translateX(-50%); text-align: center; }
+.pos-lbl.l-end { transform: translateX(-100%); text-align: right; }
+.pos-lbl.l-stop { color: var(--red); }
+.pos-links { display: flex; gap: var(--sp-3); font-size: var(--fs-sm); margin-top: var(--sp-1); }
+.pos-links a { color: var(--blue); }

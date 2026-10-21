@@ -282,6 +282,10 @@ func main() {
 	// In-app alerts: evaluates the rules every 15s and serves the bell.
 	srv.startAlerts(context.Background())
 
+	// Fill detection + auto TP1/stop/TP2 placement for journal trades, every
+	// 30s whether or not a browser is open (see tradeSweepLoop).
+	go srv.tradeSweepLoop(context.Background())
+
 	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
 	if err := r.Run(bind); err != nil {
 		log.Fatalf("server: %v", err)

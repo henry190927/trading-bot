@@ -44,6 +44,9 @@ type server struct {
 
 	client *bingx.Client
 	ai     ai.Provider
+
+	// sweepMu serialises sweepOpenTrades (fill detection + auto orders).
+	sweepMu sync.Mutex
 	// aiProviderName is a friendly label ("gemini", "anthropic", or
 	// "gemini(fallback-from-xxx)") for logs + cache-key namespacing.
 	aiProviderName string
@@ -342,6 +345,119 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		cache[string(v.Symbol)+"@"+string(v.Signal.Timeframe)] = v
 	}
 
+	s.fetchTradeViews(ctx, trades, cache)
+
+	var cards []openTradeCard
+	for _, t := range trades {
+		if !t.IsOpen() {
+			continue
+		}
+		// "Live" reference time: FilledAt for active trades, OpenedAt for pending.
+		liveSince := t.OpenedAt
+		if !t.FilledAt.IsZero() {
+			liveSince = t.FilledAt
+		}
+		card := openTradeCard{Trade: t, TimeElapsed: time.Since(liveSince)}
+		if t.IsPending() {
+			card.PendingSince = time.Since(t.OpenedAt)
+		}
+
+		// Resolve the trade's own scan from the cache (its TF, not the
+		// dashboard's). Mark price + diagnose both come from there.
+		tfStr := t.TF
+		if i := strings.Index(tfStr, ","); i >= 0 {
+			tfStr = strings.TrimSpace(tfStr[:i])
+		}
+		if sym, err := resolveWebSymbol(t.Symbol); err == nil && tfStr != "" {
+			if v, ok := cache[string(sym)+"@"+tfStr]; ok && v.Err == "" {
+				card.MarkPrice = v.MarkPrice
+				if card.MarkPrice == 0 {
+					card.MarkPrice = v.Signal.Price
+				}
+				// Re-run validator at the TRADE's own side (not the engine's
+				// preferred side) with the trade's planned entry. This way
+				// the diagnose row answers "is MY trade still good?", not
+				// "what's the best trade on this symbol right now?".
+				if len(v.Candles) >= 60 && (t.Side == "long" || t.Side == "short") {
+					var side signal.Side
+					if t.Side == "long" {
+						side = signal.Long
+					} else {
+						side = signal.Short
+					}
+					entry := t.Entry
+					if entry == 0 {
+						entry = card.MarkPrice
+					}
+					r := validator.Validate(sym, market.Timeframe(tfStr), side, entry, 6.0, v.Candles, card.MarkPrice)
+					card.Diagnose = &r
+					// Diff-since-entry: parse the journal's snapshot from
+					// +record time, compare to the live re-validation,
+					// surface the most actionable structural change.
+					if t.SignalCtx != "" {
+						entryCtx := parseSignalCtx(t.SignalCtx)
+						delta, cause, has := diagnoseDelta(entryCtx, card.Diagnose)
+						if has {
+							card.HasDiff = true
+							card.ScoreDelta = delta
+							card.DiffCause = cause
+							switch {
+							case delta < -0.5:
+								card.DiffClass = "down"
+							case delta > 0.5:
+								card.DiffClass = "up"
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// R-progress only makes sense for ACTIVE (filled) trades. Pending
+		// trades show distance-to-entry instead.
+		if t.IsPending() {
+			if card.MarkPrice > 0 && t.Entry > 0 {
+				// Signed % from mark TO entry, in the direction needed to fill.
+				// Long needs mark to fall to entry (mark > entry currently),
+				// short needs mark to rise to entry (mark < entry currently).
+				if t.Side == "long" {
+					card.DistToEntryPct = (card.MarkPrice - t.Entry) / t.Entry * 100
+				} else {
+					card.DistToEntryPct = (t.Entry - card.MarkPrice) / t.Entry * 100
+				}
+			}
+		} else if card.MarkPrice > 0 && t.Stop != t.Entry {
+			risk := t.Stop - t.Entry
+			if risk < 0 {
+				risk = -risk
+			}
+			var moved float64
+			if t.Side == "long" {
+				moved = card.MarkPrice - t.Entry
+			} else {
+				moved = t.Entry - card.MarkPrice
+			}
+			card.CurrentR = moved / risk
+			// Each fill (.ot-bar-fill.negative/.positive) is anchored at the
+			// bar's center (50%), so its CSS width is the % of *half* the bar.
+			// Negative side: full at -1R → 50% width covers entry→stop.
+			// Positive side: full at +2R (TP2) → 50% width covers entry→TP2.
+			card.PctToStop = clampPct(-moved / risk * 50)
+			if t.TP1 != 0 {
+				card.PctToTP1 = clampPct(moved / risk * 50)
+			}
+			if t.TP2 != 0 {
+				card.PctToTP2 = clampPct(moved / risk / 2 * 50)
+			}
+		}
+		cards = append(cards, card)
+	}
+	return cards
+}
+
+// fetchTradeViews fills cache with a scan for every (Symbol, TF) an open
+// trade needs that cache does not already hold, in parallel.
+func (s *server) fetchTradeViews(ctx context.Context, trades []journal.Trade, cache map[string]symbolView) {
 	// Collect distinct (Symbol, TF) pairs that the dashboard scan didn't
 	// cover but open trades need. Fetch them in parallel.
 	type pair struct {
@@ -386,6 +502,136 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		wg.Wait()
 	}
 
+}
+
+// tradeSweepEvery is how often the background sweep checks open journal
+// trades for fills and places their opted-in TP1 / stop / TP2 orders.
+const tradeSweepEvery = 30 * time.Second
+
+// tradeSweepLoop runs sweepOpenTrades forever.
+//
+// The sweep used to run only inside buildOpenTradeCards, i.e. only while
+// someone had /today open in a browser. #92 (HYPE, 2026-10-21) filled at
+// ~21:34, traded through its 82 TP1 at 23:00, and got its TP1 order at ~23:45
+// when the page was next loaded — the same "works only when a browser is open"
+// delivery bug the bracket guard fixed for stops.
+//
+// It stays in cmd/web rather than the monitor daemon because cmd/web is the
+// only journal writer: a daemon placing TP1 without writing TP1OrderID would
+// leave this process seeing an empty id and placing a second order.
+func (s *server) tradeSweepLoop(ctx context.Context) {
+	t := time.NewTicker(tradeSweepEvery)
+	defer t.Stop()
+	for {
+		s.sweepOpenTrades(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// sweepOpenTrades reads the journal, detects entry fills and places pending
+// auto orders, and writes the journal back if anything changed. Serialised by
+// sweepMu so an overlapping run can never see the same empty order id twice.
+func (s *server) sweepOpenTrades(ctx context.Context) {
+	s.sweepMu.Lock()
+	defer s.sweepMu.Unlock()
+	trades, err := journal.ReadAll("")
+	if err != nil {
+		log.Printf("trade sweep: read journal: %v", err)
+		return
+	}
+	if !needsSweep(trades) {
+		return // nothing pending or awaiting an order: no BingX calls at all
+	}
+	before := append([]journal.Trade(nil), trades...)
+	cache := map[string]symbolView{}
+	s.fetchTradeViews(ctx, trades, cache)
+	if !s.sweepTrades(ctx, trades, cache) {
+		return
+	}
+	// The sweep spent BingX round trips holding a copy of the journal. Writing
+	// that copy back would erase a row recorded or edited in the meantime, so
+	// re-read and carry over only the fields the sweep owns.
+	fresh, err := journal.ReadAll("")
+	if err != nil {
+		log.Printf("trade sweep: re-read journal: %v", err)
+		return
+	}
+	if mergeSweep(fresh, before, trades) {
+		if err := journal.WriteAll("", fresh); err != nil {
+			log.Printf("trade sweep: journal write failed: %v", err)
+		}
+	}
+}
+
+// mergeSweep copies what the sweep changed (before → after) onto fresh, by
+// trade ID. It only fills a field fresh still has empty: if the row was
+// edited or closed while the sweep ran, the edit wins. An order id that was
+// placed on the exchange but could not be merged is logged, since the next
+// sweep would otherwise not know it exists.
+func mergeSweep(fresh, before, after []journal.Trade) bool {
+	byID := make(map[int]int, len(fresh))
+	for i, t := range fresh {
+		byID[t.ID] = i
+	}
+	changed := false
+	for i := range after {
+		a, b := &after[i], &before[i]
+		j, ok := byID[a.ID]
+		if !ok {
+			if a.TP1OrderID != b.TP1OrderID || a.StopOrderID != b.StopOrderID || a.TP2OrderID != b.TP2OrderID {
+				log.Printf("trade sweep: #%d vanished from the journal after orders were placed (tp1=%s stop=%s tp2=%s)", a.ID, a.TP1OrderID, a.StopOrderID, a.TP2OrderID)
+			}
+			continue
+		}
+		f := &fresh[j]
+		if !a.FilledAt.Equal(b.FilledAt) && f.FilledAt.IsZero() {
+			f.FilledAt, changed = a.FilledAt, true
+		}
+		for _, fld := range []struct {
+			got, was string
+			dst      *string
+			name     string
+		}{
+			{a.TP1OrderID, b.TP1OrderID, &f.TP1OrderID, "tp1"},
+			{a.StopOrderID, b.StopOrderID, &f.StopOrderID, "stop"},
+			{a.TP2OrderID, b.TP2OrderID, &f.TP2OrderID, "tp2"},
+		} {
+			if fld.got == fld.was {
+				continue
+			}
+			if *fld.dst == "" {
+				*fld.dst, changed = fld.got, true
+			} else if *fld.dst != fld.got {
+				log.Printf("trade sweep: #%d %s placed as %s but the journal now names %s — check the exchange", a.ID, fld.name, fld.got, *fld.dst)
+			}
+		}
+	}
+	return changed
+}
+
+// needsSweep reports whether any open trade is still waiting for a fill or
+// for one of its opted-in orders.
+func needsSweep(trades []journal.Trade) bool {
+	for _, t := range trades {
+		if !t.IsOpen() {
+			continue
+		}
+		if t.IsPending() ||
+			(t.TP1Auto && t.TP1OrderID == "") ||
+			(t.StopAuto && t.StopOrderID == "") ||
+			(t.TP2Auto && t.TP2OrderID == "") {
+			return true
+		}
+	}
+	return false
+}
+
+// sweepTrades mutates trades in place and reports whether any changed.
+func (s *server) sweepTrades(ctx context.Context, trades []journal.Trade, cache map[string]symbolView) bool {
 	// Pass 1: auto-detect entry fills. For each pending trade, scan the
 	// candles already fetched for its symbol/TF; if any bar since the
 	// trade was recorded touched the entry level, mark it filled. Persist
@@ -504,119 +750,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		}
 	}
 
-	if tradesChanged {
-		if err := journal.WriteAll("", trades); err != nil {
-			// Soft-fail: log only, dashboard still renders w/ in-memory state.
-			log.Printf("auto-fill journal write failed: %v", err)
-		}
-	}
-
-	var cards []openTradeCard
-	for _, t := range trades {
-		if !t.IsOpen() {
-			continue
-		}
-		// "Live" reference time: FilledAt for active trades, OpenedAt for pending.
-		liveSince := t.OpenedAt
-		if !t.FilledAt.IsZero() {
-			liveSince = t.FilledAt
-		}
-		card := openTradeCard{Trade: t, TimeElapsed: time.Since(liveSince)}
-		if t.IsPending() {
-			card.PendingSince = time.Since(t.OpenedAt)
-		}
-
-		// Resolve the trade's own scan from the cache (its TF, not the
-		// dashboard's). Mark price + diagnose both come from there.
-		tfStr := t.TF
-		if i := strings.Index(tfStr, ","); i >= 0 {
-			tfStr = strings.TrimSpace(tfStr[:i])
-		}
-		if sym, err := resolveWebSymbol(t.Symbol); err == nil && tfStr != "" {
-			if v, ok := cache[string(sym)+"@"+tfStr]; ok && v.Err == "" {
-				card.MarkPrice = v.MarkPrice
-				if card.MarkPrice == 0 {
-					card.MarkPrice = v.Signal.Price
-				}
-				// Re-run validator at the TRADE's own side (not the engine's
-				// preferred side) with the trade's planned entry. This way
-				// the diagnose row answers "is MY trade still good?", not
-				// "what's the best trade on this symbol right now?".
-				if len(v.Candles) >= 60 && (t.Side == "long" || t.Side == "short") {
-					var side signal.Side
-					if t.Side == "long" {
-						side = signal.Long
-					} else {
-						side = signal.Short
-					}
-					entry := t.Entry
-					if entry == 0 {
-						entry = card.MarkPrice
-					}
-					r := validator.Validate(sym, market.Timeframe(tfStr), side, entry, 6.0, v.Candles, card.MarkPrice)
-					card.Diagnose = &r
-					// Diff-since-entry: parse the journal's snapshot from
-					// +record time, compare to the live re-validation,
-					// surface the most actionable structural change.
-					if t.SignalCtx != "" {
-						entryCtx := parseSignalCtx(t.SignalCtx)
-						delta, cause, has := diagnoseDelta(entryCtx, card.Diagnose)
-						if has {
-							card.HasDiff = true
-							card.ScoreDelta = delta
-							card.DiffCause = cause
-							switch {
-							case delta < -0.5:
-								card.DiffClass = "down"
-							case delta > 0.5:
-								card.DiffClass = "up"
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// R-progress only makes sense for ACTIVE (filled) trades. Pending
-		// trades show distance-to-entry instead.
-		if t.IsPending() {
-			if card.MarkPrice > 0 && t.Entry > 0 {
-				// Signed % from mark TO entry, in the direction needed to fill.
-				// Long needs mark to fall to entry (mark > entry currently),
-				// short needs mark to rise to entry (mark < entry currently).
-				if t.Side == "long" {
-					card.DistToEntryPct = (card.MarkPrice - t.Entry) / t.Entry * 100
-				} else {
-					card.DistToEntryPct = (t.Entry - card.MarkPrice) / t.Entry * 100
-				}
-			}
-		} else if card.MarkPrice > 0 && t.Stop != t.Entry {
-			risk := t.Stop - t.Entry
-			if risk < 0 {
-				risk = -risk
-			}
-			var moved float64
-			if t.Side == "long" {
-				moved = card.MarkPrice - t.Entry
-			} else {
-				moved = t.Entry - card.MarkPrice
-			}
-			card.CurrentR = moved / risk
-			// Each fill (.ot-bar-fill.negative/.positive) is anchored at the
-			// bar's center (50%), so its CSS width is the % of *half* the bar.
-			// Negative side: full at -1R → 50% width covers entry→stop.
-			// Positive side: full at +2R (TP2) → 50% width covers entry→TP2.
-			card.PctToStop = clampPct(-moved / risk * 50)
-			if t.TP1 != 0 {
-				card.PctToTP1 = clampPct(moved / risk * 50)
-			}
-			if t.TP2 != 0 {
-				card.PctToTP2 = clampPct(moved / risk / 2 * 50)
-			}
-		}
-		cards = append(cards, card)
-	}
-	return cards
+	return tradesChanged
 }
 
 func clampPct(v float64) float64 {
@@ -4869,9 +5003,19 @@ func collectOpenPositionsForChart(short string, markPrice float64) []map[string]
 			"filled":   filled,
 			"unrealR":  unrealR,
 			"openedAt": t.OpenedAt.Unix(),
+			"filledAt": unixOrZero(t.FilledAt),
 		})
 	}
 	return out
+}
+
+// unixOrZero is t.Unix(), or 0 for the zero time (whose Unix() is a large
+// negative number the frontend would read as a real date).
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
 }
 
 // computeChartMarkers derives event markers for the LWC candlestick
