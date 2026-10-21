@@ -596,6 +596,9 @@ func mergeSweep(fresh, before, after []journal.Trade) bool {
 		if !a.FilledAt.Equal(b.FilledAt) && f.FilledAt.IsZero() {
 			f.FilledAt, changed = a.FilledAt, true
 		}
+		if a.HasTP1Leg() && !b.HasTP1Leg() && !f.HasTP1Leg() {
+			f.TP1FillPrice, f.TP1FillPct, f.TP1FilledAt, changed = a.TP1FillPrice, a.TP1FillPct, a.TP1FilledAt, true
+		}
 		for _, fld := range []struct {
 			got, was string
 			dst      *string
@@ -628,11 +631,18 @@ func needsSweep(trades []journal.Trade) bool {
 		if t.IsPending() ||
 			(t.TP1Auto && t.TP1OrderID == "") ||
 			(t.StopAuto && t.StopOrderID == "") ||
-			(t.TP2Auto && t.TP2OrderID == "") {
+			(t.TP2Auto && t.TP2OrderID == "") ||
+			awaitingTP1Leg(t) {
 			return true
 		}
 	}
 	return false
+}
+
+// awaitingTP1Leg: a TP1 order of ours is resting on a live position and its
+// fill has not been recorded yet.
+func awaitingTP1Leg(t journal.Trade) bool {
+	return t.IsActive() && !t.HasTP1Leg() && t.TP1OrderID != "" && !strings.HasPrefix(t.TP1OrderID, "ATTACHED:")
 }
 
 // sweepTrades mutates trades in place and reports whether any changed.
@@ -755,7 +765,96 @@ func (s *server) sweepTrades(ctx context.Context, trades []journal.Trade, cache 
 		}
 	}
 
+	// Pass 3: record the TP1 scale-out once the exchange has filled it.
+	if s.detectTP1Legs(ctx, trades) {
+		tradesChanged = true
+	}
 	return tradesChanged
+}
+
+// tp1HistoryWindow is how far back the order-history lookup reaches. BingX
+// bounds the range, and a trade open longer than this falls back to the
+// planned size for its entry quantity (see tp1LegFrom).
+const tp1HistoryWindow = 7 * 24 * time.Hour
+
+// detectTP1Legs looks up, for every active trade whose TP1 order we placed
+// and whose fill is not yet recorded, that order in the exchange's history.
+// One history call per symbol. Reports whether any trade gained a leg.
+func (s *server) detectTP1Legs(ctx context.Context, trades []journal.Trade) bool {
+	if s.client == nil || s.client.APIKey == "" {
+		return false
+	}
+	bySym := map[market.Symbol][]int{}
+	for i, t := range trades {
+		if !awaitingTP1Leg(t) {
+			continue
+		}
+		if sym, err := resolveWebSymbol(t.Symbol); err == nil {
+			bySym[sym] = append(bySym[sym], i)
+		}
+	}
+	changed := false
+	now := time.Now()
+	for sym, idxs := range bySym {
+		start := now.Add(-tp1HistoryWindow)
+		for _, i := range idxs {
+			if o := trades[i].OpenedAt.Add(-time.Hour); o.After(start) {
+				start = o // narrowest window that still covers the entry
+			}
+		}
+		fills, err := s.client.OrderHistory(ctx, sym, start, now)
+		if err != nil {
+			continue // "no fills yet" also lands here; retried next sweep
+		}
+		for _, i := range idxs {
+			t := &trades[i]
+			price, pct, at, ok := tp1LegFrom(*t, fills, lotPrec(t.Symbol))
+			if !ok {
+				continue
+			}
+			t.TP1FillPrice, t.TP1FillPct, t.TP1FilledAt = price, pct, at
+			log.Printf("tp1-leg: trade #%d %s TP1 filled %.4g%% @ %g (locked %+.2fR)", t.ID, t.Symbol, pct, price, journal.LockedR(*t))
+			changed = true
+		}
+	}
+	return changed
+}
+
+// tp1LegFrom finds t's TP1 order among fills and returns its average price,
+// its share of the position in percent, and its time.
+//
+// The share is TP1 qty / entry qty, where entry qty is the entry order's own
+// fill when it is in the history, else the planned margin x leverage / entry
+// floored to the lot (what placeEntryOnBingX sent). With neither, there is no
+// honest denominator and no leg is recorded.
+func tp1LegFrom(t journal.Trade, fills []bingx.FilledOrder, lotDecimals int) (price, pct float64, at time.Time, ok bool) {
+	var tp1 *bingx.FilledOrder
+	entryQty := 0.0
+	for i := range fills {
+		f := &fills[i]
+		switch f.OrderID {
+		case t.TP1OrderID:
+			tp1 = f
+		case t.EntryOrderID:
+			if t.EntryOrderID != "" {
+				entryQty = f.Quantity
+			}
+		}
+	}
+	if tp1 == nil || tp1.AvgPrice <= 0 || tp1.Quantity <= 0 {
+		return 0, 0, time.Time{}, false
+	}
+	// A partially filled TP1 is not a leg yet: its quantity is still moving.
+	if tp1.Status != "" && !strings.EqualFold(tp1.Status, "FILLED") {
+		return 0, 0, time.Time{}, false
+	}
+	if entryQty <= 0 && t.MarginUSDT > 0 && t.Leverage > 0 && t.Entry > 0 {
+		entryQty = floorTo(t.MarginUSDT*float64(t.Leverage)/t.Entry, lotDecimals)
+	}
+	if entryQty <= 0 {
+		return 0, 0, time.Time{}, false
+	}
+	return tp1.AvgPrice, math.Min(tp1.Quantity/entryQty*100, 100), tp1.Time, true
 }
 
 // rTrack places a trade on a horizontal bar scaled in R. The left end is the
@@ -1831,6 +1930,21 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 		} else {
 			rerender("closed_at: " + perr.Error())
 			return
+		}
+	}
+
+	// With a recorded TP1 leg the form's exit is the remainder's price only.
+	// Store the size-weighted blend, which keeps R right through every later
+	// recompute, and spell both legs out in the notes. Only when the form
+	// says so: a POST without blend_tp1 is taken at its word.
+	if c.PostForm("blend_tp1") == "on" && t.HasTP1Leg() && outcome != "no-fill" {
+		rest := exit
+		exit = journal.BlendedExit(t, rest)
+		legs := tr("jc.leg.notes", t.TP1FillPct, fmtPx(t.TP1FillPrice), 100-t.TP1FillPct, fmtPx(rest), fmtPx(exit))
+		if notes == "" {
+			notes = legs
+		} else {
+			notes = legs + "\n" + notes
 		}
 	}
 
@@ -3095,7 +3209,9 @@ func templateFuncs() template.FuncMap {
 			s = strings.TrimRight(s, "0")
 			return strings.TrimSuffix(s, ".")
 		},
-		"fmtPx": fmtPx,
+		"fmtPx":   fmtPx,
+		"lockedR": journal.LockedR,
+		"sub100":  func(v float64) float64 { return 100 - v },
 		"fmtPct": func(v float64) string {
 			return fmt.Sprintf("%+.4f%%", v*100)
 		},

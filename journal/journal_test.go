@@ -88,12 +88,15 @@ func TestRiskDerivationsDegradeToZero(t *testing.T) {
 	}
 }
 
-func TestHeaderIsV9(t *testing.T) {
-	if len(Header) != 30 {
-		t.Fatalf("len(Header) = %d, want 30 (v9)", len(Header))
+func TestHeaderIsV10(t *testing.T) {
+	if len(Header) != 33 {
+		t.Fatalf("len(Header) = %d, want 33 (v10)", len(Header))
 	}
-	if Header[29] != "equity_usdt" {
-		t.Errorf("Header[29] = %q, want \"equity_usdt\"", Header[29])
+	if Header[29] != "equity_usdt" || Header[30] != "tp1_fill_price" || Header[32] != "tp1_filled_at" {
+		t.Errorf("Header tail = %q", Header[29:])
+	}
+	if n := len(rowFromTrade(Trade{})); n != len(Header) {
+		t.Errorf("rowFromTrade writes %d cells for a %d-column header", n, len(Header))
 	}
 }
 
@@ -185,13 +188,13 @@ func TestReadsV8AndUpgradesToV9(t *testing.T) {
 		t.Errorf("AccountLeverage = %v with no equity, want 0", got[0].AccountLeverage())
 	}
 
-	// Write it back: now v9, and still readable.
+	// Write it back: now the current version, and still readable.
 	if err := WriteAll(p, got); err != nil {
 		t.Fatalf("WriteAll: %v", err)
 	}
 	raw, _ := os.ReadFile(p)
-	if n := strings.Count(strings.Split(string(raw), "\n")[0], ",") + 1; n != 30 {
-		t.Errorf("rewritten header has %d columns, want 30", n)
+	if n := strings.Count(strings.Split(string(raw), "\n")[0], ",") + 1; n != len(Header) {
+		t.Errorf("rewritten header has %d columns, want %d", n, len(Header))
 	}
 	again, err := ReadAll(p)
 	if err != nil {
@@ -206,7 +209,7 @@ func TestReadsV8AndUpgradesToV9(t *testing.T) {
 // hand-edited row that dropped a comma fails loudly instead of shifting every
 // field by one.
 func TestParseRowRejectsUnknownWidths(t *testing.T) {
-	for _, n := range []int{15, 22, 24, 28, 31} {
+	for _, n := range []int{15, 22, 24, 28, 31, 32, 34} {
 		row := make([]string, n)
 		for i := range row {
 			row[i] = "0"
@@ -525,5 +528,50 @@ func TestEveryCloseOutcomeIsAlsoEditable(t *testing.T) {
 		if IsEditOutcome(bad) {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+// #92 as it actually went: long 80.424, stop 79.2 (risk 1.224), half closed
+// at TP1 82.000. Hand-traced: R(82) = 1.576/1.224 = 1.28758; locked = half.
+func TestTP1LegBlend(t *testing.T) {
+	tr := Trade{Side: "long", Entry: 80.424, Stop: 79.2, TP1FillPrice: 82, TP1FillPct: 50}
+	if got, want := LockedR(tr), 0.5*1.576/1.224; math.Abs(got-want) > 1e-9 {
+		t.Errorf("LockedR = %v, want %v", got, want)
+	}
+	// Rest stopped out at 79.2 (-1R): blended exit 80.6, R = 0.5*1.28758 - 0.5.
+	exit := BlendedExit(tr, 79.2)
+	if math.Abs(exit-80.6) > 1e-9 {
+		t.Errorf("BlendedExit = %v, want 80.6", exit)
+	}
+	if got, want := RealizedR(tr, exit), 0.5*1.576/1.224-0.5; math.Abs(got-want) > 1e-9 {
+		t.Errorf("R of the blend = %v, want %v (sum of the legs)", got, want)
+	}
+	if BlendedExit(Trade{Entry: 1}, 7) != 7 {
+		t.Error("no leg must leave the exit unchanged")
+	}
+	if over := (Trade{Side: "long", Entry: 10, Stop: 9, TP1FillPrice: 12, TP1FillPct: 150}); BlendedExit(over, 0) != 12 {
+		t.Errorf("pct > 100 must cap at the leg price, got %v", BlendedExit(over, 0))
+	}
+}
+
+func TestV10RoundTrip(t *testing.T) {
+	at := time.Date(2026, 10, 22, 0, 5, 0, 0, time.Local)
+	in := []Trade{
+		{ID: 92, OpenedAt: at, Symbol: "HYPE", Side: "long", Entry: 80.424, Stop: 79.2, TP1FillPrice: 82, TP1FillPct: 50, TP1FilledAt: at},
+		{ID: 93, OpenedAt: at, Symbol: "BTC", Side: "short", Entry: 1, Stop: 2},
+	}
+	p := filepath.Join(t.TempDir(), "j.csv")
+	if err := WriteAll(p, in); err != nil {
+		t.Fatal(err)
+	}
+	out, err := ReadAll(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g := out[0]; g.TP1FillPrice != 82 || g.TP1FillPct != 50 || !g.TP1FilledAt.Equal(at) {
+		t.Errorf("leg lost: %+v", g)
+	}
+	if out[1].HasTP1Leg() {
+		t.Errorf("row without a leg read back with one: %+v", out[1])
 	}
 }

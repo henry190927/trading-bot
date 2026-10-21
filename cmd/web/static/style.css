@@ -4605,3 +4605,7 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .jpos-lbls .stop { color: var(--red); }
 .jpos-links { display: flex; gap: var(--sp-3); font-size: var(--fs-sm); margin-top: var(--sp-2); }
 .jpos-links a { color: var(--blue); }
+.jpos-leg { color: var(--green); margin-top: var(--sp-1); }
+.jc-leg { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-3); border: 1px solid var(--green); border-radius: 6px; }
+.jc-leg .ui-hint { flex-basis: 100%; }

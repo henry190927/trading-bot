@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -137,5 +139,61 @@ func TestQuickOpenFailedEntryClearsAutoFlags(t *testing.T) {
 	}
 	if tr := trades[0]; tr.StopAuto || tr.TP1Auto || tr.TP2Auto || tr.EntryOrderID != "" {
 		t.Errorf("failed entry left intent behind: %+v", tr)
+	}
+}
+
+// Closing #92-shaped: TP1 50% recorded at 82, remainder stopped at 79.2.
+// Hand-traced: exit = 0.5*82 + 0.5*79.2 = 80.6; R = (80.6-80.424)/1.224.
+func TestClosePostBlendsTP1Leg(t *testing.T) {
+	t.Setenv("JOURNAL_PATH", filepath.Join(t.TempDir(), "journal.csv"))
+	gin.SetMode(gin.TestMode)
+	at := time.Date(2026, 10, 21, 16, 2, 0, 0, time.UTC)
+	if err := journal.WriteAll("", []journal.Trade{{
+		ID: 92, OpenedAt: at, Symbol: "HYPE", Side: "long", Entry: 80.424, Stop: 79.2, TP1: 82,
+		FilledAt: at, TP1FillPrice: 82, TP1FillPct: 50, TP1FilledAt: at,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	dicts, _ := loadDicts(i18nFS)
+	pages, err := parsePages(assets, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{dicts: dicts, pages: pages}
+	r := gin.New()
+	r.GET("/journal/:id/close", s.handleJournalCloseForm)
+	r.POST("/journal/:id/close", s.handleJournalClosePost)
+
+	// The form shows the leg and asks for the remainder only.
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", "/journal/92/close", nil))
+	if body := w.Body.String(); !strings.Contains(body, `name="blend_tp1"`) || strings.Contains(body, "partials-rows") {
+		t.Fatalf("close form: blend flag present=%v, manual partials present=%v",
+			strings.Contains(body, `name="blend_tp1"`), strings.Contains(body, "partials-rows"))
+	}
+
+	form := url.Values{"outcome": {"stop"}, "exit_price": {"79.2"}, "blend_tp1": {"on"}, "closed_at": {"2026-10-22 01:00"}}
+	req := httptest.NewRequestWithContext(t.Context(), "POST", "/journal/92/close", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("close POST = %d: %s", w.Code, w.Body.String())
+	}
+	got, _ := journal.ReadAll("")
+	g := got[0]
+	if math.Abs(g.ExitPrice-80.6) > 1e-9 {
+		t.Errorf("exit_price = %v, want the blend 80.6", g.ExitPrice)
+	}
+	// r_realized is written with 4 decimals.
+	if want := (80.6 - 80.424) / 1.224; math.Abs(g.RRealized-want) > 5e-5 {
+		t.Errorf("R = %v, want %v", g.RRealized, want)
+	}
+	if !strings.Contains(g.CloseNotes, "82") || !strings.Contains(g.CloseNotes, "79.2") {
+		t.Errorf("notes do not spell out the legs: %q", g.CloseNotes)
+	}
+	// R survives a recompute from the stored exit (what every edit does).
+	if rr := journal.RealizedR(g, g.ExitPrice); math.Abs(rr-g.RRealized) > 5e-5 {
+		t.Errorf("recompute drifted: %v vs %v", rr, g.RRealized)
 	}
 }

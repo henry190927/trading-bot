@@ -93,6 +93,7 @@
           {{if $k.HasTP2}}<span class="end" style="left:{{printf "%.1f" $k.TP2}}%">TP2<br>{{fmtPx $tr.TP2}}</span>{{end}}
         </div>
         <div class="ui-dim ui-sm">{{t "jpos.mark"}} {{fmtPx .MarkPrice}}</div>
+        {{if $tr.HasTP1Leg}}<div class="jpos-leg ui-sm">✓ {{printf (t "jpos.tp1Leg") $tr.TP1FillPct (fmtPx $tr.TP1FillPrice) (fmtR (lockedR $tr))}}</div>{{end}}
       {{else}}
         <div class="ui-dim ui-sm">{{t "jpos.noStop"}}{{if .MarkPrice}} · {{t "jpos.mark"}} {{fmtPx .MarkPrice}}{{end}}</div>
       {{end}}

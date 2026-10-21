@@ -40,7 +40,21 @@
 {{if .Trade.IsOpen}}
 <form method="POST" action="/journal/{{.Trade.ID}}/close" class="ui-form">
   <section class="ui-card">
+    {{if .Trade.HasTP1Leg}}
+    {{/* The TP1 leg came from the exchange. The exit field below is the
+         REMAINDER only; the server blends the two. The manual partials
+         calculator is hidden so the TP1 leg cannot be counted twice. */}}
+    <input type="hidden" name="blend_tp1" value="on">
+    <div class="jc-leg">
+      <b>{{t "jc.leg.title"}}</b>
+      <span class="ui-num">{{printf "%.4g" .Trade.TP1FillPct}}% @ {{fmtPx .Trade.TP1FillPrice}}</span>
+      <span class="ui-dim ui-sm">{{fmtTime .Trade.TP1FilledAt}}</span>
+      <b class="{{rClass (lockedR .Trade)}}">{{t "jc.leg.locked"}} {{fmtR (lockedR .Trade)}}R</b>
+      <div class="ui-hint">{{printf (t "jc.leg.hint") (sub100 .Trade.TP1FillPct)}}</div>
+    </div>
+    {{else}}
     {{template "partialsHelper" .}}
+    {{end}}
     <div class="ui-f-row">
       <div class="ui-f">
         <label for="outcome">{{t "th.result"}}</label>
@@ -56,7 +70,7 @@
         </select>
       </div>
       <div class="ui-f" id="exit-field">
-        <label for="exit_price">{{t "th.exit"}}</label>
+        <label for="exit_price">{{if .Trade.HasTP1Leg}}{{t "jc.leg.restExit"}}{{else}}{{t "th.exit"}}{{end}}</label>
         <input type="number" step="any" inputmode="decimal"
                name="exit_price" id="exit_price" value="{{.ExitPrice}}"
                data-tp1="{{fmtPrice .Trade.TP1}}"

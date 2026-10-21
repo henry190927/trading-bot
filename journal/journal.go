@@ -26,7 +26,9 @@ import (
 //	v6 = 21 cols (adds signal_ctx — analyst snapshot at signal time)
 //	v7 = 23 cols (adds tp1_auto + tp1_order_id — auto-TP1 placement state)
 //	v8 = 29 cols (adds margin_usdt + entry/stop/tp2 auto-placement state)
-//	v9 = 30 cols (adds equity_usdt — account equity at entry) — current
+//	v9 = 30 cols (adds equity_usdt — account equity at entry)
+//	v10 = 33 cols (adds tp1_fill_price + tp1_fill_pct + tp1_filled_at — the
+//	      TP1 scale-out as the exchange filled it) — current
 //
 // equity_usdt is the one column that makes the row say anything about RISK
 // rather than about the read. R is leverage-independent by definition, so the
@@ -59,6 +61,9 @@ var Header = []string{
 	"tp2_auto",
 	"tp2_order_id",
 	"equity_usdt",
+	"tp1_fill_price",
+	"tp1_fill_pct",
+	"tp1_filled_at",
 }
 
 // Trade is one journal row.
@@ -143,6 +148,52 @@ type Trade struct {
 	// It is here so the row can answer "what fraction of the account was at
 	// risk", which neither R nor notional can. See the Header comment.
 	EquityUSDT float64
+	// TP1FillPrice / TP1FillPct / TP1FilledAt record the TP1 scale-out as
+	// BingX filled it: the average price, the share of the position it
+	// closed (0-100), and when. Zero = no TP1 leg (not placed, not filled
+	// yet, or a row from before v10). Written by cmd/web's sweep from the
+	// order history, never typed in.
+	//
+	// The single exit_price column cannot hold two legs, and R is recomputed
+	// from it on every save, so a scale-out used to survive only as prose in
+	// the notes — and lose its R on the first edit (#53, +0.44R). See
+	// BlendedExit for how the two legs become one exit_price without
+	// changing RealizedR.
+	TP1FillPrice float64
+	TP1FillPct   float64
+	TP1FilledAt  time.Time
+}
+
+// HasTP1Leg reports whether a TP1 scale-out has been recorded.
+func (t Trade) HasTP1Leg() bool { return t.TP1FillPrice > 0 && t.TP1FillPct > 0 }
+
+// tp1Frac is the TP1 leg's share of the position as a 0-1 fraction, capped
+// at 1 so a malformed pct can never produce a negative remainder.
+func (t Trade) tp1Frac() float64 {
+	if !t.HasTP1Leg() {
+		return 0
+	}
+	return math.Min(t.TP1FillPct/100, 1)
+}
+
+// BlendedExit returns the size-weighted average exit of the TP1 leg and the
+// remainder closed at rest. With no TP1 leg it is rest unchanged.
+//
+// R is linear in the exit price, so RealizedR(t, BlendedExit(t, rest)) equals
+// frac*R(tp1) + (1-frac)*R(rest) exactly. Storing the blend in exit_price is
+// what lets a scale-out survive every later recompute.
+func BlendedExit(t Trade, rest float64) float64 {
+	f := t.tp1Frac()
+	if f == 0 {
+		return rest
+	}
+	return f*t.TP1FillPrice + (1-f)*rest
+}
+
+// LockedR is the R already banked by the TP1 leg, as a share of the whole
+// position (a 50% leg at +1.29R locks +0.64R). 0 without a leg or without R.
+func LockedR(t Trade) float64 {
+	return t.tp1Frac() * RealizedR(t, t.TP1FillPrice)
 }
 
 // Notional is the position's face value in USDT — margin x leverage. Zero when
@@ -620,8 +671,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV8(row), nil
 	case 30:
 		return parseRowV9(row), nil
+	case 33:
+		return parseRowV10(row), nil
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23/29/30 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23/29/30/33 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -775,6 +828,21 @@ func parseRowV9(row []string) Trade {
 	return t
 }
 
+// parseRowV10 is v9 + tp1_fill_price (30) + tp1_fill_pct (31) + tp1_filled_at (32).
+func parseRowV10(row []string) Trade {
+	t := parseRowV9(row[:30])
+	if row[30] != "" {
+		t.TP1FillPrice, _ = strconv.ParseFloat(row[30], 64)
+	}
+	if row[31] != "" {
+		t.TP1FillPct, _ = strconv.ParseFloat(row[31], 64)
+	}
+	if row[32] != "" {
+		t.TP1FilledAt, _ = time.Parse(time.RFC3339, row[32])
+	}
+	return t
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -817,6 +885,14 @@ func rowFromTrade(t Trade) []string {
 	if t.EquityUSDT > 0 {
 		equityStr = strconv.FormatFloat(t.EquityUSDT, 'f', -1, 64)
 	}
+	tp1Price, tp1Pct, tp1At := "", "", ""
+	if t.HasTP1Leg() {
+		tp1Price = strconv.FormatFloat(t.TP1FillPrice, 'f', -1, 64)
+		tp1Pct = strconv.FormatFloat(t.TP1FillPct, 'f', -1, 64)
+		if !t.TP1FilledAt.IsZero() {
+			tp1At = t.TP1FilledAt.Local().Format(time.RFC3339)
+		}
+	}
 	return []string{
 		strconv.Itoa(t.ID),
 		t.OpenedAt.Local().Format(time.RFC3339),
@@ -848,6 +924,7 @@ func rowFromTrade(t Trade) []string {
 		boolStr(t.TP2Auto),
 		t.TP2OrderID,
 		equityStr,
+		tp1Price, tp1Pct, tp1At,
 	}
 }
 
