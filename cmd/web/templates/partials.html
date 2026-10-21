@@ -321,3 +321,70 @@
 </details>
 <script>window.PARTIALS_I18N = {size: {{t "jf.p.size"}}, price: {{t "jf.p.price"}}, remove: {{t "jf.p.remove"}}, avg: {{t "jf.p.avg"}}, apply: {{t "jf.p.apply"}}, applied: {{t "jf.p.applied"}}};</script>
 {{end}}
+
+{{/* positionsBody: the /today 持倉 card's contents — one row per open journal
+     trade with its stop → entry → TP track in R. Rendered into the page and,
+     every 15s, by GET /api/today/positions, so the page and the refresh share
+     one template. Root carries data-count for the header badge. */}}
+{{define "positionsBody"}}
+<div class="pos-body" data-count="{{len .OpenTrades}}">
+{{if .OpenTrades}}
+  {{range .OpenTrades}}{{$tr := .Trade}}
+  <div class="pos-item" id="pos-{{$tr.ID}}">
+    <div class="pos-head">
+      <span class="ui-side {{$tr.Side}}">{{t (printf "side.%s" $tr.Side)}}</span>
+      <a class="ui-sym" href="/chart?symbol={{$tr.Symbol}}">{{$tr.Symbol}}</a>
+      <span class="ui-dim ui-sm">{{if $tr.Leverage}}{{$tr.Leverage}}x · {{end}}{{if $tr.TF}}{{$tr.TF}} · {{end}}#{{$tr.ID}}</span>
+      <span class="ui-grow"></span>
+      {{if $tr.IsPending}}
+        <span class="ui-tag">{{t "jpos.pending"}}</span>
+        <span class="ui-dim ui-sm ui-num">{{fmtElapsed .PendingSince}}</span>
+      {{else}}
+        <span class="ui-dim ui-sm ui-num">{{fmtElapsed .TimeElapsed}}</span>
+        {{if .Track}}<span class="ui-big {{rClass .Track.R}}">{{fmtR .Track.R}}R</span>{{end}}
+      {{end}}
+    </div>
+    {{if $tr.IsPending}}
+      <div class="pos-meta ui-sm ui-num">
+        <span><span class="ui-dim">{{t "th.entry"}}</span> {{fmtPx $tr.Entry}}</span>
+        <span><span class="ui-dim">{{t "trades.stop"}}</span> {{if gt $tr.Stop 0.0}}{{fmtPx $tr.Stop}}{{else}}—{{end}}</span>
+        {{if .MarkPrice}}<span><span class="ui-dim">{{t "jpos.mark"}}</span> {{fmtPx .MarkPrice}} <span class="ui-dim">({{printf "%.2f%%" .DistToEntryPct}} {{t "jpos.toEntry"}})</span></span>{{end}}
+      </div>
+    {{else if .Track}}{{$k := .Track}}
+      <div class="pos-track" title="{{t "jpos.trackHint"}}">
+        <div class="pos-fill {{if ge $k.R 0.0}}up{{else}}down{{end}}" style="left:{{printf "%.1f" $k.FillL}}%;width:{{printf "%.1f" $k.FillW}}%"></div>
+        <span class="pos-tick" style="left:{{printf "%.1f" $k.Entry}}%"></span>
+        {{if $k.HasTP1}}<span class="pos-tick tp" style="left:{{printf "%.1f" $k.TP1}}%"></span>{{end}}
+        {{if $k.HasTP2}}<span class="pos-tick tp" style="left:{{printf "%.1f" $k.TP2}}%"></span>{{end}}
+        <span class="pos-mark {{if ge $k.R 0.0}}up{{else}}down{{end}}" style="left:{{printf "%.1f" $k.Mark}}%"></span>
+      </div>
+      <div class="pos-lbls ui-num">
+        <span class="stop" style="left:0">{{t "trades.stop"}}<br>{{fmtPx $tr.Stop}}</span>
+        <span class="mid" style="left:{{printf "%.1f" $k.Entry}}%">{{t "th.entry"}}<br>{{fmtPx $tr.Entry}}</span>
+        {{if $k.HasTP1}}<span class="{{if and $k.HasTP2 (lt $k.TP1 85.0)}}mid{{else}}end{{end}}" style="left:{{printf "%.1f" $k.TP1}}%">TP1<br>{{fmtPx $tr.TP1}}</span>{{end}}
+        {{if $k.HasTP2}}<span class="end" style="left:{{printf "%.1f" $k.TP2}}%">TP2<br>{{fmtPx $tr.TP2}}</span>{{end}}
+      </div>
+      <div class="pos-meta ui-sm ui-num">
+        <span><span class="ui-dim">{{t "jpos.mark"}}</span> {{fmtPx .MarkPrice}}</span>
+        {{if $tr.HasTP1Leg}}<span class="pos-leg">{{template "icon" "check"}}{{printf (t "jpos.tp1Leg") $tr.TP1FillPct (fmtPx $tr.TP1FillPrice) (fmtR (lockedR $tr))}}</span>{{end}}
+      </div>
+    {{else}}
+      <div class="pos-meta ui-sm"><span class="ui-warn">{{t "jpos.noStop"}}</span>{{if .MarkPrice}}<span><span class="ui-dim">{{t "jpos.mark"}}</span> {{fmtPx .MarkPrice}}</span>{{end}}</div>
+    {{end}}
+    <div class="pos-actions">
+      <a class="ui-btn ghost sm" href="/chart?symbol={{$tr.Symbol}}">{{template "icon" "chart"}}{{t "jpos.chart"}}</a>
+      <a class="ui-btn ghost sm" href="/journal/{{$tr.ID}}/edit">{{t "trades.edit"}}</a>
+      <a class="ui-btn ghost sm" href="/journal/{{$tr.ID}}/close">{{t "trades.close"}}</a>
+      <a class="ui-btn ghost sm" href="/ops/verify">{{template "icon" "check"}}{{t "jpos.verify"}}</a>
+    </div>
+  </div>
+  {{end}}
+{{else}}
+  <div class="ui-empty">
+    <div class="ui-empty-t">{{t "today.noPositions"}}</div>
+    <div class="ui-sub">{{t "today.noPositionsSub"}}</div>
+    <a class="ui-btn" href="/chart">{{template "icon" "plus"}}{{t "today.newPosition"}}</a>
+  </div>
+{{end}}
+</div>
+{{end}}

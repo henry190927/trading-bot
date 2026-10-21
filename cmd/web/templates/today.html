@@ -37,26 +37,9 @@
        block, runs full width underneath. */}}
   <div class="ui-cols ui-cols-even">
     <div class="ui-col">
-      <section class="ui-card">
-        <header class="ui-card-h"><h2>{{template "icon" "wallet"}}{{t "today.positions"}} <span class="ui-count">{{len .OpenTrades}}</span></h2>{{if .OpenTrades}}<a class="ui-link" href="/journal">{{t "common.viewAll"}} {{template "icon" "arrow"}}</a>{{end}}</header>
-        {{if .OpenTrades}}
-        <ul class="ui-list">
-          {{range .OpenTrades}}
-          <li><a class="ui-row" href="/journal#pos-{{.Trade.ID}}">
-            <span class="ui-side {{.Trade.Side}}">{{t (printf "side.%s" .Trade.Side)}}</span>
-            <span class="ui-sym">{{.Trade.Symbol}}</span>{{if .Trade.Leverage}}<span class="ui-dim ui-sm">{{.Trade.Leverage}}x</span>{{end}}
-            <span class="ui-grow ui-dim ui-sm ui-num">{{fmtPx .Trade.Entry}} → {{fmtPx .MarkPrice}}</span>
-            <span class="ui-big {{rClass .CurrentR}}">{{fmtR .CurrentR}}R</span>
-          </a></li>
-          {{end}}
-        </ul>
-        {{else}}
-        <div class="ui-empty">
-          <div class="ui-empty-t">{{t "today.noPositions"}}</div>
-          <div class="ui-sub">{{t "today.noPositionsSub"}}</div>
-          <a class="ui-btn" href="/chart">{{template "icon" "plus"}}{{t "today.newPosition"}}</a>
-        </div>
-        {{end}}
+      <section class="ui-card" id="today-positions">
+        <header class="ui-card-h"><h2>{{template "icon" "wallet"}}{{t "today.positions"}} <span class="ui-count" id="today-pos-count">{{len .OpenTrades}}</span></h2><span class="ui-sub" id="today-pos-updated"></span><a class="ui-link" href="/journal">{{t "common.viewAll"}} {{template "icon" "arrow"}}</a></header>
+        <div id="today-pos-slot">{{template "positionsBody" .}}</div>
       </section>
       {{if .MacroGaps}}
       <section class="ui-card warn">
@@ -292,6 +275,30 @@
     if(u) u.textContent = {{t "today.updated"}} + ' ' + new Date().toLocaleTimeString('en-GB',{hour12:false, timeZone:'Asia/Taipei'})
                         + ' · ' + (sseAlive ? {{t "today.live"}} : {{t "today.poll"}});
   }
+
+  // ── Positions card ───────────────────────────────────────────────────
+  // Re-rendered server-side (same positionsBody template) every 15s while the
+  // tab is visible: mark, R and the track move; a fill or a TP1 leg shows up.
+  (function(){
+    var slot = document.getElementById('today-pos-slot');
+    if(!slot) return;
+    function refresh(){
+      if(document.hidden) return;
+      fetch('/api/today/positions', {cache:'no-store'})
+        .then(function(r){ return r.ok ? r.text() : Promise.reject(r.status); })
+        .then(function(html){
+          slot.innerHTML = html;
+          var b = slot.querySelector('.pos-body');
+          var c = document.getElementById('today-pos-count');
+          if(b && c) c.textContent = b.getAttribute('data-count');
+          var u = document.getElementById('today-pos-updated');
+          if(u) u.textContent = {{t "today.updated"}} + ' ' + new Date().toLocaleTimeString('en-GB',{hour12:false, timeZone:'Asia/Taipei'});
+        })
+        .catch(function(){});
+    }
+    setInterval(refresh, 15000);
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden) refresh(); });
+  })();
 
   function startPolling(){
     if(pollTimer) return;

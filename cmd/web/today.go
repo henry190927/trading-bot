@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/render"
 
 	"github.com/henry190927/trading-bot/econcal"
 	"github.com/henry190927/trading-bot/journal"
@@ -149,4 +150,16 @@ func leanKey(s Setup) string {
 		return "lean.trendDown"
 	}
 	return "lean.neutral"
+}
+
+// handleAPITodayPositions — GET /api/today/positions. The /today 持倉 card's
+// contents as an HTML fragment, rendered by the same positionsBody template
+// as the page, for its 15s refresh.
+func (s *server) handleAPITodayPositions(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Render(http.StatusOK, render.HTML{
+		Template: s.pages[langOf(c)],
+		Name:     "positionsBody",
+		Data:     gin.H{"OpenTrades": s.buildOpenTradeCards(c.Request.Context(), nil)},
+	})
 }

@@ -4582,30 +4582,32 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ui-card .live-t th:last-child, .ui-card .live-t td:last-child { padding-right: var(--sp-4); }
 .live-t td.num { text-overflow: clip; }
 
-/* /journal position card: stop → entry → TP track scaled in R. */
-.jpos-item + .jpos-item { border-top: 1px solid var(--border); padding-top: var(--sp-3); margin-top: var(--sp-3); }
-.jpos-item:target { outline: 2px solid var(--blue); outline-offset: 6px; border-radius: 4px; }
-.jpos-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
-.jpos-state { margin-left: auto; color: var(--text-dim); font-size: var(--fs-sm); }
-.jpos-r { font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
-.jpos-track { position: relative; height: 8px; margin: 16px 0 6px; border-radius: 4px;
+/* /today 持倉 card: one row per open trade, stop → entry → TP track in R. */
+.pos-item { padding: var(--sp-3) 0; }
+.pos-item + .pos-item { border-top: 1px solid var(--border); }
+.pos-item:first-child { padding-top: 0; }
+.pos-item:target { box-shadow: inset 3px 0 0 var(--blue); padding-left: var(--sp-3); }
+.pos-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.pos-track { position: relative; height: 6px; margin: 18px 0 6px; border-radius: 3px;
   background: rgba(127, 127, 127, 0.18); }
-.jpos-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
-.jpos-fill.up, .jpos-mark.up { background: var(--green); }
-.jpos-fill.down, .jpos-mark.down { background: var(--red); }
-.jpos-tick { position: absolute; top: -3px; width: 2px; height: 14px; margin-left: -1px; background: var(--text-dim); }
-.jpos-tick.tp { background: var(--green); }
-.jpos-mark { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
-  border: 2px solid var(--surface); }
-.jpos-lbls { position: relative; height: 2.7em; font-size: var(--fs-xs); color: var(--text-dim);
-  font-variant-numeric: tabular-nums; line-height: 1.3; }
-.jpos-lbls span { position: absolute; top: 0; white-space: nowrap; }
-.jpos-lbls .mid { transform: translateX(-50%); text-align: center; }
-.jpos-lbls .end { transform: translateX(-100%); text-align: right; }
-.jpos-lbls .stop { color: var(--red); }
-.jpos-links { display: flex; gap: var(--sp-3); font-size: var(--fs-sm); margin-top: var(--sp-2); }
-.jpos-links a { color: var(--blue); }
-.jpos-leg { color: var(--green); margin-top: var(--sp-1); }
+.pos-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.pos-fill.up, .pos-mark.up { background: var(--green); }
+.pos-fill.down, .pos-mark.down { background: var(--red); }
+.pos-tick { position: absolute; top: -4px; width: 2px; height: 14px; margin-left: -1px; border-radius: 1px; background: var(--text-dim); }
+.pos-tick.tp { background: var(--green); }
+.pos-mark { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); }
+.pos-lbls { position: relative; height: 2.7em; font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.3; }
+.pos-lbls span { position: absolute; top: 0; white-space: nowrap; }
+.pos-lbls .mid { transform: translateX(-50%); text-align: center; }
+.pos-lbls .end { transform: translateX(-100%); text-align: right; }
+.pos-lbls .stop { color: var(--red); }
+.pos-meta { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-1); }
+.pos-leg { display: inline-flex; align-items: center; gap: 4px; color: var(--green); }
+.pos-leg .ico { width: 14px; height: 14px; }
+.pos-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
 .jc-leg { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-3); border: 1px solid var(--green); border-radius: 6px; }
 .jc-leg .ui-hint { flex-basis: 100%; }
+.pos-head a.ui-sym { color: var(--text); text-decoration: none; }
+.pos-head a.ui-sym:hover { color: var(--blue); }

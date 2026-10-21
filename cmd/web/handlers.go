@@ -2572,15 +2572,7 @@ func (s *server) handleJournalList(c *gin.Context) {
 		pageNums = append(pageNums, i)
 	}
 
-	// Live cards for open trades (mark, R track). Costs a scan per open
-	// symbol, so only when there is something open.
-	var openCards []openTradeCard
-	if pendingCount+activeCount > 0 {
-		openCards = s.buildOpenTradeCards(c.Request.Context(), nil)
-	}
-
 	s.page(c, http.StatusOK, "journal_list.html", gin.H{
-		"OpenCards":    openCards,
 		"Trades":       pageTrades,
 		"TotalTrades":  totalTrades,
 		"Page":         page,

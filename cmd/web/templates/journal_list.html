@@ -54,60 +54,6 @@
   </section>
 </div>
 
-{{if .OpenCards}}
-<section class="ui-card" id="positions">
-  <header class="ui-card-h">
-    <h2>{{template "icon" "wallet"}}{{t "jpos.title"}} <span class="ui-count">{{len .OpenCards}}</span></h2>
-    <span class="ui-sub">{{t "jpos.sub"}}</span>
-  </header>
-  <div class="jpos-list">
-  {{range .OpenCards}}{{$tr := .Trade}}
-    <div class="jpos-item" id="pos-{{$tr.ID}}">
-      <div class="jpos-head">
-        <b>#{{$tr.ID}}</b>
-        <span class="ui-side {{$tr.Side}}">{{t (printf "side.%s" $tr.Side)}}</span>
-        <a class="ui-sym" href="/chart?symbol={{$tr.Symbol}}">{{$tr.Symbol}}</a>
-        {{if $tr.TF}}<span class="ui-dim ui-sm">{{$tr.TF}}</span>{{end}}
-        {{if $tr.Leverage}}<span class="ui-dim ui-sm">{{$tr.Leverage}}x</span>{{end}}
-        {{if $tr.IsPending}}
-          <span class="jpos-state">{{t "jpos.pending"}} · {{fmtElapsed .PendingSince}}</span>
-        {{else}}
-          <span class="jpos-state">{{fmtElapsed .TimeElapsed}}</span>
-          {{if .Track}}<b class="jpos-r {{rClass .Track.R}}">{{fmtR .Track.R}}R</b>{{end}}
-        {{end}}
-      </div>
-      {{if $tr.IsPending}}
-        <div class="ui-dim ui-sm">{{t "th.entry"}} {{fmtPx $tr.Entry}} · {{t "trades.stop"}} {{if gt $tr.Stop 0.0}}{{fmtPx $tr.Stop}}{{else}}—{{end}}{{if .MarkPrice}} · {{t "jpos.mark"}} {{fmtPx .MarkPrice}} ({{printf "%.2f%%" .DistToEntryPct}} {{t "jpos.toEntry"}}){{end}}</div>
-      {{else if .Track}}{{$k := .Track}}
-        <div class="jpos-track" title="{{t "jpos.trackHint"}}">
-          <div class="jpos-fill {{if ge $k.R 0.0}}up{{else}}down{{end}}" style="left:{{printf "%.1f" $k.FillL}}%;width:{{printf "%.1f" $k.FillW}}%"></div>
-          <span class="jpos-tick" style="left:{{printf "%.1f" $k.Entry}}%"></span>
-          {{if $k.HasTP1}}<span class="jpos-tick tp" style="left:{{printf "%.1f" $k.TP1}}%"></span>{{end}}
-          {{if $k.HasTP2}}<span class="jpos-tick tp" style="left:{{printf "%.1f" $k.TP2}}%"></span>{{end}}
-          <span class="jpos-mark {{if ge $k.R 0.0}}up{{else}}down{{end}}" style="left:{{printf "%.1f" $k.Mark}}%"></span>
-        </div>
-        <div class="jpos-lbls">
-          <span class="stop" style="left:0">{{t "trades.stop"}}<br>{{fmtPx $tr.Stop}}</span>
-          <span class="mid" style="left:{{printf "%.1f" $k.Entry}}%">{{t "th.entry"}}<br>{{fmtPx $tr.Entry}}</span>
-          {{if $k.HasTP1}}<span class="{{if and $k.HasTP2 (lt $k.TP1 85.0)}}mid{{else}}end{{end}}" style="left:{{printf "%.1f" $k.TP1}}%">TP1<br>{{fmtPx $tr.TP1}}</span>{{end}}
-          {{if $k.HasTP2}}<span class="end" style="left:{{printf "%.1f" $k.TP2}}%">TP2<br>{{fmtPx $tr.TP2}}</span>{{end}}
-        </div>
-        <div class="ui-dim ui-sm">{{t "jpos.mark"}} {{fmtPx .MarkPrice}}</div>
-        {{if $tr.HasTP1Leg}}<div class="jpos-leg ui-sm">✓ {{printf (t "jpos.tp1Leg") $tr.TP1FillPct (fmtPx $tr.TP1FillPrice) (fmtR (lockedR $tr))}}</div>{{end}}
-      {{else}}
-        <div class="ui-dim ui-sm">{{t "jpos.noStop"}}{{if .MarkPrice}} · {{t "jpos.mark"}} {{fmtPx .MarkPrice}}{{end}}</div>
-      {{end}}
-      <div class="jpos-links">
-        <a href="/journal/{{$tr.ID}}/edit">{{t "trades.edit"}}</a>
-        <a href="/journal/{{$tr.ID}}/close">{{t "trades.close"}}</a>
-        <a href="/ops/verify">🔎 {{t "jpos.verify"}}</a>
-      </div>
-    </div>
-  {{end}}
-  </div>
-</section>
-{{end}}
-
 {{if gt .ClosedCount 0}}{{template "perfPanels" .}}{{end}}
 
 <section class="ui-card">
