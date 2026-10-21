@@ -341,7 +341,7 @@
         <span class="ui-dim ui-sm ui-num">{{fmtElapsed .PendingSince}}</span>
       {{else}}
         <span class="ui-dim ui-sm ui-num">{{fmtElapsed .TimeElapsed}}</span>
-        {{if .Track}}<span class="ui-big {{rClass .Track.R}}">{{fmtR .Track.R}}R</span>{{end}}
+        {{if .Track}}<span class="ui-big {{rClass .TotalR}}" title="{{t "jpos.totalHint"}}">{{fmtR .TotalR}}R</span>{{end}}
       {{end}}
     </div>
     {{if $tr.IsPending}}

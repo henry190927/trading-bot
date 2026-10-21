@@ -78,7 +78,24 @@
 
   <section class="ui-card">
     <header class="ui-card-h"><h2>{{t "th.result"}}</h2><span class="ui-hint">{{t "jf.outcomeHint"}}</span></header>
-    {{template "partialsHelper" .}}
+    {{if or .Trade.HasTP1Leg .Trade.TP1OrderID}}
+    {{/* The TP1 scale-out, as the sweep read it from the exchange. Editable so
+         a wrong read can be corrected; clearing both fields removes the leg.
+         The manual partials helper is hidden whenever a leg exists, so the
+         same TP1 can never be entered twice. */}}
+    <div class="je-leg">
+      <div class="je-leg-h"><b>{{t "je.leg.title"}}</b>
+        {{if .Trade.HasTP1Leg}}<span class="ui-tag up">{{t "je.leg.filled"}}</span><span class="ui-dim ui-sm">{{fmtTime .Trade.TP1FilledAt}}</span><b class="{{rClass (lockedR .Trade)}}">{{t "jc.leg.locked"}} {{fmtR (lockedR .Trade)}}R</b>
+        {{else}}<span class="ui-tag">{{t "je.leg.waiting"}}</span>{{end}}
+      </div>
+      <div class="ui-f-row">
+        <div class="ui-f"><label for="tp1_fill_price">{{t "je.leg.price"}}</label><input type="number" step="any" inputmode="decimal" name="tp1_fill_price" id="tp1_fill_price" value="{{if .Trade.HasTP1Leg}}{{fmtPrice .Trade.TP1FillPrice}}{{end}}"></div>
+        <div class="ui-f"><label for="tp1_fill_pct">{{t "je.leg.pct"}}</label><input type="number" step="any" min="0" max="100" inputmode="decimal" name="tp1_fill_pct" id="tp1_fill_pct" value="{{if .Trade.HasTP1Leg}}{{printf "%.4g" .Trade.TP1FillPct}}{{end}}"></div>
+      </div>
+      <div class="ui-hint">{{if .Trade.IsOpen}}{{t "je.leg.hintOpen"}}{{else}}{{t "je.leg.hintClosed"}}{{end}}</div>
+    </div>
+    {{end}}
+    {{if not .Trade.HasTP1Leg}}{{template "partialsHelper" .}}{{end}}
     <div class="ui-f-row">
       <div class="ui-f">
         <label for="outcome">{{t "th.result"}}</label>

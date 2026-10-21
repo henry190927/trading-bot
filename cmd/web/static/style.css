@@ -4611,3 +4611,5 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .jc-leg .ui-hint { flex-basis: 100%; }
 .pos-head a.ui-sym { color: var(--text); text-decoration: none; }
 .pos-head a.ui-sym:hover { color: var(--blue); }
+.je-leg { border: 1px solid var(--border); border-radius: 6px; padding: var(--sp-3); margin-bottom: var(--sp-3); }
+.je-leg-h { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }

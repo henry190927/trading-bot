@@ -128,7 +128,7 @@ func main() {
 	r.GET("/", srv.handleTodayPage)      // home = Today (symbols overview)
 	r.GET("/today", srv.handleTodayPage) // kept for existing links/bookmarks
 	r.GET("/api/today/positions", srv.handleAPITodayPositions)
-	r.GET("/scan", srv.handleDashboard)  // Scan moved off "/"
+	r.GET("/scan", srv.handleDashboard) // Scan moved off "/"
 	r.GET("/journal", srv.handleJournalList)
 	r.GET("/journal/new", srv.handleJournalNew)
 	r.POST("/journal/open", srv.handleJournalOpen)

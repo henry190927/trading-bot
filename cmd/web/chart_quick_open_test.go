@@ -197,3 +197,58 @@ func TestClosePostBlendsTP1Leg(t *testing.T) {
 		t.Errorf("recompute drifted: %v vs %v", rr, g.RRealized)
 	}
 }
+
+func TestEditPostTP1Leg(t *testing.T) {
+	t.Setenv("JOURNAL_PATH", filepath.Join(t.TempDir(), "journal.csv"))
+	gin.SetMode(gin.TestMode)
+	at := time.Date(2026, 10, 21, 16, 9, 50, 0, time.UTC)
+	seed := func() {
+		if err := journal.WriteAll("", []journal.Trade{{
+			ID: 92, OpenedAt: at, AnalyzedAt: at, Symbol: "HYPE", Side: "long", TF: "1h", Entry: 80.424, Stop: 79.2, TP1: 82, TP2: 82.5,
+			FilledAt: at, TP1OrderID: "T", TP1FillPrice: 82, TP1FillPct: 50, TP1FilledAt: at,
+		}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dicts, _ := loadDicts(i18nFS)
+	pages, err := parsePages(assets, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{dicts: dicts, pages: pages}
+	r := gin.New()
+	r.GET("/journal/:id/edit", s.handleJournalEditForm)
+	r.POST("/journal/:id/edit", s.handleJournalEditPost)
+	post := func(extra url.Values) (int, journal.Trade) {
+		f := url.Values{"symbol": {"HYPE"}, "side": {"long"}, "tf": {"1h"}, "entry": {"80.424"}, "stop": {"79.2"},
+			"tp1": {"82"}, "tp2": {"82.5"}, "opened_at": {"2026-10-22T00:09"}, "filled_at": {"2026-10-22T00:09"}}
+		for k, v := range extra {
+			f[k] = v
+		}
+		req := httptest.NewRequestWithContext(t.Context(), "POST", "/journal/92/edit", strings.NewReader(f.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		got, _ := journal.ReadAll("")
+		return w.Code, got[0]
+	}
+
+	seed()
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", "/journal/92/edit", nil))
+	if body := w.Body.String(); !strings.Contains(body, `name="tp1_fill_price"`) || strings.Contains(body, "partials-rows") {
+		t.Fatalf("edit form: leg fields=%v, manual partials=%v", strings.Contains(body, `name="tp1_fill_price"`), strings.Contains(body, "partials-rows"))
+	}
+	if code, g := post(nil); code != http.StatusSeeOther || g.TP1FillPrice != 82 || g.TP1FillPct != 50 {
+		t.Errorf("save without leg fields: %d, leg %v/%v — must be kept", code, g.TP1FillPrice, g.TP1FillPct)
+	}
+	if _, g := post(url.Values{"tp1_fill_price": {"82.1"}, "tp1_fill_pct": {"40"}}); g.TP1FillPrice != 82.1 || g.TP1FillPct != 40 || !g.TP1FilledAt.Equal(at) {
+		t.Errorf("correction = %+v", g)
+	}
+	if code, g := post(url.Values{"tp1_fill_price": {"82"}, "tp1_fill_pct": {"150"}}); code == http.StatusSeeOther || g.TP1FillPct != 40 {
+		t.Errorf("pct 150 accepted: %d %v", code, g.TP1FillPct)
+	}
+	if _, g := post(url.Values{"tp1_fill_price": {""}, "tp1_fill_pct": {""}}); g.HasTP1Leg() || !g.TP1FilledAt.IsZero() {
+		t.Errorf("clearing left %+v", g)
+	}
+}

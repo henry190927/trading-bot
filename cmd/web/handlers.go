@@ -321,6 +321,10 @@ type openTradeCard struct {
 	DistToEntryPct float64 // |mark - entry| / entry * 100, signed for direction
 	PendingSince   time.Duration
 
+	// TotalR is the whole position's R at the mark: the TP1 leg's locked R
+	// plus the remainder's share of the live R. Equals CurrentR without a leg.
+	TotalR float64
+
 	// Track is the stop → entry → TP progress bar for an active trade with
 	// a stop; nil otherwise (pending, or R undefined).
 	Track *rTrack
@@ -454,6 +458,10 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 				card.PctToTP2 = clampPct(moved / risk / 2 * 50)
 			}
 			card.Track = newRTrack(t, card.MarkPrice)
+			card.TotalR = card.CurrentR
+			if t.HasTP1Leg() {
+				card.TotalR = journal.LockedR(t) + (1-math.Min(t.TP1FillPct/100, 1))*card.CurrentR
+			}
 		}
 		cards = append(cards, card)
 	}
@@ -2123,6 +2131,27 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		exitPrice = 0
 	}
 
+	// TP1 leg — only when the form carries the fields (the section renders
+	// only for a trade with a TP1 order or leg), so a form without them can
+	// never wipe a recorded leg. Both blank clears it.
+	legPrice, legPct, legTouched := trades[idx].TP1FillPrice, trades[idx].TP1FillPct, false
+	if ps, ok := c.GetPostForm("tp1_fill_price"); ok {
+		legTouched = true
+		ps, qs := strings.TrimSpace(ps), strings.TrimSpace(c.PostForm("tp1_fill_pct"))
+		switch {
+		case ps == "" && qs == "":
+			legPrice, legPct = 0, 0
+		default:
+			p, perr := strconv.ParseFloat(ps, 64)
+			q, qerr := strconv.ParseFloat(qs, 64)
+			if perr != nil || qerr != nil || p <= 0 || q <= 0 || q > 100 {
+				rerender(tr("je.err.leg"))
+				return
+			}
+			legPrice, legPct = p, q
+		}
+	}
+
 	// Leverage (optional, 0 = "not recorded").
 	var leverage int
 	if levStr := strings.TrimSpace(c.PostForm("leverage")); levStr != "" {
@@ -2165,6 +2194,16 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	trades[idx].Outcome = outcome
 	trades[idx].ExitPrice = exitPrice
 	trades[idx].SignalCtx = strings.TrimSpace(c.PostForm("signal_ctx"))
+	if legTouched {
+		if legPrice == 0 {
+			trades[idx].TP1FillPrice, trades[idx].TP1FillPct, trades[idx].TP1FilledAt = 0, 0, time.Time{}
+		} else {
+			if trades[idx].TP1FilledAt.IsZero() {
+				trades[idx].TP1FilledAt = time.Now()
+			}
+			trades[idx].TP1FillPrice, trades[idx].TP1FillPct = legPrice, legPct
+		}
+	}
 	switch {
 	case closedAt.IsZero():
 		trades[idx].RRealized = 0
