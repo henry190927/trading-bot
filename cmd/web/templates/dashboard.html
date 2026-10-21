@@ -127,6 +127,7 @@
           <div class="ui-detail-actions">
             {{if .Diagnose}}<a class="ui-btn ghost" style="margin-top:0" href="{{diagnoseHref . $.TF}}">{{t "scan.validate"}}</a>{{end}}
             {{if hasPlan .Signal}}<a class="ui-btn" style="margin-top:0" href="{{recordHref . $.TF}}">{{template "icon" "plus"}}{{t "scan.record"}}</a>{{end}}
+            <button type="button" class="ui-btn ghost js-copy" style="margin-top:0" data-flash="{{t "scan.copied"}}" title="{{t "scan.copyRowHint"}}" data-copy="{{.Short}} {{$.TF}} {{sideText .Signal.Side}} @ {{fmtPrice .Signal.Price}} | MR {{.Signal.MRScore}} MOM {{.Signal.MomentumScore}} total {{.Signal.Score}}{{if .Signal.POCMig.POCShort}} | drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}{{end}}{{if .Diagnose}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}} MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}} ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100 {{verdictShort .Diagnose.Verdict}}{{end}}">{{t "scan.copyRow"}}</button>
             <button type="button" class="ui-btn ghost ai-analyze-btn" style="margin-top:0" data-symbol="{{.Short}}" data-tf="{{$.TF}}">{{t "trades.ai"}}</button>
           </div>
           <div class="ai-result hidden" data-result-for="{{.Short}}-{{$.TF}}"></div>

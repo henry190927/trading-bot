@@ -369,11 +369,10 @@
         </div>
 
         <!-- Record-only fields, shown when the Record tab is
-             active. Minimal set: stop / TP1 / TP2 / anchor /
-             notes. Advanced flags (leverage, margin, place_tp1
-             etc.) still live on /journal/new — the "Open full
-             form ↗" link at the bottom takes the user there
-             with everything prefilled. -->
+             active. The "place on BingX" box sends the same order
+             set as /journal/new (entry + bundled SL/TP2 + TP1
+             partial) through the same server path; the margin-cap
+             override and per-leg toggles stay on the full form. -->
         <div class="quick-record-fields">
           <div class="quick-row">
             <label for="quick-stop">{{t "trades.stop"}}</label>
@@ -414,6 +413,11 @@
               <span class="quick-pnl-val" id="quick-pnl-rr">—</span>
             </div>
           </div>
+          <label class="quick-place" for="quick-open-pos">
+            <input type="checkbox" id="quick-open-pos">
+            <span class="quick-place-main">{{t "chart.ui.q.openPos"}}</span>
+            <span class="quick-place-hint">{{t "chart.ui.q.openPosHint"}}</span>
+          </label>
           <div class="quick-row">
             <label for="quick-anchor">{{t "trades.anchor"}}</label>
             <input type="text" id="quick-anchor" placeholder="{{t "chart.ui.q.anchorPh"}}">
@@ -957,6 +961,14 @@
         "q.riskLbl": {{t "chart.js.q.riskLbl"}},
         "q.feeLbl": {{t "chart.js.q.feeLbl"}},
         "q.suggStop": {{t "chart.js.q.suggStop"}},
+        "q.recordPlaceBtn": {{t "chart.js.q.recordPlaceBtn"}},
+        "q.placing": {{t "chart.js.q.placing"}},
+        "q.confirmPlace": {{t "chart.js.q.confirmPlace"}},
+        "q.confirmTP1": {{t "chart.js.q.confirmTP1"}},
+        "q.confirmTP2": {{t "chart.js.q.confirmTP2"}},
+        "q.verify": {{t "chart.js.q.verify"}},
+        "q.legEntry": {{t "chart.js.q.legEntry"}},
+        "q.legTP1": {{t "chart.js.q.legTP1"}},
         "open.daily": {{t "chart.js.open.daily"}},
         "open.weekly": {{t "chart.js.open.weekly"}},
         "open.london": {{t "chart.js.open.london"}},
@@ -3974,6 +3986,7 @@
         var anchorIn    = document.getElementById('quick-anchor');
         var notesIn     = document.getElementById('quick-notes');
         var marginIn    = document.getElementById('quick-margin');
+        var openPosIn   = document.getElementById('quick-open-pos');
         var leverageIn  = document.getElementById('quick-leverage');
         var pnlBox      = document.getElementById('quick-pnl');
         var pnlNotional = document.getElementById('quick-pnl-notional');
@@ -4047,10 +4060,22 @@
         var modalRoot   = backdrop.querySelector('.quick-modal');
         if (!wrap || !marker || !plusBtn || !backdrop) return;
         function currentTab() { return modalRoot.getAttribute('data-tab') || 'validate'; }
+        // Placing is only ever on the Record tab, and only while the box is
+        // ticked; the button label says which of the two will happen.
+        function placing() { return currentTab() === 'record' && openPosIn.checked; }
+        function idleLabel() {
+            if (currentTab() !== 'record') return CT['q.validateBtn'];
+            return placing() ? CT['q.recordPlaceBtn'] : CT['q.recordBtn'];
+        }
+        // Set after a successful record so "Open full form" edits THAT row
+        // instead of creating a second one (a duplicate journal row is how
+        // #91/#92 happened on 2026-10-21).
+        var lastRecordedId = null;
         function setTab(name) {
             modalRoot.setAttribute('data-tab', name);
             tabBtns.forEach(function (b) { b.classList.toggle('is-active', b.dataset.tab === name); });
-            submitBtn.textContent = name === 'record' ? CT['q.recordBtn'] : CT['q.validateBtn'];
+            submitBtn.textContent = idleLabel();
+            submitBtn.classList.toggle('is-placing', placing());
             resultBox.classList.add('hidden');
             resultBox.innerHTML = '';
         }
@@ -4265,6 +4290,11 @@
             tp2In.value  = '';
             anchorIn.value = '';
             notesIn.value  = '';
+            // Never sticky: every order is an explicit tick on this open.
+            openPosIn.checked = false;
+            lastRecordedId = null;
+            submitBtn.textContent = idleLabel();
+            submitBtn.classList.remove('is-placing');
             resultBox.classList.add('hidden');
             resultBox.innerHTML = '';
             updateGoState();
@@ -4273,6 +4303,10 @@
             setTimeout(function () { priceIn.focus(); priceIn.select(); }, 30);
         }
         function closeModal() { backdrop.classList.add('hidden'); }
+        openPosIn.addEventListener('change', function () {
+            submitBtn.textContent = idleLabel();
+            submitBtn.classList.toggle('is-placing', placing());
+        });
 
         plusBtn.addEventListener('click', function (ev) {
             ev.stopPropagation();
@@ -4305,6 +4339,7 @@
                 notes:       notesIn.value.trim(),
                 margin_usdt: marginIn.value.trim(),
                 leverage:    leverageIn.value.trim(),
+                open_position: placing() ? 'on' : '',
             };
         }
         function encodeForm(obj) {
@@ -4332,9 +4367,42 @@
             resultBox.innerHTML = lines.join('');
             resultBox.className = 'quick-result';
         }
+        function escHTML(x) {
+            return String(x).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; });
+        }
         function renderRecordResult(r) {
-            resultBox.innerHTML = '<div class="qr-ok">✓ ' + CT['q.recorded'] + ' #' + r.id + ' · <a href="/journal/' + r.id + '/edit">' + CT['q.edit'] + '</a> · <a href="/journal">' + CT['q.allTrades'] + '</a></div>';
+            lastRecordedId = r.id;
+            var lines = ['<div class="qr-ok">✓ ' + CT['q.recorded'] + ' #' + r.id + ' · <a href="/journal/' + r.id + '/edit">' + CT['q.edit'] + '</a> · <a href="/journal">' + CT['q.allTrades'] + '</a></div>'];
+            if (r.orders && r.orders.length) {
+                r.orders.forEach(function (o) {
+                    var cls = o.status === 'ok' ? 'qr-ok' : o.status === 'skip' ? 'qr-skip' : 'qr-err';
+                    var name = o.leg === 'tp1' ? CT['q.legTP1'] : CT['q.legEntry'];
+                    lines.push('<div class="qr-leg ' + cls + '">' + name + ' · ' + escHTML(o.status) + ' — ' + escHTML(o.msg) + '</div>');
+                });
+                // The journal saying ATTACHED is not proof the stop is on the
+                // exchange (#60 went naked that way); the verify page asks BingX.
+                lines.push('<div class="qr-sub"><a href="/ops/verify">🔎 ' + CT['q.verify'] + '</a></div>');
+            }
+            resultBox.innerHTML = lines.join('');
             resultBox.className = 'quick-result';
+        }
+        // Plain-text summary of exactly what will be sent, for window.confirm.
+        function confirmText(f) {
+            var m = parseFloat(f.margin_usdt), lev = parseFloat(f.leverage), e = parseFloat(f.entry);
+            var notional = (m > 0 && lev > 0) ? m * lev : NaN;
+            var qty = notional / e;
+            var t = CT['q.confirmPlace']
+                .replace('{side}', f.side === 'long' ? CT['q.long'] : CT['q.short'])
+                .replace('{sym}', f.symbol)
+                .replace('{entry}', f.entry)
+                .replace('{qty}', isNaN(qty) ? '—' : qty.toPrecision(4))
+                .replace('{margin}', f.margin_usdt || '—')
+                .replace('{lev}', f.leverage || '—')
+                .replace('{notional}', isNaN(notional) ? '—' : notional.toFixed(0))
+                .replace('{stop}', f.stop || '—');
+            if (f.tp2) t += '\n' + CT['q.confirmTP2'].replace('{tp2}', f.tp2);
+            if (f.tp1) t += '\n' + CT['q.confirmTP1'].replace('{tp1}', f.tp1);
+            return t;
         }
         function renderError(msg) {
             resultBox.innerHTML = '<div class="qr-err">⚠ ' + msg + '</div>';
@@ -4345,8 +4413,11 @@
             if (!form) return;
             var tab = currentTab();
             var url = tab === 'record' ? '/api/chart/journal-open' : '/api/chart/validate';
+            // A real order needs a second, deliberate yes that restates it.
+            // The server re-validates everything; this only stops a misclick.
+            if (form.open_position && !window.confirm(confirmText(form))) return;
             submitBtn.disabled = true;
-            submitBtn.textContent = tab === 'record' ? CT['q.recording'] : CT['q.validating'];
+            submitBtn.textContent = tab === 'record' ? (form.open_position ? CT['q.placing'] : CT['q.recording']) : CT['q.validating'];
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -4355,14 +4426,14 @@
                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                 .then(function (res) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = tab === 'record' ? CT['q.recordBtn'] : CT['q.validateBtn'];
+                    submitBtn.textContent = idleLabel();
                     if (!res.ok) { renderError(res.body.error || 'request failed'); return; }
                     if (tab === 'record') renderRecordResult(res.body);
                     else                  renderValidateResult(res.body);
                 })
                 .catch(function (err) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = tab === 'record' ? CT['q.recordBtn'] : CT['q.validateBtn'];
+                    submitBtn.textContent = idleLabel();
                     renderError('network: ' + (err && err.message ? err.message : 'unknown'));
                 });
         });
@@ -4383,6 +4454,10 @@
         openFullBtn.addEventListener('click', function (ev) {
             ev.preventDefault();
             var target = currentTab() === 'record' ? '/journal/new' : '/validate';
+            if (target === '/journal/new' && lastRecordedId != null) {
+                window.location.href = '/journal/' + lastRecordedId + '/edit';
+                return;
+            }
             var url = buildQs(target);
             if (!url) { renderError('Fill side and price first.'); return; }
             window.location.href = url + (target === '/validate' ? '&auto=1' : '');

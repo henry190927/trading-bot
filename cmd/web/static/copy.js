@@ -1,17 +1,19 @@
 // Click-to-copy via event delegation: tap any .copy-btn to write its
 // data-copy value (or text content) to the clipboard, with a 1s "✓ copied"
-// flash for tactile feedback on mobile.
+// flash for tactile feedback on mobile. A .js-copy button keeps its own
+// styling (e.g. a .ui-btn) and flashes data-flash instead of the copied value,
+// for long values such as the /scan row summary.
 document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.copy-btn');
+    var btn = e.target.closest('.copy-btn, .js-copy');
     if (!btn) return;
     e.preventDefault();
     var value = btn.dataset.copy || btn.textContent.trim();
     var done = function () {
-        var original = btn.textContent;
-        btn.textContent = '✓ ' + value;
+        var original = btn.innerHTML;
+        btn.textContent = '✓ ' + (btn.dataset.flash || value);
         btn.classList.add('copied');
         setTimeout(function () {
-            btn.textContent = original;
+            btn.innerHTML = original;
             btn.classList.remove('copied');
         }, 1000);
     };

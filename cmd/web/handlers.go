@@ -933,12 +933,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	// Per-trade margin cap (BINGX_MAX_MARGIN_USDT, default 500) guards
 	// against accidental misclick that would route a too-large order.
 	if openPos {
-		marginCap := 500.0
-		if v := os.Getenv("BINGX_MAX_MARGIN_USDT"); v != "" {
-			if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-				marginCap = f
-			}
-		}
+		marginCap := maxMarginUSDT()
 		marginOverride := c.PostForm("margin_override") == "on"
 		if marginUSDT <= 0 {
 			rerender(tr("jf.err.marginNeeded"))
@@ -1031,6 +1026,18 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		redirectURL = "/journal?tp1_status=" + url.QueryEscape(status) + "&tp1_msg=" + url.QueryEscape(msg)
 	}
 	c.Redirect(http.StatusSeeOther, redirectURL)
+}
+
+// maxMarginUSDT is the per-trade margin cap (BINGX_MAX_MARGIN_USDT, default
+// 500u) that guards a manual auto-open against a misclick routing a
+// too-large order. Shared by /journal/open and the /chart quick record.
+func maxMarginUSDT() float64 {
+	if v := os.Getenv("BINGX_MAX_MARGIN_USDT"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			return f
+		}
+	}
+	return 500
 }
 
 // placeTP1OnBingX looks up the open position for t.Symbol on BingX, then
@@ -3422,11 +3429,23 @@ func (s *server) handleAPIChartValidate(c *gin.Context) {
 
 // handleAPIChartJournalOpen — POST /api/chart/journal-open.
 // Minimal JSON alternative to handleJournalOpen used by the /chart
-// modal for quick-record. Writes a basic trade to the journal (no
-// auto-open on BingX, no leverage math — user can edit later via
-// /journal/{id}/edit for advanced fields).
-// Body params: symbol, side, entry, stop, tp1, tp2, tf, anchor, notes.
+// modal for quick-record. Writes the trade to the journal and, when
+// open_position=on, also places it on BingX through the same
+// placeEntryOnBingX / placeTP1OnBingX path as /journal/open — so the
+// risk gate, lot-precision floor and bundled SL/TP2 are one
+// implementation, not two.
+//
+// The quick path is stricter than the full form in one way: opening a
+// position REQUIRES a stop, and the stop is always bundled with the entry.
+// The full form lets you open without one (a real state worth recording
+// after the fact); a one-click modal on a live chart is exactly where a
+// forgotten stop field would go unnoticed, and a bundled SL is the only
+// stop that exists the moment the entry fills.
+//
+// Body params: symbol, side, entry, stop, tp1, tp2, tf, anchor, notes,
+// margin_usdt, leverage, open_position.
 func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
+	tr := s.translator(langOf(c))
 	symbol := strings.ToUpper(strings.TrimSpace(c.PostForm("symbol")))
 	side := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
 	if symbol == "" || (side != "long" && side != "short") {
@@ -3480,6 +3499,36 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		}
 	}
 
+	if stop > 0 && side == "long" && stop >= entry {
+		c.JSON(http.StatusBadRequest, gin.H{"error": tr("jf.err.longStop")})
+		return
+	}
+	if stop > 0 && side == "short" && stop <= entry {
+		c.JSON(http.StatusBadRequest, gin.H{"error": tr("jf.err.shortStop")})
+		return
+	}
+	openPos := c.PostForm("open_position") == "on"
+	if openPos {
+		if stop <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": tr("jf.err.stopNeededQuick")})
+			return
+		}
+		if margin <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": tr("jf.err.marginNeeded")})
+			return
+		}
+		if leverage < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": tr("jf.err.levNeeded")})
+			return
+		}
+		// No override checkbox here: going over the cap is a deliberate
+		// act, and it belongs on the full form where the box exists.
+		if cap := maxMarginUSDT(); margin > cap {
+			c.JSON(http.StatusBadRequest, gin.H{"error": tr("jf.err.marginCapQuick", margin, cap)})
+			return
+		}
+	}
+
 	trades, err := journal.ReadAll("")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "read journal: " + err.Error()})
@@ -3509,12 +3558,52 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		Leverage:   leverage,
 		EquityUSDT: s.equityAtEntry(c.Request.Context()),
 	}
+	if openPos {
+		// Every leg the user filled in gets placed: the stop always
+		// (required above), TP2 bundled with the entry, TP1 as the
+		// reduce-only partial the sweep keeps retrying until the entry fills.
+		t.StopAuto = true
+		t.TP2Auto = tp2 > 0
+		t.TP1Auto = tp1 > 0
+	}
 	trades = append(trades, t)
+	idx := len(trades) - 1
+	// The row is written BEFORE any order goes out, same as /journal/open:
+	// an exchange failure must never lose the record of what was intended.
 	if err := journal.WriteAll("", trades); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "write journal: " + err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "id": t.ID})
+	if !openPos {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "id": t.ID})
+		return
+	}
+
+	type leg struct {
+		Leg    string `json:"leg"`
+		Status string `json:"status"`
+		Msg    string `json:"msg"`
+	}
+	ctx := c.Request.Context()
+	st, msg := s.placeEntryOnBingX(ctx, tr, &trades[idx])
+	legs := []leg{{"entry", st, msg}}
+	if st == "ok" && trades[idx].TP1Auto {
+		st1, msg1 := s.placeTP1OnBingX(ctx, tr, &trades[idx], "")
+		legs = append(legs, leg{"tp1", st1, msg1})
+	}
+	if st != "ok" {
+		// The entry never reached the exchange (risk gate, no key, API
+		// error), so the row is a plan, not an order. Drop the "place this
+		// for me" flags: bracket.Decide honours StopAuto against ANY live
+		// position on this symbol and side, and a refused order should not
+		// leave an intent behind that later attaches to a position opened
+		// some other way.
+		trades[idx].StopAuto, trades[idx].TP1Auto, trades[idx].TP2Auto = false, false, false
+	}
+	if err := journal.WriteAll("", trades); err != nil {
+		log.Printf("chart quick-open: post-place journal write failed: %v", err)
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "id": t.ID, "orders": legs})
 }
 
 // chartStatePath returns the on-disk location of the persisted

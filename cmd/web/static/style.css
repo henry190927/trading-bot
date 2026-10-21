@@ -1685,6 +1685,27 @@ footer {
 .qr-ok  { color: var(--green); font-weight: 600; }
 .qr-ok a { color: var(--blue); margin: 0 0.3rem; }
 .qr-err { color: var(--red); font-weight: 600; }
+.qr-skip { color: var(--yellow); font-weight: 600; }
+.qr-leg { font-size: var(--fs-sm); font-weight: 500; margin-top: 0.3rem; word-break: break-word; }
+
+/* "Place on BingX" opt-in on the quick record tab. Styled as a bordered
+   row so it does not read like one more optional field. */
+.quick-place {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.5rem;
+    align-items: center;
+    margin: 0 0 0.7rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.quick-place input { margin: 0; accent-color: var(--red); }
+.quick-place-main { font-weight: 600; color: var(--text); font-size: var(--fs-md); }
+.quick-place-hint { grid-column: 2; color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.4; }
+.quick-place:has(input:checked) { border-color: var(--red); }
+.quick-go.is-placing { background: var(--red); border-color: var(--red); }
 /* Volume-by-price SVG overlay — anchored to the right edge of the
    chart just inside the price scale. Purely decorative; pointer
    events off so it doesn't intercept chart drag/zoom. */
