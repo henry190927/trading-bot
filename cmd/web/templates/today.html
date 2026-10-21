@@ -42,7 +42,7 @@
         {{if .OpenTrades}}
         <ul class="ui-list">
           {{range .OpenTrades}}
-          <li><a class="ui-row" href="/chart?symbol={{.Trade.Symbol}}">
+          <li><a class="ui-row" href="/journal#pos-{{.Trade.ID}}">
             <span class="ui-side {{.Trade.Side}}">{{t (printf "side.%s" .Trade.Side)}}</span>
             <span class="ui-sym">{{.Trade.Symbol}}</span>{{if .Trade.Leverage}}<span class="ui-dim ui-sm">{{.Trade.Leverage}}x</span>{{end}}
             <span class="ui-grow ui-dim ui-sm ui-num">{{fmtPx .Trade.Entry}} → {{fmtPx .MarkPrice}}</span>

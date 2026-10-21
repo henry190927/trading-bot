@@ -321,6 +321,10 @@ type openTradeCard struct {
 	DistToEntryPct float64 // |mark - entry| / entry * 100, signed for direction
 	PendingSince   time.Duration
 
+	// Track is the stop → entry → TP progress bar for an active trade with
+	// a stop; nil otherwise (pending, or R undefined).
+	Track *rTrack
+
 	// Diff-since-entry (populated only when the trade has a non-empty
 	// SignalCtx snapshot and we have a current Diagnose). Shows the
 	// trader how the validator picture has shifted since they committed,
@@ -449,6 +453,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 			if t.TP2 != 0 {
 				card.PctToTP2 = clampPct(moved / risk / 2 * 50)
 			}
+			card.Track = newRTrack(t, card.MarkPrice)
 		}
 		cards = append(cards, card)
 	}
@@ -751,6 +756,54 @@ func (s *server) sweepTrades(ctx context.Context, trades []journal.Trade, cache 
 	}
 
 	return tradesChanged
+}
+
+// rTrack places a trade on a horizontal bar scaled in R. The left end is the
+// stop (-1R); the right end is the farther target, never less than +1R, so a
+// trade with no target still has room to show profit. Every X is a 0-100
+// left offset, clamped, so a mark beyond either end pins to it.
+type rTrack struct {
+	R              float64 // live R, unclamped (the label shows the real number)
+	Entry, Mark    float64 // X of entry (0R) and of the live mark
+	TP1, TP2       float64 // X of each target; 0 when HasTP1/HasTP2 is false
+	HasTP1, HasTP2 bool
+	FillL, FillW   float64 // the coloured span between entry and mark
+}
+
+// newRTrack returns nil when R is undefined (no stop, or stop at entry).
+func newRTrack(t journal.Trade, mark float64) *rTrack {
+	long := t.Side == "long"
+	risk := t.Entry - t.Stop
+	if !long {
+		risk = -risk
+	}
+	if t.Stop <= 0 || risk <= 0 || mark <= 0 {
+		return nil
+	}
+	rOf := func(px float64) float64 {
+		if long {
+			return (px - t.Entry) / risk
+		}
+		return (t.Entry - px) / risk
+	}
+	tr := &rTrack{R: rOf(mark)}
+	hi := 1.0
+	if t.TP1 > 0 {
+		hi = math.Max(hi, rOf(t.TP1))
+	}
+	if t.TP2 > 0 {
+		hi = math.Max(hi, rOf(t.TP2))
+	}
+	x := func(r float64) float64 { return clampPct((r + 1) / (hi + 1) * 100) }
+	tr.Entry, tr.Mark = x(0), x(tr.R)
+	if t.TP1 > 0 {
+		tr.TP1, tr.HasTP1 = x(rOf(t.TP1)), true
+	}
+	if t.TP2 > 0 {
+		tr.TP2, tr.HasTP2 = x(rOf(t.TP2)), true
+	}
+	tr.FillL, tr.FillW = math.Min(tr.Entry, tr.Mark), math.Abs(tr.Mark-tr.Entry)
+	return tr
 }
 
 func clampPct(v float64) float64 {
@@ -2405,7 +2458,15 @@ func (s *server) handleJournalList(c *gin.Context) {
 		pageNums = append(pageNums, i)
 	}
 
+	// Live cards for open trades (mark, R track). Costs a scan per open
+	// symbol, so only when there is something open.
+	var openCards []openTradeCard
+	if pendingCount+activeCount > 0 {
+		openCards = s.buildOpenTradeCards(c.Request.Context(), nil)
+	}
+
 	s.page(c, http.StatusOK, "journal_list.html", gin.H{
+		"OpenCards":    openCards,
 		"Trades":       pageTrades,
 		"TotalTrades":  totalTrades,
 		"Page":         page,
@@ -5003,19 +5064,9 @@ func collectOpenPositionsForChart(short string, markPrice float64) []map[string]
 			"filled":   filled,
 			"unrealR":  unrealR,
 			"openedAt": t.OpenedAt.Unix(),
-			"filledAt": unixOrZero(t.FilledAt),
 		})
 	}
 	return out
-}
-
-// unixOrZero is t.Unix(), or 0 for the zero time (whose Unix() is a large
-// negative number the frontend would read as a real date).
-func unixOrZero(t time.Time) int64 {
-	if t.IsZero() {
-		return 0
-	}
-	return t.Unix()
 }
 
 // computeChartMarkers derives event markers for the LWC candlestick

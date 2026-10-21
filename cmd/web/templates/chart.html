@@ -253,17 +253,6 @@
     <div class="chart-header-ctx" id="chart-banner-ctx"></div>
   </section>
 
-  {{/* Open journal trades on this symbol, as a stop → entry → TP track with
-       the live R marker. Filled from data.openPositions on every poll; hidden
-       when there are none. /today's position rows link here. */}}
-  <section class="cs-card cs-pos hidden" id="chart-pos-card">
-    <div class="cs-card-h">
-      <h2>{{t "chart.pos.title"}}</h2>
-      <span class="ui-count" id="chart-pos-count">0</span>
-    </div>
-    <div id="chart-pos-list"></div>
-  </section>
-
   {{/* Order follows the mockup: score (with the per-TF tiles), plan,
        factors, the structure read, open interest. Every id is unchanged,
        so the renderer fills each element exactly as before. */}}
@@ -973,12 +962,6 @@
         "q.feeLbl": {{t "chart.js.q.feeLbl"}},
         "q.suggStop": {{t "chart.js.q.suggStop"}},
         "q.recordPlaceBtn": {{t "chart.js.q.recordPlaceBtn"}},
-        "pos.close": {{t "chart.js.pos.close"}},
-        "pos.verify": {{t "chart.js.pos.verify"}},
-        "pos.pending": {{t "chart.js.pos.pending"}},
-        "pos.entry": {{t "chart.js.pos.entry"}},
-        "pos.stop": {{t "chart.js.pos.stop"}},
-        "pos.noStop": {{t "chart.js.pos.noStop"}},
         "q.placing": {{t "chart.js.q.placing"}},
         "q.confirmPlace": {{t "chart.js.q.confirmPlace"}},
         "q.confirmTP1": {{t "chart.js.q.confirmTP1"}},
@@ -2272,67 +2255,7 @@
             title: title,
         }));
     }
-    // ── Position card (side panel) ────────────────────────────────
-    // One progress track per open trade, scaled in R: the left end is the
-    // stop (-1R), the right end the farthest target (at least +1R), with
-    // ticks at entry / TP1 / TP2 and a marker at the live R. Independent of
-    // the "positions" layer toggle — hiding the lines must not hide the card.
-    function fmtAge(sec) {
-        if (!(sec > 0)) return '';
-        var m = Math.floor(sec / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
-        if (d > 0) return d + 'd ' + (h % 24) + 'h';
-        if (h > 0) return h + 'h ' + (m % 60) + 'm';
-        return m + 'm';
-    }
-    function renderPosCard() {
-        var card = document.getElementById('chart-pos-card');
-        if (!card) return;
-        var list = lastPositions || [];
-        card.classList.toggle('hidden', !list.length);
-        document.getElementById('chart-pos-count').textContent = list.length;
-        var now = Date.now() / 1000;
-        document.getElementById('chart-pos-list').innerHTML = list.map(function (p) {
-            var long = p.side === 'long';
-            var risk = long ? p.entry - p.stop : p.stop - p.entry;
-            var rOf = function (px) { return px > 0 && risk > 0 ? (long ? px - p.entry : p.entry - px) / risk : null; };
-            var head = '<div class="pos-head"><b>#' + p.id + '</b>'
-                + '<span class="badge ' + (long ? 'side-long' : 'side-short') + '">' + (long ? CT['q.long'] : CT['q.short']) + '</span>'
-                + (p.tf ? '<span class="pos-tf">' + p.tf + '</span>' : '');
-            var links = '<div class="pos-links"><a href="/journal/' + p.id + '/edit">' + CT['q.edit'] + '</a>'
-                + '<a href="/journal/' + p.id + '/close">' + CT['pos.close'] + '</a>'
-                + '<a href="/ops/verify">🔎 ' + CT['pos.verify'] + '</a></div>';
-            if (!p.filled) {
-                return '<div class="pos-item">' + head + '<span class="pos-state">' + CT['pos.pending'] + ' · ' + fmtAge(now - p.openedAt) + '</span></div>'
-                    + '<div class="pos-sub">' + CT['pos.entry'] + ' ' + fmtPrice(p.entry) + ' · ' + CT['pos.stop'] + ' ' + (p.stop > 0 ? fmtPrice(p.stop) : '—') + '</div>' + links + '</div>';
-            }
-            var age = fmtAge(now - (p.filledAt || p.openedAt));
-            if (!(risk > 0)) {
-                return '<div class="pos-item">' + head + '<span class="pos-state">' + age + '</span></div>'
-                    + '<div class="pos-sub">' + CT['pos.noStop'] + '</div>' + links + '</div>';
-            }
-            var r = p.unrealR || 0;
-            var r1 = rOf(p.tp1), r2 = rOf(p.tp2);
-            var hi = Math.max(1, r1 || 0, r2 || 0), lo = -1;
-            var at = function (x) { return Math.max(0, Math.min(100, (x - lo) / (hi - lo) * 100)); };
-            var x0 = at(0), xr = at(r);
-            var fill = '<div class="pos-fill ' + (r >= 0 ? 'up' : 'down') + '" style="left:' + Math.min(x0, xr).toFixed(1) + '%;width:' + Math.abs(xr - x0).toFixed(1) + '%"></div>';
-            var tick = function (x, cls) { return '<span class="pos-tick ' + cls + '" style="left:' + x.toFixed(1) + '%"></span>'; };
-            var ticks = tick(x0, 'entry') + (r1 != null ? tick(at(r1), 'tp') : '') + (r2 != null ? tick(at(r2), 'tp') : '');
-            var lbl = function (x, txt, cls) { return '<span class="pos-lbl ' + cls + '" style="left:' + x.toFixed(1) + '%">' + txt + '</span>'; };
-            var labels = lbl(0, CT['pos.stop'] + '<br>' + fmtPrice(p.stop), 'l-stop')
-                + lbl(x0, CT['pos.entry'] + '<br>' + fmtPrice(p.entry), 'l-mid')
-                + (r1 != null ? lbl(at(r1), 'TP1<br>' + fmtPrice(p.tp1), at(r1) > 85 ? 'l-end' : 'l-mid') : '')
-                + (r2 != null ? lbl(at(r2), 'TP2<br>' + fmtPrice(p.tp2), 'l-end') : '');
-            return '<div class="pos-item">' + head
-                + '<span class="pos-r ' + (r >= 0 ? 'ui-up' : 'ui-down') + '">' + (r >= 0 ? '+' : '') + r.toFixed(2) + 'R</span>'
-                + '<span class="pos-state">' + age + '</span></div>'
-                + '<div class="pos-track">' + fill + ticks + '<span class="pos-mark ' + (r >= 0 ? 'up' : 'down') + '" style="left:' + xr.toFixed(1) + '%"></span></div>'
-                + '<div class="pos-lbls">' + labels + '</div>' + links + '</div>';
-        }).join('');
-    }
-
     function applyPositionLinesVisibility() {
-        renderPosCard();
         clearPositionLines();
         if (!layerOn('positions') || !lastPositions.length) return;
         lastPositions.forEach(function (p) {
