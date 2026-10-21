@@ -63,6 +63,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/henry190927/trading-bot/autotrade"
@@ -107,6 +108,7 @@ func main() {
 	volThresh := flag.Float64("vol-thresh", 1.2, "ATR%% ceiling for the vol gate")
 	concTest := flag.Bool("conc-test", false, "A/B max-concurrent 1 vs 2 vs 3 on baseline (relax one-position)")
 	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
+	symbols := flag.String("symbols", "", "comma-separated symbols to test instead of the default BTC/ETH/SOL; short names (XAU) or raw contract codes, as in sweepbt")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -118,6 +120,32 @@ func main() {
 		short string
 		sym   market.Symbol
 	}{{"BTC", market.BTCUSDT}, {"ETH", market.ETHUSDT}, {"SOL", market.SOLUSDT}}
+	// --symbols puts any contract through the same arms, so an unarmed
+	// (symbol, range-edge) cell can be gated before it becomes a rule.
+	if strings.TrimSpace(*symbols) != "" {
+		syms = syms[:0]
+		for _, tok := range strings.Split(*symbols, ",") {
+			tok = strings.ToUpper(strings.TrimSpace(tok))
+			if tok == "" {
+				continue
+			}
+			sym, ok := market.Resolve(tok)
+			if !ok {
+				sym = market.Symbol(tok)
+				if !strings.Contains(tok, "-USDT") && !strings.Contains(tok, "-USDC") {
+					sym = market.Symbol(tok + "-USDT")
+				}
+			}
+			short := market.Short(sym)
+			if short == "" {
+				short = string(sym)
+			}
+			syms = append(syms, struct {
+				short string
+				sym   market.Symbol
+			}{short, sym})
+		}
+	}
 
 	variants := []variant{
 		{name: "V0-baseline"},
