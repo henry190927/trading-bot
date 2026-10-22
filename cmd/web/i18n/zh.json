@@ -236,6 +236,7 @@
   "at.fixedMargin": "未設(固定保證金)",
   "at.cooldown": "停損後冷卻",
   "unit.barsShort": "根",
+  "at.fetchFail": "這次有 %d 組 K 線抓不到(已重試),下面的數字不完整:這些標的的部位會被當成持倉中、已結算的 R 會少算。請重新整理。",
   "at.unscored": "%d 筆無法評分的觸發被保守計為持倉中(寧可擋單,也不超過上限)",
   "at.howto.live": "真錢需要三者同時成立:總開關 ON、模擬模式關閉、AUTOTRADE_ENABLED=true。目前:",
   "at.armedNow": "已武裝真錢",

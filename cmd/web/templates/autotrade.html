@@ -34,6 +34,12 @@
 {{template "topnav" .}}
 
 <main class="ui-page">
+  {{if .FetchFails}}
+  <div class="ui-banner warn">{{template "icon" "alert"}}<div>
+    <div><b>{{printf (t "at.fetchFail") (len .FetchFails)}}</b></div>
+    <div class="ui-sm ui-num">{{range .FetchFails}}<div>{{.}}</div>{{end}}</div>
+  </div></div>
+  {{end}}
   <section class="ui-card">
     <header class="ui-card-h">
       <h2>{{template "icon" "pulse"}}{{t "at.title"}}</h2>

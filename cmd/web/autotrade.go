@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"github.com/henry190927/trading-bot/bingx"
 	"net/http"
 	"os"
 	"strings"
@@ -89,16 +92,21 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		return "1h"
 	}
 	klineCache := map[string][]market.Candle{}
+	// Every number on this page is a replay over these candles. A symbol whose
+	// fetch fails replays as nothing: its newest fire is held open "to be safe"
+	// and its settled trades drop out, so one bad fetch moved the open count
+	// from 7 to 9 (over the cap) and net R by points on 2026-10-22, with only a
+	// one-line note to show for it. Retried, and any failure left is shown
+	// at the top of the page.
+	var fetchFails []string
 	candlesFor := func(sym, tf string) []market.Candle {
 		key := sym + "|" + tf
 		if cs, ok := klineCache[key]; ok {
 			return cs
 		}
-		var cs []market.Candle
-		if ms, err := resolveWebSymbol(sym); err == nil {
-			if got, err := s.client.Klines(ctx, ms, market.Timeframe(tf), 500); err == nil {
-				cs = got
-			}
+		cs, err := klinesWithRetry(ctx, s.client, sym, tf, 500)
+		if err != nil {
+			fetchFails = append(fetchFails, sym+" "+tf+": "+err.Error())
 		}
 		klineCache[key] = cs
 		return cs
@@ -237,6 +245,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		// trade. candlesFor is already the panel's cached kline source.
 		"Book":            book,
 		"BookUnscored":    unscored,
+		"FetchFails":      fetchFails,
 		"ByStrategy":      byStrategy,
 		"BySymbol":        bySymbol,
 		"BySide":          bySide,
@@ -312,4 +321,32 @@ func blockedReasons(bs []autotrade.Blocked) map[string]int {
 		out[k]++
 	}
 	return out
+}
+
+// klinesWithRetry fetches candles, retrying twice on an error or an empty
+// answer — both of which the replay would otherwise read as "no data".
+func klinesWithRetry(ctx context.Context, c *bingx.Client, sym, tf string, limit int) ([]market.Candle, error) {
+	ms, err := resolveWebSymbol(sym)
+	if err != nil {
+		return nil, err
+	}
+	var last error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt) * 300 * time.Millisecond):
+			}
+		}
+		cs, err := c.Klines(ctx, ms, market.Timeframe(tf), limit)
+		if err == nil && len(cs) > 0 {
+			return cs, nil
+		}
+		if err == nil {
+			err = errors.New("empty response")
+		}
+		last = err
+	}
+	return nil, last
 }

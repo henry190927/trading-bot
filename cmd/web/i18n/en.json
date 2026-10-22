@@ -236,6 +236,7 @@
   "at.fixedMargin": "unset (fixed margin)",
   "at.cooldown": "Cooldown after a stop",
   "unit.barsShort": "bars",
+  "at.fetchFail": "%d candle set(s) could not be fetched (after retries), so the numbers below are incomplete: those symbols' positions are held open and their settled R is missing. Reload.",
   "at.unscored": "%d fires that could not be scored are counted as open, conservatively (better to block an order than exceed a cap)",
   "at.howto.live": "Real money needs all three at once: master ON, paper mode off, AUTOTRADE_ENABLED=true. Right now:",
   "at.armedNow": "armed for real money",
