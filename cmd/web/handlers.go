@@ -2152,6 +2152,20 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	outcome := strings.ToLower(strings.TrimSpace(c.PostForm("outcome")))
 	var exitPrice float64
 	exitStr := strings.TrimSpace(c.PostForm("exit_price"))
+	// A blank closed_at means "still open", and used to discard a result and
+	// exit typed into an open trade without a word — the trade simply stayed
+	// open (#92, 2026-10-22). Say so instead.
+	if closedAt.IsZero() && trades[idx].IsOpen() && (outcome != "" || exitStr != "") {
+		rerender(tr("jf.err.closeNeedsTime"))
+		return
+	}
+	// Closing a trade that has a TP1 leg must go through the close page, which
+	// asks for the remainder's price and stores the blend. Here exit_price is
+	// taken literally and the TP1 leg would drop out of R.
+	if !closedAt.IsZero() && trades[idx].IsOpen() && trades[idx].HasTP1Leg() {
+		rerender(tr("jf.err.closeViaClosePage", trades[idx].ID))
+		return
+	}
 	if !closedAt.IsZero() {
 		// Editing an EXISTING row: a legacy outcome has to survive the save,
 		// or opening #53 and pressing Save silently reclassifies it.

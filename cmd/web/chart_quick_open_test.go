@@ -303,3 +303,47 @@ func TestStaleEditCannotReopenAClose(t *testing.T) {
 		t.Errorf("the close was undone: %+v", got[0])
 	}
 }
+
+// The edit page is not a close page: a result/exit typed into an open trade
+// with no close time used to vanish silently, and closing a TP1-leg trade
+// here would take the exit literally.
+func TestEditRefusesSilentCloseAttempts(t *testing.T) {
+	t.Setenv("JOURNAL_PATH", filepath.Join(t.TempDir(), "journal.csv"))
+	gin.SetMode(gin.TestMode)
+	at := time.Date(2026, 10, 21, 13, 35, 0, 0, time.UTC)
+	if err := journal.WriteAll("", []journal.Trade{{
+		ID: 92, OpenedAt: at, AnalyzedAt: at, Symbol: "HYPE", Side: "long", TF: "1h", Entry: 80.424, Stop: 79.2, TP1: 82,
+		FilledAt: at, TP1FillPrice: 82, TP1FillPct: 50, TP1FilledAt: at,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	dicts, _ := loadDicts(i18nFS)
+	pages, err := parsePages(assets, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{dicts: dicts, pages: pages}
+	r := gin.New()
+	r.POST("/journal/:id/edit", s.handleJournalEditPost)
+	for name, extra := range map[string]url.Values{
+		"result without close time": {"outcome": {"stop"}, "exit_price": {"80.0753"}},
+		"close with a TP1 leg":      {"outcome": {"stop"}, "exit_price": {"80.0753"}, "closed_at": {"2026-10-22T09:56"}},
+	} {
+		cur, _ := journal.ReadAll("")
+		f := url.Values{"symbol": {"HYPE"}, "side": {"long"}, "tf": {"1h"}, "entry": {"80.424"}, "stop": {"79.2"},
+			"tp1": {"82"}, "opened_at": {"2026-10-21T21:35"}, "filled_at": {"2026-10-21T21:35"}, "ver": {journal.Version(cur[0])}}
+		for k, v := range extra {
+			f[k] = v
+		}
+		req := httptest.NewRequestWithContext(t.Context(), "POST", "/journal/92/edit", strings.NewReader(f.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code == http.StatusSeeOther {
+			t.Errorf("%s: saved (303), want the form back with an error", name)
+		}
+		if after, _ := journal.ReadAll(""); after[0] != cur[0] {
+			t.Errorf("%s: row changed: %+v", name, after[0])
+		}
+	}
+}

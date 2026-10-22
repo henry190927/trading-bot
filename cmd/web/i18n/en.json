@@ -982,6 +982,8 @@
   "ms.err.notActive": "#%d is not an active trade",
   "ms.err.price": "Enter a new stop price (> 0)",
   "jf.err.stale": "#%d changed after this page was opened (closed, or saved in another tab), so nothing was saved. Below is the current row — check it and save again.",
+  "jf.err.closeNeedsTime": "This trade is still open: close it from the Close page (or fill in a close time here). Without a close time the result and exit are not saved — nothing was saved this time.",
+  "jf.err.closeViaClosePage": "#%d has a TP1 leg — close it from the Close page, which asks for the remainder's exit and blends it with TP1. Closing here would take the exit as the whole trade's and drop TP1 from R.",
   "jf.err.levNeeded": "leverage required when 'Open position on BingX' is checked",
   "jf.err.outcome": "outcome must be %s",
   "jf.err.outcomeClosed": "outcome required when closed_at is set — one of %s",

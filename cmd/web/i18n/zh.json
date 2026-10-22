@@ -982,6 +982,8 @@
   "ms.err.notActive": "#%d 不是持倉中的交易",
   "ms.err.price": "請填新停損價(> 0)",
   "jf.err.stale": "#%d 在你打開這個頁面之後被改過(例如已經平倉或在別的分頁存過),這次沒有存。下面是目前的內容,確認後再存一次。",
+  "jf.err.closeNeedsTime": "這筆還是持倉中:要平倉請用「平倉」頁(或在這裡填平倉時間)。沒填平倉時間時,結果和出場價不會存 —— 這次沒有存任何東西。",
+  "jf.err.closeViaClosePage": "#%d 有 TP1 分批紀錄,請用「平倉」頁平倉:那裡只填剩餘部位的出場價,會自動和 TP1 加權。在這裡平倉會把出場價當成整筆,R 會漏掉 TP1。",
   "jf.err.levNeeded": "勾選「在 BingX 開倉」時必須填槓桿",
   "jf.err.outcome": "結果必須是 %s 其中之一",
   "jf.err.outcomeClosed": "有平倉時間時必須選結果 — %s 其中之一",
