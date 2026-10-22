@@ -4613,3 +4613,14 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .pos-head a.ui-sym:hover { color: var(--blue); }
 .je-leg { border: 1px solid var(--border); border-radius: 6px; padding: var(--sp-3); margin-bottom: var(--sp-3); }
 .je-leg-h { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.pos-tick.live { background: var(--yellow); height: 18px; top: -6px; width: 3px; margin-left: -1.5px; }
+.pos-live .ui-dim { margin-right: 2px; }
+.ms-body { display: flex; flex-direction: column; gap: var(--sp-3); }
+.ms-label { font-weight: 600; }
+.ms-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-1) var(--sp-3); margin: 0; font-variant-numeric: tabular-nums; }
+.ms-kv dt { color: var(--text-dim); }
+.ms-kv dd { margin: 0; }
+.ms-preview:empty { display: none; }
+.ms-preview { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: 6px; font-size: var(--fs-sm); line-height: 1.6; }
+.ms-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+.ms-actions .ui-btn { margin-top: 0; }

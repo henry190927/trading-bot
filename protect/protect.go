@@ -209,3 +209,55 @@ func Apply(ctx context.Context, c Placer, p Plan) Result {
 	}
 	return r
 }
+
+// Mover is what MoveStop needs: Placer plus cancelling an order.
+type Mover interface {
+	Placer
+	CancelOrder(ctx context.Context, sym market.Symbol, orderID string) error
+}
+
+// MoveResult records a stop move.
+type MoveResult struct {
+	NewStopID string
+	Cancelled []string // old stop ids that were cancelled
+	Errors    []string
+}
+
+// MoveStop replaces the position's protective stop(s) with p.Stop.
+//
+// The NEW stop is placed first and the old ones are cancelled only after it
+// is accepted, so at no moment is the position without a stop: a failed place
+// leaves the old stop untouched, and a failed cancel leaves two stops resting,
+// which reduce-only cannot over-close. The reverse order — cancel, then place —
+// is the one that can leave a position naked, and is never used.
+//
+// p must be a stop-only plan (p.TP == 0); a TP in a "move stop" request is a
+// caller bug, refused rather than silently placed.
+func MoveStop(ctx context.Context, c Mover, p Plan, oldStopIDs []string) MoveResult {
+	var r MoveResult
+	if !p.OK() {
+		r.Errors = append(r.Errors, "refusing to send a plan with faults: "+p.Faults[0])
+		return r
+	}
+	if p.Stop <= 0 || p.TP != 0 {
+		r.Errors = append(r.Errors, "move-stop needs a stop-only plan")
+		return r
+	}
+	res, err := c.PlaceStopMarket(ctx, p.Symbol, p.Side, p.Qty, p.Stop, p.Hedge)
+	if err != nil {
+		r.Errors = append(r.Errors, "place new stop: "+err.Error()+" — old stop left in place")
+		return r
+	}
+	r.NewStopID = res.OrderID
+	for _, id := range oldStopIDs {
+		if id == "" || id == r.NewStopID {
+			continue
+		}
+		if err := c.CancelOrder(ctx, p.Symbol, id); err != nil {
+			r.Errors = append(r.Errors, "cancel old stop "+id+": "+err.Error())
+			continue
+		}
+		r.Cancelled = append(r.Cancelled, id)
+	}
+	return r
+}

@@ -321,6 +321,16 @@ type openTradeCard struct {
 	DistToEntryPct float64 // |mark - entry| / entry * 100, signed for direction
 	PendingSince   time.Duration
 
+	// LiveStops are the protective stops resting on the exchange for this
+	// trade's position; LiveStopKnown is false when they could not be read
+	// (no API key, read failed), which is different from "none".
+	LiveStops     []liveStop
+	LiveStopKnown bool
+	// LiveStopX places the (first) live stop on the R track; LiveStopR is
+	// the whole trade's R if it is hit. HasLiveX is false when off-track.
+	LiveStopX, LiveStopR float64
+	HasLiveX             bool
+
 	// TotalR is the whole position's R at the mark: the TP1 leg's locked R
 	// plus the remainder's share of the live R. Equals CurrentR without a leg.
 	TotalR float64
@@ -354,6 +364,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 	}
 
 	s.fetchTradeViews(ctx, trades, cache)
+	live := s.liveStopsFor(ctx, trades)
 
 	var cards []openTradeCard
 	for _, t := range trades {
@@ -458,6 +469,15 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 				card.PctToTP2 = clampPct(moved / risk / 2 * 50)
 			}
 			card.Track = newRTrack(t, card.MarkPrice)
+			if ls, ok := live[t.ID]; ok {
+				card.LiveStops, card.LiveStopKnown = ls, true
+				if len(ls) > 0 {
+					card.LiveStopR = rIfStopped(t, ls[0].Price)
+					if card.Track != nil {
+						card.LiveStopX, card.HasLiveX = card.Track.at(t, ls[0].Price), true
+					}
+				}
+			}
 			card.TotalR = card.CurrentR
 			if t.HasTP1Leg() {
 				card.TotalR = journal.LockedR(t) + (1-math.Min(t.TP1FillPct/100, 1))*card.CurrentR
@@ -875,6 +895,12 @@ type rTrack struct {
 	TP1, TP2       float64 // X of each target; 0 when HasTP1/HasTP2 is false
 	HasTP1, HasTP2 bool
 	FillL, FillW   float64 // the coloured span between entry and mark
+	hi             float64 // right end of the scale, in R
+}
+
+// at places any price on this track's scale (clamped).
+func (k *rTrack) at(t journal.Trade, px float64) float64 {
+	return clampPct((journal.RealizedR(t, px) + 1) / (k.hi + 1) * 100)
 }
 
 // newRTrack returns nil when R is undefined (no stop, or stop at entry).
@@ -901,6 +927,7 @@ func newRTrack(t journal.Trade, mark float64) *rTrack {
 	if t.TP2 > 0 {
 		hi = math.Max(hi, rOf(t.TP2))
 	}
+	tr.hi = hi
 	x := func(r float64) float64 { return clampPct((r + 1) / (hi + 1) * 100) }
 	tr.Entry, tr.Mark = x(0), x(tr.R)
 	if t.TP1 > 0 {

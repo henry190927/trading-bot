@@ -356,6 +356,7 @@
         <span class="pos-tick" style="left:{{printf "%.1f" $k.Entry}}%"></span>
         {{if $k.HasTP1}}<span class="pos-tick tp" style="left:{{printf "%.1f" $k.TP1}}%"></span>{{end}}
         {{if $k.HasTP2}}<span class="pos-tick tp" style="left:{{printf "%.1f" $k.TP2}}%"></span>{{end}}
+        {{if .HasLiveX}}<span class="pos-tick live" style="left:{{printf "%.1f" .LiveStopX}}%" title="{{t "ms.liveStop"}}"></span>{{end}}
         <span class="pos-mark {{if ge $k.R 0.0}}up{{else}}down{{end}}" style="left:{{printf "%.1f" $k.Mark}}%"></span>
       </div>
       <div class="pos-lbls ui-num">
@@ -366,6 +367,10 @@
       </div>
       <div class="pos-meta ui-sm ui-num">
         <span><span class="ui-dim">{{t "jpos.mark"}}</span> {{fmtPx .MarkPrice}}</span>
+        {{if .LiveStopKnown}}
+          {{if .LiveStops}}<span class="pos-live" title="{{t "ms.liveHint"}}"><span class="ui-dim">{{t "ms.liveStop"}}</span> {{range $i, $ls := .LiveStops}}{{if $i}} · {{end}}{{fmtPx $ls.Price}}{{end}} <span class="{{rClass .LiveStopR}}">({{fmtR .LiveStopR}}R)</span>{{if gt (len .LiveStops) 1}} <span class="ui-warn">{{t "ms.multi"}}</span>{{end}}</span>
+          {{else}}<span class="ui-warn">{{template "icon" "alert"}}{{t "ms.none"}}</span>{{end}}
+        {{end}}
         {{if $tr.HasTP1Leg}}<span class="pos-leg">{{template "icon" "check"}}{{printf (t "jpos.tp1Leg") $tr.TP1FillPct (fmtPx $tr.TP1FillPrice) (fmtR (lockedR $tr))}}</span>{{end}}
       </div>
     {{else}}
@@ -373,6 +378,7 @@
     {{end}}
     <div class="pos-actions">
       <a class="ui-btn ghost sm" href="/chart?symbol={{$tr.Symbol}}">{{template "icon" "chart"}}{{t "jpos.chart"}}</a>
+      {{if not $tr.IsPending}}<button type="button" class="ui-btn ghost sm js-move-stop" data-id="{{$tr.ID}}" data-label="#{{$tr.ID}} {{$tr.Symbol}} {{t (printf "side.%s" $tr.Side)}}" data-baseline="{{fmtPrice $tr.Stop}}" data-live="{{if .LiveStops}}{{fmtPrice (index .LiveStops 0).Price}}{{end}}" data-known="{{.LiveStopKnown}}">{{template "icon" "flag"}}{{t "ms.btn"}}</button>{{end}}
       <a class="ui-btn ghost sm" href="/journal/{{$tr.ID}}/edit">{{t "trades.edit"}}</a>
       <a class="ui-btn ghost sm" href="/journal/{{$tr.ID}}/close">{{t "trades.close"}}</a>
       <a class="ui-btn ghost sm" href="/ops/verify">{{template "icon" "check"}}{{t "jpos.verify"}}</a>

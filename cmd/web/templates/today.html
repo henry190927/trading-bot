@@ -91,6 +91,29 @@
   <p class="ui-sub" style="margin:0"><span id="mkt-updated">—</span></p>
 </main>
 
+{{/* Move-stop dialog. Lives outside the positions slot, which is replaced
+     every 15s. Preview first (nothing sent); confirm only enables for the
+     exact price that was previewed. */}}
+<div class="modal-backdrop hidden" id="ms-backdrop">
+  <div class="modal quick-modal" role="dialog" aria-labelledby="ms-title">
+    <div class="modal-head"><h3 id="ms-title">{{t "ms.title"}}</h3><button type="button" class="modal-x" id="ms-close" aria-label="{{t "chart.ui.q.close"}}">&times;</button></div>
+    <div class="modal-body ms-body">
+      <div class="ms-label" id="ms-label"></div>
+      <dl class="ms-kv">
+        <dt>{{t "ms.liveStop"}}</dt><dd id="ms-live">—</dd>
+        <dt>{{t "ms.baseline"}}</dt><dd id="ms-baseline">—</dd>
+      </dl>
+      <div class="ui-f"><label for="ms-price">{{t "ms.newStop"}}</label><input type="number" step="any" inputmode="decimal" id="ms-price"></div>
+      <div class="ms-preview" id="ms-preview"></div>
+      <div class="ms-actions">
+        <button type="button" class="ui-btn ghost" id="ms-preview-btn">{{t "ms.preview"}}</button>
+        <button type="button" class="ui-btn ms-go" id="ms-go" disabled>{{t "ms.confirm"}}</button>
+      </div>
+      <div class="ui-hint">{{t "ms.hint"}}</div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   // Fallbacks when the CDN image 404s or is blocked. 🚀 is already HYPE's, so
@@ -276,6 +299,72 @@
                         + ' · ' + (sseAlive ? {{t "today.live"}} : {{t "today.poll"}});
   }
 
+  // ── Move stop ────────────────────────────────────────────────────────
+  (function(){
+    var bd = document.getElementById('ms-backdrop'), slot = document.getElementById('today-pos-slot');
+    if(!bd || !slot) return;
+    var price = document.getElementById('ms-price'), pv = document.getElementById('ms-preview');
+    var go = document.getElementById('ms-go'), pbtn = document.getElementById('ms-preview-btn');
+    var tradeID = null, previewed = null;
+    var MS = {liveStop:{{t "ms.liveStop"}}, none:{{t "ms.none"}}, qty:{{t "ms.qty"}}, mark:{{t "jpos.mark"}}, ifHit:{{t "ms.ifHit"}},
+              willCancel:{{t "ms.willCancel"}}, sending:{{t "ms.sending"}}, done:{{t "ms.done"}}, cancelled:{{t "ms.cancelled"}}, verify:{{t "jpos.verify"}}};
+    function esc(x){ return String(x).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function fmtR(r){ return (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'; }
+    function post(confirm){
+      var body = 'stop=' + encodeURIComponent(price.value.trim()) + (confirm ? '&confirm=1' : '');
+      return fetch('/api/trade/' + tradeID + '/move-stop', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); });
+    }
+    function showErr(j){ pv.innerHTML = '<div class="ui-warn">⚠ ' + esc((j.faults && j.faults.length ? j.faults.join(' · ') : j.error) || 'error') + '</div>'; }
+    function open(btn){
+      tradeID = btn.getAttribute('data-id'); previewed = null; go.disabled = true; pv.innerHTML = '';
+      document.getElementById('ms-label').textContent = btn.getAttribute('data-label');
+      // "none" only when the exchange was actually read; unknown is "—".
+      document.getElementById('ms-live').textContent = btn.getAttribute('data-live') || (btn.getAttribute('data-known') === 'true' ? MS.none : '—');
+      document.getElementById('ms-baseline').textContent = btn.getAttribute('data-baseline');
+      price.value = btn.getAttribute('data-live') || '';
+      bd.classList.remove('hidden');
+      setTimeout(function(){ price.focus(); price.select(); }, 30);
+    }
+    function close(){ bd.classList.add('hidden'); }
+    slot.addEventListener('click', function(e){ var b = e.target.closest('.js-move-stop'); if(b) open(b); });
+    document.getElementById('ms-close').addEventListener('click', close);
+    bd.addEventListener('click', function(e){ if(e.target === bd) close(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !bd.classList.contains('hidden')) close(); });
+    price.addEventListener('input', function(){ go.disabled = true; previewed = null; });
+    pbtn.addEventListener('click', function(){
+      if(!price.value.trim()) return;
+      pbtn.disabled = true;
+      post(false).then(function(res){
+        pbtn.disabled = false;
+        var j = res.j;
+        if(!res.ok){ showErr(j); return; }
+        var cur = (j.current || []).map(function(c){ return c.price; }).join(' · ') || MS.none;
+        pv.innerHTML =
+          '<div>' + MS.qty + ' <b>' + j.qty + '</b> · ' + MS.mark + ' <b>' + j.mark + '</b></div>' +
+          '<div>' + MS.ifHit + ' <b class="' + (j.r_if_stopped >= 0 ? 'ui-up' : 'ui-down') + '">' + fmtR(j.r_if_stopped) + '</b> · <b>' + (j.usdt_at_stop >= 0 ? '+' : '') + j.usdt_at_stop.toFixed(2) + 'u</b></div>' +
+          '<div class="ui-dim">' + MS.willCancel + ' ' + esc(cur) + '</div>';
+        previewed = price.value.trim(); go.disabled = false;
+      }).catch(function(){ pbtn.disabled = false; });
+    });
+    go.addEventListener('click', function(){
+      if(previewed === null || price.value.trim() !== previewed) return;
+      go.disabled = true; go.textContent = MS.sending;
+      post(true).then(function(res){
+        go.textContent = {{t "ms.confirm"}};
+        var j = res.j;
+        if(!j.new_stop_id){ showErr({error: (j.errors || []).join(' · ') || j.error}); return; }
+        var lines = ['<div class="ui-up">✓ ' + MS.done + ' <code>' + esc(j.new_stop_id) + '</code></div>'];
+        if(j.cancelled && j.cancelled.length) lines.push('<div class="ui-dim">' + MS.cancelled + ' ' + esc(j.cancelled.join(', ')) + '</div>');
+        (j.errors || []).forEach(function(e){ lines.push('<div class="ui-warn">⚠ ' + esc(e) + '</div>'); });
+        lines.push('<div><a href="/ops/verify">🔎 ' + MS.verify + '</a></div>');
+        pv.innerHTML = lines.join('');
+        previewed = null;
+        if(window.refreshPositions) window.refreshPositions();
+      }).catch(function(){ go.textContent = {{t "ms.confirm"}}; });
+    });
+  })();
+
   // ── Positions card ───────────────────────────────────────────────────
   // Re-rendered server-side (same positionsBody template) every 15s while the
   // tab is visible: mark, R and the track move; a fill or a TP1 leg shows up.
@@ -296,6 +385,7 @@
         })
         .catch(function(){});
     }
+    window.refreshPositions = refresh;
     setInterval(refresh, 15000);
     document.addEventListener('visibilitychange', function(){ if(!document.hidden) refresh(); });
   })();

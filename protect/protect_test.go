@@ -3,6 +3,7 @@ package protect
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -270,5 +271,75 @@ func TestApplySendsOnlyRequestedLegs(t *testing.T) {
 	Apply(context.Background(), g, BuildPlan(shortPos(), 2470, 0, 2400))
 	if g.stopCalls != 0 || g.tpCalls != 1 {
 		t.Errorf("tp-only: %d stop / %d tp", g.stopCalls, g.tpCalls)
+	}
+}
+
+type fakeMover struct {
+	calls     []string
+	placeErr  error
+	cancelErr map[string]error
+}
+
+func (f *fakeMover) PlaceStopMarket(_ context.Context, _ market.Symbol, _ string, qty, stop float64, _ bool) (*bingx.OrderResult, error) {
+	f.calls = append(f.calls, fmt.Sprintf("place %g@%g", qty, stop))
+	if f.placeErr != nil {
+		return nil, f.placeErr
+	}
+	return &bingx.OrderResult{OrderID: "NEW"}, nil
+}
+
+func (f *fakeMover) PlaceReduceOnlyLimit(context.Context, market.Symbol, string, float64, float64, bool) (*bingx.OrderResult, error) {
+	f.calls = append(f.calls, "limit")
+	return &bingx.OrderResult{OrderID: "L"}, nil
+}
+
+func (f *fakeMover) CancelOrder(_ context.Context, _ market.Symbol, id string) error {
+	f.calls = append(f.calls, "cancel "+id)
+	return f.cancelErr[id]
+}
+
+func movePlan() Plan {
+	pos := &bingx.Position{Symbol: "HYPE-USDT", Side: "long", Quantity: 9.3256, EntryPrice: 80.424, PositionSide: "LONG"}
+	return BuildPlan(pos, 81.2, 80.09, 0)
+}
+
+func TestMoveStopPlacesBeforeCancelling(t *testing.T) {
+	f := &fakeMover{}
+	r := MoveStop(context.Background(), f, movePlan(), []string{"OLD1", "OLD2"})
+	want := []string{"place 9.3256@80.09", "cancel OLD1", "cancel OLD2"}
+	if fmt.Sprint(f.calls) != fmt.Sprint(want) {
+		t.Fatalf("calls = %v, want %v", f.calls, want)
+	}
+	if r.NewStopID != "NEW" || len(r.Cancelled) != 2 || len(r.Errors) != 0 {
+		t.Errorf("result = %+v", r)
+	}
+}
+
+func TestMoveStopKeepsOldStopWhenPlaceFails(t *testing.T) {
+	f := &fakeMover{placeErr: errors.New("rejected")}
+	r := MoveStop(context.Background(), f, movePlan(), []string{"OLD1"})
+	if len(f.calls) != 1 || r.NewStopID != "" || len(r.Cancelled) != 0 {
+		t.Errorf("a failed place must not cancel anything: calls %v result %+v", f.calls, r)
+	}
+}
+
+func TestMoveStopReportsFailedCancel(t *testing.T) {
+	f := &fakeMover{cancelErr: map[string]error{"OLD1": errors.New("80014")}}
+	r := MoveStop(context.Background(), f, movePlan(), []string{"OLD1", "OLD2"})
+	if r.NewStopID != "NEW" || fmt.Sprint(r.Cancelled) != "[OLD2]" || len(r.Errors) != 1 {
+		t.Errorf("result = %+v", r)
+	}
+}
+
+func TestMoveStopRefusesBadPlans(t *testing.T) {
+	pos := &bingx.Position{Symbol: "HYPE-USDT", Side: "long", Quantity: 1, EntryPrice: 80}
+	for name, p := range map[string]Plan{
+		"stop above mark": BuildPlan(pos, 81, 81.5, 0),
+		"with a tp":       BuildPlan(pos, 81, 79, 83),
+	} {
+		f := &fakeMover{}
+		if r := MoveStop(context.Background(), f, p, []string{"OLD"}); len(f.calls) != 0 || len(r.Errors) == 0 {
+			t.Errorf("%s: sent %v", name, f.calls)
+		}
 	}
 }
