@@ -1897,6 +1897,7 @@ func (s *server) handleJournalCloseForm(c *gin.Context) {
 	}
 	s.page(c, http.StatusOK, "journal_close.html", gin.H{
 		"Trade":     t,
+		"Ver":       journal.Version(t),
 		"Outcome":   "",
 		"ExitPrice": "",
 		// Carry over any close_notes the user may have written earlier via
@@ -1932,6 +1933,7 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 	rerender := func(errMsg string) {
 		s.page(c, http.StatusOK, "journal_close.html", gin.H{
 			"Trade":     t,
+			"Ver":       journal.Version(t),
 			"Outcome":   outcome,
 			"ExitPrice": exitStr,
 			"Notes":     notes,
@@ -1939,6 +1941,11 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 			"Now":       time.Now().Local().Format("2006-01-02T15:04"),
 			"Error":     errMsg,
 		})
+	}
+
+	if c.PostForm("ver") != journal.Version(t) {
+		rerender(tr("jf.err.stale", t.ID))
+		return
 	}
 
 	// Closing produces a NEW outcome, so the legacy vocabulary is not offered.
@@ -2048,7 +2055,16 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		t.OpenNotes = strings.TrimSpace(c.PostForm("open_notes"))
 		t.CloseNotes = strings.TrimSpace(c.PostForm("close_notes"))
 		t.Outcome = strings.ToLower(strings.TrimSpace(c.PostForm("outcome")))
-		s.page(c, http.StatusOK, "journal_edit.html", editFormData(t, errMsg))
+		data := editFormData(t, errMsg)
+		data["Ver"] = journal.Version(trades[idx])
+		s.page(c, http.StatusOK, "journal_edit.html", data)
+	}
+
+	// A form rendered before the row last changed would overwrite that change
+	// with what it showed then. Show the current row instead of saving.
+	if c.PostForm("ver") != journal.Version(trades[idx]) {
+		s.page(c, http.StatusConflict, "journal_edit.html", editFormData(trades[idx], tr("jf.err.stale", trades[idx].ID)))
+		return
 	}
 
 	// Required string fields
@@ -2461,6 +2477,7 @@ func editFormData(t journal.Trade, errMsg string) gin.H {
 	}
 	return gin.H{
 		"Trade":         t,
+		"Ver":           journal.Version(t),
 		"OpenedAt":      asLocalInput(t.OpenedAt),
 		"AnalyzedAt":    asLocalInput(t.AnalyzedAt),
 		"FilledAt":      asLocalInput(t.FilledAt),

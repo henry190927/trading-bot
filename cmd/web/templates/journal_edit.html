@@ -20,6 +20,7 @@
 
 {{if .Trade.ID}}
 <form method="POST" action="/journal/{{.Trade.ID}}/edit" class="ui-form">
+  <input type="hidden" name="ver" value="{{.Ver}}">
 
   <section class="ui-card">
     <header class="ui-card-h"><h2>{{t "jf.editTitle"}} <span class="ui-num ui-dim">#{{.Trade.ID}}</span></h2><span class="ui-hint">{{t "jf.editHint"}}</span></header>
@@ -90,7 +91,7 @@
       </div>
       <div class="ui-f-row">
         <div class="ui-f"><label for="tp1_fill_price">{{t "je.leg.price"}}</label><input type="number" step="any" inputmode="decimal" name="tp1_fill_price" id="tp1_fill_price" value="{{if .Trade.HasTP1Leg}}{{fmtPrice .Trade.TP1FillPrice}}{{end}}"></div>
-        <div class="ui-f"><label for="tp1_fill_pct">{{t "je.leg.pct"}}</label><input type="number" step="any" min="0" max="100" inputmode="decimal" name="tp1_fill_pct" id="tp1_fill_pct" value="{{if .Trade.HasTP1Leg}}{{printf "%.4g" .Trade.TP1FillPct}}{{end}}"></div>
+        <div class="ui-f"><label for="tp1_fill_pct">{{t "je.leg.pct"}}</label><input type="number" step="any" min="0" max="100" inputmode="decimal" name="tp1_fill_pct" id="tp1_fill_pct" value="{{if .Trade.HasTP1Leg}}{{.Trade.TP1FillPct}}{{end}}"></div>
       </div>
       <div class="ui-hint">{{if .Trade.IsOpen}}{{t "je.leg.hintOpen"}}{{else}}{{t "je.leg.hintClosed"}}{{end}}</div>
     </div>

@@ -4,7 +4,9 @@
 package journal
 
 import (
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -941,4 +943,16 @@ func boolStr(b bool) string {
 // SortByOpenedDesc sorts the slice newest-first by OpenedAt.
 func SortByOpenedDesc(trades []Trade) {
 	sort.Slice(trades, func(i, j int) bool { return trades[i].OpenedAt.After(trades[j].OpenedAt) })
+}
+
+// Version is a short fingerprint of everything the row stores. A form records
+// it when it is rendered and sends it back; a save whose version no longer
+// matches was made from a stale copy and is refused.
+//
+// Without it, an edit page opened before a close could be saved after it and
+// silently reopen the trade (edit treats a blank closed_at as "reopen") —
+// which is what happened to #92 on 2026-10-22.
+func Version(t Trade) string {
+	h := sha256.Sum256([]byte(strings.Join(rowFromTrade(t), "\x1f")))
+	return hex.EncodeToString(h[:6])
 }

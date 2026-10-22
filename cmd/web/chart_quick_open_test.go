@@ -172,7 +172,8 @@ func TestClosePostBlendsTP1Leg(t *testing.T) {
 			strings.Contains(body, `name="blend_tp1"`), strings.Contains(body, "partials-rows"))
 	}
 
-	form := url.Values{"outcome": {"stop"}, "exit_price": {"79.2"}, "blend_tp1": {"on"}, "closed_at": {"2026-10-22 01:00"}}
+	cur, _ := journal.ReadAll("")
+	form := url.Values{"outcome": {"stop"}, "exit_price": {"79.2"}, "blend_tp1": {"on"}, "closed_at": {"2026-10-22 01:00"}, "ver": {journal.Version(cur[0])}}
 	req := httptest.NewRequestWithContext(t.Context(), "POST", "/journal/92/close", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w = httptest.NewRecorder()
@@ -222,6 +223,8 @@ func TestEditPostTP1Leg(t *testing.T) {
 	post := func(extra url.Values) (int, journal.Trade) {
 		f := url.Values{"symbol": {"HYPE"}, "side": {"long"}, "tf": {"1h"}, "entry": {"80.424"}, "stop": {"79.2"},
 			"tp1": {"82"}, "tp2": {"82.5"}, "opened_at": {"2026-10-22T00:09"}, "filled_at": {"2026-10-22T00:09"}}
+		cur, _ := journal.ReadAll("")
+		f.Set("ver", journal.Version(cur[0]))
 		for k, v := range extra {
 			f[k] = v
 		}
@@ -250,5 +253,53 @@ func TestEditPostTP1Leg(t *testing.T) {
 	}
 	if _, g := post(url.Values{"tp1_fill_price": {""}, "tp1_fill_pct": {""}}); g.HasTP1Leg() || !g.TP1FilledAt.IsZero() {
 		t.Errorf("clearing left %+v", g)
+	}
+}
+
+// #92, 2026-10-22: an edit page opened before the close was saved after it.
+// Edit reads a blank closed_at as "reopen", so the stale tab silently undid
+// the close. With the row version, that save is refused and the close stays.
+func TestStaleEditCannotReopenAClose(t *testing.T) {
+	t.Setenv("JOURNAL_PATH", filepath.Join(t.TempDir(), "journal.csv"))
+	gin.SetMode(gin.TestMode)
+	at := time.Date(2026, 10, 21, 13, 35, 0, 0, time.UTC)
+	if err := journal.WriteAll("", []journal.Trade{{
+		ID: 92, OpenedAt: at, AnalyzedAt: at, Symbol: "HYPE", Side: "long", TF: "1h", Entry: 80.424, Stop: 79.2, TP1: 82,
+		FilledAt: at, TP1FillPrice: 82, TP1FillPct: 50, TP1FilledAt: at,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	dicts, _ := loadDicts(i18nFS)
+	pages, err := parsePages(assets, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{dicts: dicts, pages: pages}
+	r := gin.New()
+	r.POST("/journal/:id/edit", s.handleJournalEditPost)
+	r.POST("/journal/:id/close", s.handleJournalClosePost)
+	post := func(path string, f url.Values) int {
+		req := httptest.NewRequestWithContext(t.Context(), "POST", path, strings.NewReader(f.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	before, _ := journal.ReadAll("")
+	staleVer := journal.Version(before[0]) // the edit tab is opened now
+
+	if code := post("/journal/92/close", url.Values{"outcome": {"stop"}, "exit_price": {"80.0753"}, "blend_tp1": {"on"}, "ver": {staleVer}}); code != http.StatusSeeOther {
+		t.Fatalf("close = %d", code)
+	}
+	// The old edit tab is saved: blank closed_at, as it was rendered.
+	code := post("/journal/92/edit", url.Values{"symbol": {"HYPE"}, "side": {"long"}, "tf": {"1h"}, "entry": {"80.424"}, "stop": {"79.2"},
+		"tp1": {"82"}, "opened_at": {"2026-10-21T21:35"}, "ver": {staleVer}})
+	if code != http.StatusConflict {
+		t.Errorf("stale edit = %d, want 409", code)
+	}
+	got, _ := journal.ReadAll("")
+	if got[0].IsOpen() || got[0].Outcome != "stop" {
+		t.Errorf("the close was undone: %+v", got[0])
 	}
 }

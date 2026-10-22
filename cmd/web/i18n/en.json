@@ -981,6 +981,7 @@
   "ms.hint": "Changes only the exchange's stop order; the journal stop (R baseline) stays. The new stop is placed first and the old one cancelled only after it is accepted, so the position is never without one. Size comes from the live position.",
   "ms.err.notActive": "#%d is not an active trade",
   "ms.err.price": "Enter a new stop price (> 0)",
+  "jf.err.stale": "#%d changed after this page was opened (closed, or saved in another tab), so nothing was saved. Below is the current row — check it and save again.",
   "jf.err.levNeeded": "leverage required when 'Open position on BingX' is checked",
   "jf.err.outcome": "outcome must be %s",
   "jf.err.outcomeClosed": "outcome required when closed_at is set — one of %s",

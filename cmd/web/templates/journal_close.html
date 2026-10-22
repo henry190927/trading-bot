@@ -39,6 +39,7 @@
 
 {{if .Trade.IsOpen}}
 <form method="POST" action="/journal/{{.Trade.ID}}/close" class="ui-form">
+  <input type="hidden" name="ver" value="{{.Ver}}">
   <section class="ui-card">
     {{if .Trade.HasTP1Leg}}
     {{/* The TP1 leg came from the exchange. The exit field below is the
