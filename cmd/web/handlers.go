@@ -4003,7 +4003,24 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 	if err := journal.WriteAll("", trades); err != nil {
 		log.Printf("chart quick-open: post-place journal write failed: %v", err)
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "id": t.ID, "orders": legs})
+	out := gin.H{"ok": true, "id": t.ID, "orders": legs}
+	if st == "ok" {
+		// The same facts the entry message states, as fields, so the modal can
+		// lay them out instead of printing one long sentence. qty is the
+		// lot-floored size placeEntryOnBingX sent; the exchange may round it
+		// again to its own step (SUI #93: 1628.8201 sent, 1628 on the book).
+		tt := trades[idx]
+		qty := floorTo(tt.MarginUSDT*float64(tt.Leverage)/tt.Entry, lotPrec(tt.Symbol))
+		out["summary"] = gin.H{
+			"symbol": tt.Symbol, "side": tt.Side, "entry": tt.Entry, "qty": qty,
+			"margin": tt.MarginUSDT, "leverage": tt.Leverage, "notional": qty * tt.Entry,
+			"stop": tt.Stop, "stopBundled": strings.HasPrefix(tt.StopOrderID, "ATTACHED:"),
+			"tp1": tt.TP1, "tp1Pending": tt.TP1Auto && tt.TP1OrderID == "",
+			"tp2": tt.TP2, "tp2Bundled": strings.HasPrefix(tt.TP2OrderID, "ATTACHED:"),
+			"orderId": tt.EntryOrderID, "accountLev": tt.AccountLeverage(), "killPct": tt.KillDistancePct(),
+		}
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 // chartStatePath returns the on-disk location of the persisted

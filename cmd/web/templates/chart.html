@@ -969,6 +969,18 @@
         "q.verify": {{t "chart.js.q.verify"}},
         "q.legEntry": {{t "chart.js.q.legEntry"}},
         "q.legTP1": {{t "chart.js.q.legTP1"}},
+        "q.placed": {{t "chart.js.q.placed"}},
+        "q.bundled": {{t "chart.js.q.bundled"}},
+        "q.entryLimit": {{t "chart.js.q.entryLimit"}},
+        "q.qty": {{t "chart.js.q.qty"}},
+        "q.sizing": {{t "chart.js.q.sizing"}},
+        "q.stopLbl": {{t "chart.js.q.stopLbl"}},
+        "q.tp1AfterFill": {{t "chart.js.q.tp1AfterFill"}},
+        "q.acctLev": {{t "chart.js.q.acctLev"}},
+        "q.killDist": {{t "chart.js.q.killDist"}},
+        "q.verifyBtn": {{t "chart.js.q.verifyBtn"}},
+        "q.positions": {{t "chart.js.q.positions"}},
+        "q.rawMsg": {{t "chart.js.q.rawMsg"}},
         "open.daily": {{t "chart.js.open.daily"}},
         "open.weekly": {{t "chart.js.open.weekly"}},
         "open.london": {{t "chart.js.open.london"}},
@@ -4370,20 +4382,43 @@
         function escHTML(x) {
             return String(x).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; });
         }
+        function fmtNum(v, dp) { return (v == null || isNaN(v)) ? '—' : Number(v).toLocaleString('en-US', { maximumFractionDigits: dp }); }
         function renderRecordResult(r) {
             lastRecordedId = r.id;
-            var lines = ['<div class="qr-ok">✓ ' + CT['q.recorded'] + ' #' + r.id + ' · <a href="/journal/' + r.id + '/edit">' + CT['q.edit'] + '</a> · <a href="/journal">' + CT['q.allTrades'] + '</a></div>'];
-            if (r.orders && r.orders.length) {
-                r.orders.forEach(function (o) {
-                    var cls = o.status === 'ok' ? 'qr-ok' : o.status === 'skip' ? 'qr-skip' : 'qr-err';
-                    var name = o.leg === 'tp1' ? CT['q.legTP1'] : CT['q.legEntry'];
-                    lines.push('<div class="qr-leg ' + cls + '">' + name + ' · ' + escHTML(o.status) + ' — ' + escHTML(o.msg) + '</div>');
-                });
-                // The journal saying ATTACHED is not proof the stop is on the
-                // exchange (#60 went naked that way); the verify page asks BingX.
-                lines.push('<div class="qr-sub"><a href="/ops/verify">🔎 ' + CT['q.verify'] + '</a></div>');
+            var sm = r.summary, legs = r.orders || [];
+            var bad = legs.filter(function (o) { return o.status !== 'ok'; });
+            var head = sm
+                ? '<span class="qr-badge ok">✓ ' + CT['q.placed'] + '</span><b>#' + r.id + ' ' + escHTML(sm.symbol) + ' ' + (sm.side === 'long' ? CT['q.long'] : CT['q.short']) + '</b>'
+                : '<span class="qr-badge ' + (bad.length ? 'warn' : 'ok') + '">' + (bad.length ? '!' : '✓') + ' ' + CT['q.recorded'] + '</span><b>#' + r.id + '</b>';
+            var html = ['<div class="qr-card"><div class="qr-head">' + head + '</div>'];
+            if (sm) {
+                var tag = function (on) { return on ? ' <span class="qr-tag">' + CT['q.bundled'] + '</span>' : ''; };
+                var rows = [
+                    [CT['q.entryLimit'], fmtNum(sm.entry, 8)],
+                    [CT['q.qty'], '≈ ' + fmtNum(sm.qty, 4)],
+                    [CT['q.sizing'], fmtNum(sm.margin, 2) + 'u × ' + sm.leverage + 'x = ' + fmtNum(sm.notional, 0) + 'u'],
+                    [CT['q.stopLbl'], fmtNum(sm.stop, 8) + tag(sm.stopBundled)],
+                ];
+                if (sm.tp1 > 0) rows.push(['TP1', fmtNum(sm.tp1, 8) + (sm.tp1Pending ? ' <span class="qr-tag dim">' + CT['q.tp1AfterFill'] + '</span>' : '')]);
+                if (sm.tp2 > 0) rows.push(['TP2', fmtNum(sm.tp2, 8) + tag(sm.tp2Bundled)]);
+                if (sm.accountLev > 0) rows.push([CT['q.acctLev'], sm.accountLev.toFixed(1) + 'x · ' + CT['q.killDist'] + ' ' + sm.killPct.toFixed(2) + '%']);
+                rows.push(['orderId', '<button type="button" class="copy-btn small" data-copy="' + escHTML(sm.orderId) + '">' + escHTML(sm.orderId) + '</button>']);
+                html.push('<dl class="qr-grid">' + rows.map(function (x) { return '<dt>' + x[0] + '</dt><dd>' + x[1] + '</dd>'; }).join('') + '</dl>');
             }
-            resultBox.innerHTML = lines.join('');
+            bad.forEach(function (o) {
+                var name = o.leg === 'tp1' ? CT['q.legTP1'] : CT['q.legEntry'];
+                html.push('<div class="qr-legwarn ' + (o.status === 'skip' ? 'skip' : 'err') + '"><b>' + name + ' · ' + escHTML(o.status) + '</b> ' + escHTML(o.msg) + '</div>');
+            });
+            html.push('<div class="qr-actions">'
+                + (legs.length ? '<a class="ui-btn sm" href="/ops/verify">🔎 ' + CT['q.verifyBtn'] + '</a>' : '')
+                + '<a class="ui-btn ghost sm" href="/journal/' + r.id + '/edit">' + CT['q.edit'] + '</a>'
+                + '<a class="ui-btn ghost sm" href="/">' + CT['q.positions'] + '</a></div>');
+            var okLegs = legs.filter(function (o) { return o.status === 'ok'; });
+            if (okLegs.length) {
+                html.push('<details class="qr-raw"><summary>' + CT['q.rawMsg'] + '</summary>' + okLegs.map(function (o) { return '<div>' + escHTML(o.msg) + '</div>'; }).join('') + '</details>');
+            }
+            html.push('</div>');
+            resultBox.innerHTML = html.join('');
             resultBox.className = 'quick-result';
         }
         // Plain-text summary of exactly what will be sent, for window.confirm.

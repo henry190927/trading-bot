@@ -4624,3 +4624,23 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .ms-preview { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: 6px; font-size: var(--fs-sm); line-height: 1.6; }
 .ms-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 .ms-actions .ui-btn { margin-top: 0; }
+
+/* /chart quick-record result: a card with labelled fields, not one sentence. */
+.qr-card { display: flex; flex-direction: column; gap: var(--sp-2); }
+.qr-head { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-md); }
+.qr-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 600; }
+.qr-badge.ok { color: var(--green); background: rgba(46, 160, 67, 0.15); }
+.qr-badge.warn { color: var(--yellow); background: rgba(210, 153, 34, 0.15); }
+.qr-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--sp-3); margin: 0; font-size: var(--fs-sm); }
+.qr-grid dt { color: var(--text-dim); white-space: nowrap; }
+.qr-grid dd { margin: 0; color: var(--text); font-family: ui-monospace, "SF Mono", monospace; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.qr-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-family: inherit; font-size: var(--fs-xs); color: var(--green); border: 1px solid var(--green); }
+.qr-tag.dim { color: var(--text-dim); border-color: var(--border); }
+.qr-legwarn { font-size: var(--fs-sm); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); overflow-wrap: anywhere; }
+.qr-legwarn.err { color: var(--red); border-color: var(--red); }
+.qr-legwarn.skip { color: var(--yellow); border-color: var(--yellow); }
+.qr-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.qr-actions .ui-btn { margin-top: 0; }
+.qr-raw { font-size: var(--fs-xs); color: var(--text-dim); }
+.qr-raw summary { cursor: pointer; }
+.qr-raw div { margin-top: 4px; overflow-wrap: anywhere; }

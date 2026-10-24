@@ -122,6 +122,10 @@ func TestQuickOpenPlacesEntryWithBundledStop(t *testing.T) {
 	if !tr.TP1Auto {
 		t.Error("TP1Auto not persisted, the sweep would never place the partial")
 	}
+	sm, _ := body["summary"].(map[string]any)
+	if sm == nil || sm["qty"] != 0.0025 || sm["stopBundled"] != true || sm["tp2Bundled"] != true || sm["tp1Pending"] != true || sm["orderId"] != tr.EntryOrderID {
+		t.Errorf("summary = %v", sm)
+	}
 }
 
 // A refused entry must not leave StopAuto behind: bracket.Decide would honour
