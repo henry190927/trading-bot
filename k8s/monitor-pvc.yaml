@@ -1,0 +1,40 @@
+# Persistent storage for the monitor's data directory (/opt/trading).
+#
+# emptyDir lives and dies with the POD: a container restart keeps it, but
+# deleting or replacing the pod (any env change, any rollout) wipes oi.jsonl,
+# the paper-fire log and the heartbeat. A PersistentVolumeClaim is storage
+# requested separately from any pod; the next pod mounts the same data.
+#
+# On minikube the "standard" StorageClass provisions it on the node's disk
+# (k8s.io/minikube-hostpath) the moment this claim is applied.
+#
+# ⚠️ reclaimPolicy of "standard" is Delete: deleting THIS CLAIM deletes the
+#    data. Deleting the pod or the Deployment does not.
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trading-monitor-state
+spec:
+  storageClassName: standard
+
+  # ════════════════════ 這段你來填 ════════════════════
+  #
+  # 1. accessModes — 選一個:
+  #      ReadWriteOnce     單一【節點】可讀寫(同節點上多個 pod 仍可同時掛)
+  #      ReadWriteOncePod  單一【pod】可讀寫(K8s 1.29+ GA)
+  #      ReadOnlyMany      多節點唯讀
+  #      ReadWriteMany     多節點讀寫(需要 NFS 之類的共享儲存)
+  #    想一想:monitor 是「單一寫入者」——兩個 monitor 同時寫 oi.jsonl、
+  #    同時下單會怎樣?哪個模式能讓 K8s 幫你擋住第二個?
+  #    (minikube 的 hostpath 支援前兩個)
+  #
+  # 2. 要申請多大?
+  #    正式環境:oi.jsonl ~4 MB(會成長),其他資料檔加起來 ~1 MB。
+  #    單位用 Mi / Gi(1Gi = 1024Mi)。
+  accessModes:
+    - ReadWriteOncePod
+  resources:
+    requests:
+      storage: 100Mi
+  # ════════════════════════════════════════════════════

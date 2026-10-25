@@ -313,6 +313,45 @@ base64 是**編碼**(讓二進位能放進 YAML),一行就還原。commit 一份
 
 ---
 
+## ⭐ PVC:pod 換掉,資料還在(2026-10-25)
+
+`k8s/monitor-pvc.yaml`(accessModes 與容量由我自己決定)
+
+```
+accessModes  ReadWriteOncePod   ← 單一寫入者:擋的是【pod】
+storage      100Mi              ← 資料約 5 MB 且會長;standard 不支援擴容,一開始就留餘裕
+```
+
+**為什麼不是 ReadWriteOnce:** RWO 擋的是【節點】。單節點叢集上兩個 monitor pod 都在同一台,
+兩個都掛得上、同時寫 oi.jsonl、同時下單。RWOP 才是「整個叢集只有一個 pod 能用」。
+**容量單位:** `storage: 5` 是 5 bytes —— 跟 periodSeconds 同一類坑,沒寫單位就是最小單位。
+
+### 🧪 實驗(oi.jsonl 每次取樣寫 17 行 = 17 個標的)
+
+```
+A emptyDir   刪 pod 前 51 行 → 新 pod 17 行   舊資料全沒了(17 是新 pod 自己寫的)
+B PVC        刪 pod 前 51 行 → 新 pod 68 行   51 + 17,接著寫 ✅
+C 第二個 pod 掛同一個 RWOP claim → Pending
+  FailedScheduling: 1 node has pod using PersistentVolumeClaim with the same name
+                    and ReadWriteOncePod access mode.
+```
+
+- **Pending 不是「跑起來但寫不進去」,是排程器根本不讓它啟動** —— 第二個寫入者不存在,
+  程式不必自己處理寫入衝突。
+- minikube hostpath 不是 CSI,RWOP 照樣被強制(先前不確定,實驗確認)。
+- **沒觀察到的:** B 刪 pod 後 +5s 就只剩新 pod Running —— monitor 收到 SIGTERM 幾秒內就乾淨結束,
+  空間立刻釋放,交接時「新 pod 先 Pending」的那一刻沒抓到。要看到得用 preStop 拖住舊 pod + 1s 取樣。
+- **檢查 scratch 容器的檔案:** 沒有 shell 不能 exec,用 `kubectl debug <pod> --image=busybox --target=monitor`
+  共用 process namespace,從 `/proc/1/root/opt/trading/` 讀。
+
+### Deployment + PVC,還是 StatefulSet?
+
+replicas 固定 1 時,Deployment + RWOP PVC + `strategy: Recreate` 已經保證單一寫入者。
+StatefulSet 的價值在多副本:每個副本一份自己的 PVC(volumeClaimTemplates)、穩定的名稱與順序。
+這個服務不會有第二個副本,所以刻意不用 —— 跟「生產不上 K8s」同一個判斷:不需要的東西不建。
+
+---
+
 ## 為什麼 replicas: 1
 
 不是保守,是**這個服務現在無法水平擴展**:

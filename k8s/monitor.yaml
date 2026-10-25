@@ -124,9 +124,10 @@ spec:
               readOnly: true
 
       volumes:
-        # ⚠️ emptyDir 隨 pod 消滅 —— 持久化是後面 PVC/StatefulSet 那一步。
+        # 資料目錄放在 PVC(k8s/monitor-pvc.yaml):pod 換掉,資料還在。
         - name: state
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: trading-monitor-state
         - name: config
           configMap:
             name: trading-config
