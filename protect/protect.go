@@ -261,3 +261,47 @@ func MoveStop(ctx context.Context, c Mover, p Plan, oldStopIDs []string) MoveRes
 	}
 	return r
 }
+
+// RestingTP is a take-profit currently on the exchange: what MoveTP cancels,
+// and what it puts back if the move fails.
+type RestingTP struct {
+	ID    string
+	Price float64
+}
+
+// MoveTPResult records a take-profit move.
+type MoveTPResult struct {
+	NewTPID   string   // the new take-profit's order id; "" when it was not placed
+	Cancelled []string // old take-profit ids that were cancelled
+	Restored  []string // order ids of old take-profits put back after a failure
+	Errors    []string
+}
+
+// MoveTP replaces the position's final take-profit(s) with a reduce-only
+// LIMIT at p.TP, for the live position's size (p.Qty).
+//
+// It runs in the OPPOSITE order to MoveStop, and the reason is the point of
+// the exercise. A stop must never be absent, so MoveStop places first and
+// accepts two stops resting for a moment. A take-profit may be absent for a
+// moment — nothing is unprotected — but two full-size reduce-only orders may
+// be refused by the exchange as covering more than the position. So:
+//
+//  1. Refuse, with no exchange calls, a plan with faults or one that is not
+//     take-profit-only (p.Stop != 0 or p.TP <= 0). Put a message in Errors.
+//  2. Cancel each old take-profit, in the order given (skip empty ids).
+//     If a cancel fails: stop cancelling, do NOT place the new one, put back
+//     every take-profit this call already cancelled, and return.
+//  3. Place the new take-profit (c.PlaceReduceOnlyLimit with p.Symbol,
+//     p.Side, p.Qty, p.TP, p.Hedge).
+//     If that fails: put back every cancelled take-profit and return.
+//  4. "Put back" = PlaceReduceOnlyLimit at the old price, same qty; collect
+//     the new order ids in Restored. A put-back that also fails leaves the
+//     position with NO take-profit — say so in Errors, in words that contain
+//     "no take-profit", because the caller has to tell the trader.
+//
+// Every failure adds exactly one entry to Errors. Done = every test in
+// protect_test.go named TestMoveTP* passes.
+func MoveTP(ctx context.Context, c Mover, p Plan, old []RestingTP) MoveTPResult {
+	// TODO(you): implement the contract above.
+	return MoveTPResult{Errors: []string{"MoveTP: not implemented"}}
+}

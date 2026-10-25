@@ -1150,5 +1150,21 @@
   "jc.ex.noKey": "No exchange API key is configured, so fills cannot be read.",
   "jc.ex.err": "Could not read exchange fills: %s",
   "jc.ex.none": "The exchange has no closing fill for this trade — the position may still be open, or it is outside the queried range.",
-  "jc.ex.notes": "From exchange fills: %d closing fill(s) (orderId %s), realised %+.2fu, fees %.2fu"
+  "jc.ex.notes": "From exchange fills: %d closing fill(s) (orderId %s), realised %+.2fu, fees %.2fu",
+  "mt.btn": "Move TP",
+  "mt.title": "Move final take-profit (exchange)",
+  "mt.liveTP": "Exchange TP",
+  "mt.planned": "Journal final TP",
+  "mt.pick": "Several take-profits are resting — pick the one to replace (the final target):",
+  "mt.newTP": "New take-profit",
+  "mt.confirm": "Confirm move",
+  "mt.ifHit": "If the new TP fills: whole trade",
+  "mt.willCancel": "Will cancel first:",
+  "mt.done": "New take-profit placed",
+  "mt.cancelled": "Cancelled old take-profit",
+  "mt.restored": "The new take-profit failed; the old one was put back:",
+  "mt.none": "No take-profit on the exchange",
+  "mt.hint": "Cancels the old take-profit, then places a new reduce-only limit; if the new one fails the old one is put back. Size comes from the live position. On success the journal final TP is updated too (it is not the R baseline).",
+  "mt.err.price": "Enter a new take-profit price (> 0)",
+  "mt.err.choose": "Several take-profits are resting; choose which one to replace"
 }

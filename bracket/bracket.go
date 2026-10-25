@@ -255,6 +255,31 @@ func Protects(o bingx.OpenOrder, pos *bingx.Position) bool {
 	return hedge && strings.EqualFold(o.PositionSide, pos.PositionSide)
 }
 
+// TakesProfit reports whether o is a resting take-profit for pos: a
+// TAKE_PROFIT* trigger (what a take-profit bundled on the entry becomes once
+// it fills) or a closing LIMIT. "Closing" is judged exactly as Protects
+// judges a stop — reduce-only, or, in hedge mode, an order on the position's
+// own side, since BingX rejects reduceOnly there and the side is what makes
+// a limit close rather than open.
+func TakesProfit(o bingx.OpenOrder, pos *bingx.Position) bool {
+	typ := strings.ToUpper(o.Type)
+	if !strings.HasPrefix(typ, "TAKE_PROFIT") && typ != "LIMIT" {
+		return false
+	}
+	want := "SELL"
+	if pos.Side == "short" {
+		want = "BUY"
+	}
+	if o.Side != "" && strings.ToUpper(o.Side) != want {
+		return false
+	}
+	if o.ReduceOnly {
+		return true
+	}
+	hedge := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
+	return hedge && strings.EqualFold(o.PositionSide, pos.PositionSide)
+}
+
 // StopTrigger prefers StopPrice and falls back to Price — BingX populates one
 // or the other depending on the order type.
 func StopTrigger(o bingx.OpenOrder) float64 {

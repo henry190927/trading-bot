@@ -4645,6 +4645,7 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .pos-gone { margin-top: var(--sp-2); flex-wrap: wrap; font-size: var(--fs-sm); }
 .pos-gone .ui-btn { margin: 0 0 0 auto; color: var(--on-accent); }
 .jc-ex { align-items: flex-start; margin-bottom: var(--sp-3); }
+.mt-pick { margin: var(--sp-2) 0; display: grid; gap: var(--sp-1); }
 .jc-ex .ico { margin-top: 2px; }
 .qr-actions .ui-btn { margin-top: 0; }
 .qr-raw { font-size: var(--fs-xs); color: var(--text-dim); }

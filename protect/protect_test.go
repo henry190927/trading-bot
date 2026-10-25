@@ -343,3 +343,108 @@ func TestMoveStopRefusesBadPlans(t *testing.T) {
 		}
 	}
 }
+
+// fakeTPMover records every call as "cancel ID" or "limit QTY@PRICE".
+// Limit calls are numbered from 1 and return "L<n>", failing or not, so a
+// test can name the order a put-back created.
+type fakeTPMover struct {
+	calls     []string
+	n         int
+	limitErr  map[float64]error
+	cancelErr map[string]error
+}
+
+func (f *fakeTPMover) PlaceStopMarket(_ context.Context, _ market.Symbol, _ string, qty, stop float64, _ bool) (*bingx.OrderResult, error) {
+	f.calls = append(f.calls, fmt.Sprintf("stop %g@%g", qty, stop))
+	return &bingx.OrderResult{OrderID: "S"}, nil
+}
+
+func (f *fakeTPMover) PlaceReduceOnlyLimit(_ context.Context, _ market.Symbol, _ string, qty, price float64, _ bool) (*bingx.OrderResult, error) {
+	f.n++
+	f.calls = append(f.calls, fmt.Sprintf("limit %g@%g", qty, price))
+	if err := f.limitErr[price]; err != nil {
+		return nil, err
+	}
+	return &bingx.OrderResult{OrderID: fmt.Sprintf("L%d", f.n)}, nil
+}
+
+func (f *fakeTPMover) CancelOrder(_ context.Context, _ market.Symbol, id string) error {
+	f.calls = append(f.calls, "cancel "+id)
+	return f.cancelErr[id]
+}
+
+// Long HYPE, 9.3256 @ 80.424, mark 81.2, new take-profit 83 (above the mark).
+func tpPlan() Plan {
+	pos := &bingx.Position{Symbol: "HYPE-USDT", Side: "long", Quantity: 9.3256, EntryPrice: 80.424, PositionSide: "LONG"}
+	return BuildPlan(pos, 81.2, 0, 83)
+}
+
+func TestMoveTPCancelsThenPlaces(t *testing.T) {
+	f := &fakeTPMover{}
+	r := MoveTP(context.Background(), f, tpPlan(), []RestingTP{{"OLD1", 82.5}})
+	if want := "[cancel OLD1 limit 9.3256@83]"; fmt.Sprint(f.calls) != want {
+		t.Fatalf("calls = %v, want %v", f.calls, want)
+	}
+	if r.NewTPID != "L1" || fmt.Sprint(r.Cancelled) != "[OLD1]" || len(r.Restored) != 0 || len(r.Errors) != 0 {
+		t.Errorf("result = %+v", r)
+	}
+}
+
+func TestMoveTPWithNothingToReplace(t *testing.T) {
+	f := &fakeTPMover{}
+	r := MoveTP(context.Background(), f, tpPlan(), nil)
+	if fmt.Sprint(f.calls) != "[limit 9.3256@83]" || r.NewTPID != "L1" || len(r.Errors) != 0 {
+		t.Errorf("calls %v result %+v", f.calls, r)
+	}
+}
+
+// The new order is refused: the old take-profit is put back at 82.5. It is
+// the second limit call, so its id is L2.
+func TestMoveTPPutsOldBackWhenPlaceFails(t *testing.T) {
+	f := &fakeTPMover{limitErr: map[float64]error{83: errors.New("rejected")}}
+	r := MoveTP(context.Background(), f, tpPlan(), []RestingTP{{"OLD1", 82.5}})
+	if want := "[cancel OLD1 limit 9.3256@83 limit 9.3256@82.5]"; fmt.Sprint(f.calls) != want {
+		t.Fatalf("calls = %v, want %v", f.calls, want)
+	}
+	if r.NewTPID != "" || fmt.Sprint(r.Restored) != "[L2]" || len(r.Errors) != 1 {
+		t.Errorf("result = %+v", r)
+	}
+}
+
+func TestMoveTPSaysSoWhenNothingIsLeft(t *testing.T) {
+	f := &fakeTPMover{limitErr: map[float64]error{83: errors.New("rejected"), 82.5: errors.New("rejected")}}
+	r := MoveTP(context.Background(), f, tpPlan(), []RestingTP{{"OLD1", 82.5}})
+	if r.NewTPID != "" || len(r.Restored) != 0 || len(r.Errors) != 2 {
+		t.Fatalf("result = %+v", r)
+	}
+	if !strings.Contains(strings.ToLower(strings.Join(r.Errors, " ")), "no take-profit") {
+		t.Errorf("errors %q must tell the trader there is no take-profit left", r.Errors)
+	}
+}
+
+// OLD1 cancels, OLD2 refuses: stop there, place nothing new, put OLD1 back
+// (the first limit call, L1).
+func TestMoveTPStopsAtAFailedCancel(t *testing.T) {
+	f := &fakeTPMover{cancelErr: map[string]error{"OLD2": errors.New("80014")}}
+	r := MoveTP(context.Background(), f, tpPlan(), []RestingTP{{"OLD1", 82.5}, {"OLD2", 84}})
+	if want := "[cancel OLD1 cancel OLD2 limit 9.3256@82.5]"; fmt.Sprint(f.calls) != want {
+		t.Fatalf("calls = %v, want %v", f.calls, want)
+	}
+	if r.NewTPID != "" || fmt.Sprint(r.Cancelled) != "[OLD1]" || fmt.Sprint(r.Restored) != "[L1]" || len(r.Errors) != 1 {
+		t.Errorf("result = %+v", r)
+	}
+}
+
+func TestMoveTPRefusesBadPlans(t *testing.T) {
+	pos := &bingx.Position{Symbol: "HYPE-USDT", Side: "long", Quantity: 9.3256, EntryPrice: 80.424, PositionSide: "LONG"}
+	for name, p := range map[string]Plan{
+		"tp below the mark": BuildPlan(pos, 81.2, 0, 80),
+		"with a stop":       BuildPlan(pos, 81.2, 80.09, 83),
+	} {
+		f := &fakeTPMover{}
+		r := MoveTP(context.Background(), f, p, []RestingTP{{"OLD1", 82.5}})
+		if len(f.calls) != 0 || r.NewTPID != "" || len(r.Errors) == 0 {
+			t.Errorf("%s: calls %v result %+v, want refused with no calls", name, f.calls, r)
+		}
+	}
+}

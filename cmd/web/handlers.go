@@ -329,6 +329,9 @@ type openTradeCard struct {
 	// (no API key, read failed), which is different from "none".
 	LiveStops     []liveStop
 	LiveStopKnown bool
+	// LiveTPs are the resting take-profits for the position (same read as
+	// LiveStops; meaningful only when LiveStopKnown).
+	LiveTPs []liveStop
 	// PositionGone: the trade is filled and open in the journal, but the
 	// exchange has had no position for it on goneAfter consecutive reads.
 	// The card then offers closing it from the exchange's fills.
@@ -371,7 +374,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 	}
 
 	s.fetchTradeViews(ctx, trades, cache)
-	live := s.liveStopsFor(ctx, trades)
+	live, liveTPs := s.liveStopsFor(ctx, trades)
 	goneList, _ := s.goneSnapshot()
 	gone := make(map[int]bool, len(goneList))
 	for _, g := range goneList {
@@ -483,6 +486,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 			card.Track = newRTrack(t, card.MarkPrice)
 			if ls, ok := live[t.ID]; ok {
 				card.LiveStops, card.LiveStopKnown = ls, true
+				card.LiveTPs = liveTPs[t.ID]
 				if len(ls) > 0 {
 					card.LiveStopR = rIfStopped(t, ls[0].Price)
 					if card.Track != nil {

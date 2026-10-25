@@ -375,3 +375,27 @@ func TestFindProtectiveStopHedgeShort(t *testing.T) {
 		t.Error("hedge-mode short protective stop rejected")
 	}
 }
+
+func TestTakesProfit(t *testing.T) {
+	long := &bingx.Position{Side: "long", PositionSide: "LONG"}
+	oneWay := &bingx.Position{Side: "long", PositionSide: "BOTH"}
+	cases := []struct {
+		name string
+		o    bingx.OpenOrder
+		pos  *bingx.Position
+		want bool
+	}{
+		{"bundled TP after fill", bingx.OpenOrder{Type: "TAKE_PROFIT_MARKET", Side: "SELL", PositionSide: "LONG", StopPrice: 0.948}, long, true},
+		{"hedge closing limit", bingx.OpenOrder{Type: "LIMIT", Side: "SELL", PositionSide: "LONG", Price: 0.935}, long, true},
+		{"one-way reduce-only limit", bingx.OpenOrder{Type: "LIMIT", Side: "SELL", ReduceOnly: true, Price: 0.935}, oneWay, true},
+		{"one-way limit that is not reduce-only opens a short", bingx.OpenOrder{Type: "LIMIT", Side: "SELL", Price: 0.935}, oneWay, false},
+		{"limit on the other hedge leg", bingx.OpenOrder{Type: "LIMIT", Side: "SELL", PositionSide: "SHORT", Price: 0.935}, long, false},
+		{"wrong side adds to the long", bingx.OpenOrder{Type: "LIMIT", Side: "BUY", PositionSide: "LONG", Price: 0.9}, long, false},
+		{"a stop is not a take-profit", bingx.OpenOrder{Type: "STOP_MARKET", Side: "SELL", PositionSide: "LONG", StopPrice: 0.91}, long, false},
+	}
+	for _, c := range cases {
+		if got := TakesProfit(c.o, c.pos); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}

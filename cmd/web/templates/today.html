@@ -114,6 +114,27 @@
   </div>
 </div>
 
+<div class="modal-backdrop hidden" id="mt-backdrop">
+  <div class="modal quick-modal" role="dialog" aria-labelledby="mt-title">
+    <div class="modal-head"><h3 id="mt-title">{{t "mt.title"}}</h3><button type="button" class="modal-x" id="mt-close" aria-label="{{t "chart.ui.q.close"}}">&times;</button></div>
+    <div class="modal-body ms-body">
+      <div class="ms-label" id="mt-label"></div>
+      <dl class="ms-kv">
+        <dt>{{t "mt.liveTP"}}</dt><dd id="mt-live">—</dd>
+        <dt>{{t "mt.planned"}}</dt><dd id="mt-planned">—</dd>
+      </dl>
+      <div class="mt-pick" id="mt-pick" hidden><div class="ui-hint">{{t "mt.pick"}}</div><div id="mt-pick-list"></div></div>
+      <div class="ui-f"><label for="mt-price">{{t "mt.newTP"}}</label><input type="number" step="any" inputmode="decimal" id="mt-price"></div>
+      <div class="ms-preview" id="mt-preview"></div>
+      <div class="ms-actions">
+        <button type="button" class="ui-btn ghost" id="mt-preview-btn">{{t "ms.preview"}}</button>
+        <button type="button" class="ui-btn ms-go" id="mt-go" disabled>{{t "mt.confirm"}}</button>
+      </div>
+      <div class="ui-hint">{{t "mt.hint"}}</div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   // Fallbacks when the CDN image 404s or is blocked. 🚀 is already HYPE's, so
@@ -363,6 +384,83 @@
         previewed = null;
         if(window.refreshPositions) window.refreshPositions();
       }).catch(function(){ go.textContent = {{t "ms.confirm"}}; });
+    });
+  })();
+
+  // ── Move take-profit ─────────────────────────────────────────────────
+  // Same two steps as move-stop. When several take-profits rest, the trader
+  // picks which one is the final target; the server refuses to guess.
+  (function(){
+    var bd = document.getElementById('mt-backdrop'), slot = document.getElementById('today-pos-slot');
+    if(!bd || !slot) return;
+    var price = document.getElementById('mt-price'), pv = document.getElementById('mt-preview');
+    var go = document.getElementById('mt-go'), pbtn = document.getElementById('mt-preview-btn');
+    var pick = document.getElementById('mt-pick'), list = document.getElementById('mt-pick-list');
+    var tradeID = null, previewed = null;
+    var MT = {none:{{t "mt.none"}}, qty:{{t "ms.qty"}}, mark:{{t "jpos.mark"}}, ifHit:{{t "mt.ifHit"}}, willCancel:{{t "mt.willCancel"}},
+              sending:{{t "ms.sending"}}, done:{{t "mt.done"}}, cancelled:{{t "mt.cancelled"}}, restored:{{t "mt.restored"}}, verify:{{t "jpos.verify"}}, confirm:{{t "mt.confirm"}}};
+    function esc(x){ return String(x).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function fmtR(r){ return (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'; }
+    function chosen(){ var r = list.querySelector('input:checked'); return r ? r.value : ''; }
+    function post(confirm){
+      var body = 'tp=' + encodeURIComponent(price.value.trim()) + '&replace=' + encodeURIComponent(chosen()) + (confirm ? '&confirm=1' : '');
+      return fetch('/api/trade/' + tradeID + '/move-tp', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); });
+    }
+    function showErr(j){ pv.innerHTML = '<div class="ui-warn">' + esc((j.faults && j.faults.length ? j.faults.join(' · ') : j.error) || 'error') + '</div>'; }
+    function open(btn){
+      tradeID = btn.getAttribute('data-id'); previewed = null; go.disabled = true; pv.innerHTML = '';
+      document.getElementById('mt-label').textContent = btn.getAttribute('data-label');
+      var tps = (btn.getAttribute('data-tps') || '').split(';').filter(Boolean).map(function(x){ var p = x.split('|'); return {id:p[0], price:p[1]}; });
+      document.getElementById('mt-live').textContent = tps.length ? tps.map(function(x){ return x.price; }).join(' · ') : (btn.getAttribute('data-known') === 'true' ? MT.none : '—');
+      document.getElementById('mt-planned').textContent = btn.getAttribute('data-planned') || '—';
+      list.innerHTML = tps.length > 1 ? tps.map(function(x, i){
+        return '<label class="ui-check"><input type="radio" name="mt-replace" value="' + esc(x.id) + '"' + (i === tps.length - 1 ? ' checked' : '') + '><span>' + esc(x.price) + ' <span class="ui-dim">#' + esc(x.id) + '</span></span></label>';
+      }).join('') : '';
+      pick.hidden = tps.length <= 1;
+      price.value = tps.length ? tps[tps.length - 1].price : (btn.getAttribute('data-planned') || '');
+      bd.classList.remove('hidden');
+      setTimeout(function(){ price.focus(); price.select(); }, 30);
+    }
+    function close(){ bd.classList.add('hidden'); }
+    slot.addEventListener('click', function(e){ var b = e.target.closest('.js-move-tp'); if(b) open(b); });
+    document.getElementById('mt-close').addEventListener('click', close);
+    bd.addEventListener('click', function(e){ if(e.target === bd) close(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !bd.classList.contains('hidden')) close(); });
+    price.addEventListener('input', function(){ go.disabled = true; previewed = null; });
+    list.addEventListener('change', function(){ go.disabled = true; previewed = null; });
+    pbtn.addEventListener('click', function(){
+      if(!price.value.trim()) return;
+      pbtn.disabled = true;
+      post(false).then(function(res){
+        pbtn.disabled = false;
+        var j = res.j;
+        if(!res.ok){ showErr(j); return; }
+        var cur = (j.replace || []).map(function(c){ return c.Price; }).join(' · ') || MT.none;
+        pv.innerHTML =
+          '<div>' + MT.qty + ' <b>' + j.qty + '</b> · ' + MT.mark + ' <b>' + j.mark + '</b></div>' +
+          '<div>' + MT.ifHit + ' <b class="' + (j.r_at_tp >= 0 ? 'ui-up' : 'ui-down') + '">' + fmtR(j.r_at_tp) + '</b> · <b>' + (j.usdt_at_tp >= 0 ? '+' : '') + j.usdt_at_tp.toFixed(2) + 'u</b></div>' +
+          '<div class="ui-dim">' + MT.willCancel + ' ' + esc(cur) + '</div>';
+        previewed = price.value.trim() + '|' + chosen(); go.disabled = false;
+      }).catch(function(){ pbtn.disabled = false; });
+    });
+    go.addEventListener('click', function(){
+      if(previewed === null || price.value.trim() + '|' + chosen() !== previewed) return;
+      go.disabled = true; go.textContent = MT.sending;
+      post(true).then(function(res){
+        go.textContent = MT.confirm;
+        var j = res.j, lines = [];
+        if(j.new_tp_id){ lines.push('<div class="ui-up">✓ ' + MT.done + ' <code>' + esc(j.new_tp_id) + '</code></div>'); }
+        if(j.cancelled && j.cancelled.length) lines.push('<div class="ui-dim">' + MT.cancelled + ' ' + esc(j.cancelled.join(', ')) + '</div>');
+        if(j.restored && j.restored.length) lines.push('<div class="ui-warn">' + MT.restored + ' ' + esc(j.restored.join(', ')) + '</div>');
+        (j.errors || []).forEach(function(e){ lines.push('<div class="ui-warn">' + esc(e) + '</div>'); });
+        if(!lines.length){ showErr(j); return; }
+        var ico = document.getElementById('ico-check');
+        lines.push('<div><a class="ui-btn ghost sm" href="/ops/verify">' + (ico ? ico.innerHTML : '') + MT.verify + '</a></div>');
+        pv.innerHTML = lines.join('');
+        previewed = null;
+        if(window.refreshPositions) window.refreshPositions();
+      }).catch(function(){ go.textContent = MT.confirm; });
     });
   })();
 

@@ -131,6 +131,7 @@ func main() {
 	// Two-step (preview unless confirm=1); moves the LIVE stop, never the
 	// journal's R baseline — see move_stop.go.
 	r.POST("/api/trade/:id/move-stop", srv.handleMoveStop)
+	r.POST("/api/trade/:id/move-tp", srv.handleMoveTP)
 	r.GET("/scan", srv.handleDashboard) // Scan moved off "/"
 	r.GET("/journal", srv.handleJournalList)
 	r.GET("/journal/new", srv.handleJournalNew)

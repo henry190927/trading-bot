@@ -174,14 +174,17 @@ func (s *server) recordStopOrderID(id int, orderID string) {
 // liveStopsFor reads, per symbol, the resting protective stops of each active
 // trade's position. Used by the /today card to show the exchange's stop next
 // to the R baseline. Best effort: a symbol whose read fails is just absent.
-func (s *server) liveStopsFor(ctx context.Context, trades []journal.Trade) map[int][]liveStop {
-	out := map[int][]liveStop{}
+//
+// The same reads also yield the resting take-profits (tps), so the card can
+// show the final target the exchange holds without a second round trip.
+func (s *server) liveStopsFor(ctx context.Context, trades []journal.Trade) (out, tps map[int][]liveStop) {
+	out, tps = map[int][]liveStop{}, map[int][]liveStop{}
 	if s.client == nil || s.client.APIKey == "" {
-		return out
+		return out, tps
 	}
 	poss, err := s.client.AllPositions(ctx)
 	if err != nil {
-		return out
+		return out, tps
 	}
 	orders := map[string][]bingx.OpenOrder{}
 	for _, t := range trades {
@@ -210,6 +213,7 @@ func (s *server) liveStopsFor(ctx context.Context, trades []journal.Trade) map[i
 			orders[string(sym)] = rest
 		}
 		out[t.ID] = protectiveStops(rest, pos)
+		tps[t.ID] = takeProfits(rest, pos)
 	}
-	return out
+	return out, tps
 }
