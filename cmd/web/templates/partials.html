@@ -50,6 +50,11 @@
     <span class="at-clock num" id="at-clock" title="UTC+8"></span>
   </div>
 </header>
+{{/* Icons for markup built in JS (a result card, a toast): the "icon"
+     template cannot be called from a script string, so pages clone these by
+     id instead of falling back to an emoji. Add a name here when a script
+     needs one. */}}
+<template id="ico-check">{{template "icon" "check"}}</template>
 <script>
   (function () {
     var rail = document.getElementById('rail'), scrim = document.getElementById('rail-scrim'), b = document.getElementById('rail-open');

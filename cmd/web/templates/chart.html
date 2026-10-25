@@ -4382,6 +4382,9 @@
         function escHTML(x) {
             return String(x).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; });
         }
+        // The shell's <template id="ico-NAME"> (partials.html), so a button
+        // built here carries the same SVG icon as the server-rendered ones.
+        function icoHTML(name) { var t = document.getElementById('ico-' + name); return t ? t.innerHTML : ''; }
         function fmtNum(v, dp) { return (v == null || isNaN(v)) ? '—' : Number(v).toLocaleString('en-US', { maximumFractionDigits: dp }); }
         function renderRecordResult(r) {
             lastRecordedId = r.id;
@@ -4410,7 +4413,7 @@
                 html.push('<div class="qr-legwarn ' + (o.status === 'skip' ? 'skip' : 'err') + '"><b>' + name + ' · ' + escHTML(o.status) + '</b> ' + escHTML(o.msg) + '</div>');
             });
             html.push('<div class="qr-actions">'
-                + (legs.length ? '<a class="ui-btn sm" href="/ops/verify">🔎 ' + CT['q.verifyBtn'] + '</a>' : '')
+                + (legs.length ? '<a class="ui-btn sm" href="/ops/verify">' + icoHTML('check') + CT['q.verifyBtn'] + '</a>' : '')
                 + '<a class="ui-btn ghost sm" href="/journal/' + r.id + '/edit">' + CT['q.edit'] + '</a>'
                 + '<a class="ui-btn ghost sm" href="/">' + CT['q.positions'] + '</a></div>');
             var okLegs = legs.filter(function (o) { return o.status === 'ok'; });

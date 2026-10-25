@@ -357,7 +357,8 @@
         var lines = ['<div class="ui-up">✓ ' + MS.done + ' <code>' + esc(j.new_stop_id) + '</code></div>'];
         if(j.cancelled && j.cancelled.length) lines.push('<div class="ui-dim">' + MS.cancelled + ' ' + esc(j.cancelled.join(', ')) + '</div>');
         (j.errors || []).forEach(function(e){ lines.push('<div class="ui-warn">⚠ ' + esc(e) + '</div>'); });
-        lines.push('<div><a href="/ops/verify">🔎 ' + MS.verify + '</a></div>');
+        var ico = document.getElementById('ico-check');
+        lines.push('<div><a class="ui-btn ghost sm" href="/ops/verify">' + (ico ? ico.innerHTML : '') + MS.verify + '</a></div>');
         pv.innerHTML = lines.join('');
         previewed = null;
         if(window.refreshPositions) window.refreshPositions();
