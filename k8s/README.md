@@ -204,6 +204,42 @@ CPU 超過 limit    → throttle(變慢),程式還活著
 
 ---
 
+## 🗺️ 第二階段總覽(2026-10-25,monitor)
+
+| 主題 | 一句話結論 | 實驗證據 |
+|---|---|---|
+| liveness | 只讓「重啟修得好」的關鍵迴圈觸發重啟;判斷核心是心跳,HTTP 只是傳遞方式 | 卡住 → ~4:50 回 503 → ~57s 後重啟 |
+| Secret | base64 是編碼不是加密,真值不進任何檔案 | 一行 `base64 -d` 還原 |
+| ConfigMap | 掛載成檔案會更新(~1 分鐘),環境變數只在啟動時複製一次 | 檔案 61s 生效,env 166s 沒變 |
+| PVC | 資料跟 pod 脫鉤;RWOP 擋 pod、RWO 只擋節點 | emptyDir 51→17,PVC 51→68,第二個 pod Pending |
+| 更新策略 | 單一寫入者只能 Recreate;壞版本靠 CI 驗證 + rollout undo 補 | 壞映像 → 0 個 pod;undo 6 秒恢復 |
+
+```
+                       ┌──────────────── Deployment(replicas 1,Recreate)────────────────┐
+                       │  每次改 pod 範本 = 一個新 revision = 一個 ReplicaSet(舊的留著 → 可 undo) │
+                       └───────────────────────────────┬──────────────────────────────────┘
+                                                       ▼
+   ConfigMap ──envFrom(啟動時複製一次)──►  ┌──────── Pod ────────┐  ◄── kubelet 每 15s 打 /livez
+   ConfigMap ──volume(檔案,~1 分鐘更新)──►│  monitor 容器        │      (只看 bracket / autoexec)
+   Secret    ──envFrom(base64 ≠ 加密)───►│  scratch,7.4 MB     │
+                                           └─────────┬───────────┘
+                                                     │ /opt/trading
+                                                     ▼
+                                   PVC(100Mi,ReadWriteOncePod)── 綁定 ──► PV(StorageClass standard)
+                                   pod 刪了資料還在;同時只准一個 pod 掛
+```
+
+### 名詞:PVC / PV / StorageClass
+
+```
+pod  = 租來的辦公桌(隨時可能換一張)        emptyDir = 放在桌上的東西,換桌就沒了
+PVC  = 置物櫃申請單(我要 100Mi、只給一個 pod)
+PV   = 實際分到的那個櫃子(K8s 依 StorageClass 自動建,Bound = 已綁定)
+StorageClass = 櫃子放在哪棟樓(minikube standard = 節點本機硬碟;雲端換成雲端磁碟,pod 設定不用改)
+```
+
+---
+
 ## ⭐ monitor:「活著但卡住」的 liveness(2026-10-25)
 
 `k8s/monitor.yaml` · `cmd/monitor/health.go` · `cmd/monitor/fault.go`
@@ -349,6 +385,95 @@ C 第二個 pod 掛同一個 RWOP claim → Pending
 replicas 固定 1 時,Deployment + RWOP PVC + `strategy: Recreate` 已經保證單一寫入者。
 StatefulSet 的價值在多副本:每個副本一份自己的 PVC(volumeClaimTemplates)、穩定的名稱與順序。
 這個服務不會有第二個副本,所以刻意不用 —— 跟「生產不上 K8s」同一個判斷:不需要的東西不建。
+
+---
+
+## ⭐ 滾動更新與回滾(2026-10-25)
+
+### revision = ReplicaSet
+
+```
+$ kubectl rollout history deploy/trading-monitor
+REVISION  CHANGE-CAUSE
+8         BAD: image tag trading-monitor:broken
+9         baseline: PVC + ConfigMap (rev 7)
+```
+
+- 每次改 pod 範本(映像、env)就多一個 revision,背後是一個新的 ReplicaSet;舊的 replicas 調成 0 保留
+  (`revisionHistoryLimit` 預設 10)。**回滾 = 把舊 ReplicaSet 調回 1**,所以很快。
+- 回滾到第 7 版後,它變成**第 9 版**:回到舊版也算一次新的變更。
+- `CHANGE-CAUSE` 預設是 `<none>`:部署時加 `kubernetes.io/change-cause` 註記,出事時才看得出哪版改了什麼。
+
+### 🧪 實驗:Recreate + 壞掉的映像
+
+**我的預測:** 舊的會留著。**結果:相反。**
+
+```
+15:25:29  set image → trading-monitor:broken
++ 2s   舊 pod  Terminating            ← Recreate:先殺舊的,不管新的能不能跑
++ 8s   新 pod  ErrImagePull
++20s   新 pod  ImagePullBackOff       ← 0 個 pod 在跑:裸倉守衛、自動交易全停
+
+15:26:22  kubectl rollout undo
++ 4s   579dd556d4-…  ContainerCreating   ← 沿用第 7 版的 ReplicaSet
++ 6s   579dd556d4-…  Running            ← 6 秒恢復
+```
+
+「舊的留著、新的失敗就算了」是 **RollingUpdate** 的行為。
+
+### 為什麼 monitor 不能用 RollingUpdate
+
+RollingUpdate:先建新 pod,等它 Ready 才殺舊的。但新 pod 要先掛上 PVC 才能啟動。
+
+**搭 ReadWriteOncePod → 死結:**
+
+```
+                 kubectl apply(正常的新版本)
+                            │
+                            ▼
+            ┌────────────────────────────────┐
+            │ RollingUpdate:先建新 pod,       │
+            │ 等它 Ready 才殺舊的              │
+            └────────────────────────────────┘
+                            │
+          ┌─────────────────┴─────────────────┐
+          ▼                                   ▼
+   舊 pod(Running)                    新 pod(建立中)
+   掛著 PVC ◄──── 只能一個 pod ────► 要掛同一個 PVC
+          │                                   │
+          │                                   ▼
+          │                    ❌ 排程器擋下 → Pending
+          ▼                                   ▼
+   要等新 pod Ready 才被殺  ◄──等待──  永遠不會 Ready
+          └──────────────► 🔒 死結 ◄───────────┘
+   服務不停(舊的在跑),但新版永遠上不去,rollout 超時失敗
+```
+
+**搭 ReadWriteOnce(只擋節點)→ 兩個寫入者:**
+
+```
+   舊 pod 掛著 PVC ──── 同一個節點,兩個都掛得上 ──── 新 pod 也掛上
+        ▼                                                ▼
+   自動交易器 #1                                     自動交易器 #2
+        └──────────── 同時寫 oi.jsonl、同時下單 ────────────┘
+                        ⚠️ 重複下單(更糟)
+```
+
+| 策略 + 儲存 | 正常更新 | 壞版本 |
+|---|---|---|
+| RollingUpdate + RWO | ⚠️ 短暫兩個寫入者 → 重複下單 | 舊的留著 |
+| RollingUpdate + RWOP | 🔒 死結,新版上不去 | 舊的留著 |
+| **Recreate + RWOP(採用)** | ✅ 先殺再起,停幾秒 | ❌ 停擺到回滾 |
+
+**單一寫入者只能接受「更新時停幾秒」→ Recreate。** 壞版本的停擺風險用別的方式補:
+部署前 CI 驗證映像、部署後盯 `rollout status`,失敗就 `rollout undo`。
+無狀態、可多副本同時跑的服務(例如把狀態外部化之後的 web)才適合 RollingUpdate。
+
+### 自動部署?
+
+這些清單**不會**自動部署:CI 只建映像、用 docker compose 部署到 VPS,minikube 上是手動
+`kubectl apply`。真要「push 後 K8s 自動更新」:CI 直接 `kubectl apply`(簡單,但 CI 要叢集權限),
+或 GitOps(Argo CD / Flux:叢集內持續比對 git,CI 不需要叢集權限,git 是唯一真相來源)。
 
 ---
 
