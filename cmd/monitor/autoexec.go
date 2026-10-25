@@ -69,7 +69,8 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		}
 
 		hb.Tick("autoexec")
-		cfg := autotrade.Load() // hot-reload
+		injectStall(ctx, "autoexec") // no-op unless MONITOR_FAULT_STALL names it
+		cfg := autotrade.Load()      // hot-reload
 		if !cfg.Enabled {
 			hb.SetIdle("autoexec", true, "autotrade.json enabled=false → 每輪短路")
 			continue

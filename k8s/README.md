@@ -204,6 +204,73 @@ CPU 超過 limit    → throttle(變慢),程式還活著
 
 ---
 
+## ⭐ monitor:「活著但卡住」的 liveness(2026-10-25)
+
+`k8s/monitor.yaml` · `cmd/monitor/health.go` · `cmd/monitor/fault.go`
+
+### 問題
+
+monitor 沒有 HTTP,映像是 `FROM scratch`(7.4 MB,沒有 shell)→ liveness 不能 `exec cat`。
+而它最危險的故障不是「掛掉」(K8s 本來就會重啟),是 **process 活著、某個迴圈卡在
+網路呼叫裡** —— 裸倉守衛安靜地停了,容器看起來一切正常。
+
+### 設計(兩層)
+
+```
+/livez    只看關鍵迴圈(bracket 裸倉守衛、autoexec 自動交易)→ kubelet 重啟
+/healthz  全部迴圈狀態(JSON)→ 給人、給 /ops
+/metrics  每個迴圈距上次心跳幾秒 → Prometheus,非關鍵迴圈用長門檻【只通知不重啟】
+```
+
+為了「背景資料晚一點更新」重啟整個 daemon,會連裸倉守衛一起中斷 —— 所以只有
+**重啟修得好、而且值得中斷一切**的才進 /livez。
+
+判斷核心 `criticalStalled`(自己寫的):
+
+```
+· 卡住 = heartbeat.Loop.Stalled(now):Running && 距上次心跳 > max(3×間隔, 2 分鐘)
+· 被設定關掉(Off)、或根本沒註冊的迴圈【不算】—— 重啟修不好設定,
+  算進去只會 CrashLoop
+· Idle 不豁免:idle 的迴圈每輪照樣打心跳,停了就是卡住
+```
+
+### 探針數字怎麼來的
+
+```
+bracket 卡住 ──(2 分鐘:Stalled 門檻)──> /livez 503 ──(15s × 4)──> 重啟
+目標:卡住後 3 分鐘內重啟 → 留給 K8s 的只有 1 分鐘
+
+periodSeconds 15 · failureThreshold 4 · timeoutSeconds 3
+· failureThreshold 不能是 1:一次 GC 停頓或 CPU throttle 就殺掉健康的服務,
+  幾輪後進 CrashLoopBackOff —— 停機比你想防的卡住還久
+· timeoutSeconds 要遠小於 period:HTTP 本身卡住時,120s 的 timeout × 4 = 8 分鐘
+· 不需要 startupProbe:hb.Start 把啟動算成一次心跳
+```
+
+### 🧪 實驗:故障注入 `MONITOR_FAULT_STALL=autoexec:90s`
+
+開機滿 90 秒後的那一輪讓 autoexec 永久卡住(HTTP 照常)。autoexec 每 60s 一輪,
+門檻 3 分鐘。**先寫預期:** 2:00 卡住(1:00 那輪還不到 90s)→ 5:00 開始 503 → ≤6:00 重啟。
+
+```
+13:09:31  health endpoints on :9090
+13:11:31  FAULT INJECTION: autoexec loop now blocked      ← 開機後 2:00 ✅
+
++  0s … +273s   livez 200 {"ok":true,"stalled":[]}              RESTARTS 0
++288s … +333s   livez 503 {"ok":false,"stalled":["autoexec"]}
++349s           livez 200                                        RESTARTS 1  ← 503 後 ~57s ✅
+
+Warning  Unhealthy  Liveness probe failed: HTTP probe failed with statuscode: 503
+Normal   Killing    Container monitor failed liveness probe, will be restarted
+```
+
+觀察:
+- **重啟的是容器,不是 pod**(pod 名字不變,RESTARTS +1)。改 env 則是新的 ReplicaSet、新 pod。
+- 開關沒關時,重啟後 2 分鐘又會卡 → 一直循環就是 CrashLoopBackOff。
+  **重啟只救暫時性的卡住;程式本身的 bug 每次都會再卡,最後還是要人修。**
+
+---
+
 ## 為什麼 replicas: 1
 
 不是保守,是**這個服務現在無法水平擴展**:

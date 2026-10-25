@@ -130,6 +130,14 @@ func main() {
 	go hb.Run(ctx, heartbeat.Path(), log.Printf)
 	go watchMute(ctx)
 
+	// /livez /healthz /metrics for Kubernetes (health.go). Off unless set:
+	// on the VPS the container uses host networking, so this would be a new
+	// port on the host.
+	if addr := strings.TrimSpace(os.Getenv("MONITOR_HEALTH_ADDR")); addr != "" {
+		startHealthServer(ctx, addr, hb)
+		log.Printf("health endpoints on %s (/livez /healthz /metrics)", addr)
+	}
+
 	// Earnings-blackout calendar (F3). signal.Evaluate reads earnings.Default()
 	// to gate stock symbols around a report; without this load that gate is a
 	// SILENT no-op here — autoInBlackout dutifully checks for an "earnings"

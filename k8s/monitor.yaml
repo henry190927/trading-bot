@@ -1,0 +1,126 @@
+# trading-monitor on Kubernetes
+#
+# ⚠️ 跟 deployment.yaml(web)一樣是【練習與展示】用,生產環境不跑 K8s。
+#
+# 跟 web 最大的不同:monitor 沒有自己的 HTTP,映像是 FROM scratch(沒有 shell),
+# 所以 liveness 不能用 `exec: cat 檔案`。解法:monitor 開一個只給健康檢查用的
+# 端口(cmd/monitor/health.go),由 MONITOR_HEALTH_ADDR 打開:
+#
+#   /livez    只看【關鍵迴圈】(裸倉守衛 bracket、自動交易 autoexec)
+#             —— 只有「重啟修得好」的問題才讓 kubelet 重啟
+#   /healthz  全部迴圈的狀態(JSON),給人看
+#   /metrics  每個迴圈距上次心跳幾秒,給 Prometheus;非關鍵迴圈用【比較長】
+#             的告警門檻,只通知不重啟
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-monitor
+  labels:
+    app: trading-monitor
+spec:
+  # 1:每個副本都會各自連交易所、各自送 ntfy、各自下單 → 多副本 = 重複下單。
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-monitor
+  strategy:
+    # 新舊兩個 monitor 同時跑幾秒 = 兩個自動交易器同時看同一根 K 棒 → 可能下兩次單。
+    # Recreate:先殺舊的再起新的。
+    type: Recreate
+
+  template:
+    metadata:
+      labels:
+        app: trading-monitor
+      annotations:
+        # 給 Prometheus 的 kubernetes_sd 用(常見慣例,不是 K8s 內建功能)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+
+      containers:
+        - name: monitor
+          image: trading-monitor:scratch
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: health
+              containerPort: 9090
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          env:
+            - name: MONITOR_HEALTH_ADDR
+              value: ":9090"
+            - name: TZ
+              value: Asia/Taipei
+            - name: GOMEMLIMIT
+              value: "100MiB"            # limits.memory 128Mi 的 ~80%(同 compose)
+            - name: GOMAXPROCS
+              value: "1"
+          # API key 等秘密:下一步(Secret)會建立 trading-secrets。
+          # optional: true → 還沒建立時 pod 照樣起得來(迴圈會回報「key 未設 → 沒啟動」)
+          envFrom:
+            - secretRef:
+                name: trading-secrets
+                optional: true
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+
+          # ════════════════════ 這段你來填 ════════════════════
+          #
+          # 目標:裸倉守衛(bracket)卡住後,【3 分鐘內】被重啟;但單一次
+          #       慢回應或失敗的探針【不可以】造成重啟。
+          #
+          # 已知:
+          #   · bracket 每 30s 一輪,卡住判定門檻 = 2 分鐘
+          #     → 它卡住後,/livez 要等 2 分鐘才開始回 503
+          #   · /livez 只讀記憶體,正常幾毫秒內回應
+          #   · 從「/livez 開始回 503」到「重啟」的時間
+          #       ≈ periodSeconds × failureThreshold
+          #
+          # 要填:periodSeconds、timeoutSeconds、failureThreshold
+          # 想一想:
+          #   1. 2 分鐘 + 你算出來的時間,有沒有在 3 分鐘內?
+          #   2. failureThreshold 設 1 會怎樣?
+          #   3. 需不需要 startupProbe?(提示:hb.Start 會把啟動當成一次心跳)
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: health
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 4
+          # ════════════════════════════════════════════════════
+
+          volumeMounts:
+            # monitor 會寫 oi.jsonl、autotrade_paper.jsonl、心跳檔 …
+            - name: state
+              mountPath: /opt/trading
+
+      volumes:
+        # ⚠️ emptyDir 隨 pod 消滅 —— 持久化是後面 PVC/StatefulSet 那一步。
+        - name: state
+          emptyDir: {}
+
+      # 收到 SIGTERM 後讓迴圈收尾(進行中的下單、ntfy 推播)
+      terminationGracePeriodSeconds: 30
+
+# 沒有 Service:除了 kubelet(直接打 pod IP)和 Prometheus(靠上面的 annotation
+# 找 pod),沒有別人需要連 monitor。不需要的東西不建。
