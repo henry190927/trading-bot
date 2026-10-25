@@ -1,0 +1,38 @@
+# Non-secret configuration for the monitor (and later the web).
+#
+# Two ways a ConfigMap reaches a container, and they behave differently
+# when the ConfigMap changes — that difference is the experiment in
+# k8s/README.md:
+#
+#   envFrom   copied into the process environment ONCE, at container start.
+#   volume    projected as files; kubelet rewrites them in place (~1 min).
+#
+# autotrade.json goes in as a FILE on purpose: autotrade.Load() re-reads it
+# every cycle (hot reload on the VPS), so a mounted file can change rules
+# without a restart. The env keys below cannot.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trading-config
+data:
+  # ── read as environment variables (envFrom) ──
+  TZ: Asia/Taipei
+  OI_SAMPLE_SEC: "300"
+  MONITOR_BRACKET: "1"
+
+  # ── read as a file (volume) ── a minimal paper-only rule set for minikube
+  autotrade.json: |
+    {
+      "enabled": true,
+      "paper": true,
+      "max_concurrent_total": 4,
+      "max_margin_total_usdt": 50,
+      "daily_loss_halt_r": -6,
+      "max_same_symbol_side": 1,
+      "risk_per_trade_pct": 1.0,
+      "rules": [
+        {"symbol": "BTC", "strategy": "range-edge", "tf": "1h", "side": "auto",
+         "margin_usdt": 5, "leverage": 10, "stop_pct": 0.5, "cooldown_bars": 6, "enabled": true}
+      ]
+    }

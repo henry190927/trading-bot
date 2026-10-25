@@ -62,8 +62,9 @@ spec:
           env:
             - name: MONITOR_HEALTH_ADDR
               value: ":9090"
-            - name: TZ
-              value: Asia/Taipei
+            # autotrade.json comes from the ConfigMap volume below, not the image
+            - name: AUTOTRADE_PATH
+              value: /etc/trading/autotrade.json
             - name: GOMEMLIMIT
               value: "100MiB"            # limits.memory 128Mi 的 ~80%(同 compose)
             - name: GOMAXPROCS
@@ -71,6 +72,9 @@ spec:
           # API key 等秘密:下一步(Secret)會建立 trading-secrets。
           # optional: true → 還沒建立時 pod 照樣起得來(迴圈會回報「key 未設 → 沒啟動」)
           envFrom:
+            # Non-secret settings (TZ, loop switches) — copied in ONCE at start.
+            - configMapRef:
+                name: trading-config
             - secretRef:
                 name: trading-secrets
                 optional: true
@@ -113,11 +117,19 @@ spec:
             # monitor 會寫 oi.jsonl、autotrade_paper.jsonl、心跳檔 …
             - name: state
               mountPath: /opt/trading
+            # The whole ConfigMap as a directory. NOT subPath: a subPath mount is
+            # a one-time copy and never sees ConfigMap updates.
+            - name: config
+              mountPath: /etc/trading
+              readOnly: true
 
       volumes:
         # ⚠️ emptyDir 隨 pod 消滅 —— 持久化是後面 PVC/StatefulSet 那一步。
         - name: state
           emptyDir: {}
+        - name: config
+          configMap:
+            name: trading-config
 
       # 收到 SIGTERM 後讓迴圈收尾(進行中的下單、ntfy 推播)
       terminationGracePeriodSeconds: 30

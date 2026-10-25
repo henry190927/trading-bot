@@ -271,6 +271,48 @@ Normal   Killing    Container monitor failed liveness probe, will be restarted
 
 ---
 
+## ⭐ Secret 與 ConfigMap(2026-10-25)
+
+`k8s/config.yaml` · `k8s/secret.example.yaml`(真值不進檔案)
+
+### Secret:base64 不是加密
+
+```
+$ kubectl get secret trading-secrets -o jsonpath='{.data}'
+{"BINGX_API_KEY":"ZHVtbXkta2V5LWZvci1taW5pa3ViZQ==", ...}
+$ echo ZHVtbXkta2V5LWZvci1taW5pa3ViZQ== | base64 -d
+dummy-key-for-minikube
+```
+
+base64 是**編碼**(讓二進位能放進 YAML),一行就還原。commit 一份 secret.yaml = 把明碼 key
+放進 git 歷史,刪檔也救不回來,只能換 key。所以真的 Secret 用 `kubectl create secret … --from-literal`
+建,`k8s/secret.yaml` 在 .gitignore。
+
+真正保護 Secret 的是:RBAC(誰能 get secret)· etcd encryption at rest · 外部密鑰管理
+(Vault / 雲端 Secret Manager)· Sealed Secrets / SOPS(用叢集公鑰加密後【可以】commit,GitOps 用)。
+
+### 🧪 實驗:改 ConfigMap,不重啟,誰會變?
+
+```
+改:OI_SAMPLE_SEC 300 → 120(envFrom)· autotrade.json enabled true → false(volume)
+
++  0~46s  autoexec idle=False                            | oisample every=300
++ 61s     autoexec idle=True「enabled=false → 每輪短路」 | oisample every=300
++166s     autoexec idle=True                             | oisample every=300
+同一個 pod,RESTARTS 0
+```
+
+| | 方式 | 不重啟會生效? | 原因 |
+|---|---|---|---|
+| autotrade.json | volume(整個目錄) | ✅ ~1 分鐘 | kubelet 改寫檔案 + `autotrade.Load()` 每輪重讀 |
+| OI_SAMPLE_SEC | envFrom | ❌ | 環境變數只在容器啟動時複製一次 |
+
+兩個前提:程式要會重讀檔案;**不能用 subPath**(subPath 是一次性複製,永遠不更新)。
+環境變數要生效只能重啟:`kubectl rollout restart`,或讓 ConfigMap 變動自動觸發滾動更新
+(Helm 的 checksum annotation、Kustomize configMapGenerator 的雜湊後綴)。
+
+---
+
 ## 為什麼 replicas: 1
 
 不是保守,是**這個服務現在無法水平擴展**:
