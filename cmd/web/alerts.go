@@ -60,6 +60,10 @@ type alertInput struct {
 	hub      hubStats
 	overlay  macro.Status
 	restarts int // monitor starts seen inside restartWindow
+	// gone are open trades whose position the exchange no longer has;
+	// goneKnown is false when the last positions read failed.
+	gone      []goneTrade
+	goneKnown bool
 }
 
 // loopNames gives the monitor's loop keys a human name in the alert title.
@@ -169,7 +173,28 @@ func evaluateAlerts(in alertInput) (firing []alert.Condition, held []string) {
 			Detail: strings.Join(in.overlay.Problems, ";"),
 		})
 	}
+	// ── Journal behind the exchange ──────────────────────────────────
+	// A position closed on the exchange (a stop, a TP, a manual close on the
+	// phone) while the journal still reads open. Nothing is unprotected, so
+	// warning, not critical — but nothing else would ever say so (#93).
+	if !in.goneKnown {
+		held = append(held, "position_gone:")
+	}
+	for _, g := range in.gone {
+		firing = append(firing, alert.Condition{
+			Key: "position_gone:" + strconv.Itoa(g.ID), Severity: alert.Warning,
+			Title:  fmt.Sprintf("#%d %s %s 交易所已無部位", g.ID, g.Symbol, sideZH(g.Side)),
+			Detail: "journal 仍是持倉中 — 到 /today 按「依交易所成交平倉」帶入出場價",
+		})
+	}
 	return firing, held
+}
+
+func sideZH(side string) string {
+	if side == "short" {
+		return "空"
+	}
+	return "多"
 }
 
 func wsErrSuffix(e string) string {
@@ -211,6 +236,13 @@ func (r *restartTracker) observe(started, now time.Time) (restarted bool, recent
 // not monitor_down — daemon-watch already pushes that one, from outside both
 // containers, and two pushes for one outage teach you to ignore both.
 func alertPushes(c alert.Change) bool {
+	// A vanished position is pushed when it fires, though only a warning:
+	// the trader is usually away from the screen when a stop closes a trade,
+	// and that is when the journal goes stale. Its resolve is the trader
+	// closing the row, which needs no push.
+	if strings.HasPrefix(c.Alert.Key, "position_gone:") {
+		return c.Kind == "fire"
+	}
 	return c.Alert.Severity == alert.Critical && c.Alert.Key != "monitor_down" &&
 		(c.Kind == "fire" || c.Kind == "resolve")
 }
@@ -262,6 +294,7 @@ func (s *server) startAlerts(ctx context.Context) {
 		for {
 			now := time.Now()
 			in := alertInput{now: now, hub: s.hub.stats(), overlay: macro.OverlayStatus()}
+			in.gone, in.goneKnown = s.goneSnapshot()
 			in.beat, in.beatErr = heartbeat.Read(heartbeat.Path())
 			if in.beatErr == nil {
 				var restarted bool

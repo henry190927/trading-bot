@@ -26,7 +26,8 @@ func healthy() alertInput {
 				"confluence": {Running: true, EverySec: 60, LastTick: alNow.Add(-20 * time.Second)},
 			},
 		},
-		hub: hubStats{Running: true, WSUp: true, WSLastAgeS: 1},
+		hub:       hubStats{Running: true, WSUp: true, WSLastAgeS: 1},
+		goneKnown: true,
 	}
 }
 

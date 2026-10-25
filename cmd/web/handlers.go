@@ -47,6 +47,9 @@ type server struct {
 
 	// sweepMu serialises sweepOpenTrades (fill detection + auto orders).
 	sweepMu sync.Mutex
+	// gone tracks open trades whose position the exchange no longer has
+	// (position_gone.go), refreshed by tradeSweepLoop.
+	gone goneState
 	// aiProviderName is a friendly label ("gemini", "anthropic", or
 	// "gemini(fallback-from-xxx)") for logs + cache-key namespacing.
 	aiProviderName string
@@ -326,6 +329,10 @@ type openTradeCard struct {
 	// (no API key, read failed), which is different from "none".
 	LiveStops     []liveStop
 	LiveStopKnown bool
+	// PositionGone: the trade is filled and open in the journal, but the
+	// exchange has had no position for it on goneAfter consecutive reads.
+	// The card then offers closing it from the exchange's fills.
+	PositionGone bool
 	// LiveStopX places the (first) live stop on the R track; LiveStopR is
 	// the whole trade's R if it is hit. HasLiveX is false when off-track.
 	LiveStopX, LiveStopR float64
@@ -365,6 +372,11 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 
 	s.fetchTradeViews(ctx, trades, cache)
 	live := s.liveStopsFor(ctx, trades)
+	goneList, _ := s.goneSnapshot()
+	gone := make(map[int]bool, len(goneList))
+	for _, g := range goneList {
+		gone[g.ID] = true
+	}
 
 	var cards []openTradeCard
 	for _, t := range trades {
@@ -376,7 +388,7 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 		if !t.FilledAt.IsZero() {
 			liveSince = t.FilledAt
 		}
-		card := openTradeCard{Trade: t, TimeElapsed: time.Since(liveSince)}
+		card := openTradeCard{Trade: t, TimeElapsed: time.Since(liveSince), PositionGone: gone[t.ID] && t.IsActive()}
 		if t.IsPending() {
 			card.PendingSince = time.Since(t.OpenedAt)
 		}
@@ -557,6 +569,7 @@ func (s *server) tradeSweepLoop(ctx context.Context) {
 	defer t.Stop()
 	for {
 		s.sweepOpenTrades(ctx)
+		s.refreshGone(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -1895,7 +1908,7 @@ func (s *server) handleJournalCloseForm(c *gin.Context) {
 		})
 		return
 	}
-	s.page(c, http.StatusOK, "journal_close.html", gin.H{
+	data := gin.H{
 		"Trade":     t,
 		"Ver":       journal.Version(t),
 		"Outcome":   "",
@@ -1906,7 +1919,51 @@ func (s *server) handleJournalCloseForm(c *gin.Context) {
 		"Notes": t.CloseNotes,
 		"Now":   time.Now().Local().Format("2006-01-02T15:04"),
 		"Error": "",
-	})
+	}
+	if c.Query("from") == "exchange" {
+		s.prefillCloseFromExchange(c, t, data)
+	}
+	s.page(c, http.StatusOK, "journal_close.html", data)
+}
+
+// prefillCloseFromExchange fills the close form from the exchange's record of
+// the close (exchange_close.go). It only suggests: the trader still submits,
+// and the outcome is labelled a guess. Any failure leaves the form empty and
+// says why, rather than half-filling it.
+func (s *server) prefillCloseFromExchange(c *gin.Context, t journal.Trade, data gin.H) {
+	tr := s.translator(langOf(c))
+	ex := gin.H{}
+	data["Exchange"] = ex
+	if s.client == nil || s.client.APIKey == "" {
+		ex["Err"] = tr("jc.ex.noKey")
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+	ec, ok, clipped, err := s.fetchExchangeClose(ctx, t)
+	switch {
+	case err != nil:
+		ex["Err"] = tr("jc.ex.err", err.Error())
+		return
+	case !ok:
+		ex["Err"] = tr("jc.ex.none")
+		return
+	}
+	data["Outcome"] = ec.Outcome
+	// 8 decimals: the exchange's average is exact to many more, and R is
+	// computed from this field, so it is not rounded to display precision.
+	data["ExitPrice"] = strconv.FormatFloat(math.Round(ec.ExitPrice*1e8)/1e8, 'f', -1, 64)
+	data["ClosedAt"] = ec.ClosedAt.Local().Format("2006-01-02T15:04")
+	note := tr("jc.ex.notes", ec.Fills, strings.Join(ec.OrderIDs, ", "), ec.PnL, ec.Fees)
+	if n, _ := data["Notes"].(string); n != "" {
+		note = n + "\n" + note
+	}
+	data["Notes"] = note
+	ex["Close"] = ec
+	ex["Clipped"] = clipped
+	// A closing quantity short of the entry means part of the position may
+	// still be open, or a fill sits outside the history window.
+	ex["Short"] = ec.EntryQty > 0 && ec.Qty+ec.LegQty < ec.EntryQty*0.999
 }
 
 // handleJournalClosePost processes the close form, computes realized R, writes.

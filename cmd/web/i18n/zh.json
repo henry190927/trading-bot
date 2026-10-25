@@ -1140,5 +1140,15 @@
   "chart.read.pos": "位置",
   "chart.read.trendUp": "上升 (HH-HL)",
   "chart.read.trendDown": "下降 (LH-LL)",
-  "chart.read.trendNeutral": "中性"
+  "chart.read.trendNeutral": "中性",
+  "jpos.gone": "交易所已經沒有這個部位,但 journal 仍是持倉中",
+  "jpos.closeFromEx": "依交易所成交平倉",
+  "jc.ex.summary": "已帶入交易所成交:%d 筆平倉,數量 %g,已實現 %+.2fu,手續費 %.2fu",
+  "jc.ex.guess": "結果「%s」是依出場價推斷的 —— 移動過的停損會被判成手動平倉,送出前請確認。",
+  "jc.ex.short": "平倉數量 %g 少於進場 %g —— 可能還有部位沒平,或有成交在查詢範圍之外。",
+  "jc.ex.clipped": "這筆交易開倉超過 7 天,只查得到最近 7 天的成交。",
+  "jc.ex.noKey": "沒有設定交易所 API 金鑰,無法帶入成交。",
+  "jc.ex.err": "讀取交易所成交失敗:%s",
+  "jc.ex.none": "交易所沒有這筆交易的平倉成交 —— 部位可能還在,或已超出查詢範圍。",
+  "jc.ex.notes": "依交易所成交帶入:%d 筆平倉(orderId %s),已實現 %+.2fu,手續費 %.2fu"
 }

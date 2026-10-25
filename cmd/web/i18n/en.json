@@ -1140,5 +1140,15 @@
   "chart.read.pos": "Position",
   "chart.read.trendUp": "Up (HH-HL)",
   "chart.read.trendDown": "Down (LH-LL)",
-  "chart.read.trendNeutral": "Neutral"
+  "chart.read.trendNeutral": "Neutral",
+  "jpos.gone": "The exchange no longer has this position, but the journal still shows it open",
+  "jpos.closeFromEx": "Close from exchange fills",
+  "jc.ex.summary": "Filled in from the exchange: %d closing fill(s), qty %g, realised %+.2fu, fees %.2fu",
+  "jc.ex.guess": "The result \"%s\" is inferred from the exit price — a moved stop reads as a manual close, so check it before submitting.",
+  "jc.ex.short": "Closing qty %g is less than the entry %g — part of the position may still be open, or a fill is outside the queried range.",
+  "jc.ex.clipped": "This trade opened more than 7 days ago; only the last 7 days of fills could be read.",
+  "jc.ex.noKey": "No exchange API key is configured, so fills cannot be read.",
+  "jc.ex.err": "Could not read exchange fills: %s",
+  "jc.ex.none": "The exchange has no closing fill for this trade — the position may still be open, or it is outside the queried range.",
+  "jc.ex.notes": "From exchange fills: %d closing fill(s) (orderId %s), realised %+.2fu, fees %.2fu"
 }

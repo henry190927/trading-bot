@@ -4640,6 +4640,12 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .qr-legwarn.err { color: var(--red); border-color: var(--red); }
 .qr-legwarn.skip { color: var(--yellow); border-color: var(--yellow); }
 .qr-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+/* /today card: the exchange has no position for an open journal trade. The
+   button keeps its own colours — .ui-banner a would otherwise tint it. */
+.pos-gone { margin-top: var(--sp-2); flex-wrap: wrap; font-size: var(--fs-sm); }
+.pos-gone .ui-btn { margin: 0 0 0 auto; color: var(--on-accent); }
+.jc-ex { align-items: flex-start; margin-bottom: var(--sp-3); }
+.jc-ex .ico { margin-top: 2px; }
 .qr-actions .ui-btn { margin-top: 0; }
 .qr-raw { font-size: var(--fs-xs); color: var(--text-dim); }
 .qr-raw summary { cursor: pointer; }

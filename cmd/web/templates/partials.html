@@ -381,6 +381,9 @@
     {{else}}
       <div class="pos-meta ui-sm"><span class="ui-warn">{{t "jpos.noStop"}}</span>{{if .MarkPrice}}<span><span class="ui-dim">{{t "jpos.mark"}}</span> {{fmtPx .MarkPrice}}</span>{{end}}</div>
     {{end}}
+    {{if .PositionGone}}
+    <div class="ui-banner warn pos-gone">{{template "icon" "alert"}}<span>{{t "jpos.gone"}}</span><a class="ui-btn sm" href="/journal/{{$tr.ID}}/close?from=exchange">{{template "icon" "check"}}{{t "jpos.closeFromEx"}}</a></div>
+    {{end}}
     <div class="pos-actions">
       <a class="ui-btn ghost sm" href="/chart?symbol={{$tr.Symbol}}">{{template "icon" "chart"}}{{t "jpos.chart"}}</a>
       {{if not $tr.IsPending}}<button type="button" class="ui-btn ghost sm js-move-stop" data-id="{{$tr.ID}}" data-label="#{{$tr.ID}} {{$tr.Symbol}} {{t (printf "side.%s" $tr.Side)}}" data-baseline="{{fmtPrice $tr.Stop}}" data-live="{{if .LiveStops}}{{fmtPrice (index .LiveStops 0).Price}}{{end}}" data-known="{{.LiveStopKnown}}">{{template "icon" "flag"}}{{t "ms.btn"}}</button>{{end}}
