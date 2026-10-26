@@ -121,7 +121,7 @@ Key SD decisions baked in above:
 
 - Workers: `gemini-2.5-flash-lite` (cheapest, fast) or `flash`.
 - Synthesis: `gemini-2.5-pro` or `gemini-3-flash-preview` (stronger reasoning for reconciliation).
-- On free-tier this is ≈ $0; the real constraint is **RPM**, not $. So batch across symbols
+- On free-tier this is ≈ $0; the real constraint is **RPM**, not $. ⚠️ **Superseded by §8.8:** the free tier also caps **requests per day per model (RPD = 20)**, which binds long before RPM, and the 2.5 models above may be unavailable to new keys. So batch across symbols
   benefits most when you can pipeline within the rate cap.
 - Reuse the existing model picker (`/api/ai/model`, `GEMINI_MODEL`) — add a second knob for the
   worker tier vs synthesis tier.
@@ -212,7 +212,8 @@ Current row "Gemini 429 → bounded concurrency + backoff/retry" is one line. Co
 
 | Error class | Action | Max retries | Backoff |
 |-------------|--------|-------------|---------|
-| 429 (rate limit) | retry | 3 | exp: 1s → 2s → 4s + jitter |
+| 429 per-**minute** | retry | 3 | exp: 1s → 2s → 4s + jitter |
+| 429 per-**day** (quotaId …PerDay…) | **no retry** — skip this model until reset, fall back to the next model | 0 | — (see §8.8) |
 | 5xx server | retry | 2 | exp: 1s → 2s |
 | 4xx (schema, auth) | drop worker + note | 0 | — |
 | timeout | drop worker + note | 0 | — |
@@ -242,3 +243,23 @@ Don't touch these on the next revision — they're solid:
 - §3 structured hand-off enforcement (critical for synth determinism)
 - §7 batch-first staging (correct call, aligns with existing memory)
 - §5 tier split (cheap workers, strong synth)
+
+### 8.8 Gemini free-tier: requests-per-day is the binding limit (measured 2026-10-26)
+
+Measured by Henry on the trip-planner Cloudflare-Worker chat with the same kind of free key
+(relayed from another session; not re-measured here):
+
+- 429 `QuotaFailure`: `quotaId = GenerateRequestsPerDayPerProjectPerModel-FreeTier`,
+  `quotaValue = 20`, model `gemini-3.6-flash`. **20 requests per model per day**, counted per model,
+  reset around 15:00 Taiwan (Pacific midnight).
+- Applied to §8.1's napkin (16 calls per batch): **about one batch per day.** RPD, not RPM, is the
+  bottleneck; §1's "N cheap workers ≈ $0" only holds on a paid key.
+- Google Search grounding (`tools: google_search`) returned 429 on its first call — no free quota.
+- `gemini-2.5-flash` → 404 "no longer available to new users"; some 3.x (3.5, 3.7) → 400 "User location
+  is not supported"; `3.6-flash` and `3.1-flash-lite` worked. **Availability is per key — test each.**
+- What trip-planner does instead:
+  - conversation layer: **sequential fallback**, not LLM fan-out — on 503 / 429 / location error switch
+    to the next model; each model's RPD is separate, so the daily total adds up;
+  - scatter to a non-Gemini API (Tavily search), gather with **one** Gemini call;
+  - next: a circuit breaker that, on a per-day 429, skips that model until the reset time.
+- Retry policy consequence: §8.4 now splits 429 into per-minute (backoff) and per-day (no retry).
