@@ -495,8 +495,8 @@ func (s *server) buildOpenTradeCards(ctx context.Context, dashViews []symbolView
 				}
 			}
 			card.TotalR = card.CurrentR
-			if t.HasTP1Leg() {
-				card.TotalR = journal.LockedR(t) + (1-math.Min(t.TP1FillPct/100, 1))*card.CurrentR
+			if t.HasLegs() {
+				card.TotalR = journal.LockedR(t) + (1-journal.ClosedFrac(t))*card.CurrentR
 			}
 		}
 		cards = append(cards, card)
@@ -573,6 +573,7 @@ func (s *server) tradeSweepLoop(ctx context.Context) {
 	defer t.Stop()
 	for {
 		s.sweepOpenTrades(ctx)
+		s.sweepExits(ctx)
 		s.refreshGone(ctx)
 		select {
 		case <-ctx.Done():
@@ -2040,10 +2041,14 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 	// Store the size-weighted blend, which keeps R right through every later
 	// recompute, and spell both legs out in the notes. Only when the form
 	// says so: a POST without blend_tp1 is taken at its word.
-	if c.PostForm("blend_tp1") == "on" && t.HasTP1Leg() && outcome != "no-fill" {
+	if c.PostForm("blend_tp1") == "on" && t.HasLegs() && outcome != "no-fill" {
 		rest := exit
 		exit = journal.BlendedExit(t, rest)
-		legs := tr("jc.leg.notes", t.TP1FillPct, fmtPx(t.TP1FillPrice), 100-t.TP1FillPct, fmtPx(rest), fmtPx(exit))
+		var parts []string
+		for _, l := range journal.Legs(t) {
+			parts = append(parts, fmt.Sprintf("%.4g%% @ %s", l.Pct, fmtPx(l.Price)))
+		}
+		legs := tr("jc.legs.notes", strings.Join(parts, " + "), (1-journal.ClosedFrac(t))*100, fmtPx(rest), fmtPx(exit))
 		if notes == "" {
 			notes = legs
 		} else {
@@ -2223,7 +2228,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	// Closing a trade that has a TP1 leg must go through the close page, which
 	// asks for the remainder's price and stores the blend. Here exit_price is
 	// taken literally and the TP1 leg would drop out of R.
-	if !closedAt.IsZero() && trades[idx].IsOpen() && trades[idx].HasTP1Leg() {
+	if !closedAt.IsZero() && trades[idx].IsOpen() && trades[idx].HasLegs() {
 		rerender(tr("jf.err.closeViaClosePage", trades[idx].ID))
 		return
 	}
@@ -3361,6 +3366,9 @@ func templateFuncs() template.FuncMap {
 		},
 		"fmtPx":   fmtPx,
 		"lockedR": journal.LockedR,
+		"legs":    journal.Legs,
+		// restPct is the share of the original position still open, in percent.
+		"restPct": func(t journal.Trade) float64 { return (1 - journal.ClosedFrac(t)) * 100 },
 		"sub100":  func(v float64) float64 { return 100 - v },
 		"fmtPct": func(v float64) string {
 			return fmt.Sprintf("%+.4f%%", v*100)

@@ -52,17 +52,17 @@
     </div></div>
     {{end}}
     {{end}}
-    {{if .Trade.HasTP1Leg}}
-    {{/* The TP1 leg came from the exchange. The exit field below is the
-         REMAINDER only; the server blends the two. The manual partials
-         calculator is hidden so the TP1 leg cannot be counted twice. */}}
+    {{if .Trade.HasLegs}}
+    {{/* The partial closes came from the exchange. The exit field below is
+         the REMAINDER only; the server blends it with the legs. The manual
+         partials calculator is hidden so no leg can be counted twice.
+         (The field keeps its old name, blend_tp1, for compatibility.) */}}
     <input type="hidden" name="blend_tp1" value="on">
     <div class="jc-leg">
-      <b>{{t "jc.leg.title"}}</b>
-      <span class="ui-num">{{printf "%.4g" .Trade.TP1FillPct}}% @ {{fmtPx .Trade.TP1FillPrice}}</span>
-      <span class="ui-dim ui-sm">{{fmtTime .Trade.TP1FilledAt}}</span>
+      <b>{{t "jc.legs.title"}}</b>
+      {{range legs .Trade}}<span class="ui-num">{{printf "%.4g" .Pct}}% @ {{fmtPx .Price}}</span> <span class="ui-dim ui-sm">{{fmtTime .At}}</span> {{end}}
       <b class="{{rClass (lockedR .Trade)}}">{{t "jc.leg.locked"}} {{fmtR (lockedR .Trade)}}R</b>
-      <div class="ui-hint">{{printf (t "jc.leg.hint") (sub100 .Trade.TP1FillPct)}}</div>
+      <div class="ui-hint">{{printf (t "jc.leg.hint") (restPct .Trade)}}</div>
     </div>
     {{else}}
     {{template "partialsHelper" .}}
@@ -82,7 +82,7 @@
         </select>
       </div>
       <div class="ui-f" id="exit-field">
-        <label for="exit_price">{{if .Trade.HasTP1Leg}}{{t "jc.leg.restExit"}}{{else}}{{t "th.exit"}}{{end}}</label>
+        <label for="exit_price">{{if .Trade.HasLegs}}{{t "jc.leg.restExit"}}{{else}}{{t "th.exit"}}{{end}}</label>
         <input type="number" step="any" inputmode="decimal"
                name="exit_price" id="exit_price" value="{{.ExitPrice}}"
                data-tp1="{{fmtPrice .Trade.TP1}}"

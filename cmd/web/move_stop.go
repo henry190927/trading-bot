@@ -19,7 +19,6 @@ package main
 
 import (
 	"context"
-	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -49,15 +48,11 @@ func protectiveStops(resting []bingx.OpenOrder, pos *bingx.Position) []liveStop 
 	return out
 }
 
-// rIfStopped is the whole trade's R if the remainder is stopped at stop: the
-// TP1 leg's locked R plus the remainder's share at the stop. Measured against
-// the journal's stop, the R baseline.
+// rIfStopped is the whole trade's R if the remainder exits at stop: the
+// partial closes' locked R plus the remainder's share at that price.
+// Measured against the journal's stop, the R baseline.
 func rIfStopped(t journal.Trade, stop float64) float64 {
-	rest := 1.0
-	if t.HasTP1Leg() {
-		rest = 1 - math.Min(t.TP1FillPct/100, 1)
-	}
-	return journal.LockedR(t) + rest*journal.RealizedR(t, stop)
+	return journal.LockedR(t) + (1-journal.ClosedFrac(t))*journal.RealizedR(t, stop)
 }
 
 func (s *server) handleMoveStop(c *gin.Context) {

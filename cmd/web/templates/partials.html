@@ -377,7 +377,7 @@
           {{else}}<span class="ui-warn">{{template "icon" "alert"}}{{t "ms.none"}}</span>{{end}}
           {{if .LiveTPs}}<span class="pos-live"><span class="ui-dim">{{t "mt.liveTP"}}</span> {{range $i, $tp := .LiveTPs}}{{if $i}} · {{end}}{{fmtPx $tp.Price}}{{end}}</span>{{end}}
         {{end}}
-        {{if $tr.HasTP1Leg}}<span class="pos-leg">{{template "icon" "check"}}{{printf (t "jpos.tp1Leg") $tr.TP1FillPct (fmtPx $tr.TP1FillPrice) (fmtR (lockedR $tr))}}</span>{{end}}
+        {{if $tr.HasLegs}}<span class="pos-leg">{{template "icon" "check"}}{{t "jpos.legs"}} {{range $i, $l := legs $tr}}{{if $i}} · {{end}}{{printf "%.4g" $l.Pct}}% @ {{fmtPx $l.Price}}{{end}} · {{t "jc.leg.locked"}} {{fmtR (lockedR $tr)}}R</span>{{end}}
       </div>
     {{else}}
       <div class="pos-meta ui-sm"><span class="ui-warn">{{t "jpos.noStop"}}</span>{{if .MarkPrice}}<span><span class="ui-dim">{{t "jpos.mark"}}</span> {{fmtPx .MarkPrice}}</span>{{end}}</div>

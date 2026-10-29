@@ -1166,5 +1166,8 @@
   "mt.none": "No take-profit on the exchange",
   "mt.hint": "Cancels the old take-profit, then places a new reduce-only limit; if the new one fails the old one is put back. Size comes from the live position. On success the journal final TP is updated too (it is not the R baseline).",
   "mt.err.price": "Enter a new take-profit price (> 0)",
-  "mt.err.choose": "Several take-profits are resting; choose which one to replace"
+  "mt.err.choose": "Several take-profits are resting; choose which one to replace",
+  "jpos.legs": "Scaled out",
+  "jc.legs.title": "Partial closes (from the exchange)",
+  "jc.legs.notes": "Scale-out (auto): %s + remainder %.4g%% @ %s → blended exit %s"
 }

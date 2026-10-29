@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/csv"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -66,6 +67,7 @@ var Header = []string{
 	"tp1_fill_price",
 	"tp1_fill_pct",
 	"tp1_filled_at",
+	"exits",
 }
 
 // Trade is one journal row.
@@ -164,38 +166,90 @@ type Trade struct {
 	TP1FillPrice float64
 	TP1FillPct   float64
 	TP1FilledAt  time.Time
+
+	// Exits are the partial closes recorded so far — any number of them,
+	// added on the exchange after the position opened (docs/position_orders_design.md).
+	// Stored as a JSON array in one column. The final close stays in
+	// exit_price/closed_at; the TP1 columns above are the older one-leg form
+	// of the same thing and are read as a leg too (see Legs).
+	Exits []Exit
+}
+
+// Exit is one partial close that has filled.
+type Exit struct {
+	Price   float64   `json:"price"`
+	Qty     float64   `json:"qty"`
+	Pct     float64   `json:"pct"` // share of the ORIGINAL position, in percent
+	At      time.Time `json:"at"`
+	OrderID string    `json:"order_id,omitempty"`
+	Src     string    `json:"src,omitempty"` // "exchange" | "manual"
+}
+
+// Legs returns every recorded partial close: the legacy TP1 leg, if the row
+// has one, followed by Exits. R and the close form see one list either way.
+func Legs(t Trade) []Exit {
+	var out []Exit
+	if t.HasTP1Leg() {
+		out = append(out, Exit{Price: t.TP1FillPrice, Pct: t.TP1FillPct, At: t.TP1FilledAt, OrderID: t.TP1OrderID, Src: "exchange"})
+	}
+	return append(out, t.Exits...)
+}
+
+// HasLegs reports whether any partial close has been recorded.
+func (t Trade) HasLegs() bool { return len(Legs(t)) > 0 }
+
+// legBlend reduces the partial closes to two numbers: their size-weighted
+// average price, and the share of the original position they closed, as a
+// 0-1 fraction.
+//
+// Contract (journal_legs_test.go is the definition of done):
+//   - A leg with Price <= 0 or Pct <= 0 is ignored — it carries no
+//     information and must not drag the average toward zero.
+//   - avg = Σ(Pct_i × Price_i) / Σ Pct_i over the legs kept.
+//   - frac = Σ Pct_i / 100, CAPPED at 1: a malformed row whose legs add up
+//     to more than the whole position must never produce a negative
+//     remainder. The average still uses the uncapped weights.
+//   - No legs kept → (0, 0).
+//
+// R is linear in the exit price, which is why two numbers are enough:
+// frac × R(avg) is exactly Σ (Pct_i/100) × R(Price_i).
+func legBlend(legs []Exit) (avg, frac float64) {
+	// TODO(you): implement the contract above.
+	return 0, 0
+}
+
+// ClosedFrac is the share of the original position already closed by
+// partial exits, 0-1.
+func ClosedFrac(t Trade) float64 {
+	_, f := legBlend(Legs(t))
+	return f
 }
 
 // HasTP1Leg reports whether a TP1 scale-out has been recorded.
 func (t Trade) HasTP1Leg() bool { return t.TP1FillPrice > 0 && t.TP1FillPct > 0 }
 
-// tp1Frac is the TP1 leg's share of the position as a 0-1 fraction, capped
-// at 1 so a malformed pct can never produce a negative remainder.
-func (t Trade) tp1Frac() float64 {
-	if !t.HasTP1Leg() {
-		return 0
-	}
-	return math.Min(t.TP1FillPct/100, 1)
-}
-
-// BlendedExit returns the size-weighted average exit of the TP1 leg and the
-// remainder closed at rest. With no TP1 leg it is rest unchanged.
+// BlendedExit returns the size-weighted average exit of every partial close
+// (Legs) and the remainder closed at rest. With no legs it is rest unchanged.
 //
 // R is linear in the exit price, so RealizedR(t, BlendedExit(t, rest)) equals
-// frac*R(tp1) + (1-frac)*R(rest) exactly. Storing the blend in exit_price is
-// what lets a scale-out survive every later recompute.
+// Σ frac_i*R(leg_i) + (1-Σfrac)*R(rest) exactly. Storing the blend in
+// exit_price is what lets a scale-out survive every later recompute.
 func BlendedExit(t Trade, rest float64) float64 {
-	f := t.tp1Frac()
+	avg, f := legBlend(Legs(t))
 	if f == 0 {
 		return rest
 	}
-	return f*t.TP1FillPrice + (1-f)*rest
+	return f*avg + (1-f)*rest
 }
 
-// LockedR is the R already banked by the TP1 leg, as a share of the whole
-// position (a 50% leg at +1.29R locks +0.64R). 0 without a leg or without R.
+// LockedR is the R already banked by the partial closes, as a share of the
+// whole position (a 50% leg at +1.29R locks +0.64R). 0 without legs or R.
 func LockedR(t Trade) float64 {
-	return t.tp1Frac() * RealizedR(t, t.TP1FillPrice)
+	avg, f := legBlend(Legs(t))
+	if f == 0 {
+		return 0
+	}
+	return f * RealizedR(t, avg)
 }
 
 // Notional is the position's face value in USDT — margin x leverage. Zero when
@@ -675,8 +729,10 @@ func parseRow(row []string) (Trade, error) {
 		return parseRowV9(row), nil
 	case 33:
 		return parseRowV10(row), nil
+	case 34:
+		return parseRowV11(row)
 	}
-	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23/29/30/33 columns, got %d", len(row))
+	return Trade{}, fmt.Errorf("expected 16/17/18/19/20/21/23/29/30/33/34 columns, got %d", len(row))
 }
 
 func parseRowV1(row []string) Trade {
@@ -845,6 +901,19 @@ func parseRowV10(row []string) Trade {
 	return t
 }
 
+// parseRowV11 is v10 + exits (33), a JSON array of Exit. A cell that does not
+// parse is an error, not an empty list: silently dropping a recorded leg
+// would change the trade's R on the next save.
+func parseRowV11(row []string) (Trade, error) {
+	t := parseRowV10(row[:33])
+	if s := strings.TrimSpace(row[33]); s != "" {
+		if err := json.Unmarshal([]byte(s), &t.Exits); err != nil {
+			return Trade{}, fmt.Errorf("exits: %w", err)
+		}
+	}
+	return t, nil
+}
+
 func rowFromTrade(t Trade) []string {
 	closedAt := ""
 	if !t.ClosedAt.IsZero() {
@@ -927,7 +996,21 @@ func rowFromTrade(t Trade) []string {
 		t.TP2OrderID,
 		equityStr,
 		tp1Price, tp1Pct, tp1At,
+		exitsJSON(t.Exits),
 	}
+}
+
+// exitsJSON is the exits cell: "" for none, so rows without partial closes
+// stay as compact as before.
+func exitsJSON(ex []Exit) string {
+	if len(ex) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(ex)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // boolStr renders a bool as "true" / "" so the CSV stays compact when

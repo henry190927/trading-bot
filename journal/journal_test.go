@@ -88,11 +88,11 @@ func TestRiskDerivationsDegradeToZero(t *testing.T) {
 	}
 }
 
-func TestHeaderIsV10(t *testing.T) {
-	if len(Header) != 33 {
-		t.Fatalf("len(Header) = %d, want 33 (v10)", len(Header))
+func TestHeaderIsV11(t *testing.T) {
+	if len(Header) != 34 {
+		t.Fatalf("len(Header) = %d, want 34 (v11)", len(Header))
 	}
-	if Header[29] != "equity_usdt" || Header[30] != "tp1_fill_price" || Header[32] != "tp1_filled_at" {
+	if Header[29] != "equity_usdt" || Header[30] != "tp1_fill_price" || Header[32] != "tp1_filled_at" || Header[33] != "exits" {
 		t.Errorf("Header tail = %q", Header[29:])
 	}
 	if n := len(rowFromTrade(Trade{})); n != len(Header) {
@@ -573,5 +573,14 @@ func TestV10RoundTrip(t *testing.T) {
 	}
 	if out[1].HasTP1Leg() {
 		t.Errorf("row without a leg read back with one: %+v", out[1])
+	}
+}
+
+// A v10 row (33 cells, written before exits existed) still reads, with no exits.
+func TestV10RowStillReads(t *testing.T) {
+	row := rowFromTrade(trade66())[:33]
+	got, err := parseRow(row)
+	if err != nil || got.ID != trade66().ID || len(got.Exits) != 0 {
+		t.Fatalf("v10 row: %+v, %v", got, err)
 	}
 }

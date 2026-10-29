@@ -25,7 +25,7 @@ type exchangeClose struct {
 	ExitPrice float64   // size-weighted average of the closing fills
 	ClosedAt  time.Time // the last closing fill
 	Qty       float64   // total closing quantity, excluding a recorded TP1 leg
-	LegQty    float64   // the recorded TP1 leg's fill, left out of Qty and ExitPrice
+	LegQty    float64   // recorded partial closes' fills, left out of Qty and ExitPrice
 	EntryQty  float64   // the entry order's fill, else the opening fills; 0 if unknown
 	PnL       float64   // realised PnL the exchange reported on the closing fills
 	Fees      float64   // fees on the entry and closing fills (negative = paid)
@@ -54,6 +54,14 @@ func exchangeCloseFor(t journal.Trade, fills []bingx.FilledOrder) (ec exchangeCl
 	if t.Side == "short" {
 		closeSide, openSide, posSide = "BUY", "SELL", "SHORT"
 	}
+	// Partial closes already recorded (the legacy TP1 leg and exits) are
+	// left out of the exit: the close form blends the remainder with them.
+	recorded := map[string]bool{}
+	for _, l := range journal.Legs(t) {
+		if l.OrderID != "" {
+			recorded[l.OrderID] = true
+		}
+	}
 	var notional, openQty float64
 	for _, f := range fills {
 		if f.Time.Before(t.OpenedAt) || f.AvgPrice <= 0 || f.Quantity <= 0 {
@@ -70,7 +78,7 @@ func exchangeCloseFor(t journal.Trade, fills []bingx.FilledOrder) (ec exchangeCl
 			openQty += f.Quantity
 			ec.Fees += f.FeeUSDT
 		case closeSide:
-			if t.HasTP1Leg() && f.OrderID == t.TP1OrderID {
+			if recorded[f.OrderID] {
 				ec.LegQty += f.Quantity
 				continue
 			}

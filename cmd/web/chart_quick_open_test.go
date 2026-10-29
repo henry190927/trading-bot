@@ -346,7 +346,7 @@ func TestEditRefusesSilentCloseAttempts(t *testing.T) {
 		if w.Code == http.StatusSeeOther {
 			t.Errorf("%s: saved (303), want the form back with an error", name)
 		}
-		if after, _ := journal.ReadAll(""); after[0] != cur[0] {
+		if after, _ := journal.ReadAll(""); journal.Version(after[0]) != journal.Version(cur[0]) {
 			t.Errorf("%s: row changed: %+v", name, after[0])
 		}
 	}
