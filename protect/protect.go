@@ -24,6 +24,7 @@ package protect
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/market"
@@ -302,6 +303,63 @@ type MoveTPResult struct {
 // Every failure adds exactly one entry to Errors. Done = every test in
 // protect_test.go named TestMoveTP* passes.
 func MoveTP(ctx context.Context, c Mover, p Plan, old []RestingTP) MoveTPResult {
-	// TODO(you): implement the contract above.
-	return MoveTPResult{Errors: []string{"MoveTP: not implemented"}}
+	var r MoveTPResult
+	if !p.OK() {
+		r.Errors = append(r.Errors, "refusing to send a plan with faults: "+p.Faults[0])
+		return r
+	}
+	// Statement 1
+	if p.Stop != 0 || p.TP <= 0 {
+		r.Errors = append(r.Errors, "move-tp needs a take-profit plan")
+		return r
+	}
+
+	var cancelled []RestingTP
+	resubmit := func() {
+		// Put-back gets its own context. If the new take-profit failed
+		// because ctx hit its deadline (or the browser went away), every
+		// call made with ctx would fail at once and leave the position
+		// with no take-profit at all. WithoutCancel detaches from ctx's
+		// deadline and cancellation (keeping its values); WithTimeout
+		// still bounds the put-back, so a hung exchange cannot hang the
+		// handler. Synchronous: no goroutine, the result is reported
+		// below. cancel releases the timer (go vet: lostcancel).
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+
+		for _, ctp := range cancelled {
+			res, err := c.PlaceReduceOnlyLimit(rctx, p.Symbol, p.Side, p.Qty, ctp.Price, p.Hedge)
+			if err != nil {
+				r.Errors = append(r.Errors, "no take-profit of cancelled "+ctp.ID+"["+fmt.Sprintf("%f", ctp.Price)+"]: "+err.Error())
+				continue
+			}
+			r.Restored = append(r.Restored, res.OrderID)
+		}
+	}
+
+	// Statement 2
+	for _, tp := range old {
+		if tp.ID == "" {
+			continue
+		}
+		if err := c.CancelOrder(ctx, p.Symbol, tp.ID); err != nil {
+			r.Errors = append(r.Errors, "cancel old take-profit "+tp.ID+"["+fmt.Sprintf("%g", tp.Price)+"]: "+err.Error())
+			resubmit()
+			return r
+		}
+		r.Cancelled = append(r.Cancelled, tp.ID)
+		cancelled = append(cancelled, tp)
+	}
+
+	// Statement 3
+	res, err := c.PlaceReduceOnlyLimit(ctx, p.Symbol, p.Side, p.Qty, p.TP, p.Hedge)
+	if err != nil {
+		r.Errors = append(r.Errors, "place new reduce-only limit: "+err.Error())
+		resubmit()
+		return r
+	}
+
+	// Statement 4
+	r.NewTPID = res.OrderID
+	return r
 }
