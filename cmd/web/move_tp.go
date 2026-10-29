@@ -34,7 +34,7 @@ func takeProfits(resting []bingx.OpenOrder, pos *bingx.Position) []liveStop {
 	var out []liveStop
 	for _, o := range resting {
 		if bracket.TakesProfit(o, pos) {
-			out = append(out, liveStop{ID: o.OrderID, Price: bracket.StopTrigger(o)})
+			out = append(out, liveStop{ID: o.OrderID, Price: bracket.StopTrigger(o), Qty: o.Quantity})
 		}
 	}
 	return out

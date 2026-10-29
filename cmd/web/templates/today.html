@@ -114,6 +114,25 @@
   </div>
 </div>
 
+<div class="modal-backdrop hidden" id="at-backdrop">
+  <div class="modal quick-modal" role="dialog" aria-labelledby="at-title">
+    <div class="modal-head"><h3 id="at-title">{{t "atp.title"}}</h3><button type="button" class="modal-x" id="at-close" aria-label="{{t "chart.ui.q.close"}}">&times;</button></div>
+    <div class="modal-body ms-body">
+      <div class="ms-label" id="at-label"></div>
+      <div class="ui-f-row">
+        <div class="ui-f"><label for="at-price">{{t "atp.price"}}</label><input type="number" step="any" inputmode="decimal" id="at-price"></div>
+        <div class="ui-f"><label for="at-pct">{{t "atp.pct"}}</label><input type="number" step="any" inputmode="decimal" min="1" max="99" id="at-pct" value="30"></div>
+      </div>
+      <div class="ms-preview" id="at-preview"></div>
+      <div class="ms-actions">
+        <button type="button" class="ui-btn ghost" id="at-preview-btn">{{t "ms.preview"}}</button>
+        <button type="button" class="ui-btn ms-go" id="at-go" disabled>{{t "atp.confirm"}}</button>
+      </div>
+      <div class="ui-hint">{{t "atp.hint"}}</div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop hidden" id="mt-backdrop">
   <div class="modal quick-modal" role="dialog" aria-labelledby="mt-title">
     <div class="modal-head"><h3 id="mt-title">{{t "mt.title"}}</h3><button type="button" class="modal-x" id="mt-close" aria-label="{{t "chart.ui.q.close"}}">&times;</button></div>
@@ -461,6 +480,82 @@
         previewed = null;
         if(window.refreshPositions) window.refreshPositions();
       }).catch(function(){ go.textContent = MT.confirm; });
+    });
+  })();
+
+  // ── Add / cancel a partial take-profit ───────────────────────────────
+  (function(){
+    var bd = document.getElementById('at-backdrop'), slot = document.getElementById('today-pos-slot');
+    if(!bd || !slot) return;
+    var price = document.getElementById('at-price'), pct = document.getElementById('at-pct'), pv = document.getElementById('at-preview');
+    var go = document.getElementById('at-go'), pbtn = document.getElementById('at-preview-btn');
+    var tradeID = null, previewed = null;
+    var AT = {qty:{{t "ms.qty"}}, of:{{t "atp.ofEntry"}}, left:{{t "atp.left"}}, locks:{{t "atp.locks"}}, over:{{t "atp.over"}},
+              sending:{{t "ms.sending"}}, done:{{t "atp.done"}}, confirm:{{t "atp.confirm"}}, verify:{{t "jpos.verify"}},
+              cancelAsk:{{t "atp.cancelAsk"}}, cancelled:{{t "atp.cancelled"}}};
+    function esc(x){ return String(x).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function fmtR(r){ return (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'; }
+    function key(){ return price.value.trim() + '|' + pct.value.trim(); }
+    function post(url, body){
+      return fetch(url, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); });
+    }
+    function send(confirm){
+      return post('/api/trade/' + tradeID + '/add-tp', 'tp=' + encodeURIComponent(price.value.trim()) + '&pct=' + encodeURIComponent(pct.value.trim()) + (confirm ? '&confirm=1' : ''));
+    }
+    function showErr(j){ pv.innerHTML = '<div class="ui-warn">' + esc((j.faults && j.faults.length ? j.faults.join(' · ') : j.error) || 'error') + '</div>'; }
+    function open(btn){
+      tradeID = btn.getAttribute('data-id'); previewed = null; go.disabled = true; pv.innerHTML = ''; price.value = '';
+      document.getElementById('at-label').textContent = btn.getAttribute('data-label');
+      bd.classList.remove('hidden');
+      setTimeout(function(){ price.focus(); }, 30);
+    }
+    function close(){ bd.classList.add('hidden'); }
+    slot.addEventListener('click', function(e){
+      var b = e.target.closest('.js-add-tp');
+      if(b){ open(b); return; }
+      var x = e.target.closest('.js-cancel-tp');
+      if(!x || !window.confirm(AT.cancelAsk + ' ' + x.getAttribute('data-price'))) return;
+      x.disabled = true;
+      post('/api/trade/' + x.getAttribute('data-id') + '/cancel-tp', 'order_id=' + encodeURIComponent(x.getAttribute('data-order')))
+        .then(function(res){
+          if(window.toast) window.toast(res.ok ? AT.cancelled + ' ' + x.getAttribute('data-price') : (res.j.error || 'error'), res.ok ? 'ok' : 'err');
+          if(window.refreshPositions) window.refreshPositions();
+        }).catch(function(){ x.disabled = false; });
+    });
+    document.getElementById('at-close').addEventListener('click', close);
+    bd.addEventListener('click', function(e){ if(e.target === bd) close(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !bd.classList.contains('hidden')) close(); });
+    [price, pct].forEach(function(el){ el.addEventListener('input', function(){ go.disabled = true; previewed = null; }); });
+    pbtn.addEventListener('click', function(){
+      if(!price.value.trim() || !pct.value.trim()) return;
+      pbtn.disabled = true;
+      send(false).then(function(res){
+        pbtn.disabled = false;
+        var j = res.j;
+        if(!res.ok){ showErr(j); return; }
+        var lines = [
+          '<div>' + AT.qty + ' <b>' + j.qty + '</b> (' + j.pct + '% ' + AT.of + ' ' + j.entry_qty + ') · ' + AT.left + ' <b>' + (j.live_qty - j.qty).toFixed(6).replace(/\.?0+$/, '') + '</b></div>',
+          '<div>' + AT.locks + ' <b class="' + (j.r_locked >= 0 ? 'ui-up' : 'ui-down') + '">' + fmtR(j.r_locked) + '</b> · <b>' + (j.usdt >= 0 ? '+' : '') + j.usdt.toFixed(2) + 'u</b></div>'
+        ];
+        if(j.resting_tp_qty + j.qty > j.live_qty) lines.push('<div class="ui-warn">' + AT.over + '</div>');
+        pv.innerHTML = lines.join('');
+        previewed = key(); go.disabled = false;
+      }).catch(function(){ pbtn.disabled = false; });
+    });
+    go.addEventListener('click', function(){
+      if(previewed === null || key() !== previewed) return;
+      go.disabled = true; go.textContent = AT.sending;
+      send(true).then(function(res){
+        go.textContent = AT.confirm;
+        var j = res.j;
+        if(!j.order_id){ showErr({error: (j.errors || []).join(' · ') || j.error, faults: j.faults}); return; }
+        var ico = document.getElementById('ico-check');
+        pv.innerHTML = '<div class="ui-up">✓ ' + AT.done + ' <code>' + esc(j.order_id) + '</code></div>' +
+          '<div><a class="ui-btn ghost sm" href="/ops/verify">' + (ico ? ico.innerHTML : '') + AT.verify + '</a></div>';
+        previewed = null;
+        if(window.refreshPositions) window.refreshPositions();
+      }).catch(function(){ go.textContent = AT.confirm; });
     });
   })();
 

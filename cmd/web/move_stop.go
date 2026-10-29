@@ -35,6 +35,7 @@ import (
 type liveStop struct {
 	ID    string  `json:"id"`
 	Price float64 `json:"price"`
+	Qty   float64 `json:"qty,omitempty"` // 0 when the exchange did not report it
 }
 
 // protectiveStops lists every resting order that would close pos.

@@ -132,6 +132,8 @@ func main() {
 	// journal's R baseline — see move_stop.go.
 	r.POST("/api/trade/:id/move-stop", srv.handleMoveStop)
 	r.POST("/api/trade/:id/move-tp", srv.handleMoveTP)
+	r.POST("/api/trade/:id/add-tp", srv.handleAddTP)
+	r.POST("/api/trade/:id/cancel-tp", srv.handleCancelTP)
 	r.GET("/scan", srv.handleDashboard) // Scan moved off "/"
 	r.GET("/journal", srv.handleJournalList)
 	r.GET("/journal/new", srv.handleJournalNew)
