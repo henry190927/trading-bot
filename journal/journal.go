@@ -214,8 +214,18 @@ func (t Trade) HasLegs() bool { return len(Legs(t)) > 0 }
 // R is linear in the exit price, which is why two numbers are enough:
 // frac × R(avg) is exactly Σ (Pct_i/100) × R(Price_i).
 func legBlend(legs []Exit) (avg, frac float64) {
-	// TODO(you): implement the contract above.
-	return 0, 0
+	sum, tPct := 0.0, 0.0
+	for _, leg := range legs {
+		if leg.Price <= 0 || leg.Pct <= 0 {
+			continue
+		}
+		sum += leg.Price * leg.Pct
+		tPct += leg.Pct
+	}
+	if tPct == 0 {
+		return 0, 0
+	}
+	return sum / tPct, min(tPct/100.0, 1)
 }
 
 // ClosedFrac is the share of the original position already closed by

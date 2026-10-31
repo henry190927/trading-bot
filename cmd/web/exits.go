@@ -14,6 +14,7 @@ package main
 import (
 	"context"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/henry190927/trading-bot/bingx"
@@ -43,8 +44,70 @@ import (
 //   - entryQty <= 0 means the denominator is unknown: return nil.
 //   - Do not modify fills (the caller may reuse the slice).
 func newExitsFrom(t journal.Trade, fills []bingx.FilledOrder, entryQty float64) []journal.Exit {
-	// TODO(you): implement the contract above.
-	return nil
+	if entryQty <= 0 {
+		return nil
+	}
+
+	slice := make([]bingx.FilledOrder, 0, len(fills))
+
+	// 平倉方向, 倉位方向 init based on t.Side is "long"
+	closeSide, positionSide := "SELL", "LONG"
+	if t.Side == "short" {
+		closeSide, positionSide = "BUY", "SHORT"
+	}
+
+	since := t.FilledAt
+	if since.IsZero() {
+		since = t.OpenedAt
+	}
+
+	seen := make(map[string]struct{})
+	for _, exit := range journal.Legs(t) {
+		if exit.OrderID != "" {
+			seen[exit.OrderID] = struct{}{}
+		}
+	}
+
+	for _, fill := range fills {
+		if fill.Side != closeSide {
+			continue
+		}
+		if fill.Quantity <= 0 || fill.AvgPrice <= 0 {
+			continue
+		}
+		if fill.Time.Before(since) {
+			continue
+		}
+		if fill.Status != "" && fill.Status != "FILLED" {
+			continue
+		}
+		if fill.PositionSide != "" && fill.PositionSide != "BOTH" && fill.PositionSide != positionSide {
+			continue
+		}
+		if _, ok := seen[fill.OrderID]; ok {
+			continue
+		}
+
+		slice = append(slice, fill)
+	}
+
+	slices.SortFunc(slice, func(i, j bingx.FilledOrder) int {
+		return i.Time.Compare(j.Time)
+	})
+
+	// 沒有結果就回傳 nil
+	var exits []journal.Exit
+	closed := journal.ClosedFrac(t) * entryQty
+
+	for _, fill := range slice {
+		if closed+fill.Quantity >= 0.999*entryQty {
+			break
+		}
+		exits = append(exits, journal.Exit{Price: fill.AvgPrice, Qty: fill.Quantity, Pct: fill.Quantity / entryQty * 100, At: fill.Time, OrderID: fill.OrderID, Src: "exchange"})
+		closed += fill.Quantity
+	}
+
+	return exits
 }
 
 // plannedQty is the entry size placeEntryOnBingX sent: margin × leverage /
