@@ -51,6 +51,13 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// 79, because the log had grown to 92 fires. The row cap is a UI choice and
 	// belongs at render time, not in the arithmetic.
 	fires := autotrade.ReadFires(autotradeLogDepth)
+	// The paper balance needs every fire since paper_since; at the read depth
+	// the oldest ones can fall off, and then the balance silently drops them.
+	logFull := len(fires) >= autotradeLogDepth
+	var oldestRead time.Time
+	if len(fires) > 0 {
+		oldestRead = fires[len(fires)-1].Time // newest-first
+	}
 
 	// ?since=YYYY-MM-DD (TPE) narrows EVERY number on the page, not just the
 	// table — a filter that moved the rows while leaving the totals alone
@@ -233,6 +240,18 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	}
 	sum := autotrade.Summarize(outs)
 
+	// Paper balance (display only). Not under a ?since filter: that would
+	// drop positions the balance has to count.
+	var paperBal *autotrade.PaperBalance
+	paperTruncated := false
+	if cfg.PaperBaseUSDT > 0 && sinceLabel == "" {
+		if ps := autotrade.ParsePaperSince(cfg.PaperSince); !ps.IsZero() {
+			pb := autotrade.ComputePaperBalance(positions, cfg.PaperBaseUSDT, ps)
+			paperBal = &pb
+			paperTruncated = logFull && oldestRead.After(ps)
+		}
+	}
+
 	envArmed := strings.EqualFold(strings.TrimSpace(os.Getenv("AUTOTRADE_ENABLED")), "true")
 
 	s.page(c, http.StatusOK, "autotrade.html", gin.H{
@@ -263,20 +282,22 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		// Risk sizing replaces margin_usdt and turns leverage into a ceiling
 		// (autotrade.Size). The rules table must say so, or it would keep
 		// showing a 35u margin that no order uses.
-		"RiskPct":    cfg.RiskPerTradePct,
-		"LiqStopPct": autotrade.LiqStopMaxFrac * 100,
-		"Rules":      cfg.Rules,
-		"Fires":      rows,
-		"PageSize":   autotradePageSize,
-		"Since":      sinceLabel,
-		"CapBlocked": len(capBlocked),
-		"CapReasons": blockedReasons(capBlocked),
-		"FiresRead":  len(fires),
-		"Sum":        sum,
-		"Equity":     buildEquityCurve(statTrades),
-		"Histogram":  buildRHistogram(statTrades),
-		"Calendar":   buildDailyCalendar(statTrades, 42, time.Now()),
-		"StatN":      len(statTrades),
+		"RiskPct":        cfg.RiskPerTradePct,
+		"LiqStopPct":     autotrade.LiqStopMaxFrac * 100,
+		"Rules":          cfg.Rules,
+		"Fires":          rows,
+		"PageSize":       autotradePageSize,
+		"Since":          sinceLabel,
+		"CapBlocked":     len(capBlocked),
+		"CapReasons":     blockedReasons(capBlocked),
+		"FiresRead":      len(fires),
+		"Sum":            sum,
+		"PaperBal":       paperBal,
+		"PaperTruncated": paperTruncated,
+		"Equity":         buildEquityCurve(statTrades),
+		"Histogram":      buildRHistogram(statTrades),
+		"Calendar":       buildDailyCalendar(statTrades, 42, time.Now()),
+		"StatN":          len(statTrades),
 		// perfPanels labels its distribution panel with .ClosedCount.
 		"ClosedCount":     len(statTrades),
 		"StatUnscoreable": statUnscoreable,

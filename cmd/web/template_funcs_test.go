@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/henry190927/trading-bot/autotrade"
 )
@@ -158,5 +159,29 @@ func TestBdTableExecutes(t *testing.T) {
 	if strings.Count(unsettled, "—") != 3 { // tp/stop, win-rate, R/trade
 		t.Errorf("unsettled group should dash 3 cells, got %d:\n%s",
 			strings.Count(unsettled, "—"), unsettled)
+	}
+}
+
+// TestPaperBalExecutes renders the panel's paper-balance cell with a real
+// PaperBalance: .Since.Format and the ge comparison only fail at execute time.
+func TestPaperBalExecutes(t *testing.T) {
+	tpl := template.Must(template.New("").Funcs(templateFuncs()).ParseFS(assets, "templates/*.html"))
+	pb := autotrade.PaperBalance{Base: 140, Since: time.Date(2026, 11, 1, 3, 0, 0, 0, time.UTC),
+		Realized: 2.2, Unrealized: 0.6, Balance: 142.2, Closed: 2, Open: 1, NoRisk: 1}
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "paperBal", pb); err != nil {
+		t.Fatalf("paperBal failed to execute: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"142.20u", "ui-up", "&#43;2.20", "2/1", "2026-11-01 03:00"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("paperBal output missing %q:\n%s", want, out)
+		}
+	}
+	pb.Balance = 138
+	buf.Reset()
+	_ = tpl.ExecuteTemplate(&buf, "paperBal", pb)
+	if !strings.Contains(buf.String(), "ui-down") {
+		t.Errorf("below base should render ui-down:\n%s", buf.String())
 	}
 }

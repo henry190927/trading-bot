@@ -59,7 +59,12 @@ type Config struct {
 	// liquidation guard, and margin_usdt is no longer read. 0 = the old fixed
 	// margin_usdt × leverage sizing. See sizing.go.
 	RiskPerTradePct float64 `json:"risk_per_trade_pct"`
-	Rules           []Rule  `json:"rules"`
+	// PaperBaseUSDT and PaperSince set up the panel's paper balance: a
+	// starting balance and the time it starts from (RFC3339 or YYYY-MM-DD).
+	// Display only — nothing sizes off it. 0 / "" = not shown.
+	PaperBaseUSDT float64 `json:"paper_base_usdt,omitempty"`
+	PaperSince    string  `json:"paper_since,omitempty"`
+	Rules         []Rule  `json:"rules"`
 }
 
 // Path is the on-disk config (env AUTOTRADE_PATH or the default).

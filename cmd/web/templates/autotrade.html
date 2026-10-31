@@ -1,3 +1,4 @@
+{{define "paperBal"}}<div title="{{printf (t "at.paperBal.hint") .Base (.Since.Format "2006-01-02 15:04")}}"><span class="ui-dim ui-sm">{{t "at.paperBal"}}</span><b class="ui-num {{if ge .Balance .Base}}ui-up{{else}}ui-down{{end}}">{{printf "%.2f" .Balance}}u</b> <span class="ui-dim ui-sm">{{printf "%+.2f" .Realized}} · {{t "at.paperBal.open"}} {{printf "%+.2f" .Unrealized}} · {{.Closed}}/{{.Open}}{{if .NoRisk}} · {{printf (t "at.paperBal.noRisk") .NoRisk}}{{end}}</span></div>{{end}}
 {{define "bdTable"}}
 <div class="dt-scroll">
 <table class="dt">
@@ -59,7 +60,9 @@
       <div><span class="ui-dim ui-sm">{{t "at.cap.sameSide"}}</span><b class="ui-num">{{if .MaxSameSide}}{{.MaxSameSide}}{{else}}<span class="ui-dim">{{t "at.unset"}}</span>{{end}}</b></div>
       <div><span class="ui-dim ui-sm">{{t "at.cap.risk"}}</span><b class="ui-num">{{if gt .RiskPct 0.0}}{{printf "%.2f" .RiskPct}}%{{else}}<span class="ui-dim">{{t "at.fixedMargin"}}</span>{{end}}</b></div>
       <div><span class="ui-dim ui-sm">{{t "at.cooldown"}}</span><b class="ui-num">{{.Cooldown}} {{t "unit.barsShort"}}</b></div>
+      {{with .PaperBal}}{{template "paperBal" .}}{{end}}
     </div>
+    {{if .PaperTruncated}}<div class="ui-callout bad">{{t "at.paperBal.truncated"}}</div>{{end}}
     {{if gt .BookUnscored 0}}<div class="ui-callout bad">{{printf (t "at.unscored") .BookUnscored}}</div>{{end}}
     <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary>
       <p>{{t "at.howto.live"}} {{if .LiveArmed}}<b class="ui-down">{{t "at.armedNow"}}</b>{{else}}<b class="ui-up">{{t "at.notArmedNow"}}</b>{{end}}</p>
