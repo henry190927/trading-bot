@@ -6,6 +6,13 @@
 //	  → rest a limit in the near half of this node (-entry-frac), stop past
 //	  its far foot, target the node price just left. This is how the user
 //	  trades it by hand (BTC 10/21: node 81,250–81,900, limit 81,700).
+//	Arm A2 (approach, limit): like A, but the limit is placed only once a close
+//	  first lands within -approach-atr ATR of the node's near edge, or inside
+//	  the node without breaking its far foot (an hourly bar often skips the
+//	  band) — price has
+//	  already shown it is heading for the node (user, 11/01: "react after
+//	  price shows its direction"), instead of right after it leaves the
+//	  other node.
 //	Arm B (breakout): the previous close was inside a node, this bar closes
 //	  beyond its edge into the gap → enter toward the next node.
 //
@@ -40,16 +47,17 @@ import (
 )
 
 type params struct {
-	arm       string  // "A" | "B"
-	target    string  // "foot" (near side of the next node) | "poc" (next node's POC)
-	side      string  // long | short | auto
-	lookback  int     // bars in the profile
-	bins      int     // profile bins
-	bufATR    float64 // stop buffer beyond the stop level, in ATR(14)
-	minR      float64 // skip fires whose target/risk is below this
-	trendVeto bool    // skip longs in a structural downtrend and shorts in an uptrend
-	entryFrac float64 // arm A: limit sits this far from the far foot (0.7 = upper 30% for a long)
-	opts      indicator.NodeOpts
+	arm         string  // "A" | "B"
+	target      string  // "foot" (near side of the next node) | "poc" (next node's POC)
+	side        string  // long | short | auto
+	lookback    int     // bars in the profile
+	bins        int     // profile bins
+	bufATR      float64 // stop buffer beyond the stop level, in ATR(14)
+	minR        float64 // skip fires whose target/risk is below this
+	approachATR float64 // arm A2: the band beyond the near edge that counts as "approaching"
+	trendVeto   bool    // skip longs in a structural downtrend and shorts in an uptrend
+	entryFrac   float64 // arm A: limit sits this far from the far foot (0.7 = upper 30% for a long)
+	opts        indicator.NodeOpts
 }
 
 func main() {
@@ -57,16 +65,18 @@ func main() {
 	endOff := flag.Int("end-offset", 0, "end the window N days before now; -days 30 -end-offset 30 is a DISJOINT bucket")
 	tfStr := flag.String("tf", "1h", "timeframe for both the profile and the signal bars")
 	symbols := flag.String("symbols", "BTC,ETH", "comma-separated short names (crypto only for now, user 11/01; e.g. add SOL,XRP,SUI as exploratory)")
-	arm := flag.String("arm", "A", "A (edge hold) | B (breakout) | both")
+	arm := flag.String("arm", "A", "A (limit after leaving the other node) | A2 (limit once approaching this node) | B (breakout) | both (A and B) | all")
 	target := flag.String("target", "foot", "foot (near side of the next node) | poc (next node's POC)")
 	side := flag.String("side", "auto", "long | short | auto")
 	lookback := flag.Int("lookback", 200, "closed bars in each profile")
 	bins := flag.Int("bins", 80, "profile bins (engine uses 80)")
 	bufATR := flag.Float64("buf-atr", 0.25, "stop buffer in ATR(14)")
+	approachATR := flag.Float64("approach-atr", 1.0, "arm A2: a close within this many ATR beyond the node's near edge counts as approaching it")
 	trend := flag.String("trend", "off", "off | veto: AnalyzeStructure on the last 250 closed bars, no long in a downtrend, no short in an uptrend (the range-edge / NFE rule)")
 	entryFrac := flag.Float64("entry-frac", 0.7, "arm A limit position inside the node, from the far foot (BTC 10/21 example: 0.69)")
 	minR := flag.Float64("min-r", 1.5, "skip fires whose reward:risk is below this")
 	feeBp := flag.Float64("fee-bp", 6, "round-trip fee charged per filled trade, basis points of entry (0 = like the other harnesses)")
+	trace := flag.Bool("trace", false, "print every position: node, bracket, outcome, and for a no-fill how close price came to the limit")
 	showFunnel := flag.Bool("funnel", false, "print how many edge events were dropped for target side or reward:risk")
 	expiry := flag.Int("expiry", 6, "EvaluateFire expiry bars (same 6 the other harnesses use)")
 	flag.Parse()
@@ -79,8 +89,11 @@ func main() {
 	start := end.AddDate(0, 0, -*days)
 
 	arms := []string{strings.ToUpper(*arm)}
-	if arms[0] == "BOTH" {
+	switch arms[0] {
+	case "BOTH":
 		arms = []string{"A", "B"}
+	case "ALL":
+		arms = []string{"A", "A2", "B"}
 	}
 
 	type series struct {
@@ -118,7 +131,7 @@ func main() {
 	for _, a := range arms {
 		p := params{
 			arm: a, target: *target, side: *side, lookback: *lookback, bins: *bins,
-			bufATR: *bufATR, minR: *minR, entryFrac: *entryFrac, trendVeto: *trend == "veto", opts: indicator.DefaultNodeOpts(),
+			bufATR: *bufATR, minR: *minR, entryFrac: *entryFrac, trendVeto: *trend == "veto", approachATR: *approachATR, opts: indicator.DefaultNodeOpts(),
 		}
 		fmt.Printf("\n=== vpbt arm %s · %dd ending -%dd · %s · lookback %d · target %s · side %s · entry-frac %.2f (A) · buf %.2fATR · minR %.1f · fee %.0fbp · expiry %d · trend %s ===\n",
 			a, *days, *endOff, tf, *lookback, *target, *side, *entryFrac, *bufATR, *minR, *feeBp, *expiry, *trend)
@@ -158,6 +171,11 @@ func main() {
 			}
 			fmt.Printf("%-5s %6d %5.0f%% %5d %5d %6.0f%% %+9.2f %+8.3f %8.2f\n",
 				s.short, len(positions), fp, tp, stop, win, netR, rpt, tpd)
+			if *trace {
+				for _, pos := range positions {
+					printTrace(pos, s.cs, *expiry)
+				}
+			}
 			aggR += netR
 			aggN += len(positions)
 		}
@@ -237,6 +255,7 @@ func genFires(cs []market.Candle, atr []float64, short string, start time.Time, 
 						tgt = above.POC
 					}
 					if f, ok := mkFire(p, bar, short, strategy, "long", entry, stop, tgt); ok {
+						f.Why += fmt.Sprintf(" · node %s–%s → next %s–%s", px(n.Low), px(n.High), px(above.Low), px(above.High))
 						out = append(out, f)
 						coolLong = &f
 						break
@@ -250,6 +269,7 @@ func genFires(cs []market.Candle, atr []float64, short string, start time.Time, 
 						tgt = below.POC
 					}
 					if f, ok := mkFire(p, bar, short, strategy, "short", entry, stop, tgt); ok {
+						f.Why += fmt.Sprintf(" · node %s–%s → next %s–%s", px(n.Low), px(n.High), px(below.Low), px(below.High))
 						out = append(out, f)
 						coolShort = &f
 						break
@@ -274,6 +294,11 @@ func longSetup(p params, n, above indicator.Node, prev, bar market.Candle, atr f
 		if prev.Close >= above.Low && bar.Close < above.Low && bar.Close > n.High {
 			return n.Low + p.entryFrac*(n.High-n.Low), n.Low - p.bufATR*atr, true
 		}
+	case "A2":
+		band := n.High + p.approachATR*atr
+		if prev.Close > band && bar.Close <= band && bar.Close >= n.Low {
+			return n.Low + p.entryFrac*(n.High-n.Low), n.Low - p.bufATR*atr, true
+		}
 	case "B":
 		if prev.Close >= n.Low && prev.Close <= n.High && bar.Close > n.High {
 			return bar.Close, (n.Low+n.High)/2 - p.bufATR*atr, true
@@ -288,6 +313,11 @@ func shortSetup(p params, n, below indicator.Node, prev, bar market.Candle, atr 
 	switch p.arm {
 	case "A":
 		if prev.Close <= below.High && bar.Close > below.High && bar.Close < n.Low {
+			return n.High - p.entryFrac*(n.High-n.Low), n.High + p.bufATR*atr, true
+		}
+	case "A2":
+		band := n.Low - p.approachATR*atr
+		if prev.Close < band && bar.Close >= band && bar.Close <= n.High {
 			return n.High - p.entryFrac*(n.High-n.Low), n.High + p.bufATR*atr, true
 		}
 	case "B":
@@ -319,9 +349,61 @@ func mkFire(p params, bar market.Candle, short, strategy, side string, entry, st
 	}
 	return autotrade.PaperFire{
 		Time: bar.CloseTime, Symbol: short, Strategy: strategy, Side: side,
-		Market: p.arm != "A", Entry: entry, Stop: stop, TP: tgt,
+		Market: p.arm == "B", Entry: entry, Stop: stop, TP: tgt,
 		Why: fmt.Sprintf("arm %s · %.2fR", p.arm, reward/risk),
 	}, true
+}
+
+// printTrace prints one position on two lines. For a no-fill it adds the
+// closest approach: how far the best price in the expiry window stayed from
+// the limit, in % of the limit and in units of the bracket's risk.
+func printTrace(pos autotrade.Position, cs []market.Candle, expiry int) {
+	f, oc := pos.Fire, pos.Outcome
+	utc8 := time.FixedZone("UTC+8", 8*3600)
+	risk := f.Entry - f.Stop
+	if f.Side == "short" {
+		risk = f.Stop - f.Entry
+	}
+	fmt.Printf("    %s %-5s entry %s stop %s tp %s · %s\n",
+		f.Time.In(utc8).Format("01-02 15:04"), f.Side, px(f.Entry), px(f.Stop), px(f.TP), f.Why)
+	switch oc.Status {
+	case autotrade.OutNoFill, autotrade.OutPending:
+		best, seen := 0.0, 0
+		for _, c := range cs {
+			if !c.CloseTime.After(f.Time) {
+				continue
+			}
+			if seen == expiry {
+				break
+			}
+			if f.Side == "long" && (seen == 0 || c.Low < best) {
+				best = c.Low
+			}
+			if f.Side == "short" && (seen == 0 || c.High > best) {
+				best = c.High
+			}
+			seen++
+		}
+		gap := best - f.Entry
+		if f.Side == "short" {
+			gap = f.Entry - best
+		}
+		fmt.Printf("          %-7s closest %s · missed by %.2f%% (%.2f R)\n", oc.Status, px(best), 100*gap/f.Entry, gap/risk)
+	default:
+		fmt.Printf("          %-7s %+.2fR · filled after %d bars · exit %s after %d bars\n",
+			oc.Status, oc.NetR, oc.BarsToFill, px(oc.ExitPrice), oc.BarsHeld)
+	}
+}
+
+func px(p float64) string {
+	switch {
+	case p >= 1000:
+		return fmt.Sprintf("%.0f", p)
+	case p >= 10:
+		return fmt.Sprintf("%.2f", p)
+	default:
+		return fmt.Sprintf("%.4f", p)
+	}
 }
 
 // funnel counts why edge events did or did not become fires (-funnel).
