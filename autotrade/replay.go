@@ -109,11 +109,11 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 				hold = hold.Add(time.Duration(cooldownBars) * barDur)
 			}
 		case OutNoFill:
-			hold = f.Time.Add(time.Duration(expiryBars) * barDur)
+			hold = f.Time.Add(time.Duration(f.Expiry(expiryBars)) * barDur)
 			l.until, l.resolved = hold, true
 			l.r = 0
 		default: // still open
-			hold = f.Time.Add(time.Duration(expiryBars) * barDur)
+			hold = f.Time.Add(time.Duration(f.Expiry(expiryBars)) * barDur)
 		}
 		openUntil[key] = hold
 		live = append(live, l)

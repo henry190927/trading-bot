@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/henry190927/trading-bot/autostrat"
 	"github.com/henry190927/trading-bot/autotrade"
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/config"
@@ -54,6 +55,7 @@ type params struct {
 	bins        int     // profile bins
 	bufATR      float64 // stop buffer beyond the stop level, in ATR(14)
 	minR        float64 // skip fires whose target/risk is below this
+	cooldown    bool    // stay quiet on a side until the last fire's target or stop is reached
 	approachATR float64 // arm A2: the band beyond the near edge that counts as "approaching"
 	trendVeto   bool    // skip longs in a structural downtrend and shorts in an uptrend
 	entryFrac   float64 // arm A: limit sits this far from the far foot (0.7 = upper 30% for a long)
@@ -71,13 +73,14 @@ func main() {
 	lookback := flag.Int("lookback", 200, "closed bars in each profile")
 	bins := flag.Int("bins", 80, "profile bins (engine uses 80)")
 	bufATR := flag.Float64("buf-atr", 0.25, "stop buffer in ATR(14)")
+	cooldown := flag.Bool("cooldown", true, "design §3 cooldown: after a fire, stay quiet on that side until a close reaches its target or stop. The live daemon has NO such cooldown (only one position per rule), so use -cooldown=false to measure what the vp-node rule does")
 	approachATR := flag.Float64("approach-atr", 1.0, "arm A2: a close within this many ATR beyond the node's near edge counts as approaching it")
 	trend := flag.String("trend", "off", "off | veto: AnalyzeStructure on the last 250 closed bars, no long in a downtrend, no short in an uptrend (the range-edge / NFE rule)")
 	entryFrac := flag.Float64("entry-frac", 0.7, "arm A limit position inside the node, from the far foot (BTC 10/21 example: 0.69)")
 	minR := flag.Float64("min-r", 1.5, "skip fires whose reward:risk is below this")
 	feeBp := flag.Float64("fee-bp", 6, "round-trip fee charged per filled trade, basis points of entry (0 = like the other harnesses)")
 	trace := flag.Bool("trace", false, "print every position: node, bracket, outcome, and for a no-fill how close price came to the limit")
-	showFunnel := flag.Bool("funnel", false, "print how many edge events were dropped for target side or reward:risk")
+	showFunnel := flag.Bool("funnel", false, "print how many edge events were dropped for target side or reward:risk (arms A and B; A2 runs the shared autostrat code and is not counted)")
 	expiry := flag.Int("expiry", 6, "EvaluateFire expiry bars (same 6 the other harnesses use)")
 	flag.Parse()
 
@@ -131,7 +134,7 @@ func main() {
 	for _, a := range arms {
 		p := params{
 			arm: a, target: *target, side: *side, lookback: *lookback, bins: *bins,
-			bufATR: *bufATR, minR: *minR, entryFrac: *entryFrac, trendVeto: *trend == "veto", approachATR: *approachATR, opts: indicator.DefaultNodeOpts(),
+			bufATR: *bufATR, minR: *minR, entryFrac: *entryFrac, trendVeto: *trend == "veto", approachATR: *approachATR, cooldown: *cooldown, opts: indicator.DefaultNodeOpts(),
 		}
 		fmt.Printf("\n=== vpbt arm %s · %dd ending -%dd · %s · lookback %d · target %s · side %s · entry-frac %.2f (A) · buf %.2fATR · minR %.1f · fee %.0fbp · expiry %d · trend %s ===\n",
 			a, *days, *endOff, tf, *lookback, *target, *side, *entryFrac, *bufATR, *minR, *feeBp, *expiry, *trend)
@@ -233,6 +236,28 @@ func genFires(cs []market.Candle, atr []float64, short string, start time.Time, 
 			return trend
 		}
 
+		if p.arm == "A2" {
+			// The live "vp-node" rule's own code, so this arm measures what
+			// the daemon runs.
+			wl := wantLong && coolLong == nil && !(p.trendVeto && trendNow() == signal.StructDowntrend)
+			ws := wantShort && coolShort == nil && !(p.trendVeto && trendNow() == signal.StructUptrend)
+			t := autostrat.VPNodeTrigger(cs, a, i, wl, ws, p.vpNode())
+			if !t.Fire {
+				continue
+			}
+			f := autotrade.PaperFire{
+				Time: bar.CloseTime, Symbol: short, Strategy: strategy, Side: t.Side,
+				Market: t.Market, Entry: t.Entry, Stop: t.Stop, TP: t.TP, Why: "arm A2 · " + t.Why,
+			}
+			out = append(out, f)
+			if p.cooldown && t.Side == "long" {
+				coolLong = &f
+			} else if p.cooldown {
+				coolShort = &f
+			}
+			continue
+		}
+
 		vp := indicator.BuildVolumeProfile(cs[i-p.lookback:i], p.bins, 1)
 		nodes := indicator.FindNodes(vp, p.opts)
 		if len(nodes) < 2 {
@@ -257,7 +282,9 @@ func genFires(cs []market.Candle, atr []float64, short string, start time.Time, 
 					if f, ok := mkFire(p, bar, short, strategy, "long", entry, stop, tgt); ok {
 						f.Why += fmt.Sprintf(" · node %s–%s → next %s–%s", px(n.Low), px(n.High), px(above.Low), px(above.High))
 						out = append(out, f)
-						coolLong = &f
+						if p.cooldown {
+							coolLong = &f
+						}
 						break
 					}
 				}
@@ -271,7 +298,9 @@ func genFires(cs []market.Candle, atr []float64, short string, start time.Time, 
 					if f, ok := mkFire(p, bar, short, strategy, "short", entry, stop, tgt); ok {
 						f.Why += fmt.Sprintf(" · node %s–%s → next %s–%s", px(n.Low), px(n.High), px(below.Low), px(below.High))
 						out = append(out, f)
-						coolShort = &f
+						if p.cooldown {
+							coolShort = &f
+						}
 						break
 					}
 				}
@@ -294,11 +323,6 @@ func longSetup(p params, n, above indicator.Node, prev, bar market.Candle, atr f
 		if prev.Close >= above.Low && bar.Close < above.Low && bar.Close > n.High {
 			return n.Low + p.entryFrac*(n.High-n.Low), n.Low - p.bufATR*atr, true
 		}
-	case "A2":
-		band := n.High + p.approachATR*atr
-		if prev.Close > band && bar.Close <= band && bar.Close >= n.Low {
-			return n.Low + p.entryFrac*(n.High-n.Low), n.Low - p.bufATR*atr, true
-		}
 	case "B":
 		if prev.Close >= n.Low && prev.Close <= n.High && bar.Close > n.High {
 			return bar.Close, (n.Low+n.High)/2 - p.bufATR*atr, true
@@ -315,17 +339,21 @@ func shortSetup(p params, n, below indicator.Node, prev, bar market.Candle, atr 
 		if prev.Close <= below.High && bar.Close > below.High && bar.Close < n.Low {
 			return n.High - p.entryFrac*(n.High-n.Low), n.High + p.bufATR*atr, true
 		}
-	case "A2":
-		band := n.Low - p.approachATR*atr
-		if prev.Close < band && bar.Close >= band && bar.Close <= n.High {
-			return n.High - p.entryFrac*(n.High-n.Low), n.High + p.bufATR*atr, true
-		}
 	case "B":
 		if prev.Close >= n.Low && prev.Close <= n.High && bar.Close < n.Low {
 			return bar.Close, (n.Low+n.High)/2 + p.bufATR*atr, true
 		}
 	}
 	return 0, 0, false
+}
+
+// vpNode maps the harness flags onto the live strategy's parameters.
+func (p params) vpNode() autostrat.VPNodeParams {
+	v := autostrat.DefaultVPNodeParams()
+	v.Lookback, v.Bins, v.Opts = p.lookback, p.bins, p.opts
+	v.EntryFrac, v.ApproachATR, v.BufATR, v.MinR = p.entryFrac, p.approachATR, p.bufATR, p.minR
+	v.TargetPOC = p.target == "poc"
+	return v
 }
 
 // mkFire builds the fire, rejecting it when the target is on the wrong side

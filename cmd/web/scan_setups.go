@@ -140,7 +140,7 @@ type scanCandidate struct {
 // scanStrategies is the set autostrat.EvalAutoTrigger can dispatch on. Kept
 // here rather than derived from the config, because the whole point is to
 // evaluate combinations the config does NOT contain.
-var scanStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr"}
+var scanStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "vp-node"}
 
 // scanGrid returns every configured+enabled rule, followed by a synthesized
 // rule for each (symbol, strategy) pair the config does not cover.

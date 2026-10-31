@@ -25,6 +25,10 @@ type Rule struct {
 	Leverage     int     `json:"leverage"`
 	StopPct      float64 `json:"stop_pct"` // buffer beyond box/structure for the stop; ONLY the range-edge path reads it — the engine/sweep-reject/htf-snr paths use their own Plan.StopLoss
 	CooldownBars int     `json:"cooldown_bars_after_stop"`
+	// ExpiryBars is how long this rule's resting limits wait for a fill, in
+	// closed bars of its TF. 0 = the default 6 that every rule used before
+	// 2026-11-01. Copied onto each fire so replays honour it per fire.
+	ExpiryBars int `json:"expiry_bars,omitempty"`
 
 	// REMOVED 2026-09-02, do not re-add without an implementation:
 	//   MaxConcurrent  (per-symbol) — had zero consumers anywhere. One position
@@ -97,7 +101,7 @@ func Load() Config {
 // Kept here rather than in autostrat because autostrat imports autotrade; a
 // test in autostrat pins the two lists together so adding a case there without
 // adding it here fails the build gate rather than the next hand-edit.
-var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "struct-momentum"}
+var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "struct-momentum", "vp-node"}
 
 // UnknownStrategies returns the rule strategy names this build cannot execute.
 func (c Config) UnknownStrategies() []string {

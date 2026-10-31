@@ -83,6 +83,10 @@ func EvalAutoTrigger(ctx context.Context, client *bingx.Client, sym market.Symbo
 		return evalSweepReject(ctx, client, sym, r)
 	case "htf-snr":
 		return evalHTFSNR(ctx, client, sym, r)
+	case "vp-node":
+		// Volume-profile node, arm A2 of cmd/vpbt: a limit inside the node
+		// price is approaching. Paper forward test from 2026-11-01.
+		return evalVPNode(ctx, client, sym, r)
 	default:
 		return Trigger{}
 	}

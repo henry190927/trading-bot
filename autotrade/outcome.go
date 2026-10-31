@@ -48,6 +48,7 @@ type Outcome struct {
 // stop (conservative). candles must be ascending by time; bars at/before the fire
 // are ignored so there is no look-ahead into the bar the order was placed on.
 func EvaluateFire(f PaperFire, candles []market.Candle, expiryBars int) Outcome {
+	expiryBars = f.Expiry(expiryBars) // a fire that carries its rule's expiry overrides the default
 	long := f.Side == "long"
 	var risk float64
 	if long {
@@ -257,7 +258,7 @@ func DedupFires(fires []PaperFire, expiryBars, cooldownBars int, barDur time.Dur
 		case OutStop:
 			hold = oc.ExitAt.Add(time.Duration(cooldownBars) * barDur)
 		case OutNoFill:
-			hold = f.Time.Add(time.Duration(expiryBars) * barDur)
+			hold = f.Time.Add(time.Duration(f.Expiry(expiryBars)) * barDur)
 		default: // open / pending — still in the position or waiting to fill
 			hold = f.Time.Add(1_000_000 * time.Hour)
 		}

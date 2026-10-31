@@ -327,6 +327,7 @@ func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, w
 		Qty: sz.Qty, Margin: sz.Margin, Lev: sz.Lev,
 		Why: why, Score: score, Live: live,
 		RiskUSDT: sz.RiskUSDT, Equity: sz.Equity,
+		ExpiryBars: r.ExpiryBars,
 	}
 }
 

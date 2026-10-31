@@ -33,6 +33,18 @@ type PaperFire struct {
 	// (RiskUSDT is still set there).
 	RiskUSDT float64 `json:"risk_usdt,omitempty"`
 	Equity   float64 `json:"equity,omitempty"`
+	// ExpiryBars is how many closed bars a resting limit waits before it
+	// counts as a no-fill, copied from the rule at fire time (2026-11-01).
+	// 0 = the caller's default (6 everywhere), which is every older row.
+	ExpiryBars int `json:"expiry_bars,omitempty"`
+}
+
+// Expiry returns the fire's own limit expiry, or def when it carries none.
+func (f PaperFire) Expiry(def int) int {
+	if f.ExpiryBars > 0 {
+		return f.ExpiryBars
+	}
+	return def
 }
 
 // PaperLogPath is the on-disk JSONL store (env AUTOTRADE_PAPER_LOG or default).

@@ -154,3 +154,40 @@ func TestEvaluateFire(t *testing.T) {
 		})
 	}
 }
+
+// A fire that carries its rule's ExpiryBars waits that long; one that does
+// not keeps the caller's default. Same six untouched bars, two answers.
+func TestEvaluateFirePerFireExpiry(t *testing.T) {
+	fireT := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	b := func(i int, lo, hi float64) market.Candle { return bar(fireT.Add(time.Duration(i)*time.Hour), lo, hi) }
+	untouched := []market.Candle{b(0, 101, 103), b(1, 102, 104), b(2, 101, 105), b(3, 103, 106), b(4, 104, 107), b(5, 105, 108)}
+
+	legacy := PaperFire{Time: fireT, Side: "long", Entry: 100, Stop: 95, TP: 110}
+	if got := EvaluateFire(legacy, untouched, 6).Status; got != OutNoFill {
+		t.Errorf("no ExpiryBars, 6 untouched bars: got %s, want %s", got, OutNoFill)
+	}
+
+	long24 := legacy
+	long24.ExpiryBars = 24
+	if got := EvaluateFire(long24, untouched, 6).Status; got != OutPending {
+		t.Errorf("ExpiryBars 24, 6 untouched bars: got %s, want %s", got, OutPending)
+	}
+
+	// The 8th bar trades down to the limit: inside 24, so it fills.
+	touched := append(append([]market.Candle{}, untouched...), b(6, 104, 106), b(7, 99, 104))
+	oc := EvaluateFire(long24, touched, 6)
+	if oc.Status != OutOpen || oc.BarsToFill != 8 {
+		t.Errorf("ExpiryBars 24, touched on bar 8: got %s after %d bars, want %s after 8", oc.Status, oc.BarsToFill, OutOpen)
+	}
+
+	// DedupFires holds a no-fill's slot for the fire's own expiry.
+	resolve := func(PaperFire) Outcome { return Outcome{Status: OutNoFill} }
+	next := legacy
+	next.Time = fireT.Add(10 * time.Hour)
+	if got := len(DedupFires([]PaperFire{legacy, next}, 6, 6, time.Hour, resolve)); got != 2 {
+		t.Errorf("default expiry 6: a fire 10h later should open a new position, got %d positions", got)
+	}
+	if got := len(DedupFires([]PaperFire{long24, next}, 6, 6, time.Hour, resolve)); got != 1 {
+		t.Errorf("ExpiryBars 24: a fire 10h later is still inside the slot, got %d positions", got)
+	}
+}
