@@ -27,6 +27,49 @@ func TestComputePaperBalance(t *testing.T) {
 	}
 }
 
+// Hand-traced:
+//
+//	tp:   2 × 2.1 = 4.2, fee 2000 × 0.1 = 200 notional × 6bp = 0.12 → 4.08
+//	stop: -1 × 2 = -2,   fee 100 × 5    = 500 notional × 6bp = 0.30 → -2.30
+func TestPnLUSDT(t *testing.T) {
+	tp := PaperFire{RiskUSDT: 2.1, Entry: 2000, Qty: 0.1}
+	stop := PaperFire{RiskUSDT: 2, Entry: 100, Qty: 5}
+	cases := []struct {
+		name   string
+		f      PaperFire
+		o      Outcome
+		want   float64
+		wantOK bool
+	}{
+		{"tp pays the fee", tp, Outcome{Status: OutTP, NetR: 2}, 4.08, true},
+		{"stop pays it too", stop, Outcome{Status: OutStop, NetR: -1}, -2.30, true},
+		{"open has no settled value", tp, Outcome{Status: OutOpen, UnrealR: 0.5}, 0, false},
+		{"pending", tp, Outcome{Status: OutPending}, 0, false},
+		{"no-fill moved no money", tp, Outcome{Status: OutNoFill}, 0, false},
+		{"unscored", tp, Outcome{Status: OutUnscored}, 0, false},
+		{"before risk sizing", PaperFire{Entry: 100, Qty: 5}, Outcome{Status: OutStop, NetR: -1}, 0, false},
+	}
+	for _, c := range cases {
+		got, ok := PnLUSDT(c.f, c.o)
+		if ok != c.wantOK || math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("%s: got (%.4f, %v), want (%.4f, %v)", c.name, got, ok, c.want, c.wantOK)
+		}
+	}
+}
+
+// The balance books the same after-fee number the fires table shows.
+func TestPaperBalanceRealizedIsAfterFees(t *testing.T) {
+	since := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	ps := []Position{
+		{Fire: PaperFire{Time: since, RiskUSDT: 2.1, Entry: 2000, Qty: 0.1}, Outcome: Outcome{Status: OutTP, NetR: 2}},
+		{Fire: PaperFire{Time: since, RiskUSDT: 2, Entry: 100, Qty: 5}, Outcome: Outcome{Status: OutStop, NetR: -1}},
+	}
+	b := ComputePaperBalance(ps, 140, since)
+	if math.Abs(b.Realized-1.78) > 1e-9 || math.Abs(b.Balance-141.78) > 1e-9 {
+		t.Errorf("realized %.4f balance %.4f, want 1.78 / 141.78", b.Realized, b.Balance)
+	}
+}
+
 func TestParsePaperSince(t *testing.T) {
 	if got := ParsePaperSince("2026-11-01"); !got.Equal(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("date form: got %v", got)

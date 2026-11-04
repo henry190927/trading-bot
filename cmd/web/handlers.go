@@ -87,6 +87,9 @@ type server struct {
 	// dashboard refreshes that didn't change the underlying setup.
 	aiSymbolCacheMu sync.Mutex
 	aiSymbolCache   map[string]aiCacheEntry
+
+	// hist is /ops/autotrade's long candle history (klinecache.go).
+	hist histCache
 }
 
 type aiCacheEntry struct {

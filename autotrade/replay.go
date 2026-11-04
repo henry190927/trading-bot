@@ -99,6 +99,11 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 		oc := resolve(f)
 		out = append(out, Position{Fire: f, Outcome: oc})
 		curIdx[key] = len(out) - 1
+		if oc.Status == OutUnscored {
+			// Shown, but it holds no slot and no margin: see OutUnscored.
+			openUntil[key] = f.Time
+			continue
+		}
 
 		l := liveLeg{symbol: f.Symbol, side: f.Side, margin: f.Margin, r: oc.NetR}
 		var hold time.Time

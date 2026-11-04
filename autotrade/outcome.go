@@ -16,6 +16,14 @@ const (
 	OutOpen    OutcomeStatus = "open"    // filled but neither stop nor tp hit yet
 	OutTP      OutcomeStatus = "tp"      // take-profit reached
 	OutStop    OutcomeStatus = "stop"    // stop-loss reached
+	// OutUnscored: the candles start after the fire, so the bars that decide
+	// its fill and exit are not in hand. Replaying it anyway scored it on
+	// whatever the window started with — and held its rule's slot until that
+	// fake exit, absorbing every later fire of the rule. Found 2026-11-04: the
+	// panel read 500 bars (~21 days of 1h) against fires back to 08-27, and
+	// netR read -26.39R over 179 positions where the full history is -17.85R
+	// over 429. Unscored books no R and holds no slot.
+	OutUnscored OutcomeStatus = "unscored"
 )
 
 // Outcome is the replayed result of one PaperFire.
@@ -58,6 +66,12 @@ func EvaluateFire(f PaperFire, candles []market.Candle, expiryBars int) Outcome 
 	}
 	if risk <= 0 {
 		return Outcome{Status: OutOpen} // malformed bracket — can't score
+	}
+	// No candles at all keeps its old meaning (open/pending, held "to be
+	// safe"); candles that start too late are a different case — see
+	// OutUnscored.
+	if len(candles) > 0 && !coversFire(f, candles) {
+		return Outcome{Status: OutUnscored}
 	}
 
 	// Only bars that closed after the order existed.
@@ -259,6 +273,8 @@ func DedupFires(fires []PaperFire, expiryBars, cooldownBars int, barDur time.Dur
 			hold = oc.ExitAt.Add(time.Duration(cooldownBars) * barDur)
 		case OutNoFill:
 			hold = f.Time.Add(time.Duration(f.Expiry(expiryBars)) * barDur)
+		case OutUnscored:
+			hold = f.Time // nothing known about it: absorbs no later fire
 		default: // open / pending — still in the position or waiting to fill
 			hold = f.Time.Add(1_000_000 * time.Hour)
 		}
@@ -276,10 +292,28 @@ type Summary struct {
 	Open    int
 	TP      int
 	Stop    int
-	NetR    float64 // sum of realized R (tp + stop)
-	UnrealR float64 // sum of unrealized R across open trades (mark-to-last-close)
-	WinRate float64 // tp / (tp + stop), 0 if none resolved
-	FillPct float64 // filled / (filled + no-fill); pending excluded (undetermined)
+	// Unscored fires had no candles reaching back to them; counted so the
+	// page can say how many it left out instead of dropping them silently.
+	Unscored int
+	NetR     float64 // sum of realized R (tp + stop)
+	UnrealR  float64 // sum of unrealized R across open trades (mark-to-last-close)
+	WinRate  float64 // tp / (tp + stop), 0 if none resolved
+	FillPct  float64 // filled / (filled + no-fill); pending excluded (undetermined)
+}
+
+// coversFire reports whether candles reach back far enough to replay f: the
+// bar f was placed in, and every bar after it, must be in the slice.
+//
+// Contract (outcome_cover_test.go is the definition of done):
+//   - candles is non-empty and ascending by time (EvaluateFire checks len).
+//   - True when the FIRST candle opened at or before f.Time — then the bar
+//     the fire landed in is present, and every later bar follows it.
+//   - False when the first candle opened after f.Time: at least one bar
+//     between the fire and the window is missing.
+//   - A fire newer than the last candle is still covered (it is just
+//     pending/open with nothing to replay yet) — only the START matters.
+func coversFire(f PaperFire, candles []market.Candle) bool {
+	return candles[0].OpenTime.Compare(f.Time) <= 0
 }
 
 // Summarize folds a slice of outcomes into a Summary.
@@ -304,6 +338,8 @@ func Summarize(outs []Outcome) Summary {
 			s.Filled++
 			s.Stop++
 			s.NetR += o.NetR
+		case OutUnscored:
+			s.Unscored++
 		}
 	}
 	if resolved := s.TP + s.Stop; resolved > 0 {

@@ -13,7 +13,7 @@ import (
 type PaperBalance struct {
 	Base       float64
 	Since      time.Time
-	Realized   float64 // closed positions: NetR × the fire's RiskUSDT
+	Realized   float64 // closed positions: PnLUSDT, so after fees
 	Unrealized float64 // open positions: UnrealR × RiskUSDT, marked to the last close
 	Balance    float64 // Base + Realized
 	Closed     int
@@ -34,8 +34,33 @@ func ParsePaperSince(s string) time.Time {
 	return time.Time{}
 }
 
+// FeeBp is the round-trip fee charged against a settled paper trade, in
+// basis points of the entry notional — the 6 vpbt charges by default (user's
+// call 2026-11-04). R stays fee-free everywhere; only the USDT figures pay it.
+const FeeBp = 6.0
+
+// PnLUSDT is what a settled paper position made or lost in USDT, after fees.
+//
+// Contract (paperbal_test.go is the definition of done):
+//   - Only a settled position has a value: o.Status is OutTP or OutStop.
+//     Anything else (open, pending, no-fill, unscored) → (0, false).
+//   - f.RiskUSDT <= 0 means the fire predates risk sizing (before 2026-10-18)
+//     and has no money value → (0, false).
+//   - Otherwise u = o.NetR × f.RiskUSDT − fee, where fee = f.Entry × f.Qty ×
+//     FeeBp / 10000 (round trip, on the entry notional), and ok = true.
+func PnLUSDT(f PaperFire, o Outcome) (u float64, ok bool) {
+	if o.Status != OutTP && o.Status != OutStop {
+		return 0, false
+	}
+	if f.RiskUSDT <= 0 {
+		return 0, false
+	}
+	return o.NetR*f.RiskUSDT - f.Entry*f.Qty*FeeBp/10000, true
+}
+
 // ComputePaperBalance values every position whose fire is at or after since.
-// NetR is fee-free, like everywhere else in the paper book.
+// Realized is after fees (PnLUSDT); Unrealized is not — no fee is paid until
+// the position closes.
 func ComputePaperBalance(ps []Position, base float64, since time.Time) PaperBalance {
 	b := PaperBalance{Base: base, Since: since}
 	for _, p := range ps {
@@ -49,7 +74,8 @@ func ComputePaperBalance(ps []Position, base float64, since time.Time) PaperBala
 				b.NoRisk++
 				continue
 			}
-			b.Realized += oc.NetR * f.RiskUSDT
+			u, _ := PnLUSDT(f, oc)
+			b.Realized += u
 			b.Closed++
 		case OutOpen:
 			if f.RiskUSDT <= 0 {

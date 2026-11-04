@@ -99,6 +99,14 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		return "1h"
 	}
 	klineCache := map[string][]market.Candle{}
+	// Every fire is replayed on the bars from its own time on. A fixed 500
+	// bars is ~21 days of 1h against a log that reaches back months, and the
+	// fires older than the window were scored on the wrong bars — see
+	// autotrade.OutUnscored. Fetch back to the oldest fire on the page.
+	var oldestFire time.Time
+	if len(fires) > 0 {
+		oldestFire = fires[len(fires)-1].Time // newest-first
+	}
 	// Every number on this page is a replay over these candles. A symbol whose
 	// fetch fails replays as nothing: its newest fire is held open "to be safe"
 	// and its settled trades drop out, so one bad fetch moved the open count
@@ -111,7 +119,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		if cs, ok := klineCache[key]; ok {
 			return cs
 		}
-		cs, err := klinesWithRetry(ctx, s.client, sym, tf, 500)
+		cs, err := s.klinesSince(ctx, sym, tf, oldestFire)
 		if err != nil {
 			fetchFails = append(fetchFails, sym+" "+tf+": "+err.Error())
 		}
@@ -157,9 +165,11 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		StatusClass       string
 		NetR              float64
 		UnrealR           float64
-		Absorbed          int  // raw re-fires collapsed into this position
-		Resolved          bool // has a realized netR (tp/stop)
-		Open              bool // filled, still running — show unrealized R
+		PnLU              float64 // after fees; see autotrade.PnLUSDT
+		HasPnLU           bool    // settled and risk-sized (fires from 2026-10-18 on)
+		Absorbed          int     // raw re-fires collapsed into this position
+		Resolved          bool    // has a realized netR (tp/stop)
+		Open              bool    // filled, still running — show unrealized R
 	}
 
 	// Normalise older records that predate the strategy field, then dedup the raw
@@ -221,7 +231,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	clsFor := map[autotrade.OutcomeStatus]string{
 		autotrade.OutTP: "b-green", autotrade.OutStop: "b-red",
 		autotrade.OutNoFill: "b-dim", autotrade.OutOpen: "b-yellow",
-		autotrade.OutPending: "b-blue",
+		autotrade.OutPending: "b-blue", autotrade.OutUnscored: "b-dim",
 	}
 	for i := len(positions) - 1; i >= 0; i-- { // newest-first for display
 		p := positions[i]
@@ -229,10 +239,12 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		outs = append(outs, out)
 		cur := liveFor(f.Symbol, tfFor(f))
 		curUp := (f.Side == "long" && cur >= f.Entry) || (f.Side == "short" && cur <= f.Entry)
+		pnlU, hasPnlU := autotrade.PnLUSDT(f, out)
 		rows = append(rows, fireRow{
 			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tfFor(f), Strategy: f.Strategy, Side: f.Side, Why: f.Why,
 			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Score: f.Score, Cur: cur, CurUp: curUp, Margin: f.Margin, Lev: f.Lev, Live: f.Live,
 			Status: string(out.Status), StatusClass: clsFor[out.Status], NetR: out.NetR, UnrealR: out.UnrealR,
+			PnLU: pnlU, HasPnLU: hasPnlU,
 			Absorbed: p.Absorbed,
 			Resolved: out.Status == autotrade.OutTP || out.Status == autotrade.OutStop,
 			Open:     out.Status == autotrade.OutOpen,
