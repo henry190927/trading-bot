@@ -37,6 +37,18 @@ type Book struct {
 	OpenLegs []Leg
 }
 
+// Add records a position opened after the book was built — cmd/monitor builds
+// the book once per tick, so a fire earlier in the same tick is invisible to
+// the rules after it unless it is added here. All three fields move together:
+// on 2026-11-02 the executor bumped only the count and margin, and an ETH
+// vp-node short opened four seconds after an ETH engine short in the same
+// tick, past a max-same-symbol-side of 1.
+func (b *Book) Add(c Candidate) {
+	b.OpenCount++
+	b.OpenMargin += c.Margin
+	b.OpenLegs = append(b.OpenLegs, Leg{Symbol: c.Symbol, Side: c.Side})
+}
+
 // Leg identifies an open position by the two things a concentration rule needs.
 type Leg struct {
 	Symbol string

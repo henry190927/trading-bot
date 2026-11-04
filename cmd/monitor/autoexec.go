@@ -254,8 +254,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			// Account for it immediately: buildBook only runs once per tick, so
 			// without this two rules firing in the same tick would both see an
 			// empty slot and the cap would be breached by one.
-			book.OpenCount++
-			book.OpenMargin += sz.Margin
+			book.Add(autotrade.Candidate{Symbol: r.Symbol, Side: trig.Side, Margin: sz.Margin})
 			score := autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry)
 
 			if !live {

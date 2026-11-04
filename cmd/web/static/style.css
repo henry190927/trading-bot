@@ -2983,6 +2983,11 @@ main { overflow-x: hidden; }
   border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); }
 .at-pg:hover:not(:disabled) { border-color: var(--text-dim); }
 .at-pg:disabled { opacity: .35; cursor: default; }
+/* /ops/autotrade fires filter: four selects that wrap two-up on a phone. */
+.at-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.at-filter .ui-f { flex: 1 1 140px; max-width: 220px; }
+.at-filter .ui-f select { height: 32px; }
+.at-filter .ui-btn { margin-top: 0; height: 32px; }
 
 /* Numeric cell helper: mono + tabular + right-aligned. */
 .dt .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }

@@ -103,7 +103,7 @@
       <div><span class="ui-dim ui-sm">{{t "at.st.open"}}</span><b class="ui-num">{{.Sum.Open}}</b></div>
       <div><span class="ui-dim ui-sm">{{t "trades.winRate"}}</span><b class="ui-num">{{printf "%.0f" (mulPct .Sum.WinRate)}}%</b></div>
       <div><span class="ui-dim ui-sm">{{t "at.netR"}}</span><b class="ui-num {{if ge .Sum.NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.NetR}}R</b></div>
-      {{with .PaperBal}}<div title="{{t "at.netU.hint"}}"><span class="ui-dim ui-sm">{{printf (t "at.netU") (.Since.Format "01/02")}}</span><b class="ui-num {{if ge .Realized 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Realized}}u</b></div>{{end}}
+      {{with .PaperBal}}<div title="{{t "at.netU.hint"}}"><span class="ui-dim ui-sm">{{t "at.netU"}}</span><b class="ui-num {{if ge .Realized 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Realized}}u</b></div>{{end}}
       {{if .Sum.Unscored}}<div title="{{t "at.unscoredFires.hint"}}"><span class="ui-dim ui-sm">{{t "at.st.unscored"}}</span><b class="ui-num">{{.Sum.Unscored}}</b></div>{{end}}
       <div title="{{t "at.floatHint"}}"><span class="ui-dim ui-sm">{{t "at.floatR"}}</span><b class="ui-num {{if ge .Sum.UnrealR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.UnrealR}}R</b></div>
     </div>
@@ -155,12 +155,20 @@
       </details>{{end}}
     </div>
     {{if .Fires}}
+    <div id="at-filter" class="at-filter">
+      <div class="ui-f"><label for="atf-sym">{{t "th.symbol"}}</label><select id="atf-sym" data-key="sym"></select></div>
+      <div class="ui-f"><label for="atf-strat">{{t "setups.strategy"}}</label><select id="atf-strat" data-key="strat"></select></div>
+      <div class="ui-f"><label for="atf-side">{{t "th.side"}}</label><select id="atf-side" data-key="side"></select></div>
+      <div class="ui-f"><label for="atf-st">{{t "th.result"}}</label><select id="atf-st" data-key="st"></select></div>
+      <button type="button" id="atf-clear" class="ui-btn ghost" hidden>{{t "at.filter.clear"}}</button>
+    </div>
+    <div id="at-filter-sum" class="ui-sm" style="margin-bottom:var(--sp-3)" hidden></div>
     <div class="dt-scroll">
     <table class="dt">
       <thead><tr><th>{{t "at.time"}}</th><th>{{t "th.symbol"}}</th><th>{{t "setups.strategy"}}</th><th>{{t "th.side"}}</th><th class="num" title="{{t "at.scoreHint"}}">{{t "trades.score"}}</th><th class="num">{{t "th.entry"}}</th><th class="num">{{t "at.now"}}</th><th class="num">{{t "trades.stop"}}</th><th class="num">TP</th><th class="num">{{t "at.size"}}</th><th>{{t "th.result"}}</th><th class="num">R</th><th class="num" title="{{t "at.u.hint"}}">u</th><th>{{t "at.why"}}</th></tr></thead>
       <tbody id="at-fires-body">
         {{range .Fires}}
-        <tr>
+        <tr data-sym="{{.Symbol}}" data-strat="{{.Strategy}}" data-side="{{.Side}}" data-st="{{.Status}}"{{if .Resolved}} data-r="{{.NetR}}"{{end}}{{if .HasPnLU}} data-u="{{.PnLU}}"{{end}}>
           <td class="ui-num ui-dim">{{.When}}{{if .Absorbed}} <span class="ui-tag" title="{{printf (t "at.absorbedHint") .Absorbed}}">+{{.Absorbed}}</span>{{end}}</td>
           <td><span class="ui-sym">{{.Symbol}}</span> <span class="ui-dim ui-sm">{{.TF}}</span></td>
           <td><code class="ui-id">{{.Strategy}}</code>{{if .Live}} <span class="ui-tag tag-red">LIVE</span>{{end}}</td>
@@ -207,20 +215,102 @@
     // It MUST survive the 10s soft refresh below, which replaces the tbody's
     // innerHTML wholesale: the fresh rows arrive all-visible, so applyPaging
     // is re-run after every swap and the page index is kept outside the DOM.
+    //
+    // The filter (symbol / strategy / side / result) narrows the rows first and
+    // the pager pages what is left, so both live in this one function: a row is
+    // shown only when it matches AND falls on the current page. The selection
+    // is kept in the query string (sym=, strat=, side=, st=) so a reload keeps
+    // it, and the soft refresh fetches location.href — the server ignores them.
     var atPage = 0;
+    var KEYS = ['sym', 'strat', 'side', 'st'];
+    var atFilter = {};
+    try {
+      var q = new URLSearchParams(location.search);
+      KEYS.forEach(function (k) { if (q.get(k)) atFilter[k] = q.get(k); });
+    } catch (e) {}
+    function matches(tr) {
+      for (var i = 0; i < KEYS.length; i++) {
+        var k = KEYS[i];
+        if (atFilter[k] && tr.dataset[k] !== atFilter[k]) return false;
+      }
+      return true;
+    }
+    // Options are rebuilt from the rows on every refresh: a symbol or strategy
+    // appears only when it has a row, and a choice survives as long as it does.
+    function buildOptions(rows) {
+      KEYS.forEach(function (k) {
+        var sel = document.querySelector('#at-filter select[data-key="' + k + '"]');
+        if (!sel) return;
+        var seen = {}, opts = [];
+        rows.forEach(function (tr) {
+          var v = tr.dataset[k];
+          if (!v || seen[v]) return;
+          seen[v] = true;
+          // Label from the row itself, so side/result read in the page's language.
+          var label = v;
+          if (k === 'side') label = (tr.querySelector('.ui-side') || {}).textContent || v;
+          if (k === 'st') label = (tr.querySelector('.ui-so') || {}).textContent || v;
+          opts.push([v, label.trim()]);
+        });
+        opts.sort(function (a, b) { return a[1].localeCompare(b[1]); });
+        if (atFilter[k] && !seen[atFilter[k]]) opts.unshift([atFilter[k], atFilter[k]]);
+        var html = '<option value="">' + {{t "at.filter.all"}} + '</option>';
+        opts.forEach(function (o) {
+          var opt = document.createElement('option');
+          opt.value = o[0]; opt.textContent = o[1];
+          html += opt.outerHTML;
+        });
+        if (sel.innerHTML !== html) sel.innerHTML = html;
+        sel.value = atFilter[k] || '';
+      });
+    }
+    function fmt(x) { return (x >= 0 ? '+' : '') + x.toFixed(2); }
+    function summarize(shown) {
+      var box = document.getElementById('at-filter-sum');
+      var clear = document.getElementById('atf-clear');
+      var active = KEYS.some(function (k) { return atFilter[k]; });
+      if (clear) clear.hidden = !active;
+      if (!box) return;
+      box.hidden = !active;
+      if (!active) return;
+      var tp = 0, stop = 0, r = 0, u = 0, nu = 0;
+      shown.forEach(function (tr) {
+        if (tr.dataset.st === 'tp') tp++;
+        if (tr.dataset.st === 'stop') stop++;
+        if (tr.dataset.r !== undefined) r += parseFloat(tr.dataset.r) || 0;
+        if (tr.dataset.u !== undefined) { u += parseFloat(tr.dataset.u) || 0; nu++; }
+      });
+      box.innerHTML = '';
+      var parts = [
+        [{{t "at.filter.n"}}, String(shown.length), ''],
+        ['TP / ' + {{t "at.st.stop"}}, tp + ' / ' + stop, ''],
+        [{{t "at.filter.netR"}}, fmt(r) + 'R', r >= 0 ? 'ui-up' : 'ui-down'],
+        [{{t "at.filter.netU"}}, nu ? fmt(u) + 'u' : '—', nu ? (u >= 0 ? 'ui-up' : 'ui-down') : 'ui-dim']
+      ];
+      parts.forEach(function (p, i) {
+        if (i) box.appendChild(document.createTextNode(' · '));
+        var l = document.createElement('span'); l.className = 'ui-dim'; l.textContent = p[0] + ' ';
+        var v = document.createElement('b'); v.className = 'ui-num ' + p[2]; v.textContent = p[1];
+        box.appendChild(l); box.appendChild(v);
+      });
+    }
     window.atApplyPaging = function () {
       var pager = document.getElementById('at-pager');
       var body = document.getElementById('at-fires-body');
       if (!pager || !body) return;
       var size = parseInt(pager.dataset.size, 10) || 50;
-      var rows = body.querySelectorAll(':scope > tr');
+      var all = Array.prototype.slice.call(body.querySelectorAll(':scope > tr'));
+      buildOptions(all);
+      var rows = all.filter(matches);
+      all.forEach(function (tr) { tr.hidden = true; });
+      summarize(rows);
       var pages = Math.max(1, Math.ceil(rows.length / size));
       // The log grows and shrinks; clamp rather than showing an empty page.
       if (atPage >= pages) atPage = pages - 1;
       if (atPage < 0) atPage = 0;
       var from = atPage * size;
       var to = Math.min(from + size, rows.length);
-      for (var i = 0; i < rows.length; i++) rows[i].hidden = (i < from || i >= to);
+      for (var i = from; i < to; i++) rows[i].hidden = false;
       pager.hidden = rows.length <= size;
       var lbl = document.getElementById('at-pglabel');
       if (lbl) lbl.textContent = (rows.length ? (from + 1) : 0) + '–' + to + ' / ' + rows.length;
@@ -232,6 +322,29 @@
       var prev = document.getElementById('at-prev'), next = document.getElementById('at-next');
       if (prev) prev.addEventListener('click', function () { atPage--; window.atApplyPaging(); });
       if (next) next.addEventListener('click', function () { atPage++; window.atApplyPaging(); });
+      function syncURL() {
+        try {
+          var q = new URLSearchParams(location.search);
+          KEYS.forEach(function (k) { if (atFilter[k]) q.set(k, atFilter[k]); else q.delete(k); });
+          var qs = q.toString();
+          history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+        } catch (e) {}
+      }
+      document.querySelectorAll('#at-filter select').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+          if (sel.value) atFilter[sel.dataset.key] = sel.value; else delete atFilter[sel.dataset.key];
+          atPage = 0;
+          syncURL();
+          window.atApplyPaging();
+        });
+      });
+      var clear = document.getElementById('atf-clear');
+      if (clear) clear.addEventListener('click', function () {
+        atFilter = {};
+        atPage = 0;
+        syncURL();
+        window.atApplyPaging();
+      });
       window.atApplyPaging();
     })();
   })();

@@ -205,3 +205,24 @@ func TestCheckCapsSameSymbolSide(t *testing.T) {
 		}
 	})
 }
+
+// The 2026-11-02 tick: ETH engine short fires, then ETH vp-node short in the
+// same tick. The book was built before either, so only Add can stop the second.
+func TestBookAddSeesSameTickFire(t *testing.T) {
+	cfg := cfgWith(1, 16, 0, 0)
+	var bk Book
+	engine := Candidate{Symbol: "ETH", Side: "short", Margin: 4}
+	if v := CheckCaps(cfg, bk, engine); v.Blocked {
+		t.Fatalf("first ETH short on an empty book blocked: %s", v.Reason)
+	}
+	bk.Add(engine)
+	if bk.OpenCount != 1 || bk.OpenMargin != 4 || len(bk.OpenLegs) != 1 {
+		t.Fatalf("Add: %+v, want one leg, count 1, margin 4", bk)
+	}
+	if v := CheckCaps(cfg, bk, Candidate{Symbol: "ETH", Side: "short", Margin: 4}); !v.Blocked {
+		t.Fatal("second ETH short in the same tick was allowed")
+	}
+	if v := CheckCaps(cfg, bk, Candidate{Symbol: "ETH", Side: "long", Margin: 4}); v.Blocked {
+		t.Fatalf("opposite side should pass: %s", v.Reason)
+	}
+}
