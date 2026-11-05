@@ -12,7 +12,8 @@
 // included, rather than reimplemented from the idea. A backtest that measures a
 // different rule than the daemon runs is worse than no backtest, because it
 // produces a number people trust. Scored with autotrade.DedupFires +
-// autotrade.EvaluateFire, the same primitives the live panel uses.
+// autotrade.EvaluateFire, the same primitives the live panel uses; -no-dedup
+// scores every fire on its own instead (the signal rather than the book).
 //
 // NO LOOK-AHEAD: at each base bar only HTF swing points whose confirming candle
 // CLOSED before that bar opened are eligible — the same `!CloseTime.Before(
@@ -48,6 +49,7 @@ func main() {
 	rMult := flag.Float64("r", 2.0, "take-profit as an R multiple")
 	side := flag.String("side", "auto", "long | short | auto")
 	symbols := flag.String("symbols", "", "comma-separated symbols; short names or raw contract codes")
+	noDedup := flag.Bool("no-dedup", false, "score every fire independently instead of through DedupFires. This measures the SIGNAL; the dedup'd run measures the BOOK, where one slot per (symbol,strategy) makes the result path-dependent and a one-bar shift re-sequences everything after it.")
 	endOff := flag.Int("end-offset", 0, "end the window N days before now, so -days 30 -end-offset 30 is a DISJOINT bucket; nested windows cannot localise a decay in time")
 	flag.Parse()
 
@@ -87,8 +89,12 @@ func main() {
 		}
 	}
 
-	fmt.Printf("=== htf-snr A/B · %dd ending -%dd · base %s · HTF %s · strength %d · tol %.2f%% · stop=wick+%.2fATR · TP %.1fR · side %s ===\n",
-		*days, *endOff, tf, htf, *strength, *tolPct, *bufATR, *rMult, *side)
+	scoring := "dedup (book)"
+	if *noDedup {
+		scoring = "no-dedup (signal)"
+	}
+	fmt.Printf("=== htf-snr A/B · %dd ending -%dd · base %s · HTF %s · strength %d · tol %.2f%% · stop=wick+%.2fATR · TP %.1fR · side %s · %s ===\n",
+		*days, *endOff, tf, htf, *strength, *tolPct, *bufATR, *rMult, *side, scoring)
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
 
 	var aggR float64
@@ -108,9 +114,19 @@ func main() {
 		}
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
 		fires := genSNRFires(cs, hcs, atr, s.short, *strength, *tolPct/100.0, *bufATR, *rMult, *side)
-		positions := autotrade.DedupFires(fires, 6, 6, time.Hour, func(f autotrade.PaperFire) autotrade.Outcome {
-			return autotrade.EvaluateFire(f, cs, 6)
-		})
+		var positions []autotrade.Position
+		if *noDedup {
+			// Each fire resolved on its own forward bars and nothing else, so
+			// dropping a bar at the window's start can only drop that fire —
+			// it cannot change the outcome of any other.
+			for _, f := range fires {
+				positions = append(positions, autotrade.Position{Fire: f, Outcome: autotrade.EvaluateFire(f, cs, 6)})
+			}
+		} else {
+			positions = autotrade.DedupFires(fires, 6, 6, time.Hour, func(f autotrade.PaperFire) autotrade.Outcome {
+				return autotrade.EvaluateFire(f, cs, 6)
+			})
+		}
 		var netR float64
 		var tp, stop, filled int
 		for _, p := range positions {
