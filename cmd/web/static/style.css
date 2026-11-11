@@ -4659,3 +4659,4 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .qr-raw { font-size: var(--fs-xs); color: var(--text-dim); }
 .qr-raw summary { cursor: pointer; }
 .qr-raw div { margin-top: 4px; overflow-wrap: anywhere; }
+.quick-row-hint { color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.4; }

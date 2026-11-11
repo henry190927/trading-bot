@@ -147,8 +147,8 @@ func guessOutcome(t journal.Trade, exit float64) string {
 }
 
 // exchangeHistoryMax is how far back an order-history query may reach;
-// BingX bounds the range (see tp1HistoryWindow).
-const exchangeHistoryMax = tp1HistoryWindow
+// BingX bounds the range to 7 days.
+const exchangeHistoryMax = 7 * 24 * time.Hour
 
 // fetchExchangeClose asks the exchange for t's fills and reduces them.
 // clipped reports that the trade opened before the history window, so an

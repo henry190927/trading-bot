@@ -557,7 +557,7 @@ func (s *server) fetchTradeViews(ctx context.Context, trades []journal.Trade, ca
 }
 
 // tradeSweepEvery is how often the background sweep checks open journal
-// trades for fills and places their opted-in TP1 / stop / TP2 orders.
+// trades for fills and places their opted-in stop / final TP orders.
 const tradeSweepEvery = 30 * time.Second
 
 // tradeSweepLoop runs sweepOpenTrades forever.
@@ -569,7 +569,7 @@ const tradeSweepEvery = 30 * time.Second
 // delivery bug the bracket guard fixed for stops.
 //
 // It stays in cmd/web rather than the monitor daemon because cmd/web is the
-// only journal writer: a daemon placing TP1 without writing TP1OrderID would
+// only journal writer: a daemon placing an order without writing its id would
 // leave this process seeing an empty id and placing a second order.
 func (s *server) tradeSweepLoop(ctx context.Context) {
 	t := time.NewTicker(tradeSweepEvery)
@@ -636,8 +636,8 @@ func mergeSweep(fresh, before, after []journal.Trade) bool {
 		a, b := &after[i], &before[i]
 		j, ok := byID[a.ID]
 		if !ok {
-			if a.TP1OrderID != b.TP1OrderID || a.StopOrderID != b.StopOrderID || a.TP2OrderID != b.TP2OrderID {
-				log.Printf("trade sweep: #%d vanished from the journal after orders were placed (tp1=%s stop=%s tp2=%s)", a.ID, a.TP1OrderID, a.StopOrderID, a.TP2OrderID)
+			if a.StopOrderID != b.StopOrderID || a.TP2OrderID != b.TP2OrderID {
+				log.Printf("trade sweep: #%d vanished from the journal after orders were placed (stop=%s tp2=%s)", a.ID, a.StopOrderID, a.TP2OrderID)
 			}
 			continue
 		}
@@ -645,15 +645,11 @@ func mergeSweep(fresh, before, after []journal.Trade) bool {
 		if !a.FilledAt.Equal(b.FilledAt) && f.FilledAt.IsZero() {
 			f.FilledAt, changed = a.FilledAt, true
 		}
-		if a.HasTP1Leg() && !b.HasTP1Leg() && !f.HasTP1Leg() {
-			f.TP1FillPrice, f.TP1FillPct, f.TP1FilledAt, changed = a.TP1FillPrice, a.TP1FillPct, a.TP1FilledAt, true
-		}
 		for _, fld := range []struct {
 			got, was string
 			dst      *string
 			name     string
 		}{
-			{a.TP1OrderID, b.TP1OrderID, &f.TP1OrderID, "tp1"},
 			{a.StopOrderID, b.StopOrderID, &f.StopOrderID, "stop"},
 			{a.TP2OrderID, b.TP2OrderID, &f.TP2OrderID, "tp2"},
 		} {
@@ -678,20 +674,12 @@ func needsSweep(trades []journal.Trade) bool {
 			continue
 		}
 		if t.IsPending() ||
-			(t.TP1Auto && t.TP1OrderID == "") ||
 			(t.StopAuto && t.StopOrderID == "") ||
-			(t.TP2Auto && t.TP2OrderID == "") ||
-			awaitingTP1Leg(t) {
+			(t.TP2Auto && t.TP2OrderID == "") {
 			return true
 		}
 	}
 	return false
-}
-
-// awaitingTP1Leg: a TP1 order of ours is resting on a live position and its
-// fill has not been recorded yet.
-func awaitingTP1Leg(t journal.Trade) bool {
-	return t.IsActive() && !t.HasTP1Leg() && t.TP1OrderID != "" && !strings.HasPrefix(t.TP1OrderID, "ATTACHED:")
 }
 
 // sweepTrades mutates trades in place and reports whether any changed.
@@ -771,26 +759,18 @@ func (s *server) sweepTrades(ctx context.Context, trades []journal.Trade, cache 
 			}
 		}
 	}
-	// Pass 2: auto-place reduce-only orders for active trades. Each of
-	// TP1 / Stop / TP2 has its own opt-in flag (TP1Auto / StopAuto /
-	// TP2Auto) and its own orderId column; sweep tries each independently
-	// and persists successes. The reduce-only flag is hard-coded in all
+	// Pass 2: auto-place reduce-only orders for active trades. Stop and the
+	// final TP each have their own opt-in flag (StopAuto / TP2Auto) and
+	// orderId column; sweep tries each independently and persists
+	// successes. Partial TPs are not here: they are added on /today after
+	// the fill (docs/position_orders_design.md step b) and recorded by
+	// sweepExits. The reduce-only flag is hard-coded in all
 	// placement helpers, so a misfire's worst outcome is BingX rejecting
 	// the order — never an unintended position open.
 	for i := range trades {
 		t := &trades[i]
 		if !t.IsActive() {
 			continue
-		}
-		if t.TP1Auto && t.TP1OrderID == "" {
-			status, msg := s.placeTP1OnBingX(ctx, s.translator("en"), t, "") // log only
-			switch status {
-			case "ok":
-				log.Printf("auto-tp1: trade #%d %s %s → %s", t.ID, t.Symbol, t.Side, msg)
-				tradesChanged = true
-			case "error":
-				log.Printf("auto-tp1: trade #%d %s %s ERROR: %s", t.ID, t.Symbol, t.Side, msg)
-			}
 		}
 		if t.StopAuto && t.StopOrderID == "" {
 			status, msg := s.placeStopOnBingX(ctx, t)
@@ -803,7 +783,7 @@ func (s *server) sweepTrades(ctx context.Context, trades []journal.Trade, cache 
 			}
 		}
 		if t.TP2Auto && t.TP2OrderID == "" {
-			status, msg := s.placeTP2OnBingX(ctx, t, 50)
+			status, msg := s.placeTP2OnBingX(ctx, t)
 			switch status {
 			case "ok":
 				log.Printf("auto-tp2: trade #%d %s %s → %s", t.ID, t.Symbol, t.Side, msg)
@@ -813,97 +793,7 @@ func (s *server) sweepTrades(ctx context.Context, trades []journal.Trade, cache 
 			}
 		}
 	}
-
-	// Pass 3: record the TP1 scale-out once the exchange has filled it.
-	if s.detectTP1Legs(ctx, trades) {
-		tradesChanged = true
-	}
 	return tradesChanged
-}
-
-// tp1HistoryWindow is how far back the order-history lookup reaches. BingX
-// bounds the range, and a trade open longer than this falls back to the
-// planned size for its entry quantity (see tp1LegFrom).
-const tp1HistoryWindow = 7 * 24 * time.Hour
-
-// detectTP1Legs looks up, for every active trade whose TP1 order we placed
-// and whose fill is not yet recorded, that order in the exchange's history.
-// One history call per symbol. Reports whether any trade gained a leg.
-func (s *server) detectTP1Legs(ctx context.Context, trades []journal.Trade) bool {
-	if s.client == nil || s.client.APIKey == "" {
-		return false
-	}
-	bySym := map[market.Symbol][]int{}
-	for i, t := range trades {
-		if !awaitingTP1Leg(t) {
-			continue
-		}
-		if sym, err := resolveWebSymbol(t.Symbol); err == nil {
-			bySym[sym] = append(bySym[sym], i)
-		}
-	}
-	changed := false
-	now := time.Now()
-	for sym, idxs := range bySym {
-		start := now.Add(-tp1HistoryWindow)
-		for _, i := range idxs {
-			if o := trades[i].OpenedAt.Add(-time.Hour); o.After(start) {
-				start = o // narrowest window that still covers the entry
-			}
-		}
-		fills, err := s.client.OrderHistory(ctx, sym, start, now)
-		if err != nil {
-			continue // "no fills yet" also lands here; retried next sweep
-		}
-		for _, i := range idxs {
-			t := &trades[i]
-			price, pct, at, ok := tp1LegFrom(*t, fills, lotPrec(t.Symbol))
-			if !ok {
-				continue
-			}
-			t.TP1FillPrice, t.TP1FillPct, t.TP1FilledAt = price, pct, at
-			log.Printf("tp1-leg: trade #%d %s TP1 filled %.4g%% @ %g (locked %+.2fR)", t.ID, t.Symbol, pct, price, journal.LockedR(*t))
-			changed = true
-		}
-	}
-	return changed
-}
-
-// tp1LegFrom finds t's TP1 order among fills and returns its average price,
-// its share of the position in percent, and its time.
-//
-// The share is TP1 qty / entry qty, where entry qty is the entry order's own
-// fill when it is in the history, else the planned margin x leverage / entry
-// floored to the lot (what placeEntryOnBingX sent). With neither, there is no
-// honest denominator and no leg is recorded.
-func tp1LegFrom(t journal.Trade, fills []bingx.FilledOrder, lotDecimals int) (price, pct float64, at time.Time, ok bool) {
-	var tp1 *bingx.FilledOrder
-	entryQty := 0.0
-	for i := range fills {
-		f := &fills[i]
-		switch f.OrderID {
-		case t.TP1OrderID:
-			tp1 = f
-		case t.EntryOrderID:
-			if t.EntryOrderID != "" {
-				entryQty = f.Quantity
-			}
-		}
-	}
-	if tp1 == nil || tp1.AvgPrice <= 0 || tp1.Quantity <= 0 {
-		return 0, 0, time.Time{}, false
-	}
-	// A partially filled TP1 is not a leg yet: its quantity is still moving.
-	if tp1.Status != "" && !strings.EqualFold(tp1.Status, "FILLED") {
-		return 0, 0, time.Time{}, false
-	}
-	if entryQty <= 0 && t.MarginUSDT > 0 && t.Leverage > 0 && t.Entry > 0 {
-		entryQty = floorTo(t.MarginUSDT*float64(t.Leverage)/t.Entry, lotDecimals)
-	}
-	if entryQty <= 0 {
-		return 0, 0, time.Time{}, false
-	}
-	return tp1.AvgPrice, math.Min(tp1.Quantity/entryQty*100, 100), tp1.Time, true
 }
 
 // rTrack places a trade on a horizontal bar scaled in R. The left end is the
@@ -1140,7 +1030,6 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		"Side":           c.Query("side"),
 		"Entry":          c.Query("entry"),
 		"Stop":           c.Query("stop"),
-		"TP1":            c.Query("tp1"),
 		"TP2":            c.Query("tp2"),
 		"Anchor":         c.Query("anchor"),
 		"TF":             c.Query("tf"),
@@ -1152,8 +1041,6 @@ func (s *server) handleJournalNew(c *gin.Context) {
 		"Anchors":        recommendedAnchors,
 		"Error":          "",
 		"MarginUSDT":     "",
-		"TP1PartialPct":  "50",
-		"PlaceTP1":       true,
 		"MarginOverride": false,
 	})
 }
@@ -1168,7 +1055,6 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	side := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
 	entryStr := strings.TrimSpace(c.PostForm("entry"))
 	stopStr := strings.TrimSpace(c.PostForm("stop"))
-	tp1Str := strings.TrimSpace(c.PostForm("tp1"))
 	tp2Str := strings.TrimSpace(c.PostForm("tp2"))
 	anchor := strings.TrimSpace(c.PostForm("anchor"))
 	tf := strings.TrimSpace(c.PostForm("tf"))
@@ -1180,12 +1066,10 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	rerender := func(errMsg string) {
 		s.page(c, http.StatusOK, "journal_new.html", gin.H{
 			"Symbol": symbol, "Side": side, "Entry": entryStr, "Stop": stopStr,
-			"TP1": tp1Str, "TP2": tp2Str, "Anchor": anchor, "TF": tf,
+			"TP2": tp2Str, "Anchor": anchor, "TF": tf,
 			"Score": score, "Notes": notes, "AnalyzedAt": analyzedAtStr,
 			"Leverage":       leverageStr,
 			"MarginUSDT":     strings.TrimSpace(c.PostForm("margin_usdt")),
-			"TP1PartialPct":  strings.TrimSpace(c.PostForm("tp1_partial_pct")),
-			"PlaceTP1":       c.PostForm("place_tp1") == "on",
 			"MarginOverride": c.PostForm("margin_override") == "on",
 			"Symbols":        uiSymbols,
 			"Anchors":        recommendedAnchors,
@@ -1215,17 +1099,9 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		rerender(err.Error())
 		return
 	}
-	// Optional, same as the edit form: a target of 0 means "none planned",
-	// which is a real state. /ops/entry writes tp1 = 0 because BingX's bundled
-	// take-profit closes 100% and a partial TP1 is a separate order placed
-	// after the fill; a trade recorded after the fact may have had no target
-	// at all. The edit handler was relaxed first and this one was missed, so
-	// a row could be edited to tp1 = 0 but never created with it.
-	tp1, err := parseFloatOptional(tp1Str, "tp1")
-	if err != nil {
-		rerender(err.Error())
-		return
-	}
+	// The final TP is optional: a trade recorded after the fact may have had
+	// no target at all. There is no TP1 any more — partial TPs are added on
+	// /today after the fill (docs/position_orders_design.md step c).
 	tp2, err := parseFloatOptional(tp2Str, "tp2")
 	if err != nil {
 		rerender(err.Error())
@@ -1264,7 +1140,6 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		leverage = n
 	}
 
-	autoTP1 := c.PostForm("place_tp1") == "on"
 	autoStop := c.PostForm("place_stop") == "on"
 	autoTP2 := c.PostForm("place_tp2") == "on"
 	openPos := c.PostForm("open_position") == "on"
@@ -1304,14 +1179,12 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		Score:      score,
 		Entry:      entry,
 		Stop:       stop,
-		TP1:        tp1,
 		TP2:        tp2,
 		Anchor:     anchor,
 		OpenNotes:  notes,
 		Leverage:   leverage,
 		SignalCtx:  strings.TrimSpace(c.PostForm("signal_ctx")),
 		MarginUSDT: marginUSDT,
-		TP1Auto:    autoTP1,
 		StopAuto:   autoStop,
 		TP2Auto:    autoTP2,
 		// Equity at entry, captured whether or not this trade auto-opens.
@@ -1329,21 +1202,16 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		return
 	}
 
-	// Synchronous order placements (entry + immediate TP1 attempt). The
-	// journal row above ALREADY has the auto flags persisted, so any
-	// failure here just leaves the sweep to retry later — never blocks
-	// the user from recording the plan.
+	// Synchronous entry placement. The journal row above ALREADY has the
+	// auto flags persisted, so any failure here just leaves the sweep to
+	// retry later — never blocks the user from recording the plan.
 	statuses := []string{}
 	if openPos {
 		st, msg := s.placeEntryOnBingX(c.Request.Context(), s.translator(langOf(c)), &trades[idx])
 		statuses = append(statuses, "entry:"+st+":"+msg)
 	}
-	if autoTP1 {
-		st, msg := s.placeTP1OnBingX(c.Request.Context(), s.translator(langOf(c)), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
-		statuses = append(statuses, "tp1:"+st+":"+msg)
-	}
-	// Persist any orderIds that got written by the helpers.
-	if trades[idx].EntryOrderID != "" || trades[idx].TP1OrderID != "" {
+	// Persist any orderIds that got written by the helper.
+	if trades[idx].EntryOrderID != "" {
 		if err := journal.WriteAll("", trades); err != nil {
 			log.Printf("auto-open: post-place journal write failed: %v", err)
 		}
@@ -1357,11 +1225,11 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		// Worst status wins for color coding.
 		status := "ok"
 		for _, s := range statuses {
-			if strings.HasPrefix(s, "entry:error") || strings.HasPrefix(s, "tp1:error") {
+			if strings.HasPrefix(s, "entry:error") {
 				status = "error"
 				break
 			}
-			if strings.HasPrefix(s, "entry:skip") || strings.HasPrefix(s, "tp1:skip") {
+			if strings.HasPrefix(s, "entry:skip") {
 				status = "skip"
 			}
 		}
@@ -1380,62 +1248,6 @@ func maxMarginUSDT() float64 {
 		}
 	}
 	return 500
-}
-
-// placeTP1OnBingX looks up the open position for t.Symbol on BingX, then
-// submits a reduce-only LIMIT order at t.TP1 for the chosen partial %.
-// On success, writes the returned orderId into t.TP1OrderID — the caller
-// is responsible for persisting the mutated trade back to the journal.
-// Returns (status, msg) where status is one of: "ok" / "skip" / "error".
-// Never panics; all failures are surfaced via msg.
-func (s *server) placeTP1OnBingX(ctx context.Context, tr func(string, ...any) string, t *journal.Trade, partialStr string) (string, string) {
-	if t.TP1OrderID != "" {
-		return "skip", tr("place.already-tp1", t.TP1OrderID)
-	}
-	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
-		return "skip", "BingX API key/secret not configured in .env"
-	}
-	pct := 50.0
-	if partialStr != "" {
-		v, err := strconv.ParseFloat(partialStr, 64)
-		if err != nil || v <= 0 || v > 100 {
-			return "error", tr("place.bad-pct")
-		}
-		pct = v
-	}
-	sym, err := resolveWebSymbol(t.Symbol)
-	if err != nil {
-		return "error", err.Error()
-	}
-	pos, err := s.client.FindOpenPosition(ctx, sym, t.Side)
-	if err != nil {
-		return "error", "read positions: " + err.Error()
-	}
-	if pos == nil {
-		return "skip", tr("place.no-position-tp1", tr("place.side."+t.Side), t.Symbol)
-	}
-	// Sanity against the live MARK — see stopPlacementFault's note on why
-	// entry is the wrong reference. The journal form already validated the
-	// trade PLAN; this re-checks the order about to be sent.
-	mark, err := s.markFor(ctx, sym)
-	if err != nil {
-		return "error", "read mark price: " + err.Error()
-	}
-	if code, args := tpFault(t.Side, t.TP1, mark); code != "" {
-		return "error", tr("place."+code, args...)
-	}
-
-	qty := partialQty(t.Symbol, pos.Quantity, pct)
-	if qty <= 0 {
-		return "error", tr("place.qty-zero-tp1", qty, pct, pos.Quantity, t.Symbol)
-	}
-	hedgeMode := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
-	res, err := s.client.PlaceReduceOnlyLimit(ctx, sym, t.Side, qty, t.TP1, hedgeMode)
-	if err != nil {
-		return "error", "place TP1: " + err.Error()
-	}
-	t.TP1OrderID = res.OrderID
-	return "ok", tr("place.ok-tp1", res.OrderID, qty, t.TP1, pct, pos.Quantity)
 }
 
 // qtyPrecision is the per-symbol qty step we floor placement size to.
@@ -1473,27 +1285,6 @@ func lotPrec(symbol string) int {
 		return p
 	}
 	return 4
-}
-
-// partialQty sizes one leg of a scale-out: pct% of the LIVE position, floored
-// to the symbol's lot step.
-//
-// One function because there used to be two, and only one of them floored.
-// placeTP1OnBingX computed pos.Quantity*pct/100 raw, so a 50% partial of a BTC
-// 0.0615 position asked BingX for 0.03075 — five decimals against BTC's
-// four-decimal step, which the exchange rejects. It also broke the pair:
-// placeTP2OnBingX sized itself as the remainder after a FLOORED TP1, so the
-// two orders together committed 0.03075 + 0.0308 = 0.06155 of a 0.0615
-// position. The halves of an odd quantity are not equal and both legs have to
-// agree on which side the odd step falls, so they share the arithmetic.
-func partialQty(symbol string, posQty, pct float64) float64 {
-	return floorTo(posQty*pct/100, lotPrec(symbol))
-}
-
-// remainderQty is the LAST leg of a scale-out: everything partialQty did not
-// take, so TP1+TP2 close the position exactly and never oversell it.
-func remainderQty(symbol string, posQty, firstPct float64) float64 {
-	return floorTo(posQty-partialQty(symbol, posQty, firstPct), lotPrec(symbol))
 }
 
 // hedgeModeEnabled reflects BINGX_HEDGE_MODE=true on the VPS. One-way
@@ -1543,13 +1334,11 @@ func (s *server) placeEntryOnBingX(ctx context.Context, tr func(string, ...any) 
 	if err := s.client.SetLeverage(ctx, sym, levSide, t.Leverage); err != nil {
 		return "error", "set leverage: " + err.Error()
 	}
-	// Bundle SL and TP2 with the entry where applicable. BingX activates
-	// them the moment the entry fills, so neither the stop nor the TP2
-	// runner has a sweep-based delay. Sentinels in StopOrderID / TP2OrderID
-	// prevent the sweep from placing duplicates after fill. TP1 (partial)
-	// stays on the sweep path — bundled SL/TP close 100% of the position,
-	// which collides with partial scaling, so TP1 needs the explicit
-	// reduce-only LIMIT path.
+	// Bundle SL and the final TP (TP2) with the entry where applicable.
+	// BingX activates them the moment the entry fills, so neither has a
+	// sweep-based delay. Sentinels in StopOrderID / TP2OrderID prevent the
+	// sweep from placing duplicates after fill. Partial TPs are separate
+	// reduce-only LIMITs added on /today once the position exists.
 	var bundledStop, bundledTP float64
 	if t.StopAuto && t.Stop > 0 {
 		bundledStop = t.Stop
@@ -1736,19 +1525,16 @@ func (s *server) placeStopOnBingX(ctx context.Context, t *journal.Trade) (string
 	return "ok", msg
 }
 
-// placeTP2OnBingX submits a reduce-only LIMIT at t.TP2 for the
-// remaining (post-TP1-partial) position size. Sized as the position's
-// full qty minus what we'd close at TP1 (so TP1 + TP2 together fully
-// close the position).
-func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1PartialPct float64) (string, string) {
+// placeTP2OnBingX submits a reduce-only LIMIT at t.TP2 (the final TP) for
+// the whole live position, floored to the lot. It is the fallback for a
+// final TP that could not be bundled with the entry — a position opened
+// elsewhere and recorded here with place_tp2 ticked.
+func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade) (string, string) {
 	if t.TP2OrderID != "" {
 		return "skip", fmt.Sprintf("TP2 already placed (orderId=%s) — cancel on BingX first to re-place", t.TP2OrderID)
 	}
 	if s.client == nil || s.client.APIKey == "" || s.client.APISecret == "" {
 		return "skip", "BingX API key/secret not configured in .env"
-	}
-	if tp1PartialPct <= 0 || tp1PartialPct > 100 {
-		tp1PartialPct = 50
 	}
 	sym, err := resolveWebSymbol(t.Symbol)
 	if err != nil {
@@ -1768,9 +1554,9 @@ func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1Parti
 	if fault := tpPlacementFault(t.Side, t.TP2, mark); fault != "" {
 		return "error", fault
 	}
-	tp2Qty := remainderQty(t.Symbol, pos.Quantity, tp1PartialPct)
+	tp2Qty := floorTo(pos.Quantity, lotPrec(t.Symbol))
 	if tp2Qty <= 0 {
-		return "skip", fmt.Sprintf("TP1 partial=%.0f%% leaves no remainder for TP2", tp1PartialPct)
+		return "skip", fmt.Sprintf("position qty %g floors to zero for TP2", pos.Quantity)
 	}
 	hedge := pos.PositionSide == "LONG" || pos.PositionSide == "SHORT"
 	res, err := s.client.PlaceReduceOnlyLimit(ctx, sym, t.Side, tp2Qty, t.TP2, hedge)
@@ -1778,7 +1564,7 @@ func (s *server) placeTP2OnBingX(ctx context.Context, t *journal.Trade, tp1Parti
 		return "error", "place TP2: " + err.Error()
 	}
 	t.TP2OrderID = res.OrderID
-	return "ok", fmt.Sprintf("TP2 placed — orderId=%s qty=%g @ %.4f (remaining after %.0f%% TP1)", res.OrderID, tp2Qty, t.TP2, tp1PartialPct)
+	return "ok", fmt.Sprintf("TP2 placed — orderId=%s qty=%g @ %.4f", res.OrderID, tp2Qty, t.TP2)
 }
 
 // unwindOnBingX is the "abandon this trade" path: cancels every known
@@ -2157,18 +1943,16 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		return
 	}
 	// A target of 0 means "none planned", which is a real state and not a
-	// typo: /ops/entry writes tp1 = 0 deliberately, because BingX's bundled
-	// take-profit closes 100% of the position and a partial TP1 is a separate
-	// reduce-only order placed after the fill. Recording a TP1 that does not
-	// exist yet would make /ops/verify report protection that is not there.
-	//
-	// Requiring > 0 here meant a row written by that route could not be edited
-	// at all — setting filled_at on one failed with "tp1 must be > 0", on a
-	// form whose error path returns 200 so the failure read as success.
-	tp1, err := parseFloatOptional(c.PostForm("tp1"), "tp1")
-	if err != nil {
-		rerender(err.Error())
-		return
+	// typo. TP1 is legacy (docs/position_orders_design.md step c): the form
+	// shows it only on a row that already has one, so a form without the
+	// field keeps the stored value instead of zeroing it.
+	tp1 := trades[idx].TP1
+	if v, ok := c.GetPostForm("tp1"); ok {
+		tp1, err = parseFloatOptional(v, "tp1")
+		if err != nil {
+			rerender(err.Error())
+			return
+		}
 	}
 	tp2, err := parseFloatOptional(c.PostForm("tp2"), "tp2")
 	if err != nil {
@@ -2342,10 +2126,9 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	// Persist the auto-placement intent flags from the edit form. Editing
 	// always reflects the current checkbox state — unchecked = clear future
 	// auto-retry for that order type.
-	autoTP1 := c.PostForm("place_tp1") == "on"
 	autoStop := c.PostForm("place_stop") == "on"
 	autoTP2 := c.PostForm("place_tp2") == "on"
-	trades[idx].TP1Auto = autoTP1
+	trades[idx].TP1Auto = false // legacy flag; nothing places TP1 any more
 	trades[idx].StopAuto = autoStop
 	trades[idx].TP2Auto = autoTP2
 
@@ -2353,22 +2136,7 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		rerender("write journal: " + err.Error())
 		return
 	}
-
-	// Same BingX TP1 placement as /journal/open. From edit, this is also the
-	// path used to (a) retroactively place TP1 on an existing journal row,
-	// or (b) re-fire the BingX API while iterating without spamming new
-	// journal entries.
-	redirectURL := "/journal"
-	if autoTP1 {
-		status, msg := s.placeTP1OnBingX(c.Request.Context(), s.translator(langOf(c)), &trades[idx], strings.TrimSpace(c.PostForm("tp1_partial_pct")))
-		if trades[idx].TP1OrderID != "" {
-			if err := journal.WriteAll("", trades); err != nil {
-				log.Printf("auto-tp1: post-place journal write failed (orderId=%s): %v", trades[idx].TP1OrderID, err)
-			}
-		}
-		redirectURL = "/journal?tp1_status=" + url.QueryEscape(status) + "&tp1_msg=" + url.QueryEscape(msg)
-	}
-	c.Redirect(http.StatusSeeOther, redirectURL)
+	c.Redirect(http.StatusSeeOther, "/journal")
 }
 
 // handleAIAnalyzeTrade is the Phase 1 AI advisor endpoint. POST
@@ -2559,21 +2327,20 @@ func editFormData(t journal.Trade, errMsg string) gin.H {
 		exitStr = fmt.Sprintf("%.4f", t.ExitPrice)
 	}
 	return gin.H{
-		"Trade":         t,
-		"Ver":           journal.Version(t),
-		"OpenedAt":      asLocalInput(t.OpenedAt),
-		"AnalyzedAt":    asLocalInput(t.AnalyzedAt),
-		"FilledAt":      asLocalInput(t.FilledAt),
-		"ClosedAt":      asLocalInput(t.ClosedAt),
-		"Entry":         fmt.Sprintf("%.4f", t.Entry),
-		"Stop":          fmt.Sprintf("%.4f", t.Stop),
-		"TP1":           fmt.Sprintf("%.4f", t.TP1),
-		"TP2":           fmt.Sprintf("%.4f", t.TP2),
-		"ExitPrice":     exitStr,
-		"Symbols":       uiSymbols,
-		"Anchors":       recommendedAnchors,
-		"Error":         errMsg,
-		"TP1PartialPct": "50",
+		"Trade":      t,
+		"Ver":        journal.Version(t),
+		"OpenedAt":   asLocalInput(t.OpenedAt),
+		"AnalyzedAt": asLocalInput(t.AnalyzedAt),
+		"FilledAt":   asLocalInput(t.FilledAt),
+		"ClosedAt":   asLocalInput(t.ClosedAt),
+		"Entry":      fmt.Sprintf("%.4f", t.Entry),
+		"Stop":       fmt.Sprintf("%.4f", t.Stop),
+		"TP1":        fmt.Sprintf("%.4f", t.TP1),
+		"TP2":        fmt.Sprintf("%.4f", t.TP2),
+		"ExitPrice":  exitStr,
+		"Symbols":    uiSymbols,
+		"Anchors":    recommendedAnchors,
+		"Error":      errMsg,
 	}
 }
 
@@ -3641,7 +3408,6 @@ func templateFuncs() template.FuncMap {
 			q.Set("side", strings.ToLower(r.Side.String()))
 			q.Set("entry", fmt.Sprintf("%.4f", r.Entry))
 			q.Set("stop", fmt.Sprintf("%.4f", r.SuggStop))
-			q.Set("tp1", fmt.Sprintf("%.4f", r.SuggTP1))
 			q.Set("tp2", fmt.Sprintf("%.4f", r.SuggTP2))
 			q.Set("anchor", "manual")
 			q.Set("tf", string(r.Timeframe))
@@ -3659,11 +3425,10 @@ func templateFuncs() template.FuncMap {
 			q.Set("side", strings.ToLower(v.Signal.Side.String()))
 			q.Set("entry", fmt.Sprintf("%.4f", v.Signal.Plan.Entry))
 			q.Set("stop", fmt.Sprintf("%.4f", v.Signal.Plan.StopLoss))
-			if len(v.Signal.Plan.TakeProfit) >= 1 {
-				q.Set("tp1", fmt.Sprintf("%.4f", v.Signal.Plan.TakeProfit[0]))
-			}
-			if len(v.Signal.Plan.TakeProfit) >= 2 {
-				q.Set("tp2", fmt.Sprintf("%.4f", v.Signal.Plan.TakeProfit[1]))
+			// The final TP is the plan's farthest target; its nearer ones are
+			// partials, added on /today after the fill.
+			if n := len(v.Signal.Plan.TakeProfit); n >= 1 {
+				q.Set("tp2", fmt.Sprintf("%.4f", v.Signal.Plan.TakeProfit[n-1]))
 			}
 			q.Set("anchor", v.Signal.Plan.Anchor)
 			q.Set("tf", tf)
@@ -3903,7 +3668,7 @@ func (s *server) handleAPIChartValidate(c *gin.Context) {
 // Minimal JSON alternative to handleJournalOpen used by the /chart
 // modal for quick-record. Writes the trade to the journal and, when
 // open_position=on, also places it on BingX through the same
-// placeEntryOnBingX / placeTP1OnBingX path as /journal/open — so the
+// placeEntryOnBingX path as /journal/open — so the
 // risk gate, lot-precision floor and bundled SL/TP2 are one
 // implementation, not two.
 //
@@ -3933,18 +3698,13 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	var stop, tp1, tp2 float64
+	var stop, tp2 float64
 	if v := strings.TrimSpace(c.PostForm("stop")); v != "" {
 		if f, err := parseFloatPositive(v, "stop"); err == nil {
 			stop = f
 		} else {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
-		}
-	}
-	if v := strings.TrimSpace(c.PostForm("tp1")); v != "" {
-		if f, err := parseFloatPositive(v, "tp1"); err == nil {
-			tp1 = f
 		}
 	}
 	if v := strings.TrimSpace(c.PostForm("tp2")); v != "" {
@@ -4022,7 +3782,6 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		TF:         tf,
 		Entry:      entry,
 		Stop:       stop,
-		TP1:        tp1,
 		TP2:        tp2,
 		Anchor:     anchor,
 		OpenNotes:  notes,
@@ -4031,12 +3790,10 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		EquityUSDT: s.equityAtEntry(c.Request.Context()),
 	}
 	if openPos {
-		// Every leg the user filled in gets placed: the stop always
-		// (required above), TP2 bundled with the entry, TP1 as the
-		// reduce-only partial the sweep keeps retrying until the entry fills.
+		// Every leg the user filled in gets placed, both bundled with the
+		// entry: the stop always (required above), the final TP when set.
 		t.StopAuto = true
 		t.TP2Auto = tp2 > 0
-		t.TP1Auto = tp1 > 0
 	}
 	trades = append(trades, t)
 	idx := len(trades) - 1
@@ -4059,10 +3816,6 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 	ctx := c.Request.Context()
 	st, msg := s.placeEntryOnBingX(ctx, tr, &trades[idx])
 	legs := []leg{{"entry", st, msg}}
-	if st == "ok" && trades[idx].TP1Auto {
-		st1, msg1 := s.placeTP1OnBingX(ctx, tr, &trades[idx], "")
-		legs = append(legs, leg{"tp1", st1, msg1})
-	}
 	if st != "ok" {
 		// The entry never reached the exchange (risk gate, no key, API
 		// error), so the row is a plan, not an order. Drop the "place this
@@ -4070,7 +3823,7 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		// position on this symbol and side, and a refused order should not
 		// leave an intent behind that later attaches to a position opened
 		// some other way.
-		trades[idx].StopAuto, trades[idx].TP1Auto, trades[idx].TP2Auto = false, false, false
+		trades[idx].StopAuto, trades[idx].TP2Auto = false, false
 	}
 	if err := journal.WriteAll("", trades); err != nil {
 		log.Printf("chart quick-open: post-place journal write failed: %v", err)
@@ -4087,7 +3840,6 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 			"symbol": tt.Symbol, "side": tt.Side, "entry": tt.Entry, "qty": qty,
 			"margin": tt.MarginUSDT, "leverage": tt.Leverage, "notional": qty * tt.Entry,
 			"stop": tt.Stop, "stopBundled": strings.HasPrefix(tt.StopOrderID, "ATTACHED:"),
-			"tp1": tt.TP1, "tp1Pending": tt.TP1Auto && tt.TP1OrderID == "",
 			"tp2": tt.TP2, "tp2Bundled": strings.HasPrefix(tt.TP2OrderID, "ATTACHED:"),
 			"orderId": tt.EntryOrderID, "accountLev": tt.AccountLeverage(), "killPct": tt.KillDistancePct(),
 		}

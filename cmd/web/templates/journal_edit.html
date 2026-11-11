@@ -49,8 +49,10 @@
     <div class="ui-f-row jf-prices">
       <div class="ui-f"><label for="entry">{{t "th.entry"}}</label><input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required></div>
       <div class="ui-f"><label for="stop">{{t "trades.stop"}}</label><input type="number" step="any" inputmode="decimal" name="stop" id="stop" value="{{.Stop}}" required></div>
-      <div class="ui-f"><label for="tp1">TP1</label><input type="number" step="any" inputmode="decimal" name="tp1" id="tp1" value="{{.TP1}}" required></div>
-      <div class="ui-f"><label for="tp2">TP2</label><input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}" required></div>
+      {{/* TP1 is legacy (docs/position_orders_design.md step c): shown only on a
+           row that already has one. Without the field the handler keeps it. */}}
+      {{if gt .Trade.TP1 0.0}}<div class="ui-f"><label for="tp1">TP1 <span class="ui-hint">{{t "je.tp1Legacy"}}</span></label><input type="number" step="any" inputmode="decimal" name="tp1" id="tp1" value="{{.TP1}}"></div>{{end}}
+      <div class="ui-f"><label for="tp2">{{t "jf.finalTP"}}</label><input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}"></div>
     </div>
     <div class="ui-f-row">
       <div class="ui-f">
@@ -137,8 +139,6 @@
       <div class="ui-sm">{{t "jf.recheckWarn"}}</div>
     </div></div>
     {{end}}
-    <div class="ui-f-row"><div class="ui-f"><label for="tp1_partial_pct">{{t "jf.tp1Pct"}}</label><input type="number" min="1" max="100" step="1" name="tp1_partial_pct" id="tp1_partial_pct" value="{{.TP1PartialPct}}" placeholder="50"></div></div>
-    <label class="ui-check"><input type="checkbox" name="place_tp1" id="place_tp1" {{if and .Trade.TP1Auto (not .Trade.TP1OrderID)}}checked{{end}}><span>{{t "jf.placeTP1"}}<span class="ui-hint">{{t "jf.sweepAfterFill"}}</span></span></label>
     <label class="ui-check"><input type="checkbox" name="place_stop" id="place_stop" {{if and .Trade.StopAuto (not .Trade.StopOrderID)}}checked{{end}}><span>{{t "jf.placeStop"}}<span class="ui-hint">{{t "jf.editStopHint"}}</span></span></label>
     <label class="ui-check"><input type="checkbox" name="place_tp2" id="place_tp2" {{if and .Trade.TP2Auto (not .Trade.TP2OrderID)}}checked{{end}}><span>{{t "jf.placeTP2"}}<span class="ui-hint">{{t "jf.editTP2Hint"}}</span></span></label>
   </section>

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/journal"
 )
 
@@ -17,12 +16,15 @@ func TestNeedsSweep(t *testing.T) {
 		want bool
 	}{
 		{"pending entry", journal.Trade{ID: 1, Entry: 80}, true},
-		{"filled, tp1 still to place", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, TP1Auto: true}, true},
-		{"filled, placed, tp1 fill not recorded", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, TP1Auto: true, TP1OrderID: "9", StopAuto: true, StopOrderID: "8"}, true},
-		{"filled, placed, tp1 leg recorded", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, TP1Auto: true, TP1OrderID: "9", StopAuto: true, StopOrderID: "8", TP1FillPrice: 82, TP1FillPct: 50}, false},
-		{"bundled tp only", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, TP2OrderID: "ATTACHED:7", TP1OrderID: "ATTACHED:7"}, false},
+		{"filled, stop still to place", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, StopAuto: true}, true},
+		{"filled, final tp still to place", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, TP2Auto: true}, true},
+		{"filled, both placed", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, StopAuto: true, StopOrderID: "8", TP2Auto: true, TP2OrderID: "9"}, false},
+		{"bundled tp only", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, TP2OrderID: "ATTACHED:7"}, false},
+		// A legacy row's TP1 flag and resting TP1 order no longer drive the
+		// sweep: nothing places TP1, and sweepExits records its fill.
+		{"legacy tp1 flag", journal.Trade{ID: 1, Entry: 80, FilledAt: filled, TP1Auto: true, TP1OrderID: "9"}, false},
 		{"filled, nothing opted in", journal.Trade{ID: 1, Entry: 80, FilledAt: filled}, false},
-		{"closed", journal.Trade{ID: 1, Entry: 80, ClosedAt: filled, TP1Auto: true}, false},
+		{"closed", journal.Trade{ID: 1, Entry: 80, ClosedAt: filled, StopAuto: true}, false},
 	}
 	for _, c := range cases {
 		if got := needsSweep([]journal.Trade{c.tr}); got != c.want {
@@ -36,18 +38,18 @@ func TestNeedsSweep(t *testing.T) {
 func TestMergeSweepKeepsConcurrentChanges(t *testing.T) {
 	filled := time.Date(2026, 10, 21, 13, 34, 0, 0, time.UTC)
 	before := []journal.Trade{
-		{ID: 92, Entry: 80.424, TP1Auto: true},
-		{ID: 93, Entry: 1.5, TP1Auto: true, FilledAt: filled},
+		{ID: 92, Entry: 80.424, StopAuto: true},
+		{ID: 93, Entry: 1.5, StopAuto: true, FilledAt: filled},
 	}
 	after := []journal.Trade{
-		{ID: 92, Entry: 80.424, TP1Auto: true, FilledAt: filled, TP1OrderID: "tp1-92"},
-		{ID: 93, Entry: 1.5, TP1Auto: true, FilledAt: filled, TP1OrderID: "tp1-93"},
+		{ID: 92, Entry: 80.424, StopAuto: true, FilledAt: filled, StopOrderID: "stop-92"},
+		{ID: 93, Entry: 1.5, StopAuto: true, FilledAt: filled, StopOrderID: "stop-93"},
 	}
-	// Meanwhile: #92's notes were edited, #93 got a TP1 id by hand, #94 was
+	// Meanwhile: #92's notes were edited, #93 got a stop id by hand, #94 was
 	// recorded.
 	fresh := []journal.Trade{
-		{ID: 92, Entry: 80.424, TP1Auto: true, OpenNotes: "edited"},
-		{ID: 93, Entry: 1.5, TP1Auto: true, FilledAt: filled, TP1OrderID: "manual"},
+		{ID: 92, Entry: 80.424, StopAuto: true, OpenNotes: "edited"},
+		{ID: 93, Entry: 1.5, StopAuto: true, FilledAt: filled, StopOrderID: "manual"},
 		{ID: 94, Entry: 2},
 	}
 	if !mergeSweep(fresh, before, after) {
@@ -56,11 +58,11 @@ func TestMergeSweepKeepsConcurrentChanges(t *testing.T) {
 	if len(fresh) != 3 || fresh[2].ID != 94 {
 		t.Fatalf("new row lost: %+v", fresh)
 	}
-	if f := fresh[0]; f.OpenNotes != "edited" || f.TP1OrderID != "tp1-92" || !f.FilledAt.Equal(filled) {
-		t.Errorf("#92 = %+v, want the edit kept AND the sweep's fill + tp1 id", f)
+	if f := fresh[0]; f.OpenNotes != "edited" || f.StopOrderID != "stop-92" || !f.FilledAt.Equal(filled) {
+		t.Errorf("#92 = %+v, want the edit kept AND the sweep's fill + stop id", f)
 	}
-	if fresh[1].TP1OrderID != "manual" {
-		t.Errorf("#93 tp1 = %q, the hand-set id must win", fresh[1].TP1OrderID)
+	if fresh[1].StopOrderID != "manual" {
+		t.Errorf("#93 stop = %q, the hand-set id must win", fresh[1].StopOrderID)
 	}
 }
 
@@ -101,50 +103,5 @@ func TestRTrack(t *testing.T) {
 		if newRTrack(bad, 80) != nil {
 			t.Errorf("R undefined but got a track for %+v", bad)
 		}
-	}
-}
-
-// #92's real numbers: margin 15 x 100 / 80.424 floored to the lot = 18.6511,
-// TP1 closed 9.3255 @ 82. Hand-traced pct = 9.3255/18.6511 = 49.9997%.
-func TestTP1LegFrom(t *testing.T) {
-	at := time.Date(2026, 10, 21, 16, 2, 0, 0, time.UTC)
-	tr := journal.Trade{Side: "long", Entry: 80.424, Stop: 79.2, MarginUSDT: 15, Leverage: 100,
-		EntryOrderID: "E", TP1OrderID: "T"}
-	tp1 := bingx.FilledOrder{OrderID: "T", AvgPrice: 82, Quantity: 9.3255, Status: "FILLED", Time: at}
-	entry := bingx.FilledOrder{OrderID: "E", AvgPrice: 80.424, Quantity: 18.6511, Status: "FILLED"}
-	other := bingx.FilledOrder{OrderID: "X", AvgPrice: 1, Quantity: 1, Status: "FILLED"}
-
-	price, pct, when, ok := tp1LegFrom(tr, []bingx.FilledOrder{other, entry, tp1}, 4)
-	if !ok || price != 82 || math.Abs(pct-9.3255/18.6511*100) > 1e-9 || !when.Equal(at) {
-		t.Fatalf("got %v %v %v %v", price, pct, when, ok)
-	}
-	// Entry order outside the history: falls back to the planned size,
-	// floor(1500/80.424, 4) = 18.6511 — the same denominator.
-	if _, pct2, _, ok := tp1LegFrom(tr, []bingx.FilledOrder{tp1}, 4); !ok || math.Abs(pct2-pct) > 1e-9 {
-		t.Errorf("planned-size fallback pct = %v, want %v", pct2, pct)
-	}
-	// No denominator at all: no leg rather than a guess.
-	bare := tr
-	bare.MarginUSDT = 0
-	if _, _, _, ok := tp1LegFrom(bare, []bingx.FilledOrder{tp1}, 4); ok {
-		t.Error("recorded a leg with no entry quantity to divide by")
-	}
-	// Partially filled TP1 is not a leg yet.
-	part := tp1
-	part.Status = "PARTIALLY_FILLED"
-	if _, _, _, ok := tp1LegFrom(tr, []bingx.FilledOrder{entry, part}, 4); ok {
-		t.Error("recorded a partially filled TP1")
-	}
-	if _, _, _, ok := tp1LegFrom(tr, []bingx.FilledOrder{entry, other}, 4); ok {
-		t.Error("matched an unrelated order")
-	}
-}
-
-func TestMergeSweepCarriesTP1Leg(t *testing.T) {
-	before := []journal.Trade{{ID: 92}}
-	after := []journal.Trade{{ID: 92, TP1FillPrice: 82, TP1FillPct: 50}}
-	fresh := []journal.Trade{{ID: 92, OpenNotes: "edited"}}
-	if !mergeSweep(fresh, before, after) || fresh[0].TP1FillPrice != 82 || fresh[0].OpenNotes != "edited" {
-		t.Errorf("fresh = %+v", fresh[0])
 	}
 }

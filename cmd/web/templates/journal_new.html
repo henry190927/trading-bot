@@ -41,8 +41,7 @@
     <div class="ui-f-row jf-prices">
       <div class="ui-f"><label for="entry">{{t "th.entry"}}</label><input type="number" step="any" inputmode="decimal" name="entry" id="entry" value="{{.Entry}}" required></div>
       <div class="ui-f"><label for="stop">{{t "trades.stop"}}</label><input type="number" step="any" inputmode="decimal" name="stop" id="stop" value="{{.Stop}}" required></div>
-      <div class="ui-f"><label for="tp1">TP1</label><input type="number" step="any" inputmode="decimal" name="tp1" id="tp1" value="{{.TP1}}" required></div>
-      <div class="ui-f"><label for="tp2">TP2</label><input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}" required></div>
+      <div class="ui-f"><label for="tp2">{{t "jf.finalTP"}} <span class="ui-hint">{{t "jf.finalTPHint"}}</span></label><input type="number" step="any" inputmode="decimal" name="tp2" id="tp2" value="{{.TP2}}" required></div>
     </div>
     <div class="ui-f-row">
       <div class="ui-f">
@@ -61,7 +60,6 @@
     <div class="ui-f-row">
       <div class="ui-f"><label for="leverage">{{t "jf.leverage"}} <span class="ui-hint">{{t "jf.leverageHint"}}</span></label><input type="number" min="1" max="500" step="1" name="leverage" id="leverage" value="{{.Leverage}}" placeholder="0"></div>
       <div class="ui-f"><label for="margin_usdt">{{t "jf.margin"}} <span class="ui-hint">{{t "jf.marginHint"}}</span></label><input type="number" min="0" step="any" inputmode="decimal" name="margin_usdt" id="margin_usdt" value="{{.MarginUSDT}}" placeholder="100"></div>
-      <div class="ui-f"><label for="tp1_partial_pct">{{t "jf.tp1Pct"}} <span class="ui-hint">{{t "jf.tp1PctHint"}}</span></label><input type="number" min="1" max="100" step="1" name="tp1_partial_pct" id="tp1_partial_pct" value="{{.TP1PartialPct}}" placeholder="50"></div>
     </div>
     <label class="ui-check"><input type="checkbox" name="margin_override" id="margin_override" {{if .MarginOverride}}checked{{end}}><span>{{t "jf.override"}}<span class="ui-hint">{{t "jf.overrideHint"}}</span></span></label>
 
@@ -69,7 +67,6 @@
     <div class="pnl-preview jf-pnl" id="pnl-preview" hidden>
       <div class="pnl-row"><span class="pnl-label">{{t "jf.pnl.qty"}}</span><span class="pnl-val" id="pnl-qty">—</span></div>
       <div class="pnl-row"><span class="pnl-label">{{t "jf.pnl.notional"}}</span><span class="pnl-val" id="pnl-notional">—</span></div>
-      <div class="pnl-row pnl-tp1"><span class="pnl-label">{{t "jf.pnl.tp1"}}</span><span class="pnl-val" id="pnl-tp1">—</span></div>
       <div class="pnl-row pnl-tp2"><span class="pnl-label">{{t "jf.pnl.tp2"}}</span><span class="pnl-val" id="pnl-tp2">—</span></div>
       <div class="pnl-row pnl-stop"><span class="pnl-label">{{t "jf.pnl.stop"}}</span><span class="pnl-val" id="pnl-stop">—</span></div>
       <div class="pnl-note">{{t "jf.pnl.note"}}</div>
@@ -80,7 +77,6 @@
     <header class="ui-card-h"><h2>{{t "jf.bingx"}}</h2><span class="ui-hint">{{t "jf.bingxHint"}}</span></header>
     <label class="ui-check"><input type="checkbox" name="open_position" id="open_position"><span><b>{{t "jf.openPos"}}</b> — {{t "jf.openPosDesc"}}<span class="ui-hint ui-down">{{t "jf.openPosWarn"}}</span></span></label>
     <label class="ui-check"><input type="checkbox" name="place_stop" id="place_stop"><span>{{t "jf.placeStop"}}<span class="ui-hint">{{t "jf.bundledHint"}}</span></span></label>
-    <label class="ui-check"><input type="checkbox" name="place_tp1" id="place_tp1" {{if .PlaceTP1}}checked{{end}}><span>{{t "jf.placeTP1"}}<span class="ui-hint">{{t "jf.placeTP1Hint"}}</span></span></label>
     <label class="ui-check"><input type="checkbox" name="place_tp2" id="place_tp2"><span>{{t "jf.placeTP2"}}<span class="ui-hint">{{t "jf.bundledHint"}}</span></span></label>
   </section>
 
@@ -115,7 +111,7 @@
 
 <script>window.JF = {
   override: {{t "jf.js.override"}}, setLev: {{t "jf.js.setLev"}}, placeLimit: {{t "jf.js.placeLimit"}},
-  bundled: {{t "jf.js.bundled"}}, slBundled: {{t "jf.js.slBundled"}}, tp2Bundled: {{t "jf.js.tp2Bundled"}}, tp1Sweep: {{t "jf.js.tp1Sweep"}}
+  bundled: {{t "jf.js.bundled"}}, slBundled: {{t "jf.js.slBundled"}}, tp2Bundled: {{t "jf.js.tp2Bundled"}}
 };</script>
 <script>
 // Pre-fill leverage with per-symbol defaults the user runs (XAU=200, XAG=100).
@@ -137,7 +133,7 @@
 // Live PnL preview: qty = (margin × leverage) / entry; PnL = qty × (exit-entry) × sideMult.
 // Updates on every relevant field change. Hidden if margin or entry is empty.
 (function () {
-    var ids = ['entry','stop','tp1','tp2','leverage','margin_usdt','tp1_partial_pct'];
+    var ids = ['entry','stop','tp2','leverage','margin_usdt'];
     var inputs = ids.map(function (i) { return document.getElementById(i); });
     var sideRadios = document.querySelectorAll('input[name="side"]');
     var pane = document.getElementById('pnl-preview');
@@ -169,11 +165,9 @@
     function recompute() {
         var entry = num(inputs[0]);
         var stop  = num(inputs[1]);
-        var tp1   = num(inputs[2]);
-        var tp2   = num(inputs[3]);
-        var lev   = num(inputs[4]) || 1;
-        var margin = num(inputs[5]);
-        var pct   = num(inputs[6]); if (!isFinite(pct) || pct <= 0) pct = 50;
+        var tp2   = num(inputs[2]);
+        var lev   = num(inputs[3]) || 1;
+        var margin = num(inputs[4]);
         var s     = side();
 
         if (!isFinite(entry) || entry <= 0 || !isFinite(margin) || margin <= 0 || !s) {
@@ -198,7 +192,6 @@
             if (!isFinite(exit) || exit <= 0) return NaN;
             return qty * (exit - entry) * mult;
         }
-        var p1 = pnl(tp1) * (pct / 100);
         var p2 = pnl(tp2);
         var pS = pnl(stop);
         var setVal = function(id, v) {
@@ -207,7 +200,6 @@
             el.classList.toggle('pnl-pos', isFinite(v) && v > 0);
             el.classList.toggle('pnl-neg', isFinite(v) && v < 0);
         };
-        setVal('pnl-tp1', p1);
         setVal('pnl-tp2', p2);
         setVal('pnl-stop', pS);
     }
@@ -221,7 +213,7 @@
 // the form with open_position checked, intercept and show a summary of
 // every order that will be sent. They must explicitly confirm before the
 // form actually POSTs. Submit proceeds untouched if open_position is
-// unchecked (existing alert-only / TP1-only flow).
+// unchecked (journal-only record).
 (function () {
     var form = document.querySelector('form[action="/journal/open"]');
     var openPos = document.getElementById('open_position');
@@ -257,9 +249,8 @@
         list.innerHTML = '';
         var sym = gv('symbol');
         var side = (document.querySelector('input[name="side"]:checked') || {}).value || '?';
-        var entry = gv('entry'), stop = gv('stop'), tp1 = gv('tp1'), tp2 = gv('tp2');
+        var entry = gv('entry'), stop = gv('stop'), tp2 = gv('tp2');
         var margin = gv('margin_usdt'), lev = gv('leverage');
-        var partial = gv('tp1_partial_pct') || '50';
         var override = gck('margin_override');
         var marginNum = parseFloat(margin);
 
@@ -278,12 +269,11 @@
         var entryLine = fill(JF.placeLimit, side.toUpperCase(), margin, entry);
         var bundled = [];
         if (gck('place_stop')) bundled.push('SL @ ' + stop);
-        if (gck('place_tp2')) bundled.push('TP2 @ ' + tp2);
+        if (gck('place_tp2')) bundled.push('TP @ ' + tp2);
         if (bundled.length) entryLine += ' [' + JF.bundled + ': ' + bundled.join(', ') + ']';
         add(entryLine);
         if (gck('place_stop'))  add('  → ' + fill(JF.slBundled, stop));
         if (gck('place_tp2'))   add('  → ' + fill(JF.tp2Bundled, tp2));
-        if (gck('place_tp1'))   add(fill(JF.tp1Sweep, tp1, partial));
     }
 })();
 </script>

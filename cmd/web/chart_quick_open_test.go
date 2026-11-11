@@ -119,11 +119,13 @@ func TestQuickOpenPlacesEntryWithBundledStop(t *testing.T) {
 	if tr.TP2OrderID != "ATTACHED:"+tr.EntryOrderID {
 		t.Errorf("tp2 not bundled: %q", tr.TP2OrderID)
 	}
-	if !tr.TP1Auto {
-		t.Error("TP1Auto not persisted, the sweep would never place the partial")
+	// baseForm still sends tp1, as a page cached from before step c would.
+	// It is ignored: partial TPs are added on /today after the fill.
+	if tr.TP1Auto || tr.TP1 != 0 || tr.TP1OrderID != "" || len(orders) != 1 {
+		t.Errorf("tp1 acted on: TP1=%v TP1Auto=%v TP1OrderID=%q orders=%v", tr.TP1, tr.TP1Auto, tr.TP1OrderID, orders)
 	}
 	sm, _ := body["summary"].(map[string]any)
-	if sm == nil || sm["qty"] != 0.0025 || sm["stopBundled"] != true || sm["tp2Bundled"] != true || sm["tp1Pending"] != true || sm["orderId"] != tr.EntryOrderID {
+	if sm == nil || sm["qty"] != 0.0025 || sm["stopBundled"] != true || sm["tp2Bundled"] != true || sm["orderId"] != tr.EntryOrderID {
 		t.Errorf("summary = %v", sm)
 	}
 }

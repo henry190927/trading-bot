@@ -370,8 +370,9 @@
 
         <!-- Record-only fields, shown when the Record tab is
              active. The "place on BingX" box sends the same order
-             set as /journal/new (entry + bundled SL/TP2 + TP1
-             partial) through the same server path; the margin-cap
+             set as /journal/new (entry + bundled SL + final TP)
+             through the same server path; partial TPs are added on
+             /today after the fill. The margin-cap
              override and per-leg toggles stay on the full form. -->
         <div class="quick-record-fields">
           <div class="quick-row">
@@ -379,13 +380,10 @@
             <input type="number" step="any" id="quick-stop" placeholder="{{t "chart.ui.q.stopPh"}}">
           </div>
           <div class="quick-row">
-            <label for="quick-tp1">TP1</label>
-            <input type="number" step="any" id="quick-tp1" placeholder="{{t "chart.ui.q.optional"}}">
-          </div>
-          <div class="quick-row">
-            <label for="quick-tp2">TP2</label>
+            <label for="quick-tp2">{{t "chart.ui.q.finalTP"}}</label>
             <input type="number" step="any" id="quick-tp2" placeholder="{{t "chart.ui.q.optional"}}">
           </div>
+          <div class="quick-row quick-row-hint">{{t "chart.ui.q.partialTPHint"}}</div>
           <div class="quick-row quick-row-pair">
             <label for="quick-margin">{{t "at.margin"}}</label>
             <input type="number" step="any" min="0" id="quick-margin" placeholder="USDT">
@@ -393,7 +391,7 @@
             <input type="number" step="1" min="0" max="500" id="quick-leverage" placeholder="×">
           </div>
           <!-- Estimated P&L block — populated live from entry / stop /
-               TP1 / TP2 / margin / leverage. Purely a preview; not
+               final TP / margin / leverage. Purely a preview; not
                stored on the trade row. -->
           <div class="quick-pnl hidden" id="quick-pnl">
             <div class="quick-pnl-row">
@@ -403,9 +401,7 @@
               <span class="quick-pnl-val quick-pnl-neg" id="quick-pnl-risk">—</span>
             </div>
             <div class="quick-pnl-row">
-              <span class="quick-pnl-label">TP1</span>
-              <span class="quick-pnl-val quick-pnl-pos" id="quick-pnl-tp1">—</span>
-              <span class="quick-pnl-label">TP2</span>
+              <span class="quick-pnl-label">{{t "chart.ui.q.finalTP"}}</span>
               <span class="quick-pnl-val quick-pnl-pos" id="quick-pnl-tp2">—</span>
             </div>
             <div class="quick-pnl-row">
@@ -964,18 +960,16 @@
         "q.recordPlaceBtn": {{t "chart.js.q.recordPlaceBtn"}},
         "q.placing": {{t "chart.js.q.placing"}},
         "q.confirmPlace": {{t "chart.js.q.confirmPlace"}},
-        "q.confirmTP1": {{t "chart.js.q.confirmTP1"}},
         "q.confirmTP2": {{t "chart.js.q.confirmTP2"}},
+        "q.finalTP": {{t "chart.ui.q.finalTP"}},
         "q.verify": {{t "chart.js.q.verify"}},
         "q.legEntry": {{t "chart.js.q.legEntry"}},
-        "q.legTP1": {{t "chart.js.q.legTP1"}},
         "q.placed": {{t "chart.js.q.placed"}},
         "q.bundled": {{t "chart.js.q.bundled"}},
         "q.entryLimit": {{t "chart.js.q.entryLimit"}},
         "q.qty": {{t "chart.js.q.qty"}},
         "q.sizing": {{t "chart.js.q.sizing"}},
         "q.stopLbl": {{t "chart.js.q.stopLbl"}},
-        "q.tp1AfterFill": {{t "chart.js.q.tp1AfterFill"}},
         "q.acctLev": {{t "chart.js.q.acctLev"}},
         "q.killDist": {{t "chart.js.q.killDist"}},
         "q.verifyBtn": {{t "chart.js.q.verifyBtn"}},
@@ -3993,7 +3987,6 @@
         var tfOut       = document.getElementById('quick-tf');
         var priceIn     = document.getElementById('quick-price');
         var stopIn      = document.getElementById('quick-stop');
-        var tp1In       = document.getElementById('quick-tp1');
         var tp2In       = document.getElementById('quick-tp2');
         var anchorIn    = document.getElementById('quick-anchor');
         var notesIn     = document.getElementById('quick-notes');
@@ -4003,7 +3996,6 @@
         var pnlBox      = document.getElementById('quick-pnl');
         var pnlNotional = document.getElementById('quick-pnl-notional');
         var pnlRisk     = document.getElementById('quick-pnl-risk');
-        var pnlTP1      = document.getElementById('quick-pnl-tp1');
         var pnlTP2      = document.getElementById('quick-pnl-tp2');
         var pnlRR       = document.getElementById('quick-pnl-rr');
 
@@ -4021,7 +4013,6 @@
             var side = selectedSide();
             var entry = parseFloat(priceIn.value);
             var stop  = parseFloat(stopIn.value);
-            var tp1   = parseFloat(tp1In.value);
             var tp2   = parseFloat(tp2In.value);
             var mgn   = parseFloat(marginIn.value);
             var lev   = parseFloat(leverageIn.value);
@@ -4046,22 +4037,16 @@
             } else {
                 pnlRisk.textContent = '—';
             }
-            var tp1PnL = legPnL(tp1);
             var tp2PnL = legPnL(tp2);
-            pnlTP1.textContent = tp1PnL == null ? '—' : fmtUSD(tp1PnL);
             pnlTP2.textContent = tp2PnL == null ? '—' : fmtUSD(tp2PnL);
-            // R:R against TP1 (TP2 in parens if present).
+            // R:R against the final TP.
             var rrStr = '—';
-            if (riskPnL != null && riskPnL !== 0) {
-                var absRisk = Math.abs(riskPnL);
-                var parts = [];
-                if (tp1PnL != null) parts.push('TP1 ' + (tp1PnL / absRisk).toFixed(2) + 'R');
-                if (tp2PnL != null) parts.push('TP2 ' + (tp2PnL / absRisk).toFixed(2) + 'R');
-                if (parts.length) rrStr = parts.join(' · ');
+            if (riskPnL != null && riskPnL !== 0 && tp2PnL != null) {
+                rrStr = (tp2PnL / Math.abs(riskPnL)).toFixed(2) + 'R';
             }
             pnlRR.textContent = rrStr;
         }
-        [priceIn, stopIn, tp1In, tp2In, marginIn, leverageIn].forEach(function (el) {
+        [priceIn, stopIn, tp2In, marginIn, leverageIn].forEach(function (el) {
             if (el) el.addEventListener('input', recomputePnL);
         });
         var sideBtns    = document.querySelectorAll('.quick-side-btn');
@@ -4298,7 +4283,6 @@
             // TP levels are typically per-trade. Leverage + margin
             // stay populated from last-used (sticky prefs above).
             stopIn.value = '';
-            tp1In.value  = '';
             tp2In.value  = '';
             anchorIn.value = '';
             notesIn.value  = '';
@@ -4345,7 +4329,6 @@
                 symbol:      currentSym(), tf: currentTF(),
                 side:        side, entry:  price,
                 stop:        stopIn.value.trim(),
-                tp1:         tp1In.value.trim(),
                 tp2:         tp2In.value.trim(),
                 anchor:      anchorIn.value.trim(),
                 notes:       notesIn.value.trim(),
@@ -4402,14 +4385,13 @@
                     [CT['q.sizing'], fmtNum(sm.margin, 2) + 'u × ' + sm.leverage + 'x = ' + fmtNum(sm.notional, 0) + 'u'],
                     [CT['q.stopLbl'], fmtNum(sm.stop, 8) + tag(sm.stopBundled)],
                 ];
-                if (sm.tp1 > 0) rows.push(['TP1', fmtNum(sm.tp1, 8) + (sm.tp1Pending ? ' <span class="qr-tag dim">' + CT['q.tp1AfterFill'] + '</span>' : '')]);
-                if (sm.tp2 > 0) rows.push(['TP2', fmtNum(sm.tp2, 8) + tag(sm.tp2Bundled)]);
+                if (sm.tp2 > 0) rows.push([CT['q.finalTP'], fmtNum(sm.tp2, 8) + tag(sm.tp2Bundled)]);
                 if (sm.accountLev > 0) rows.push([CT['q.acctLev'], sm.accountLev.toFixed(1) + 'x · ' + CT['q.killDist'] + ' ' + sm.killPct.toFixed(2) + '%']);
                 rows.push(['orderId', '<button type="button" class="copy-btn small" data-copy="' + escHTML(sm.orderId) + '">' + escHTML(sm.orderId) + '</button>']);
                 html.push('<dl class="qr-grid">' + rows.map(function (x) { return '<dt>' + x[0] + '</dt><dd>' + x[1] + '</dd>'; }).join('') + '</dl>');
             }
             bad.forEach(function (o) {
-                var name = o.leg === 'tp1' ? CT['q.legTP1'] : CT['q.legEntry'];
+                var name = CT['q.legEntry'];
                 html.push('<div class="qr-legwarn ' + (o.status === 'skip' ? 'skip' : 'err') + '"><b>' + name + ' · ' + escHTML(o.status) + '</b> ' + escHTML(o.msg) + '</div>');
             });
             html.push('<div class="qr-actions">'
@@ -4439,7 +4421,6 @@
                 .replace('{notional}', isNaN(notional) ? '—' : notional.toFixed(0))
                 .replace('{stop}', f.stop || '—');
             if (f.tp2) t += '\n' + CT['q.confirmTP2'].replace('{tp2}', f.tp2);
-            if (f.tp1) t += '\n' + CT['q.confirmTP1'].replace('{tp1}', f.tp1);
             return t;
         }
         function renderError(msg) {
@@ -4485,7 +4466,7 @@
             return path + '?' + encodeForm({
                 symbol: form.symbol, side: form.side,
                 entry:  form.entry,  tf:   form.tf,
-                stop:   form.stop,   tp1:  form.tp1, tp2: form.tp2,
+                stop:   form.stop,   tp2:  form.tp2,
                 anchor: form.anchor,
             });
         }
