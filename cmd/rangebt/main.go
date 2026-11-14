@@ -63,6 +63,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -128,6 +129,7 @@ func main() {
 	htfVetoF := flag.Bool("htf-veto", false, "A/B: add the same veto read on the bias TF (1h→4h, 250 HTF bars closed at or before the fire bar's open) to EVERY variant. Stop and target unchanged.")
 	feeBps := flag.Float64("fee-bps", 0, "round-trip fee in bps of notional, charged in R per resolved trade (6 = mixed, as cmd/backtest). Default 0 keeps the historical gross output.")
 	noDedup := flag.Bool("no-dedup", false, "score every fire independently instead of through DedupFires (the SIGNAL rather than the BOOK), as cmd/snrbt. Range-edge re-fires every bar inside the edge third, so this is heavily overlapping.")
+	warmup := flag.Bool("warmup", false, "LIVE PARITY: fetch 250 extra bars BEFORE the window so the first in-window bars see the same 250-bar structure read, full 24-bar box and warmed EMA/ATR that live Klines(250) gives; fires are still only taken on in-window bars. Off by default (historical output). Matters most for -days 30 buckets, where the cold start is a third of the window.")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -187,8 +189,8 @@ func main() {
 	}
 
 	fmt.Printf("=== range-edge A/B · %dd · %s · stop %.2f%% · vol-gate ATR%%>%.1f ===\n", *days, *tfStr, *stopPct, *volThresh)
-	if *trendVeto || *htfVetoF || *feeBps != 0 || *noDedup {
-		fmt.Printf("    trend-veto=%v · htf-veto=%v · fee %.1fbp · no-dedup=%v · end-offset %dd\n", *trendVeto, *htfVetoF, *feeBps, *noDedup, *endOff)
+	if *trendVeto || *htfVetoF || *feeBps != 0 || *noDedup || *warmup {
+		fmt.Printf("    trend-veto=%v · htf-veto=%v · fee %.1fbp · no-dedup=%v · end-offset %dd · warmup=%v\n", *trendVeto, *htfVetoF, *feeBps, *noDedup, *endOff, *warmup)
 	}
 	fmt.Printf("%-5s %-12s %6s %6s %5s %5s %7s %7s\n", "sym", "variant", "pos", "fill%", "tp", "stop", "win%", "netR")
 
@@ -197,7 +199,11 @@ func main() {
 	aggPos := map[string]int{}
 
 	for _, s := range syms {
-		cs, err := client.KlinesRange(context.Background(), s.sym, tf, start, end)
+		fetchStart := start
+		if *warmup {
+			fetchStart = start.Add(-time.Duration(warmupBars) * tfDur(tf))
+		}
+		cs, err := client.KlinesRange(context.Background(), s.sym, tf, fetchStart, end)
 		if err != nil || len(cs) < 60 {
 			log.Printf("%s: klines: %v (len %d)", s.short, err, len(cs))
 			continue
@@ -235,6 +241,9 @@ func main() {
 		}
 		for _, v := range variants {
 			fires := genFires(cs, hcs, ema, atr, v, *stopPct/100.0, *volThresh/100.0, s.short)
+			if *warmup {
+				fires = inWindow(fires, start)
+			}
 			resolve := func(f autotrade.PaperFire) autotrade.Outcome {
 				return autotrade.WithFee(f, autotrade.EvaluateFire(f, cs, 6), *feeBps)
 			}
@@ -429,6 +438,37 @@ func bullishEvent(e signal.StructEventKind) bool {
 
 func bearishEvent(e signal.StructEventKind) bool {
 	return e == signal.EvCHoCHDown || e == signal.EvBOSDown
+}
+
+// warmupBars is the -warmup history: live range-edge reads Klines(250).
+const warmupBars = 250
+
+// tfDur is a timeframe's bar length ("15m", "1h", "4h", "1d").
+func tfDur(tf market.Timeframe) time.Duration {
+	s := string(tf)
+	if strings.HasSuffix(s, "d") {
+		n, _ := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		return time.Duration(max(n, 1)) * 24 * time.Hour
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return time.Hour
+	}
+	return d
+}
+
+// inWindow keeps fires placed on bars that OPENED at or after start — the
+// bar's close is after start — so -warmup bars inform the read but never
+// trade. genFires is stateless per bar, so filtering after generation is the
+// same as not generating them.
+func inWindow(fires []autotrade.PaperFire, start time.Time) []autotrade.PaperFire {
+	out := fires[:0:0]
+	for _, f := range fires {
+		if f.Time.After(start) {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // htfLookback is the HTF bar count the -htf-veto read uses — the same 250

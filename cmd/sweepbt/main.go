@@ -53,6 +53,7 @@ func main() {
 	htfVetoF := flag.Bool("htf-veto", false, "A/B: the same veto read on the bias TF (autostrat.EngineBiasTF: 1h→4h), 300 HTF bars closed at or before the fire bar's open. Stop and target unchanged.")
 	feeBps := flag.Float64("fee-bps", 0, "round-trip fee in bps of notional, charged in R per resolved trade (6 = mixed, as cmd/backtest). Default 0 keeps the historical gross output.")
 	noDedup := flag.Bool("no-dedup", false, "score every fire independently instead of through DedupFires (the SIGNAL rather than the BOOK), as cmd/snrbt")
+	warmup := flag.Bool("warmup", false, "LIVE PARITY: fetch 300 extra bars BEFORE the window (live sweep-reject reads Klines(300)) so the first in-window bars see pre-window pools and a warmed ATR, and the 60-bar cold start falls outside the window; fires are still only taken on in-window bars. Off by default (historical output). Matters most for -days 30 buckets.")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -110,15 +111,19 @@ func main() {
 		}
 	}
 	fmt.Printf("=== %s · %dd · %s · tol %.2f%% · stop=sweep+%.2fATR · TP %.1fR ===\n", mode, *days, *tfStr, *tol, *bufATR, *rMult)
-	if *trendVeto || *htfVetoF || *feeBps != 0 || *noDedup {
-		fmt.Printf("    trend-veto=%v · htf-veto=%v · fee %.1fbp · no-dedup=%v · end-offset %dd\n", *trendVeto, *htfVetoF, *feeBps, *noDedup, *endOff)
+	if *trendVeto || *htfVetoF || *feeBps != 0 || *noDedup || *warmup {
+		fmt.Printf("    trend-veto=%v · htf-veto=%v · fee %.1fbp · no-dedup=%v · end-offset %dd · warmup=%v\n", *trendVeto, *htfVetoF, *feeBps, *noDedup, *endOff, *warmup)
 	}
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
 	var aggR float64
 	var aggN int
 
 	for _, s := range syms {
-		cs, err := client.KlinesRange(context.Background(), s.sym, tf, start, end)
+		fetchStart := start
+		if *warmup {
+			fetchStart = start.Add(-structLookback * tfDur(tf))
+		}
+		cs, err := client.KlinesRange(context.Background(), s.sym, tf, fetchStart, end)
 		if err != nil || len(cs) < 80 {
 			log.Printf("%s: klines %v (len %d)", s.short, err, len(cs))
 			continue
@@ -129,6 +134,9 @@ func main() {
 			fires = genAMDFires(cs, atr, s.short, *bufATR, *rMult, *amdRangeTP)
 		} else {
 			fires = genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult, *liqTP, *openGate)
+		}
+		if *warmup {
+			fires = inWindow(fires, start)
 		}
 		if *trendVeto {
 			// Warm-up: live reads 300 bars, so the window's first fires need
