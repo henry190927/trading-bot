@@ -795,15 +795,7 @@ func Evaluate(in Inputs) Signal {
 		// fired while an event pointed the other way — a short killed by an
 		// HH-HL uptrend was announced as "against CHoCH-down", i.e. against
 		// a structure that agreed with it. Name the condition that fired.
-		var trendVeto, eventVeto bool
-		switch sig.Side {
-		case Long:
-			trendVeto = st.Trend == StructDowntrend
-			eventVeto = st.Event == EvCHoCHDown || st.Event == EvBOSDown
-		case Short:
-			trendVeto = st.Trend == StructUptrend
-			eventVeto = st.Event == EvCHoCHUp || st.Event == EvBOSUp
-		}
+		trendVeto, eventVeto := StructureVeto(st, sig.Side)
 		if veto := trendVeto || eventVeto; veto {
 			var label string
 			switch {

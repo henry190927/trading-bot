@@ -1,6 +1,9 @@
 package signal
 
 import (
+	"sort"
+	"time"
+
 	"github.com/henry190927/trading-bot/market"
 )
 
@@ -230,6 +233,55 @@ func AnalyzeStructure(candles []market.Candle, strength int) StructureState {
 		st.InZone = lastClose >= st.Zone.Lo && lastClose <= st.Zone.Hi
 	}
 	return st
+}
+
+// StructureVeto is THE N 字 counter-trend veto (逆勢否決) definition, shared
+// by the engine (StructureVetoEnabled / isStructureVetoSymbol) and the
+// rule backtests (sweepbt / rangebt -trend-veto) so the two cannot drift.
+//
+// trend: an established HH-HL uptrend kills a short, LH-LL downtrend a long.
+// event: a BOS/CHoCH against the side on the latest closed bar of st.
+// Neutral trend and no event veto nothing. Flat never vetoes.
+func StructureVeto(st StructureState, side Side) (trend, event bool) {
+	switch side {
+	case Long:
+		trend = st.Trend == StructDowntrend
+		event = st.Event == EvCHoCHDown || st.Event == EvBOSDown
+	case Short:
+		trend = st.Trend == StructUptrend
+		event = st.Event == EvCHoCHUp || st.Event == EvBOSUp
+	}
+	return trend, event
+}
+
+// StructureVetoAt is StructureVeto (trend OR event) on the structure of the
+// `lookback` bars ending at cs[i] INCLUSIVE — the bar a fire is taken on,
+// which is closed at fire time — and nothing after it. Swings inside that
+// slice confirm `strength` bars late by construction (FindSwingPoints needs
+// bars on both sides within the slice), so a swing that is only confirmed
+// after i cannot be seen. lookback <= 0 means everything up to i.
+func StructureVetoAt(cs []market.Candle, i, lookback int, side Side) bool {
+	if i < 0 || i >= len(cs) {
+		return false
+	}
+	lb := 0
+	if lookback > 0 && i+1-lookback > 0 {
+		lb = i + 1 - lookback
+	}
+	trend, event := StructureVeto(AnalyzeStructure(cs[lb:i+1], 2), side)
+	return trend || event
+}
+
+// StructureVetoAsOf is StructureVetoAt on a (higher-TF) series, using only
+// the bars whose CloseTime is at or before asOf — pass the base bar's
+// OpenTime for the same no-look-ahead alignment precomputeHTFStruct uses
+// in package backtest. No closed bar yet = no veto. htf must be ascending.
+func StructureVetoAsOf(htf []market.Candle, asOf time.Time, lookback int, side Side) bool {
+	n := sort.Search(len(htf), func(k int) bool { return htf[k].CloseTime.After(asOf) })
+	if n == 0 {
+		return false
+	}
+	return StructureVetoAt(htf, n-1, lookback, side)
 }
 
 // buildPivotZone computes the 0.5–0.705 retracement band (樞紐區) of a

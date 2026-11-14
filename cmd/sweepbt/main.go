@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/henry190927/trading-bot/autostrat"
 	"github.com/henry190927/trading-bot/autotrade"
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/config"
@@ -48,6 +49,10 @@ func main() {
 	amdRangeTP := flag.Bool("amd-range-tp", false, "with --amd: take profit at the OPPOSITE edge of the Asian range instead of a fixed R multiple (falls back to R when that edge is nearer than 1R)")
 	openGate := flag.Bool("open-gate", false, "A/B (c): only fire when entry sits BETWEEN the daily and weekly open (the \"mixed\" bucket cmd/openbt found best). Suppresses fires beyond BOTH opens.")
 	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
+	trendVeto := flag.Bool("trend-veto", false, "A/B: drop fires the N 字 counter-trend structure veto kills (signal.StructureVeto, the XAU/XAG engine definition: opposing HH-HL/LH-LL trend OR opposing BOS/CHoCH on the fire bar, over the 300 bars ending at it, as live sweep-reject reads). Stop and target unchanged.")
+	htfVetoF := flag.Bool("htf-veto", false, "A/B: the same veto read on the bias TF (autostrat.EngineBiasTF: 1h→4h), 300 HTF bars closed at or before the fire bar's open. Stop and target unchanged.")
+	feeBps := flag.Float64("fee-bps", 0, "round-trip fee in bps of notional, charged in R per resolved trade (6 = mixed, as cmd/backtest). Default 0 keeps the historical gross output.")
+	noDedup := flag.Bool("no-dedup", false, "score every fire independently instead of through DedupFires (the SIGNAL rather than the BOOK), as cmd/snrbt")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -105,6 +110,9 @@ func main() {
 		}
 	}
 	fmt.Printf("=== %s · %dd · %s · tol %.2f%% · stop=sweep+%.2fATR · TP %.1fR ===\n", mode, *days, *tfStr, *tol, *bufATR, *rMult)
+	if *trendVeto || *htfVetoF || *feeBps != 0 || *noDedup {
+		fmt.Printf("    trend-veto=%v · htf-veto=%v · fee %.1fbp · no-dedup=%v · end-offset %dd\n", *trendVeto, *htfVetoF, *feeBps, *noDedup, *endOff)
+	}
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
 	var aggR float64
 	var aggN int
@@ -122,9 +130,32 @@ func main() {
 		} else {
 			fires = genSweepFires(cs, atr, s.short, *tol/100.0, *bufATR, *rMult, *liqTP, *openGate)
 		}
-		positions := autotrade.DedupFires(fires, 6, 6, time.Hour, func(f autotrade.PaperFire) autotrade.Outcome {
-			return autotrade.EvaluateFire(f, cs, 6)
-		})
+		if *trendVeto {
+			// Warm-up: live reads 300 bars, so the window's first fires need
+			// bars from before it. Fetched separately so the fire generation
+			// (and therefore the OFF arm) sees exactly the same series.
+			dur := cs[1].OpenTime.Sub(cs[0].OpenTime)
+			ref, rerr := client.KlinesRange(context.Background(), s.sym, tf, start.Add(-structLookback*dur), end)
+			if rerr != nil || len(ref) < len(cs) {
+				log.Printf("%s: warm-up klines %v (len %d)", s.short, rerr, len(ref))
+				continue
+			}
+			fires = applyTrendVeto(fires, sameTFVeto(ref))
+		}
+		if *htfVetoF {
+			htfTF := autostrat.EngineBiasTF(tf)
+			hdur := 4 * time.Hour
+			if htfTF != "4h" {
+				hdur = 24 * time.Hour
+			}
+			hcs, herr := client.KlinesRange(context.Background(), s.sym, htfTF, start.Add(-(structLookback+2)*hdur), end)
+			if herr != nil || len(hcs) < 40 {
+				log.Printf("%s: htf klines %v (len %d)", s.short, herr, len(hcs))
+				continue
+			}
+			fires = applyTrendVeto(fires, htfVeto(cs, hcs))
+		}
+		positions := scoreFires(fires, cs, *noDedup, *feeBps)
 		var netR float64
 		var tp, stop, filled int
 		for _, p := range positions {

@@ -66,6 +66,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/henry190927/trading-bot/autostrat"
 	"github.com/henry190927/trading-bot/autotrade"
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/config"
@@ -98,6 +99,20 @@ type variant struct {
 	// never blocked anything. Event fires on 25-37% of bars, and two of the
 	// five losing shorts were taken on a CHoCH-up.
 	eventFilter bool
+
+	// nfeVeto (-trend-veto) applies signal.StructureVeto — the N 字
+	// counter-trend veto exactly as the XAU/XAG engine runs it (opposing
+	// trend OR opposing BOS/CHoCH) — to the same 250-bar structure read the
+	// shipped Trend guard already uses. The Trend half is a no-op here (the
+	// base trigger already excludes it), so on V0 this equals V6; it is a
+	// flag so every variant can be measured with and without it.
+	nfeVeto bool
+
+	// htfVeto (-htf-veto) is the same StructureVeto read on the bias TF
+	// (autostrat.EngineBiasTF: 1h→4h): the last 250 HTF bars closed at or
+	// before the fire bar's OpenTime (backtest.precomputeHTFStruct's
+	// alignment). Requires genFires' htf series.
+	htfVeto bool
 }
 
 func main() {
@@ -109,6 +124,10 @@ func main() {
 	concTest := flag.Bool("conc-test", false, "A/B max-concurrent 1 vs 2 vs 3 on baseline (relax one-position)")
 	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
 	symbols := flag.String("symbols", "", "comma-separated symbols to test instead of the default BTC/ETH/SOL; short names (XAU) or raw contract codes, as in sweepbt")
+	trendVeto := flag.Bool("trend-veto", false, "A/B: add the N 字 counter-trend structure veto (signal.StructureVeto, the XAU/XAG engine definition) to EVERY variant. Stop and target unchanged.")
+	htfVetoF := flag.Bool("htf-veto", false, "A/B: add the same veto read on the bias TF (1h→4h, 250 HTF bars closed at or before the fire bar's open) to EVERY variant. Stop and target unchanged.")
+	feeBps := flag.Float64("fee-bps", 0, "round-trip fee in bps of notional, charged in R per resolved trade (6 = mixed, as cmd/backtest). Default 0 keeps the historical gross output.")
+	noDedup := flag.Bool("no-dedup", false, "score every fire independently instead of through DedupFires (the SIGNAL rather than the BOOK), as cmd/snrbt. Range-edge re-fires every bar inside the edge third, so this is heavily overlapping.")
 	flag.Parse()
 
 	client := bingx.New(os.Getenv("BINGX_API_KEY"), os.Getenv("BINGX_API_SECRET"))
@@ -156,8 +175,21 @@ func main() {
 		{name: "V5-short-only", noLong: true},
 		{name: "V6-event-filt", eventFilter: true},
 	}
+	if *trendVeto {
+		for i := range variants {
+			variants[i].nfeVeto = true
+		}
+	}
+	if *htfVetoF {
+		for i := range variants {
+			variants[i].htfVeto = true
+		}
+	}
 
 	fmt.Printf("=== range-edge A/B · %dd · %s · stop %.2f%% · vol-gate ATR%%>%.1f ===\n", *days, *tfStr, *stopPct, *volThresh)
+	if *trendVeto || *htfVetoF || *feeBps != 0 || *noDedup {
+		fmt.Printf("    trend-veto=%v · htf-veto=%v · fee %.1fbp · no-dedup=%v · end-offset %dd\n", *trendVeto, *htfVetoF, *feeBps, *noDedup, *endOff)
+	}
 	fmt.Printf("%-5s %-12s %6s %6s %5s %5s %7s %7s\n", "sym", "variant", "pos", "fill%", "tp", "stop", "win%", "netR")
 
 	// aggregate netR per variant across symbols
@@ -176,9 +208,23 @@ func main() {
 		}
 		ema := alignRight(indicator.EMA(closes, 20), len(cs))
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
+		var hcs []market.Candle
+		if *htfVetoF {
+			htfTF := autostrat.EngineBiasTF(tf)
+			hdur := 4 * time.Hour
+			if htfTF != "4h" {
+				hdur = 24 * time.Hour
+			}
+			var herr error
+			hcs, herr = client.KlinesRange(context.Background(), s.sym, htfTF, start.Add(-(htfLookback+2)*hdur), end)
+			if herr != nil || len(hcs) < 40 {
+				log.Printf("%s: htf klines %v (len %d)", s.short, herr, len(hcs))
+				continue
+			}
+		}
 
 		if *concTest {
-			base := genFires(cs, ema, atr, variant{name: "V0"}, *stopPct/100.0, *volThresh/100.0, s.short)
+			base := genFires(cs, nil, ema, atr, variant{name: "V0"}, *stopPct/100.0, *volThresh/100.0, s.short)
 			for _, n := range []int{1, 2, 3} {
 				sum := summarize(scoreConcurrent(base, n, cs))
 				fmt.Printf("%-5s conc=%-2d %6d %5.0f%% %5d %5d %6.0f%% %+7.2f\n",
@@ -188,11 +234,18 @@ func main() {
 			continue
 		}
 		for _, v := range variants {
-			fires := genFires(cs, ema, atr, v, *stopPct/100.0, *volThresh/100.0, s.short)
+			fires := genFires(cs, hcs, ema, atr, v, *stopPct/100.0, *volThresh/100.0, s.short)
 			resolve := func(f autotrade.PaperFire) autotrade.Outcome {
-				return autotrade.EvaluateFire(f, cs, 6)
+				return autotrade.WithFee(f, autotrade.EvaluateFire(f, cs, 6), *feeBps)
 			}
-			positions := autotrade.DedupFires(fires, 6, 6, time.Hour, resolve)
+			var positions []autotrade.Position
+			if *noDedup {
+				for _, f := range fires {
+					positions = append(positions, autotrade.Position{Fire: f, Outcome: resolve(f)})
+				}
+			} else {
+				positions = autotrade.DedupFires(fires, 6, 6, time.Hour, resolve)
+			}
 			sum := summarize(positions)
 			fmt.Printf("%-5s %-12s %6d %5.0f%% %5d %5d %6.0f%% %+7.2f\n",
 				s.short, v.name, sum.total, sum.fillPct*100, sum.tp, sum.stop, sum.winPct*100, sum.netR)
@@ -211,7 +264,7 @@ func main() {
 // genFires walks bar-by-bar (closed-bar) reconstructing range-edge triggers under
 // the variant's filters. entry = bar close, marketable (range-edge is a market-ish
 // fill at the box edge on close).
-func genFires(cs []market.Candle, ema, atr []float64, v variant, stopBuf, volThresh float64, short string) []autotrade.PaperFire {
+func genFires(cs, htf []market.Candle, ema, atr []float64, v variant, stopBuf, volThresh float64, short string) []autotrade.PaperFire {
 	var out []autotrade.PaperFire
 	const boxN = 24
 	for i := boxN; i < len(cs); i++ {
@@ -247,7 +300,9 @@ func genFires(cs []market.Candle, ema, atr []float64, v variant, stopBuf, volThr
 		emaDown := i >= 3 && ema[i] <= ema[i-3]
 
 		if pos <= 0.34 && st.Trend != signal.StructDowntrend &&
-			!v.noLong && !(v.eventFilter && bearishEvent(st.Event)) {
+			!v.noLong && !(v.eventFilter && bearishEvent(st.Event)) &&
+			!(v.nfeVeto && nfeVetoes(st, signal.Long)) &&
+			!(v.htfVeto && signal.StructureVetoAsOf(htf, cs[i].OpenTime, htfLookback, signal.Long)) {
 			if !v.momFilter || emaUp {
 				out = append(out, autotrade.PaperFire{
 					Time: cs[i].CloseTime, Symbol: short, TF: "1h", Strategy: "range-edge", Side: "long",
@@ -257,7 +312,9 @@ func genFires(cs []market.Candle, ema, atr []float64, v variant, stopBuf, volThr
 			}
 		}
 		if pos >= 0.66 && st.Trend != signal.StructUptrend &&
-			!v.noShort && !(v.eventFilter && bullishEvent(st.Event)) {
+			!v.noShort && !(v.eventFilter && bullishEvent(st.Event)) &&
+			!(v.nfeVeto && nfeVetoes(st, signal.Short)) &&
+			!(v.htfVeto && signal.StructureVetoAsOf(htf, cs[i].OpenTime, htfLookback, signal.Short)) {
 			if !v.momFilter || emaDown {
 				out = append(out, autotrade.PaperFire{
 					Time: cs[i].CloseTime, Symbol: short, TF: "1h", Strategy: "range-edge", Side: "short",
@@ -366,4 +423,14 @@ func bullishEvent(e signal.StructEventKind) bool {
 
 func bearishEvent(e signal.StructEventKind) bool {
 	return e == signal.EvCHoCHDown || e == signal.EvBOSDown
+}
+
+// htfLookback is the HTF bar count the -htf-veto read uses — the same 250
+// live range-edge reads on its own TF (autostrat.evalRangeEdge).
+const htfLookback = 250
+
+// nfeVetoes is the engine's N 字 counter-trend veto, verbatim.
+func nfeVetoes(st signal.StructureState, side signal.Side) bool {
+	trend, event := signal.StructureVeto(st, side)
+	return trend || event
 }

@@ -350,3 +350,32 @@ func Summarize(outs []Outcome) Summary {
 	}
 	return s
 }
+
+// WithFee returns oc net of a round-trip fee of feeBps basis points of
+// notional, converted to R the same way backtest.simulate does:
+// fee_R = feeBps/10000 * fill / |entry - stop|. Only a resolved trade (TP or
+// stop) pays — a no-fill never executed and an open trade has no realized R
+// yet. feeBps <= 0 returns oc unchanged, so a caller defaulting to 0 is
+// byte-identical to not calling it.
+//
+// Rule backtests (sweepbt, rangebt) score through EvaluateFire, which is
+// gross; without this a tight-stop rule looks better than it trades, because
+// the fee in R grows as the stop shrinks.
+func WithFee(f PaperFire, oc Outcome, feeBps float64) Outcome {
+	if feeBps <= 0 || (oc.Status != OutTP && oc.Status != OutStop) {
+		return oc
+	}
+	risk := f.Entry - f.Stop
+	if risk < 0 {
+		risk = -risk
+	}
+	if risk == 0 {
+		return oc
+	}
+	fill := oc.FillPrice
+	if fill == 0 {
+		fill = f.Entry
+	}
+	oc.NetR -= feeBps / 10000.0 * fill / risk
+	return oc
+}
