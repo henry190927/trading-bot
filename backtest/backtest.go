@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/henry190927/trading-bot/autotrade"
 	"github.com/henry190927/trading-bot/bingx"
 	"github.com/henry190927/trading-bot/dxy"
 	"github.com/henry190927/trading-bot/indicator"
@@ -68,7 +69,48 @@ type Options struct {
 	// "/10 says STRONG TAKE" actually predict winners? Adds ~50ms
 	// per signal but doesn't change strategy.
 	ReplayValidator bool
+
+	// The fields below exist so cmd/backtest can reproduce what the LIVE
+	// "engine" / "struct-momentum" autotrade rules actually trade
+	// (autostrat.evalEngine scored by autotrade.EvaluateFire + DedupFires).
+	// Every zero value is the legacy behaviour.
+
+	// TPLevel picks the Plan.TakeProfit level that scores a win, 1-based so
+	// the zero value keeps the legacy rule: the LAST level, scored as a
+	// fixed +2R. 1 = TP1, the 1R level evalEngine sends live; a non-zero
+	// level is scored at its actual distance in R.
+	TPLevel int
+
+	// PaperExec scores each signal through autotrade.EvaluateFire — the
+	// function the paper panel and the live replay use — instead of
+	// simulate: a marketable plan fills at the fire, a resting limit waits
+	// ExpiryBars, the exit scan includes the fill bar (stop first), and there
+	// is NO timeout (maxHoldBars is ignored; a trade still open when the data
+	// ends is "open", unscored, like the panel). Re-fires are deduped the way
+	// autotrade.DedupFires does: one position at a time, a stop adds
+	// CooldownBars, a no-fill holds the slot for ExpiryBars. The live mark at
+	// the fire is proxied by the next bar's open (the daemon fires seconds
+	// after the close) and fed to the engine as LiveMarkPrice, which is what
+	// suppresses wrong-side plans and decides Market vs resting limit live.
+	PaperExec    bool
+	ExpiryBars   int // PaperExec: resting-limit expiry in bars; 0 = autotrade's default 6
+	CooldownBars int // PaperExec: bars after a stop before the next position
+
+	// EngineWindow caps the candles the engine sees per bar to the trailing
+	// N (live evalEngine reads Klines(300), i.e. 299 closed bars). 0 = the
+	// whole history up to the bar (legacy). The window matters: POC
+	// migration and period opens read the full slice.
+	EngineWindow int
+
+	// BiasWindow computes the MTF MACD bias from only the trailing N closed
+	// bias bars, as live does from Klines(EngineBiasTF, 100). 0 = MACD over
+	// the whole bias series (legacy).
+	BiasWindow int
 }
+
+// paperDefaultExpiry is autotrade's default resting-limit expiry, used when a
+// rule (and so its fires) carries none.
+const paperDefaultExpiry = 6
 
 type Trade struct {
 	Symbol     market.Symbol
@@ -158,6 +200,9 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 		return res
 	}
 	biases := precomputeBiases(candles, biasCandles)
+	if opts.BiasWindow > 0 {
+		biases = precomputeBiasesWindowed(candles, biasCandles, opts.BiasWindow)
+	}
 	dxyTrends := precomputeDXYTrends(candles, opts.DXYCandles)
 	htfDirs, htfInZone := precomputeHTFStruct(candles, opts.HTFCandles)
 	const warmup = 100
@@ -168,6 +213,9 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 			continue
 		}
 		slice := candles[:i+1]
+		if opts.EngineWindow > 0 && len(slice) > opts.EngineWindow {
+			slice = slice[len(slice)-opts.EngineWindow:]
+		}
 		// Per-bar context: funding rate at the candle's CloseTime, when
 		// the caller provided funding history. Activates applyContextFilters
 		// (crowd warnings) and applyFundingContrarianVote (extreme/contrarian
@@ -178,15 +226,23 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 				sigCtx.FundingRate = fr
 			}
 		}
+		// Paper execution: the mark the daemon sees when it fires, seconds
+		// after bar i closes, is proxied by bar i+1's open (i+1 always
+		// exists: the loop stops one bar short).
+		var mark float64
+		if opts.PaperExec {
+			mark = candles[i+1].Open
+		}
 		sig := signal.Evaluate(signal.Inputs{
-			Symbol:     sym,
-			Timeframe:  tf,
-			Candles:    slice,
-			Bias:       biases[i],
-			DXYTrend:   dxyTrends[i],
-			HTFZoneDir: htfDirs[i],
-			HTFInZone:  htfInZone[i],
-			Ctx:        sigCtx,
+			Symbol:        sym,
+			Timeframe:     tf,
+			Candles:       slice,
+			Bias:          biases[i],
+			DXYTrend:      dxyTrends[i],
+			HTFZoneDir:    htfDirs[i],
+			HTFInZone:     htfInZone[i],
+			Ctx:           sigCtx,
+			LiveMarkPrice: mark,
 		})
 		if sig.Side == signal.Flat || sig.Score < threshold || sig.Plan.Entry == 0 {
 			continue
@@ -202,11 +258,20 @@ func Run(sym market.Symbol, tf market.Timeframe, candles []market.Candle, biasCa
 			applyStopVariants(&sig, opts)
 		}
 		res.NumSignals++
+		if opts.PaperExec {
+			tr, until := simulatePaper(sym, tf, sig, candles, i, mark, opts)
+			if tr == nil {
+				continue
+			}
+			res.Trades = append(res.Trades, *tr)
+			openTradeUntil = until
+			continue
+		}
 		end := i + 1 + maxHoldBars
 		if end > len(candles) {
 			end = len(candles)
 		}
-		tr, lastIdx := simulate(sym, sig, candles[i+1:end], opts.FeeBpsRoundTrip)
+		tr, lastIdx := simulate(sym, sig, candles[i+1:end], opts.FeeBpsRoundTrip, opts.TPLevel)
 		if tr == nil {
 			continue
 		}
@@ -366,13 +431,20 @@ func applyStopVariants(sig *signal.Signal, opts Options) {
 	}
 }
 
-func simulate(sym market.Symbol, sig signal.Signal, future []market.Candle, feeBps float64) (*Trade, int) {
+func simulate(sym market.Symbol, sig signal.Signal, future []market.Candle, feeBps float64, tpLevel int) (*Trade, int) {
 	plan := sig.Plan
 	risk := plan.Risk()
 	if risk == 0 || len(plan.TakeProfit) < 2 {
 		return nil, 0
 	}
 	tp := plan.TakeProfit[len(plan.TakeProfit)-1]
+	// Legacy: the last level, scored as a fixed +2R. A chosen level is
+	// scored at its actual distance, so TP1 books ~+1R, not +2R.
+	tpR, tpOutcome := 2.0, "tp2"
+	if tpLevel > 0 {
+		tp, tpR = tpAt(plan, sig.Side, tpLevel)
+		tpOutcome = fmt.Sprintf("tp%d", tpLevel)
+	}
 
 	// Fee impact in R units. Notional per 1R of risk = entry / risk_price.
 	// Round-trip fee in account-currency = (feeBps/10000) * 2 * notional? No:
@@ -418,7 +490,7 @@ func simulate(sym market.Symbol, sig signal.Signal, future []market.Candle, feeB
 				return t, i
 			}
 			if c.High >= tp {
-				return mkTrade(2, tp, c.CloseTime, "tp2"), i
+				return mkTrade(tpR, tp, c.CloseTime, tpOutcome), i
 			}
 		} else {
 			if c.High >= plan.StopLoss {
@@ -437,7 +509,7 @@ func simulate(sym market.Symbol, sig signal.Signal, future []market.Candle, feeB
 				return t, i
 			}
 			if c.Low <= tp {
-				return mkTrade(2, tp, c.CloseTime, "tp2"), i
+				return mkTrade(tpR, tp, c.CloseTime, tpOutcome), i
 			}
 		}
 	}
@@ -469,7 +541,7 @@ func computeStats(res *Result) {
 	res.WorstR = math.MaxFloat64
 	filledN := 0
 	for _, t := range res.Trades {
-		if t.Outcome == "no-fill" {
+		if t.Outcome == "no-fill" || t.Outcome == "open" {
 			continue
 		}
 		filledN++
@@ -626,4 +698,115 @@ func (r Result) StopHuntSummary() string {
 		r.Symbol, r.Timeframe, r.StopHits, r.StopHitsReclaim, ReclaimWindow,
 		r.StopReclaimPct, r.MedWickR,
 		r.WickBucket005, r.WickBucket010, r.WickBucket025, r.WickBucket050, r.WickBucketBig)
+}
+
+// tpAt returns the level-th (1-based, clamped to the plan) take-profit and its
+// distance from entry in R.
+func tpAt(plan signal.Plan, side signal.Side, level int) (float64, float64) {
+	idx := level - 1
+	if idx >= len(plan.TakeProfit) {
+		idx = len(plan.TakeProfit) - 1
+	}
+	tp := plan.TakeProfit[idx]
+	d := tp - plan.Entry
+	if side == signal.Short {
+		d = -d
+	}
+	return tp, d / plan.Risk()
+}
+
+// simulatePaper scores one signal the way the live paper book does: the fire
+// autostrat.evalEngine would log, replayed by autotrade.EvaluateFire, net of
+// the round-trip fee via autotrade.WithFee. It returns the trade and the last
+// bar index whose fire DedupFires would absorb into this position.
+func simulatePaper(sym market.Symbol, tf market.Timeframe, sig signal.Signal, candles []market.Candle, i int, mark float64, opts Options) (*Trade, int) {
+	plan := sig.Plan
+	risk := plan.Risk()
+	if risk == 0 || len(plan.TakeProfit) == 0 {
+		return nil, i
+	}
+	// evalEngine: TP = TakeProfit[0]. TPLevel picks another level.
+	level := opts.TPLevel
+	if level <= 0 {
+		level = len(plan.TakeProfit)
+	}
+	tp, _ := tpAt(plan, sig.Side, level)
+	side := "long"
+	if sig.Side == signal.Short {
+		side = "short"
+	}
+	expiry := opts.ExpiryBars
+	if expiry <= 0 {
+		expiry = paperDefaultExpiry
+	}
+	// evalEngine: marketable when the plan entry is already on the fillable
+	// side of the live mark.
+	marketable := (side == "long" && plan.Entry >= mark) || (side == "short" && plan.Entry <= mark)
+	f := autotrade.PaperFire{
+		Time: candles[i].CloseTime, Symbol: string(sym), TF: string(tf), Strategy: "engine",
+		Side: side, Market: marketable, Entry: plan.Entry, Stop: plan.StopLoss, TP: tp,
+		ExpiryBars: expiry,
+	}
+	gross := autotrade.EvaluateFire(f, candles[i:], expiry)
+	oc := autotrade.WithFee(f, gross, opts.FeeBpsRoundTrip)
+
+	tr := &Trade{
+		Symbol: sym, Side: sig.Side, Score: sig.Score, SignaledAt: candles[i].CloseTime,
+		Entry: plan.Entry, Stop: plan.StopLoss, Exit: oc.ExitPrice, ExitedAt: oc.ExitAt,
+		RGross: gross.NetR, FeeR: gross.NetR - oc.NetR, R: oc.NetR, Anchor: plan.Anchor,
+	}
+	// DedupFires' hold: the next position may open on a fire NOT before it.
+	barDur := market.BarDuration(tf)
+	var hold time.Time
+	switch oc.Status {
+	case autotrade.OutTP:
+		tr.Outcome = "tp"
+		hold = oc.ExitAt
+	case autotrade.OutStop:
+		tr.Outcome = "stop"
+		hold = oc.ExitAt.Add(time.Duration(opts.CooldownBars) * barDur)
+	case autotrade.OutNoFill:
+		tr.Outcome = "no-fill"
+		hold = f.Time.Add(time.Duration(expiry) * barDur)
+	default: // open / pending at the end of the data: holds the slot forever
+		tr.Outcome = "open"
+		return tr, len(candles)
+	}
+	until := i
+	for until+1 < len(candles) && candles[until+1].CloseTime.Before(hold) {
+		until++
+	}
+	return tr, until
+}
+
+// precomputeBiasesWindowed is precomputeBiases with the MACD computed, per
+// base bar, from only the trailing `window` closed bias bars — what
+// signal.Bias sees live from Klines(biasTF, 100). Fewer than 35 bars is Flat,
+// as in signal.Bias.
+func precomputeBiasesWindowed(base, bias []market.Candle, window int) []signal.Side {
+	out := make([]signal.Side, len(base))
+	if len(bias) == 0 {
+		return out
+	}
+	memo := map[int]signal.Side{}
+	bi := 0
+	for ci, c := range base {
+		for bi+1 < len(bias) && !bias[bi+1].CloseTime.After(c.OpenTime) {
+			bi++
+		}
+		if bias[bi].CloseTime.After(c.OpenTime) {
+			continue // no closed bias bar yet
+		}
+		s, ok := memo[bi]
+		if !ok {
+			lo := bi + 1 - window
+			if lo < 0 {
+				lo = 0
+			}
+			s = signal.Bias(bias[lo : bi+1])
+			memo[bi] = s
+		}
+		out[ci] = s
+	}
+	return out
 }

@@ -52,6 +52,18 @@ func main() {
 	smRegime := flag.Bool("sm-regime", false, "STRATEGY: pick MR vs StructMomentum PER BAR from the measured N 字 structure (confirmed HH-HL/LH-LL -> SM, neutral -> MR) instead of from the per-symbol allowlist. This is the conditional arm: run it against BOTH --no-struct-momentum (all MR) and --struct-momentum (all SM) over 60/90/120d and gate per window. Mutually exclusive with both.")
 	noFundingVote := flag.Bool("no-funding-vote", false, "disable signal.FundingContrarianVoteEnabled — the contrarian +1/+2 vote stays off even when --funding is on. A/B switch for the pre-2026-06-08 baseline.")
 	endOff := flag.Int("end-offset", 0, "end the window N days before now; with -days 30 this gives DISJOINT buckets, which nested windows cannot provide")
+	// Live parity. The autotrade "engine"/"struct-momentum" rules do not trade
+	// what the defaults score: autostrat.evalEngine always passes the MTF bias,
+	// sends TakeProfit[0] (1R), reads 299 closed bars (Klines 300 minus the
+	// forming one) and 99 closed bias bars, and autotrade.EvaluateFire scores
+	// the fire with no timeout. The live rule, reproduced:
+	//   -bias -exec paper -tp-index 0 -window 299 -bias-window 99
+	tpIndex := flag.Int("tp-index", -1, "which Plan.TakeProfit level scores a win: -1 = the last (legacy, a fixed +2R), 0 = TP1 (1R, what evalEngine sends live), 1 = TP2. A chosen level is scored at its actual distance in R. Stop is unchanged.")
+	execMode := flag.String("exec", "backtest", "how a signal is scored: \"backtest\" (legacy simulate: next-bar limit touch, -hold timeout) or \"paper\" (autotrade.EvaluateFire + DedupFires, the live paper book: marketable plans fill at the fire, limits expire after -expiry bars, stop checked from the fill bar, NO timeout so -hold is ignored, -cooldown bars after a stop; live mark proxied by the next bar's open and fed to the engine as LiveMarkPrice)")
+	expiry := flag.Int("expiry", 6, "-exec paper: resting-limit expiry in bars (autotrade default 6)")
+	cooldown := flag.Int("cooldown", 6, "-exec paper: bars after a stop before the next position (autotrade.json cooldown_bars_after_stop)")
+	window := flag.Int("window", 0, "engine sees only the trailing N bars at each step; 0 = all history (legacy). Live evalEngine = 299.")
+	biasWindow := flag.Int("bias-window", 0, "with -bias: MACD bias from only the trailing N closed bias bars; 0 = the whole bias series (legacy). Live = 99.")
 	flag.Parse()
 	if *structMomentum && *noStructMomentum {
 		fmt.Fprintln(os.Stderr, "--struct-momentum and --no-struct-momentum are mutually exclusive: one forces StructMomentum on, the other forces it off. Pick the arm you mean.")
@@ -59,6 +71,10 @@ func main() {
 	}
 	if *smRegime && (*structMomentum || *noStructMomentum) {
 		fmt.Fprintln(os.Stderr, "--sm-regime is the conditional arm; --struct-momentum and --no-struct-momentum are the two unconditional baselines it is measured against. Run them as separate arms.")
+		os.Exit(2)
+	}
+	if *execMode != "backtest" && *execMode != "paper" {
+		fmt.Fprintf(os.Stderr, "-exec %q: want backtest or paper\n", *execMode)
 		os.Exit(2)
 	}
 	if *noStructMomentum {
@@ -119,6 +135,12 @@ func main() {
 		StopBufferR:     *stopBufferR,
 		SlideOffsetPct:  *slideOffsetPct,
 		ReplayValidator: *replayValidator,
+		TPLevel:         *tpIndex + 1,
+		PaperExec:       *execMode == "paper",
+		ExpiryBars:      *expiry,
+		CooldownBars:    *cooldown,
+		EngineWindow:    *window,
+		BiasWindow:      *biasWindow,
 	}
 
 	// DXY macro veto — only useful for XAU/XAG; the engine ignores it for
@@ -153,7 +175,13 @@ func main() {
 		}
 		var biasCandles []market.Candle
 		if *useBias {
-			biasCandles, err = client.KlinesRange(ctx, sym, biasTF, start, end)
+			biasStart := start
+			if *biasWindow > 0 {
+				// Live always has its full window of closed bias bars; give
+				// the first base bars the same instead of a Flat warm-up.
+				biasStart = start.Add(-time.Duration(*biasWindow) * market.BarDuration(biasTF))
+			}
+			biasCandles, err = client.KlinesRange(ctx, sym, biasTF, biasStart, end)
 			if err != nil {
 				log.Printf("%s: bias history fetch failed: %v", sym, err)
 				biasCandles = nil
