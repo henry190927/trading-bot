@@ -255,7 +255,13 @@ func main() {
 		fmt.Println()
 	}
 
-	fmt.Println("--- aggregate (BTC+ETH+SOL) ---")
+	// Label from the symbols actually run, so a -symbols MSTR,SNDK run is not
+	// captioned BTC+ETH+SOL. The default list renders the historical label.
+	names := make([]string, len(syms))
+	for i, s := range syms {
+		names[i] = s.short
+	}
+	fmt.Printf("--- aggregate (%s) ---\n", strings.Join(names, "+"))
 	for _, v := range variants {
 		fmt.Printf("%-12s positions %-4d netR %+7.2f\n", v.name, aggPos[v.name], agg[v.name])
 	}

@@ -64,7 +64,7 @@ func TestNoLookAheadOnHTFSwings(t *testing.T) {
 			"every base bar must open BEFORE confirmation", cs[len(cs)-1].OpenTime, confirm)
 	}
 
-	fires := genSNRFires(cs, hcs, atr, "TEST", strength, 0.002, 0.25, 2.0, "auto")
+	fires := genSNRFires(cs, hcs, atr, "TEST", strength, 0.002, 0.25, 2.0, "auto", 0)
 	if len(fires) != 0 {
 		t.Errorf("fired %d time(s) on a swing that was not yet confirmed — look-ahead", len(fires))
 	}
@@ -113,7 +113,7 @@ func TestFiresOnceTheSwingIsConfirmed(t *testing.T) {
 		})
 		atr = append(atr, 1.0)
 	}
-	fires := genSNRFires(cs, hcs, atr, "TEST", strength, 0.002, 0.25, 2.0, "auto")
+	fires := genSNRFires(cs, hcs, atr, "TEST", strength, 0.002, 0.25, 2.0, "auto", 0)
 	if len(fires) == 0 {
 		t.Fatal("no fires on a confirmed swing — the look-ahead guard suppresses everything")
 	}
@@ -129,7 +129,7 @@ func TestFiresOnceTheSwingIsConfirmed(t *testing.T) {
 		t.Errorf("TP = %v, want %v (2R)", f.TP, want)
 	}
 	// side=long must produce nothing on a rejected HIGH.
-	if got := genSNRFires(cs, hcs, atr, "TEST", strength, 0.002, 0.25, 2.0, "long"); len(got) != 0 {
+	if got := genSNRFires(cs, hcs, atr, "TEST", strength, 0.002, 0.25, 2.0, "long", 0); len(got) != 0 {
 		t.Errorf("side=long fired %d time(s) on a swing-high rejection", len(got))
 	}
 }

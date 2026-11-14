@@ -51,6 +51,8 @@ func main() {
 	symbols := flag.String("symbols", "", "comma-separated symbols; short names or raw contract codes")
 	noDedup := flag.Bool("no-dedup", false, "score every fire independently instead of through DedupFires. This measures the SIGNAL; the dedup'd run measures the BOOK, where one slot per (symbol,strategy) makes the result path-dependent and a one-bar shift re-sequences everything after it.")
 	endOff := flag.Int("end-offset", 0, "end the window N days before now, so -days 30 -end-offset 30 is a DISJOINT bucket; nested windows cannot localise a decay in time")
+	feeBps := flag.Float64("fee-bps", 0, "round-trip fee in bps of notional, charged in R per resolved trade via autotrade.WithFee (6 = mixed, as cmd/backtest). Default 0 keeps the historical gross output.")
+	htfBars := flag.Int("htf-bars", 0, "LIVE PARITY: at each base bar only swings found in the last N HTF bars (as of that bar) are eligible — evalHTFSNR fetches Klines(htf, 200), so 200 is what the daemon sees. 0 = every swing since the fetch start (historical behaviour, reaching back up to 2x -days of HTF history).")
 	flag.Parse()
 
 	config.LoadDotEnv()
@@ -95,6 +97,10 @@ func main() {
 	}
 	fmt.Printf("=== htf-snr A/B · %dd ending -%dd · base %s · HTF %s · strength %d · tol %.2f%% · stop=wick+%.2fATR · TP %.1fR · side %s · %s ===\n",
 		*days, *endOff, tf, htf, *strength, *tolPct, *bufATR, *rMult, *side, scoring)
+	if *feeBps != 0 || *htfBars != 0 {
+		// Printed only off-default so the default output stays byte-identical.
+		fmt.Printf("    fee %.1fbp · htf-bars %d\n", *feeBps, *htfBars)
+	}
 	fmt.Printf("%-5s %6s %6s %5s %5s %7s %9s %8s %8s\n", "sym", "pos", "fill%", "tp", "stop", "win%", "netR", "R/trade", "trd/day")
 
 	var aggR float64
@@ -107,25 +113,31 @@ func main() {
 		}
 		// The HTF series is fetched over a LONGER window: a swing near the
 		// start of the base range needs bars before it to be a swing at all.
-		hcs, herr := client.KlinesRange(context.Background(), s.sym, htf, start.AddDate(0, 0, -*days), end)
+		hstart := start.AddDate(0, 0, -*days)
+		if *htfBars > 0 {
+			// The live window must be fully populated at the FIRST base bar too.
+			if w := start.Add(-time.Duration(*htfBars+2) * htfDur(htf)); w.Before(hstart) {
+				hstart = w
+			}
+		}
+		hcs, herr := client.KlinesRange(context.Background(), s.sym, htf, hstart, end)
 		if herr != nil || len(hcs) < 40 {
 			log.Printf("%s: htf klines %v (len %d)", s.short, herr, len(hcs))
 			continue
 		}
 		atr := alignRight(indicator.ATR(cs, 14), len(cs))
-		fires := genSNRFires(cs, hcs, atr, s.short, *strength, *tolPct/100.0, *bufATR, *rMult, *side)
+		fires := genSNRFires(cs, hcs, atr, s.short, *strength, *tolPct/100.0, *bufATR, *rMult, *side, *htfBars)
+		resolve := func(f autotrade.PaperFire) autotrade.Outcome { return resolveFire(f, cs, *feeBps) }
 		var positions []autotrade.Position
 		if *noDedup {
 			// Each fire resolved on its own forward bars and nothing else, so
 			// dropping a bar at the window's start can only drop that fire —
 			// it cannot change the outcome of any other.
 			for _, f := range fires {
-				positions = append(positions, autotrade.Position{Fire: f, Outcome: autotrade.EvaluateFire(f, cs, 6)})
+				positions = append(positions, autotrade.Position{Fire: f, Outcome: resolve(f)})
 			}
 		} else {
-			positions = autotrade.DedupFires(fires, 6, 6, time.Hour, func(f autotrade.PaperFire) autotrade.Outcome {
-				return autotrade.EvaluateFire(f, cs, 6)
-			})
+			positions = autotrade.DedupFires(fires, 6, 6, time.Hour, resolve)
 		}
 		var netR float64
 		var tp, stop, filled int
@@ -163,19 +175,56 @@ func main() {
 	fmt.Printf("--- aggregate: %d positions, netR %+.2f, R/trade %+.3f, trd/day %.2f ---\n", aggN, aggR, aggRPT, aggTPD)
 }
 
+// resolveFire scores one fire the way the live panel does (EvaluateFire,
+// 6-bar expiry), then charges the round-trip fee in R. feeBps 0 is gross and
+// returns EvaluateFire's outcome unchanged.
+func resolveFire(f autotrade.PaperFire, cs []market.Candle, feeBps float64) autotrade.Outcome {
+	return autotrade.WithFee(f, autotrade.EvaluateFire(f, cs, 6), feeBps)
+}
+
+// htfDur is the bias TF's bar length, for sizing the -htf-bars warm-up.
+func htfDur(tf market.Timeframe) time.Duration {
+	if tf == "4h" {
+		return 4 * time.Hour
+	}
+	return 24 * time.Hour
+}
+
 // genSNRFires walks closed base bars and emits a fire wherever the live
 // evalHTFSNR would have. Mirrors that function's shape, including taking the
 // FIRST matching swing rather than the best one.
-func genSNRFires(cs, hcs []market.Candle, atr []float64, short string, strength int,
-	tolFrac, bufATR, rMult float64, side string) []autotrade.PaperFire {
+//
+// htfBars > 0 reproduces the daemon's HTF view: at each base bar the swings
+// are found in only the last htfBars HTF bars that had OPENED by the base
+// bar's close (the forming one included, as Klines returns it). The forming
+// bar can only affect swings whose confirmation it is part of, and those fail
+// the CloseTime test below, so including its full range reads no future.
+// htfBars 0 finds swings once over the whole fetched series.
+func genSNRFires(cs, allHTF []market.Candle, atr []float64, short string, strength int,
+	tolFrac, bufATR, rMult float64, side string, htfBars int) []autotrade.PaperFire {
 
+	hcs := allHTF
 	sw := signal.FindSwingPoints(hcs, strength, 0)
 	wantShort := side == "short" || side == "auto"
 	wantLong := side == "long" || side == "auto"
 
 	var out []autotrade.PaperFire
+	j, lastJ := 0, -1
 	for i := 30; i < len(cs); i++ {
 		bar, prev, a := cs[i], cs[i-1], atr[i]
+		if htfBars > 0 {
+			for j < len(allHTF) && allHTF[j].OpenTime.Before(bar.CloseTime.Add(time.Second)) {
+				j++
+			}
+			if j != lastJ {
+				lo := j - htfBars
+				if lo < 0 {
+					lo = 0
+				}
+				hcs, lastJ = allHTF[lo:j], j
+				sw = signal.FindSwingPoints(hcs, strength, 0)
+			}
+		}
 		if a <= 0 {
 			continue
 		}
