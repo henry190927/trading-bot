@@ -37,6 +37,11 @@ type Outcome struct {
 	ExitAt     time.Time
 	BarsToFill int // closed bars from fire → fill
 	BarsHeld   int // closed bars from fill → exit (or → last bar if open)
+	// Trail fires only (EvaluateTrailFire). CurStop is the stop in force for
+	// the forming bar while the position is open; Trailed is whether the stop
+	// had moved off its initial level (at the exit, or now when open).
+	CurStop float64
+	Trailed bool
 }
 
 // EvaluateFire replays the closed candles that occur after the fire to classify
@@ -281,13 +286,16 @@ func DedupFires(fires []PaperFire, expiryBars, cooldownBars int, barDur time.Dur
 		case OutTP:
 			hold = oc.ExitAt
 		case OutStop:
-			hold = oc.ExitAt.Add(time.Duration(cooldownBars) * barDur)
+			hold = stopHold(f, oc.ExitAt, cooldownBars, barDur)
 		case OutNoFill:
 			hold = f.Time.Add(time.Duration(f.Expiry(expiryBars)) * barDur)
 		case OutUnscored:
 			hold = f.Time // nothing known about it: absorbs no later fire
+			if HoldsSlot(f, oc) {
+				hold = f.Time.Add(openForever) // a trail fire fails safe: see HoldsSlot
+			}
 		default: // open / pending — still in the position or waiting to fill
-			hold = f.Time.Add(1_000_000 * time.Hour)
+			hold = f.Time.Add(openForever)
 		}
 		openUntil[key] = hold
 	}
@@ -308,8 +316,13 @@ type Summary struct {
 	Unscored int
 	NetR     float64 // sum of realized R (tp + stop)
 	UnrealR  float64 // sum of unrealized R across open trades (mark-to-last-close)
-	WinRate  float64 // tp / (tp + stop), 0 if none resolved
-	FillPct  float64 // filled / (filled + no-fill); pending excluded (undetermined)
+	// WinRate is settled positions with NetR > 0 over all settled (tp+stop).
+	// It was tp/(tp+stop), which is the same number for a fixed bracket (a tp
+	// is > 0, a stop is exactly -1 gross) and 0% for a trail exit, which is
+	// always a stop order however far it ran. Pinned by
+	// TestFixedBracketPanelPinned.
+	WinRate float64
+	FillPct float64 // filled / (filled + no-fill); pending excluded (undetermined)
 }
 
 // coversFire reports whether candles reach back far enough to replay f: the
@@ -331,6 +344,7 @@ func coversFire(f PaperFire, candles []market.Candle) bool {
 func Summarize(outs []Outcome) Summary {
 	var s Summary
 	s.Total = len(outs)
+	wins := 0
 	for _, o := range outs {
 		switch o.Status {
 		case OutPending:
@@ -352,9 +366,12 @@ func Summarize(outs []Outcome) Summary {
 		case OutUnscored:
 			s.Unscored++
 		}
+		if (o.Status == OutTP || o.Status == OutStop) && o.NetR > 0 {
+			wins++
+		}
 	}
 	if resolved := s.TP + s.Stop; resolved > 0 {
-		s.WinRate = float64(s.TP) / float64(resolved)
+		s.WinRate = float64(wins) / float64(resolved)
 	}
 	if det := s.Filled + s.NoFill; det > 0 {
 		s.FillPct = float64(s.Filled) / float64(det)

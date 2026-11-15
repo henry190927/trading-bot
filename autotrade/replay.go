@@ -99,8 +99,10 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 		oc := resolve(f)
 		out = append(out, Position{Fire: f, Outcome: oc})
 		curIdx[key] = len(out) - 1
-		if oc.Status == OutUnscored {
+		if oc.Status == OutUnscored && !HoldsSlot(f, oc) {
 			// Shown, but it holds no slot and no margin: see OutUnscored.
+			// (A trail fire that cannot be scored is held open instead —
+			// HoldsSlot — and falls through to the open case below.)
 			openUntil[key] = f.Time
 			continue
 		}
@@ -110,8 +112,8 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 		switch oc.Status {
 		case OutTP, OutStop:
 			hold, l.until, l.resolved = oc.ExitAt, oc.ExitAt, true
-			if oc.Status == OutStop && cooldownBars > 0 {
-				hold = hold.Add(time.Duration(cooldownBars) * barDur)
+			if oc.Status == OutStop && (cooldownBars > 0 || f.IsTrail()) {
+				hold = stopHold(f, oc.ExitAt, cooldownBars, barDur)
 			}
 		case OutNoFill:
 			hold = f.Time.Add(time.Duration(f.Expiry(expiryBars)) * barDur)
@@ -119,6 +121,12 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 			l.r = 0
 		default: // still open
 			hold = f.Time.Add(time.Duration(f.Expiry(expiryBars)) * barDur)
+			if f.IsTrail() {
+				// B10: expiry means nothing for a market entry, and a trail
+				// position can outlive any expiry by weeks. It holds until it
+				// exits — which, being open, it has not.
+				hold = f.Time.Add(openForever)
+			}
 		}
 		openUntil[key] = hold
 		live = append(live, l)

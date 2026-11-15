@@ -29,6 +29,11 @@ type Trigger struct {
 	Stop   float64
 	TP     float64
 	Market bool // true = marketable (fills at fire); false = resting limit
+	// TrailM > 0: no take-profit (TP is 0); the exit is the ratcheted M-bar
+	// opposite channel, scored by autotrade.EvaluateTrailFire. A property of
+	// the strategy, not a rule knob — a range-edge rule has no trail to run.
+	// 0 = fixed bracket (every strategy but htf-trend).
+	TrailM int
 	Why    string
 	// Tags is Why as labelled values, for a page to show as chips in its own
 	// language. Why stays the sentence the daemon logs and notifies with.

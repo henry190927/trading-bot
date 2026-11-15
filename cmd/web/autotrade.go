@@ -203,7 +203,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 
 	resolve := func(f autotrade.PaperFire) autotrade.Outcome {
 		tf := tfFor(f)
-		return autotrade.EvaluateFireLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
+		return autotrade.ResolveLive(f, candlesFor(f.Symbol, tf), 6, liveFor(f.Symbol, tf))
 	}
 	// ONE dedup pass feeds every number on the page. There used to be two — a
 	// 60-fire pass for the table and summary and a 500-fire pass for the

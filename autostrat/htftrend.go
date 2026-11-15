@@ -36,8 +36,8 @@ func DefaultHTFTrendParams() HTFTrendParams {
 // atr is ATR(p.ATRPeriod) as of bar i (bar i is closed, so it may include it).
 //
 // Long: Close[i] > max High of the channel → market long at Close[i], stop
-// StopATR×atr below. Short mirrors at the channel low. TP is 0: the exit is
-// the trail (HTFTrendTrailStop), not a target.
+// StopATR×atr below. Short mirrors at the channel low. TP is 0 and TrailM is
+// set: the exit is the trail (HTFTrendTrailStop), not a target.
 func HTFTrendTrigger(cs []market.Candle, atr float64, i int, wantLong, wantShort bool, p HTFTrendParams) Trigger {
 	if p.EntryN < 1 || i < p.EntryN || i >= len(cs) || atr <= 0 || p.StopATR <= 0 {
 		return Trigger{}
@@ -52,13 +52,13 @@ func HTFTrendTrigger(cs []market.Candle, atr float64, i int, wantLong, wantShort
 	switch {
 	case wantLong && bar.Close > hi:
 		return Trigger{
-			Fire: true, Side: "long", Market: true, Entry: bar.Close, Stop: bar.Close - d,
+			Fire: true, Side: "long", Market: true, Entry: bar.Close, Stop: bar.Close - d, TrailM: p.TrailM,
 			Why:  fmt.Sprintf("close %.4f broke the %d-bar high %.4f; trail = %d-bar low", bar.Close, p.EntryN, hi, p.TrailM),
 			Tags: []Tag{tag("htf-trend-break", hi, p.EntryN)},
 		}
 	case wantShort && bar.Close < lo:
 		return Trigger{
-			Fire: true, Side: "short", Market: true, Entry: bar.Close, Stop: bar.Close + d,
+			Fire: true, Side: "short", Market: true, Entry: bar.Close, Stop: bar.Close + d, TrailM: p.TrailM,
 			Why:  fmt.Sprintf("close %.4f broke the %d-bar low %.4f; trail = %d-bar high", bar.Close, p.EntryN, lo, p.TrailM),
 			Tags: []Tag{tag("htf-trend-break", lo, p.EntryN)},
 		}

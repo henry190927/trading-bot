@@ -187,7 +187,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 					st.lastBlockBar = barTime
 					log.Printf("autoexec: %s %s/%s BLOCKED by sizing — %s", r.Symbol, r.TF, r.Strategy, sz.Reason)
 					autotrade.AppendBlocked(autotrade.BlockedCandidate{
-						Fire:   fireRecord(r, trig, sz, trig.Why, 0, false),
+						Fire:   fireRecord(r, trig, sz, barTime, trig.Why, 0, false),
 						Reason: sz.Reason, BarTime: barTime,
 						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
 					})
@@ -220,7 +220,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 					st.lastBlockBar = barTime
 					log.Printf("autoexec: %s %s/%s BLOCKED by caps — %s", r.Symbol, r.TF, r.Strategy, v.Reason)
 					autotrade.AppendBlocked(autotrade.BlockedCandidate{
-						Fire: fireRecord(r, trig, sz, trig.Why,
+						Fire: fireRecord(r, trig, sz, barTime, trig.Why,
 							autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry), false),
 						Reason: v.Reason, BarTime: barTime,
 						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
@@ -241,7 +241,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 					log.Printf("autoexec: %s %s/%s BLOCKED by session guard — %s",
 						r.Symbol, r.TF, r.Strategy, why)
 					autotrade.AppendBlocked(autotrade.BlockedCandidate{
-						Fire:   fireRecord(r, trig, sz, trig.Why, 0, false),
+						Fire:   fireRecord(r, trig, sz, barTime, trig.Why, 0, false),
 						Reason: "session-guard: " + why, BarTime: barTime,
 						OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
 					})
@@ -262,7 +262,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				msg := fmt.Sprintf("%s %s @%.4f stop %.4f tp %.4f (qty %.4f, %.1fu×%d, risk %.2fu) — %s",
 					r.Symbol, trig.Side, trig.Entry, trig.Stop, trig.TP, qty, sz.Margin, sz.Lev, sz.RiskUSDT, trig.Why)
 				log.Printf("[AUTO-PAPER] would place %s", msg)
-				autotrade.AppendFire(fireRecord(r, trig, sz, trig.Why, score, false))
+				autotrade.AppendFire(fireRecord(r, trig, sz, barTime, trig.Why, score, false))
 				if n != nil {
 					_ = n.Push(ctx, "🤖 auto (paper)", msg, "robot")
 				}
@@ -308,7 +308,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			}
 			log.Printf("[AUTO-LIVE] placed %s %s @%.4f stop %.4f tp %.4f qty %.4f orderId=%s",
 				r.Symbol, trig.Side, trig.Entry, trig.Stop, trig.TP, qty, id)
-			autotrade.AppendFire(fireRecord(r, trig, sz, trig.Why+" id="+id, score, true))
+			autotrade.AppendFire(fireRecord(r, trig, sz, barTime, trig.Why+" id="+id, score, true))
 			if n != nil {
 				_ = n.Push(ctx, "🤖 auto PLACED", fmt.Sprintf("%s %s @%.4f (stop %.4f tp %.4f) id=%s", r.Symbol, trig.Side, trig.Entry, trig.Stop, trig.TP, id), "robot")
 			}
@@ -318,7 +318,11 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 
 // fireRecord is the log row for one fire — placed, paper or refused — so the
 // four places that write one cannot drift apart on which size they record.
-func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, why string, score float64, live bool) autotrade.PaperFire {
+//
+// barTime is the signal bar's CloseTime (the bar the dedup keyed on), and
+// TrailM/CooldownBars travel with the fire so a replay scores and holds it
+// without consulting a config that may have changed since (B6).
+func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, barTime time.Time, why string, score float64, live bool) autotrade.PaperFire {
 	return autotrade.PaperFire{
 		Time: time.Now().UTC(), Symbol: r.Symbol, TF: r.TF, Strategy: r.Strategy,
 		Side: trig.Side, Market: trig.Market,
@@ -327,6 +331,7 @@ func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, w
 		Why: why, Score: score, Live: live,
 		RiskUSDT: sz.RiskUSDT, Equity: sz.Equity,
 		ExpiryBars: r.ExpiryBars,
+		TrailM:     trig.TrailM, BarTime: barTime, CooldownBars: r.CooldownBars,
 	}
 }
 
@@ -352,12 +357,17 @@ func paperBlocked(kc *klineCache, r autotrade.Rule, barTime time.Time) bool {
 	if len(cs) == 0 {
 		return true // can't determine → assume still in a position (fail-safe)
 	}
-	oc := autotrade.EvaluateFire(*latest, cs, 6)
+	oc := autotrade.Resolve(*latest, cs, 6)
+	if autotrade.HoldsSlot(*latest, oc) {
+		return true // still in a position / waiting to fill (or a trail fire that cannot be scored: fail-safe)
+	}
 	switch oc.Status {
-	case autotrade.OutOpen, autotrade.OutPending:
-		return true // still in a position / waiting to fill
 	case autotrade.OutStop:
-		return barTime.Before(oc.ExitAt.Add(time.Duration(r.CooldownBars) * barDurationTF(r.TF)))
+		cd := r.CooldownBars
+		if latest.IsTrail() {
+			cd = latest.CooldownBars // the rule's value when it fired; 0 for htf-trend, as its backtest
+		}
+		return barTime.Before(oc.ExitAt.Add(time.Duration(cd) * barDurationTF(r.TF)))
 	default:
 		return false // tp / no-fill → free to re-enter
 	}

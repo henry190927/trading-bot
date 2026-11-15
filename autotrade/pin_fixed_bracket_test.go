@@ -125,6 +125,17 @@ func TestFixedBracketPanelPinned(t *testing.T) {
 	}
 }
 
+// The same log through the dispatchers the call sites now use (book.go,
+// autoexec.go paperBlocked, cmd/web/autotrade.go): identical output.
+func TestFixedBracketPanelPinnedViaResolve(t *testing.T) {
+	got := pinRender(t,
+		func(f PaperFire, cs []market.Candle, live float64) Outcome { return ResolveLive(f, cs, 6, live) },
+		func(f PaperFire, cs []market.Candle) Outcome { return Resolve(f, cs, 6) })
+	if got != pinGolden {
+		t.Errorf("fixed-bracket panel output moved through Resolve.\n--- got ---\n%s\n--- want ---\n%s", got, pinGolden)
+	}
+}
+
 // Captured on 09db44a (before EvaluateTrailFire / Resolve / WinRate-by-NetR).
 const pinGolden = `book open=3 margin=60.00 todayR=-2.000000 legs=3 unscored=0
 09-29T18 BTC range-edge long unscored +0.000000 +0.000000 abs=0

@@ -37,6 +37,20 @@ type PaperFire struct {
 	// counts as a no-fill, copied from the rule at fire time (2026-11-01).
 	// 0 = the caller's default (6 everywhere), which is every older row.
 	ExpiryBars int `json:"expiry_bars,omitempty"`
+
+	// Trail exits (htf-trend, 2026-11-15). TrailM > 0 means the fire has no
+	// take-profit and exits on the ratcheted M-bar opposite channel; it is
+	// scored by EvaluateTrailFire, recomputed from the candles (Resolve
+	// dispatches). 0 = fixed bracket, which is every older row.
+	TrailM int `json:"trail_m,omitempty"`
+	// BarTime is the signal bar's CloseTime, so a replay finds the bar the
+	// fire was taken on instead of inferring it from Time.
+	BarTime time.Time `json:"bar_time,omitzero"`
+	// CooldownBars is the rule's post-stop cooldown at fire time, so a replay
+	// stops guessing one value for every rule (B6). Only trail fires are
+	// replayed with it today; fixed-bracket replays keep the panel's
+	// max-across-rules convention so their totals do not move.
+	CooldownBars int `json:"cooldown_bars,omitempty"`
 }
 
 // Expiry returns the fire's own limit expiry, or def when it carries none.

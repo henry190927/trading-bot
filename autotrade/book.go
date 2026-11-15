@@ -100,12 +100,12 @@ func BuildBookTraced(fires []PaperFire, candles CandleFn, now time.Time, cooldow
 			continue
 		}
 
-		oc := EvaluateFire(f, cs, 6)
+		oc := Resolve(f, cs, 6)
 		tr.Status, tr.ExitAt, tr.NetR = oc.Status, oc.ExitAt, oc.NetR
 
 		if newestForRule {
 			seen[key] = true
-			if oc.Status == OutOpen || oc.Status == OutPending {
+			if HoldsSlot(f, oc) {
 				bk.OpenCount++
 				bk.OpenMargin += f.Margin
 				bk.OpenLegs = append(bk.OpenLegs, Leg{Symbol: f.Symbol, Side: f.Side})
@@ -127,7 +127,7 @@ func BuildBookTraced(fires []PaperFire, candles CandleFn, now time.Time, cooldow
 		if len(cs) == 0 {
 			return Outcome{Status: OutOpen} // unscoreable → holds its slot, books no R
 		}
-		return EvaluateFire(f, cs, 6)
+		return Resolve(f, cs, 6)
 	}
 	// barDur is 1h for all rules, matching the panel's convention. Only XAG
 	// runs on 2h, where this makes the post-stop absorb window half as long —
