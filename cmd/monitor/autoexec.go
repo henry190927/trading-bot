@@ -404,25 +404,12 @@ func paperBlocked(kc *klineCache, r autotrade.Rule, barTime time.Time, trail boo
 		return false
 	}
 	// Shared with the tick's book assembly, so these candles are already
-	// fetched by the time we get here.
-	cs := kc.forFire(r.Symbol, r.TF)
-	if len(cs) == 0 {
-		return true // can't determine → assume still in a position (fail-safe)
-	}
-	oc := autotrade.Resolve(*latest, cs, 6)
-	if autotrade.HoldsSlot(*latest, oc) {
-		return true // still in a position / waiting to fill (or a trail fire that cannot be scored: fail-safe)
-	}
-	switch oc.Status {
-	case autotrade.OutStop:
-		cd := r.CooldownBars
-		if latest.IsTrail() {
-			cd = latest.CooldownBars // the rule's value when it fired; 0 for htf-trend, as its backtest
-		}
-		return barTime.Before(oc.ExitAt.Add(time.Duration(cd) * barDurationTF(r.TF)))
-	default:
-		return false // tp / no-fill → free to re-enter
-	}
+	// fetched by the time we get here. The decision itself is
+	// autotrade.SlotBlocked, shared with cmd/trendbt's offline replay: open,
+	// pending, unscoreable-trail or no candles (fail-safe) block; a stop
+	// blocks through the cooldown (a trail fire's own, inclusive of the exit
+	// bar); tp / no-fill free the slot.
+	return autotrade.SlotBlocked(*latest, kc.forFire(r.Symbol, r.TF), barTime, r.CooldownBars, barDurationTF(r.TF))
 }
 
 // barDurationTF maps a timeframe string to its bar duration for cooldown math.

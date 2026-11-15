@@ -77,7 +77,7 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 		// first because the executor's own loop skips a rule that already holds
 		// a position before it ever reaches the caps.
 		key := f.Symbol + "|" + f.Strategy
-		if u, ok := openUntil[key]; ok && f.Time.Before(u) {
+		if u, ok := openUntil[key]; ok && absorbedBy(f, u) {
 			if i, ok := curIdx[key]; ok {
 				out[i].Absorbed++
 			}

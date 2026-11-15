@@ -21,7 +21,7 @@ func TestHTFTrendLiveWindowParity(t *testing.T) {
 		fires := 0
 		for k := htfTrendLiveBars - 1; k < len(full); k++ {
 			want := HTFTrendTrigger(full, atr[k], k, true, true, p)
-			got := htfTrendOnWindow(full[k-htfTrendLiveBars+1:k+1], rule)
+			got := HTFTrendOnWindow(full[k-htfTrendLiveBars+1:k+1], rule)
 			if got.Fire != want.Fire || got.Side != want.Side || got.Entry != want.Entry || got.TrailM != want.TrailM || !got.BarTime.Equal(want.BarTime) {
 				t.Fatalf("bar %d: live %+v, full-history %+v", k, got, want)
 			}
@@ -43,10 +43,10 @@ func TestHTFTrendLiveWindowParity(t *testing.T) {
 	cs := randomWalk(600, 7)
 	for k := htfTrendLiveBars - 1; k < len(cs); k++ {
 		w := cs[k-htfTrendLiveBars+1 : k+1]
-		if tr := htfTrendOnWindow(w, autotrade.Rule{Side: "long"}); tr.Fire && tr.Side != "long" {
+		if tr := HTFTrendOnWindow(w, autotrade.Rule{Side: "long"}); tr.Fire && tr.Side != "long" {
 			t.Fatalf("side long fired %s", tr.Side)
 		}
-		if tr := htfTrendOnWindow(w, autotrade.Rule{Side: "short"}); tr.Fire && tr.Side != "short" {
+		if tr := HTFTrendOnWindow(w, autotrade.Rule{Side: "short"}); tr.Fire && tr.Side != "short" {
 			t.Fatalf("side short fired %s", tr.Side)
 		}
 	}

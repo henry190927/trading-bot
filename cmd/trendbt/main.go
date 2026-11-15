@@ -57,8 +57,26 @@ func main() {
 	showTrades := flag.Bool("trades", false, "print every trade in the window")
 	cacheDir := flag.String("cache", "", "directory to cache klines in (JSON per symbol+tf; reused if younger than -cache-ttl)")
 	cacheTTL := flag.Duration("cache-ttl", 6*time.Hour, "max cache age")
-	since := flag.String("since", "2019-01-01", "earliest date to page back to")
+	since := flag.String("since", "2019-01-01", "earliest date to page back to; with -compare-log, the date the compare starts from (history is then paged from 2019-01-01)")
+	compareLog := flag.String("compare-log", "", "paper log (autotrade_paper.jsonl) to match fire by fire against the backtest since -since (compare.go)")
+	blockedLog := flag.String("blocked-log", "", "with -compare-log: the blocked-candidate log that explains missing signals")
+	replayDays := flag.Int("replay-days", 0, "offline replay: emulate the paper executor over the last N days and score it through the live resolver and the panel path (compare.go)")
+	replayOut := flag.String("replay-out", "", "with -replay-days: write the synthetic paper log here")
+	riskPct := flag.Float64("risk-pct", 0.25, "with -replay-days: the rules' risk_pct written on synthetic fires")
+	bookPct := flag.Float64("book-pct", 1.5, "with -replay-days: the book's risk_per_trade_pct the panel normalises to")
 	flag.Parse()
+
+	var compareSince time.Time
+	if *compareLog != "" {
+		t, err := time.Parse("2006-01-02", *since)
+		if err != nil || *since == "2019-01-01" {
+			log.Fatalf("-compare-log needs -since YYYY-MM-DD (the forward test's start)")
+		}
+		compareSince, *since = t, "2019-01-01"
+	}
+	if (*compareLog != "" || *replayDays > 0) && strategyForTF(market.Timeframe(*tfStr)) == "" {
+		log.Fatalf("-tf %s has no htf-trend strategy (4h = htf-trend, 1d = htf-trend-1d)", *tfStr)
+	}
 
 	p := autostrat.DefaultHTFTrendParams()
 	if *n > 0 {
@@ -103,6 +121,16 @@ func main() {
 	}
 	if len(data) == 0 {
 		log.Fatal("no data")
+	}
+
+	if *compareLog != "" || *replayDays > 0 {
+		if p != autostrat.DefaultHTFTrendParams() || *side != "auto" {
+			log.Fatal("-compare-log / -replay-days compare against the executor, which runs the pre-registered parameters on both sides")
+		}
+		if *compareLog != "" {
+			os.Exit(runCompareLog(data, tf, *compareLog, *blockedLog, compareSince))
+		}
+		os.Exit(runReplay(data, tf, *replayDays, *riskPct, *bookPct, *replayOut))
 	}
 
 	now := time.Now().UTC()

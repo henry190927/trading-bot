@@ -200,11 +200,13 @@ func evalHTFTrend(ctx context.Context, client *bingx.Client, sym market.Symbol, 
 	if err != nil {
 		return Trigger{}
 	}
-	return htfTrendOnWindow(cs, r)
+	return HTFTrendOnWindow(cs, r)
 }
 
-// htfTrendOnWindow evaluates the newest bar of a closed-bar window.
-func htfTrendOnWindow(cs []market.Candle, r autotrade.Rule) Trigger {
+// HTFTrendOnWindow evaluates the newest bar of a closed-bar window — what the
+// executor does with the bars its fetch returned. Exported for the offline
+// replay of the executor in cmd/trendbt.
+func HTFTrendOnWindow(cs []market.Candle, r autotrade.Rule) Trigger {
 	p := DefaultHTFTrendParams()
 	if len(cs) < max(p.EntryN, p.ATRPeriod)+2 {
 		return Trigger{}

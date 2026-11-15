@@ -271,7 +271,7 @@ func DedupFires(fires []PaperFire, expiryBars, cooldownBars int, barDur time.Dur
 	var out []Position
 	for _, f := range fires {
 		key := f.Symbol + "|" + f.Strategy
-		if u, ok := openUntil[key]; ok && f.Time.Before(u) {
+		if u, ok := openUntil[key]; ok && absorbedBy(f, u) {
 			if i, ok := curIdx[key]; ok {
 				out[i].Absorbed++
 			}

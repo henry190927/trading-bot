@@ -223,3 +223,45 @@ func TestPaperFireTrailFieldsOmitted(t *testing.T) {
 		t.Errorf("trail row round trip = %+v (%v), want TrailM 2 and the bar time", back, err)
 	}
 }
+
+// The backtest takes the next signal on bar >= exit+1. A signal on the exit
+// bar itself is logged a minute AFTER that bar's close, so a Time comparison
+// against ExitAt lets it through; the executor and the replays must refuse it.
+// Found by the offline replay design, not by a failure: a long stopped by a
+// bar that also closes below the 20-bar low is an ordinary bar.
+func TestTrailSignalOnExitBarRefused(t *testing.T) {
+	cs := trailFixture() // the trail fire stops out on bar 8
+	f := trailFire(cs)
+	d := 4 * time.Hour
+	if !SlotBlocked(f, cs[:9], cs[8].CloseTime, 0, d) {
+		t.Error("signal on the exit bar: free, want blocked (backtest: next signal >= exit+1)")
+	}
+	if SlotBlocked(f, cs, cs[9].CloseTime, 0, d) {
+		t.Error("signal on the bar after the exit: blocked, want free")
+	}
+	g := f
+	g.CooldownBars = 1
+	if !SlotBlocked(g, cs, cs[9].CloseTime, 0, d) {
+		t.Error("cooldown 1: bar after the exit must still be blocked")
+	}
+	if !SlotBlocked(f, cs[:8], cs[7].CloseTime, 0, d) || !SlotBlocked(f, nil, cs[9].CloseTime, 0, d) {
+		t.Error("open position / no candles must block")
+	}
+	// Fixed bracket: unchanged — a stop at exactly barTime with cooldown 0 frees.
+	fixed := PaperFire{Time: cs[4].CloseTime.Add(time.Minute), Side: "long", Market: true, Entry: 11.5, Stop: 11.2, TP: 20}
+	oc := EvaluateFire(fixed, cs, 6)
+	if oc.Status != OutStop || SlotBlocked(fixed, cs, oc.ExitAt, 0, d) {
+		t.Errorf("fixed bracket at its exit bar with cooldown 0: blocked (status %s), want free as before", oc.Status)
+	}
+
+	// The replays absorb it the same way.
+	exitBar := f
+	exitBar.Time, exitBar.BarTime, exitBar.Side, exitBar.Entry, exitBar.Stop = cs[8].CloseTime.Add(time.Minute), cs[8].CloseTime, "short", 11.5, 12.5
+	all := func(g PaperFire) Outcome { return Resolve(g, cs, 6) }
+	if ps, _ := ReplayWithCaps([]PaperFire{f, exitBar}, Config{}, 6, 0, time.Hour, all); len(ps) != 1 {
+		t.Errorf("replay: %d positions, want the exit-bar signal absorbed", len(ps))
+	}
+	if ps := DedupFires([]PaperFire{f, exitBar}, 6, 0, time.Hour, all); len(ps) != 1 {
+		t.Errorf("dedup: %d positions, want the exit-bar signal absorbed", len(ps))
+	}
+}

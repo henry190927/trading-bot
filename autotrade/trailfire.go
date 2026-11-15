@@ -163,3 +163,46 @@ func EvaluateTrailFireLive(f PaperFire, cs []market.Candle, livePrice float64) O
 	out.ExitPrice, out.UnrealR = livePrice, dir*(livePrice-f.Entry)/risk
 	return out
 }
+
+// absorbedBy reports whether fire f falls inside a slot held until u. A trail
+// fire is judged by its SIGNAL BAR, not the minute it was logged: a signal on
+// the very bar its predecessor stopped out on is one the backtest never takes
+// ("after an exit on bar j, the next signal must come on bar >= j+1"), yet it
+// is logged a minute after that bar's close, i.e. after u. Fixed-bracket
+// fires keep the Time comparison every existing number was computed with.
+func absorbedBy(f PaperFire, u time.Time) bool {
+	if f.IsTrail() && !f.BarTime.IsZero() {
+		return !f.BarTime.After(u)
+	}
+	return f.Time.Before(u)
+}
+
+// SlotBlocked is the executor's paper one-position-per-rule decision
+// (cmd/monitor paperBlocked) as a pure function, so cmd/trendbt can replay the
+// executor's gating offline with the same code. latest is the rule's newest
+// fire, cs the executor's candles for it, barTime the candidate's signal-bar
+// close, ruleCooldown the rule's cooldown (fixed bracket) and barDur its TF.
+//
+//   - open / pending (or a trail fire that cannot be scored) → blocked;
+//   - no candles → blocked (fail-safe);
+//   - stopped → blocked through the cooldown: for a fixed bracket while
+//     barTime < exit + cooldown (unchanged); for a trail fire while barTime
+//     <= exit + its own CooldownBars — so with cooldown 0 a signal on the exit
+//     bar itself is refused, as in the backtest;
+//   - tp / no-fill → free.
+func SlotBlocked(latest PaperFire, cs []market.Candle, barTime time.Time, ruleCooldown int, barDur time.Duration) bool {
+	if len(cs) == 0 {
+		return true
+	}
+	oc := Resolve(latest, cs, 6)
+	if HoldsSlot(latest, oc) {
+		return true
+	}
+	if oc.Status != OutStop {
+		return false
+	}
+	if latest.IsTrail() {
+		return !barTime.After(oc.ExitAt.Add(time.Duration(latest.CooldownBars) * barDur))
+	}
+	return barTime.Before(oc.ExitAt.Add(time.Duration(ruleCooldown) * barDur))
+}
