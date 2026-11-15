@@ -69,22 +69,11 @@ func HTFTrendTrigger(cs []market.Candle, atr float64, i int, wantLong, wantShort
 // HTFTrendTrailStop is the stop that applies to bar j+1 of a position whose
 // stop during bar j was cur: the opposite M-bar channel ending at closed bar
 // j, ratcheted so it never loosens. Reads cs[j-M+1 .. j] only.
+//
+// A thin caller of autotrade.TrailStop, the one implementation the paper
+// resolver also runs (docs/htf_trend_executor_design.md §2.2).
 func HTFTrendTrailStop(cs []market.Candle, j int, long bool, cur float64, m int) float64 {
-	if m < 1 || j < m-1 || j >= len(cs) {
-		return cur
-	}
-	if long {
-		lo := math.Inf(1)
-		for _, c := range cs[j-m+1 : j+1] {
-			lo = math.Min(lo, c.Low)
-		}
-		return math.Max(cur, lo)
-	}
-	hi := math.Inf(-1)
-	for _, c := range cs[j-m+1 : j+1] {
-		hi = math.Max(hi, c.High)
-	}
-	return math.Min(cur, hi)
+	return autotrade.TrailStop(cs, j, long, cur, m)
 }
 
 // TrendTrade is one simulated position. All R are relative to the INITIAL
@@ -170,34 +159,20 @@ func SimulateHTFTrend(cs []market.Candle, atr []float64, firstSignal int, wantLo
 	return out
 }
 
-// runTrail walks one position forward from its signal bar.
+// runTrail walks one position forward from its signal bar: the walk is
+// autotrade.WalkTrail (shared with the paper resolver); this adds the fee and
+// the backtest's bookkeeping.
 func runTrail(cs []market.Candle, i int, side string, entry, stop float64, m int, feeBps float64) TrendTrade {
-	long := side == "long"
 	risk := math.Abs(entry - stop)
 	t := TrendTrade{
 		Side: side, EntryIdx: i, EntryTime: cs[i].CloseTime, Entry: entry, InitStop: stop, Risk: risk,
 		StopPct: risk / entry * 100, MaxLev: autotrade.MaxLevForStop(risk / entry),
 		FeeR: trendFeeR(side, entry, stop, feeBps),
 	}
-	cur := stop
-	exitIdx, exit, open := len(cs)-1, cs[len(cs)-1].Close, true
-	for j := i + 1; j < len(cs); j++ {
-		// Trail from the bars that have CLOSED before bar j opens (≤ j-1).
-		// For j = i+1 that includes the signal bar itself.
-		cur = HTFTrendTrailStop(cs, j-1, long, cur, m)
-		b := cs[j]
-		if long && b.Low <= cur {
-			exitIdx, exit, open = j, math.Min(cur, b.Open), false
-			break
-		}
-		if !long && b.High >= cur {
-			exitIdx, exit, open = j, math.Max(cur, b.Open), false
-			break
-		}
-	}
-	t.ExitIdx, t.ExitTime, t.Exit, t.Open = exitIdx, cs[exitIdx].CloseTime, exit, open
-	t.BarsHeld = exitIdx - i
-	t.GrossR = t.dir() * (exit - entry) / risk
+	w := autotrade.WalkTrail(cs, i, side, stop, m)
+	t.ExitIdx, t.ExitTime, t.Exit, t.Open = w.ExitIdx, cs[w.ExitIdx].CloseTime, w.Exit, w.Open
+	t.BarsHeld = w.ExitIdx - i
+	t.GrossR = t.dir() * (w.Exit - entry) / risk
 	t.NetR = t.GrossR - t.FeeR
 	return t
 }
