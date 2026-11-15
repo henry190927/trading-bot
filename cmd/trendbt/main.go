@@ -64,7 +64,43 @@ func main() {
 	replayOut := flag.String("replay-out", "", "with -replay-days: write the synthetic paper log here")
 	riskPct := flag.Float64("risk-pct", 0.25, "with -replay-days: the rules' risk_pct written on synthetic fires")
 	bookPct := flag.Float64("book-pct", 1.5, "with -replay-days: the book's risk_per_trade_pct the panel normalises to")
+	capRun := flag.Bool("cap-run", false, "the pre-registered same-side cap run (docs/htf_trend_design.md §7): -symbols × {4h, 1d} as one group (caprun.go)")
+	capValues := flag.String("cap-values", "0,3,4,5", "with -cap-run: the pre-registered caps (0 = off, must come first)")
+	capStart := flag.String("cap-start", "2022-10-15", "with -cap-run: first signal date")
 	flag.Parse()
+
+	if *capRun {
+		syms := *symbols
+		set := false
+		flag.Visit(func(f *flag.Flag) { set = set || f.Name == "symbols" })
+		if !set {
+			syms = "BTC,ETH,SOL,XRP,SUI,HYPE,NEAR,LINK" // the user's 8 (executor design §6.1), not the 9 of §3
+		}
+		st, err := time.Parse("2006-01-02", *capStart)
+		if err != nil {
+			log.Fatalf("-cap-start: %v", err)
+		}
+		var caps []int
+		for _, s := range strings.Split(*capValues, ",") {
+			var c int
+			if _, err := fmt.Sscanf(strings.TrimSpace(s), "%d", &c); err == nil && c >= 0 {
+				caps = append(caps, c)
+			}
+		}
+		if len(caps) < 2 || caps[0] != 0 {
+			log.Fatal("-cap-values must start with 0 (off, the baseline) and list at least one cap")
+		}
+		from, err := time.Parse("2006-01-02", *since)
+		if err != nil {
+			log.Fatalf("-since: %v", err)
+		}
+		client := bingx.New("", "")
+		load := func(sym market.Symbol, tf market.Timeframe) ([]market.Candle, error) {
+			return fetch(client, sym, tf, from, *cacheDir, *cacheTTL)
+		}
+		runCapRun(load, strings.Split(syms, ","), *feeBps, st, caps, *bucketDays)
+		return
+	}
 
 	var compareSince time.Time
 	if *compareLog != "" {

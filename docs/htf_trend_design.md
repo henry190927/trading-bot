@@ -220,3 +220,38 @@ Recommend the eligible c with the lowest whole-sample MDD; if two are within
 (0). The latest 360 d are reported for information only, not as a criterion.
 Not done regardless of the result: per-TF caps, symbol priority orders other
 than the rule order, best-first allocation, any change to N/M/K.
+
+### 7.1 Result (run 2026-11-15, pre-registration committed as dab7016)
+
+Reproduce: `trendbt -cap-run -fee-bps 10` (klines cached the same day).
+Model check passed: cap off reproduced every rule's SimulateHTFTrend trades
+exactly (16 rules, struct-equal).
+
+| cap | refused signals | n | netR | R/trade | SE | MDD R | latest 360 d: n / netR / R/trade / MDD |
+|---|---|---|---|---|---|---|---|
+| off | 0 | 2502 | +259.49 | +0.1037 | 0.0295 | 44.26 | 675 / +43.23 / +0.0640 / 44.26 |
+| 3 | 3738 | 1224 | +49.16 | +0.0402 | 0.0356 | 20.36 | 319 / +5.18 / +0.0162 / 20.36 |
+| 4 | 2908 | 1513 | +70.55 | +0.0466 | 0.0321 | 30.03 | 395 / +0.58 / +0.0015 / 30.03 |
+| 5 | 2227 | 1754 | +112.56 | +0.0642 | 0.0314 | 35.16 | 457 / +2.62 / +0.0057 / 35.16 |
+
+("refused" counts every refused bar; a refused rule re-signals on later bars.)
+
+Against the decision rule (R/trade floor = +0.1037 − 0.0295 = +0.0742):
+
+| cap | (1) R/trade ≥ floor | (2) MDD < off | (3) bucket MDD ≤ off | (4) bucket netR diff t ≥ −1 | verdict |
+|---|---|---|---|---|---|
+| 3 | +0.0402 ✗ | 20.36 ✓ | 22/25 ✓ | −2.44 ✗ | not eligible |
+| 4 | +0.0466 ✗ | 30.03 ✓ | 22/25 ✓ | −2.58 ✗ | not eligible |
+| 5 | +0.0642 ✗ | 35.16 ✓ | 22/25 ✓ | −2.70 ✗ | not eligible |
+
+**Verdict: no tested cap is eligible → `max_same_side` 0 (off).** Every cap
+lowers the drawdown consistently (22 of 25 buckets) and pays for it with more
+than the edge: first-come keeps the EARLIEST breakouts of a move and refuses
+the later ones, and the later ones are where the large winners were (the
+2024-09-26..11-25 bucket: +76.3 R off, +9.5 / +15.6 / +34.5 R at 3 / 4 / 5).
+The drawdown control the user wants comes from `risk_pct` 0.25 instead
+(44 R × 0.25 % ≈ 11 % of equity), not from a cap.
+
+Hypothesis NOT tested (would need its own pre-registration): a cap that
+refuses by something other than arrival order, e.g. keeping the newest
+breakouts and closing the oldest, or vol-scaled size per leg.
