@@ -94,6 +94,13 @@ type StrategyCap struct {
 	Strategies []string `json:"strategies,omitempty"`
 	// MaxConcurrent caps open positions in the group.
 	MaxConcurrent int `json:"max_concurrent,omitempty"`
+	// MaxSameSide caps open positions in the group on one side, ACROSS
+	// symbols (htf-trend's backtest had 9 of 9 symbols long at once). Not
+	// per symbol like max_same_symbol_side: the risk here is one market move
+	// hitting every leg. Slots go first-come in rule order, which is a
+	// selection rule — the value comes from a pre-registered trendbt run
+	// (docs/htf_trend_design.md §7), not from a concurrency count.
+	MaxSameSide int `json:"max_same_side,omitempty"`
 }
 
 // capGroup returns the StrategyCaps group a strategy belongs to, or "".

@@ -64,8 +64,19 @@ func BuildBook(fires []PaperFire, candles CandleFn, now time.Time, cooldownBars 
 	return bk, un
 }
 
-// BuildBookTraced is BuildBook plus a per-fire trace, in input order.
+// BuildBookTraced is BuildBook plus a per-fire trace, in input order. R is
+// unweighted (bookPct 0); the executor and the panel call BuildBookWeighted.
 func BuildBookTraced(fires []PaperFire, candles CandleFn, now time.Time, cooldownBars int) (Book, int, []FireTrace) {
+	return BuildBookWeighted(fires, candles, now, cooldownBars, 0)
+}
+
+// BuildBookWeighted is BuildBookTraced with RealizedRToday in book units:
+// each settled position's NetR × Fire.RWeight(bookPct), so a −1R stop of a
+// 0.25% rule moves a 1.5% book's breaker by −1/6R, not −1R. Without it the
+// halt fires early on low-risk rules and late on high-risk ones (§4.2).
+// bookPct is Config.RiskPerTradePct; every fire without its own risk_pct
+// weighs exactly 1, so existing books are unchanged.
+func BuildBookWeighted(fires []PaperFire, candles CandleFn, now time.Time, cooldownBars int, bookPct float64) (Book, int, []FireTrace) {
 	today := now.UTC().Format("2006-01-02")
 
 	var bk Book
@@ -142,7 +153,7 @@ func BuildBookTraced(fires []PaperFire, candles CandleFn, now time.Time, cooldow
 		if oc.ExitAt.IsZero() || oc.ExitAt.UTC().Format("2006-01-02") != today {
 			continue
 		}
-		bk.RealizedRToday += oc.NetR
+		bk.RealizedRToday += oc.NetR * pos.Fire.RWeight(bookPct)
 		counted[pos.Fire.Symbol+"|"+pos.Fire.Strategy+"|"+pos.Fire.Time.String()] = true
 	}
 	// Mark the trace so diagnostics show which fires actually fed the breaker.

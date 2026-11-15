@@ -59,3 +59,22 @@ func Breakdown(ps []Position, key func(PaperFire) string) []Group {
 func ByStrategy(f PaperFire) string { return f.Strategy }
 func BySymbol(f PaperFire) string   { return f.Symbol }
 func BySide(f PaperFire) string     { return f.Side }
+
+// NormaliseR returns copies of ps with NetR and UnrealR in book units
+// (× Fire.RWeight(bookPct)) for the figures that sum ACROSS rules — the
+// panel's net R, floating R, equity curve, histogram and calendar — and
+// whether any position actually weighed other than 1 (the page labels the
+// unit only then). Per-rule figures (Breakdown, the rows) stay in each
+// rule's own R. With no risk_pct override anywhere this is the identity.
+func NormaliseR(ps []Position, bookPct float64) (out []Position, mixed bool) {
+	out = make([]Position, len(ps))
+	for i, p := range ps {
+		if w := p.Fire.RWeight(bookPct); w != 1 {
+			p.Outcome.NetR *= w
+			p.Outcome.UnrealR *= w
+			mixed = true
+		}
+		out[i] = p
+	}
+	return out, mixed
+}

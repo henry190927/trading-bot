@@ -138,6 +138,21 @@ func CheckCaps(cfg Config, bk Book, cand Candidate) CapsVerdict {
 					group, n, sc.MaxConcurrent),
 			}
 		}
+		if sc.MaxSameSide > 0 {
+			same := 0
+			for _, l := range bk.OpenLegs {
+				if l.Side == cand.Side && cfg.capGroup(l.Strategy) == group {
+					same++
+				}
+			}
+			if same >= sc.MaxSameSide {
+				return CapsVerdict{
+					Blocked: true,
+					Reason: fmt.Sprintf("strategy-same-side %s: %d %s open >= cap %d",
+						group, same, cand.Side, sc.MaxSameSide),
+				}
+			}
+		}
 	}
 	if group == "" && cfg.MaxSameSymbolSide > 0 && cand.Side != "" {
 		n := 0
@@ -185,4 +200,21 @@ func groupedLegs(cfg Config, bk Book) int {
 		}
 	}
 	return n
+}
+
+// CapUsage splits the open book the way CheckCaps counts it: shared is what
+// max_concurrent_total sees, groups is open positions per StrategyCaps group.
+// The panel shows these rather than OpenCount, which would read as the shared
+// cap being exceeded once a group has positions.
+func CapUsage(cfg Config, bk Book) (shared int, groups map[string]int) {
+	groups = map[string]int{}
+	for g := range cfg.StrategyCaps {
+		groups[g] = 0
+	}
+	for _, l := range bk.OpenLegs {
+		if g := cfg.capGroup(l.Strategy); g != "" {
+			groups[g]++
+		}
+	}
+	return bk.OpenCount - groupedLegs(cfg, bk), groups
 }

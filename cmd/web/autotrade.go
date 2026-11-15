@@ -37,6 +37,39 @@ const (
 	autotradePageSize = 50
 )
 
+// atFireRow is one position row on /ops/autotrade. Package-level so the row
+// template ("atFireRow") can be executed in a test with a real trail row —
+// a display that has never had real data is untested.
+type atFireRow struct {
+	When              string
+	Symbol, Side, Why string
+	TF                string
+	Strategy          string
+	Entry, Stop, TP   float64
+	Score             float64 // validator /100 structural-fit at fire time (0 = legacy/unscored)
+	Cur               float64 // live mark price
+	CurUp             bool    // current price is on the profitable side of entry
+	Margin            float64
+	Lev               int
+	Live              bool
+	Status            string
+	StatusClass       string
+	NetR              float64
+	UnrealR           float64
+	PnLU              float64 // after fees; see autotrade.PnLUSDT
+	HasPnLU           bool    // settled and risk-sized (fires from 2026-10-18 on)
+	Absorbed          int     // raw re-fires collapsed into this position
+	Resolved          bool    // has a realized netR (tp/stop)
+	Open              bool    // filled, still running — show unrealized R
+	// Trail exits (htf-trend): the TP column shows the trail instead of a
+	// target — CurStop while open — and a stop that had moved off its
+	// initial level is labelled trailed. R stays the rule's own R.
+	Trail   bool
+	CurStop float64
+	Trailed bool
+	RiskPct float64 // the fire's own risk_pct (0 = the book's)
+}
+
 func (s *server) handleOpsAutotrade(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	ctx := c.Request.Context()
@@ -168,29 +201,6 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		return p
 	}
 
-	type fireRow struct {
-		When              string
-		Symbol, Side, Why string
-		TF                string
-		Strategy          string
-		Entry, Stop, TP   float64
-		Score             float64 // validator /100 structural-fit at fire time (0 = legacy/unscored)
-		Cur               float64 // live mark price
-		CurUp             bool    // current price is on the profitable side of entry
-		Margin            float64
-		Lev               int
-		Live              bool
-		Status            string
-		StatusClass       string
-		NetR              float64
-		UnrealR           float64
-		PnLU              float64 // after fees; see autotrade.PnLUSDT
-		HasPnLU           bool    // settled and risk-sized (fires from 2026-10-18 on)
-		Absorbed          int     // raw re-fires collapsed into this position
-		Resolved          bool    // has a realized netR (tp/stop)
-		Open              bool    // filled, still running — show unrealized R
-	}
-
 	// Normalise older records that predate the strategy field, then dedup the raw
 	// fire log into realistic one-position-per-rule trades (a persistent setup that
 	// re-fired every bar is ONE position, not N). fires come newest-first; DedupFires
@@ -218,7 +228,9 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// Same slice the summary and the portfolio views use — the executor's depth.
 	// Computing the book off a shorter slice could truncate today's realized R
 	// and disagree with what actually gates a trade.
-	book, unscored := autotrade.BuildBook(fires, candlesFor, time.Now().UTC(), cooldown)
+	// Weighted like the executor's: the breaker figure is in book units.
+	book, unscored, _ := autotrade.BuildBookWeighted(fires, candlesFor, time.Now().UTC(), cooldown, cfg.RiskPerTradePct)
+	capShared, capGroups := autotrade.CapUsage(cfg, book)
 
 	resolve := func(f autotrade.PaperFire) autotrade.Outcome {
 		tf := tfFor(f)
@@ -234,8 +246,12 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// the same bar on the same side produced three positions where the live
 	// MaxSameSymbolSide=1 admits one.
 	positions, capBlocked := autotrade.ReplayWithCaps(oldest, cfg, 6, cooldown, time.Hour, resolve)
-	statTrades, statUnscoreable := rTradesFromPositions(positions)
-	statOpenR, statOpenN := openUnrealR(positions)
+	// Figures summed ACROSS rules are in book units (risk_pct-weighted, see
+	// autotrade.NormaliseR); per-rule figures below stay in each rule's own R.
+	// Identical to the raw positions until a rule carries its own risk_pct.
+	normPositions, mixedR := autotrade.NormaliseR(positions, cfg.RiskPerTradePct)
+	statTrades, statUnscoreable := rTradesFromPositions(normPositions)
+	statOpenR, statOpenN := openUnrealR(normPositions)
 
 	// Per-cut breakdowns over EVERY position, not the display-capped table.
 	// Folding these by hand off the rendered rows was how a "range-edge is
@@ -245,8 +261,8 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	bySymbol := autotrade.Breakdown(positions, autotrade.BySymbol)
 	bySide := autotrade.Breakdown(positions, autotrade.BySide)
 
-	var rows []fireRow
-	var outs []autotrade.Outcome
+	var rows []atFireRow
+	var outs []autotrade.Outcome // book units, for the header summary
 	clsFor := map[autotrade.OutcomeStatus]string{
 		autotrade.OutTP: "b-green", autotrade.OutStop: "b-red",
 		autotrade.OutNoFill: "b-dim", autotrade.OutOpen: "b-yellow",
@@ -255,11 +271,11 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	for i := len(positions) - 1; i >= 0; i-- { // newest-first for display
 		p := positions[i]
 		f, out := p.Fire, p.Outcome
-		outs = append(outs, out)
+		outs = append(outs, normPositions[i].Outcome)
 		cur := liveFor(f.Symbol, tfFor(f))
 		curUp := (f.Side == "long" && cur >= f.Entry) || (f.Side == "short" && cur <= f.Entry)
 		pnlU, hasPnlU := autotrade.PnLUSDT(f, out)
-		rows = append(rows, fireRow{
+		rows = append(rows, atFireRow{
 			When: f.Time.In(tpe).Format("01/02 15:04"), Symbol: f.Symbol, TF: tfFor(f), Strategy: f.Strategy, Side: f.Side, Why: f.Why,
 			Entry: f.Entry, Stop: f.Stop, TP: f.TP, Score: f.Score, Cur: cur, CurUp: curUp, Margin: f.Margin, Lev: f.Lev, Live: f.Live,
 			Status: string(out.Status), StatusClass: clsFor[out.Status], NetR: out.NetR, UnrealR: out.UnrealR,
@@ -267,6 +283,7 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 			Absorbed: p.Absorbed,
 			Resolved: out.Status == autotrade.OutTP || out.Status == autotrade.OutStop,
 			Open:     out.Status == autotrade.OutOpen,
+			Trail:    f.IsTrail(), CurStop: out.CurStop, Trailed: out.Trailed, RiskPct: f.RiskPct,
 		})
 	}
 	sum := autotrade.Summarize(outs)
@@ -303,8 +320,17 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 		"Cooldown":        cooldown,
 		"CooldownUniform": cooldownUniform,
 		"MaxConc":         cfg.MaxConcurrentTotal,
-		"MaxMargin":       cfg.MaxMarginTotalUSDT,
-		"DailyHaltR":      cfg.DailyLossHaltR,
+		// The shared count max_concurrent_total actually sees, and each
+		// strategy_caps group's own count (autotrade.CapUsage).
+		"CapShared":    capShared,
+		"CapGroups":    capGroups,
+		"StrategyCaps": cfg.StrategyCaps,
+		// Net/floating R, the curve, histogram and calendar are in units of
+		// the book's risk_per_trade_pct when some rule risks a different
+		// share (MixedR); the page says so next to each.
+		"MixedR":     mixedR,
+		"MaxMargin":  cfg.MaxMarginTotalUSDT,
+		"DailyHaltR": cfg.DailyLossHaltR,
 		// Shown even when 0 (= unlimited/off). A cap that gates real trades
 		// while being invisible on the panel that claims to show the caps is
 		// the display-vs-reality shape this file has already been fixed for

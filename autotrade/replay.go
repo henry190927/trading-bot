@@ -107,7 +107,8 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 			continue
 		}
 
-		l := liveLeg{symbol: f.Symbol, side: f.Side, strategy: f.Strategy, margin: f.Margin, r: oc.NetR}
+		// r is banked into the breaker's day in book units, as BuildBookWeighted does.
+		l := liveLeg{symbol: f.Symbol, side: f.Side, strategy: f.Strategy, margin: f.Margin, r: oc.NetR * f.RWeight(cfg.RiskPerTradePct)}
 		var hold time.Time
 		switch oc.Status {
 		case OutTP, OutStop:

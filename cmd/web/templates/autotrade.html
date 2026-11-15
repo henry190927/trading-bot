@@ -1,4 +1,20 @@
 {{define "paperBal"}}<div title="{{printf (t "at.paperBal.hint") .Base (.Since.Format "2006-01-02 15:04")}}"><span class="ui-dim ui-sm">{{t "at.paperBal"}}</span><b class="ui-num {{if ge .Balance .Base}}ui-up{{else}}ui-down{{end}}">{{printf "%.2f" .Balance}}u</b> <span class="ui-dim ui-sm">{{printf "%+.2f" .Realized}} · {{t "at.paperBal.open"}} {{printf "%+.2f" .Unrealized}} · {{.Closed}}/{{.Open}}{{if .NoRisk}} · {{printf (t "at.paperBal.noRisk") .NoRisk}}{{end}}</span></div>{{end}}
+{{define "atFireRow"}}        <tr data-sym="{{.Symbol}}" data-strat="{{.Strategy}}" data-side="{{.Side}}" data-st="{{.Status}}"{{if .Resolved}} data-r="{{.NetR}}"{{end}}{{if .HasPnLU}} data-u="{{.PnLU}}"{{end}}>
+          <td class="ui-num ui-dim">{{.When}}{{if .Absorbed}} <span class="ui-tag" title="{{printf (t "at.absorbedHint") .Absorbed}}">+{{.Absorbed}}</span>{{end}}</td>
+          <td><span class="ui-sym">{{.Symbol}}</span> <span class="ui-dim ui-sm">{{.TF}}</span></td>
+          <td><code class="ui-id">{{.Strategy}}</code>{{if .Live}} <span class="ui-tag tag-red">LIVE</span>{{end}}</td>
+          <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
+          <td class="num">{{if .Score}}<span class="{{if ge .Score 60.0}}ui-up{{else if lt .Score 40.0}}ui-down{{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="num">{{fmtPx .Entry}}</td>
+          <td class="num">{{if .Cur}}<span class="{{if .CurUp}}ui-up{{else}}ui-down{{end}}">{{fmtPx .Cur}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="num">{{fmtPx .Stop}}</td><td class="num">{{if .Trail}}<span class="ui-dim" title="{{t "at.trailHint"}}">{{t "live.trail"}}</span>{{if .Open}} @{{fmtPx .CurStop}}{{end}}{{else}}{{fmtPx .TP}}{{end}}</td>
+          <td class="num ui-dim">{{printf "%.0f" .Margin}}u × {{.Lev}}</td>
+          <td><span class="ui-so at-{{.Status}}">{{t (printf "at.st.%s" .Status)}}</span>{{if and .Trailed .Resolved}} <span class="ui-tag" title="{{t "at.trailedHint"}}">{{t "at.trailed"}}</span>{{end}}{{if .RiskPct}} <span class="ui-dim ui-sm" title="{{t "at.ownRHint"}}">{{printf "%.2f" .RiskPct}}%</span>{{end}}</td>
+          <td class="num">{{if .Resolved}}<b class="{{if ge .NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .NetR}}</b>{{else if .Open}}<i class="{{if ge .UnrealR 0.0}}ui-up{{else}}ui-down{{end}}" title="{{t "at.floatHint"}}">{{printf "%+.2f" .UnrealR}}</i>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="num">{{if .HasPnLU}}<b class="{{if ge .PnLU 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .PnLU}}</b>{{else}}<span class="ui-dim">—</span>{{end}}</td>
+          <td class="ui-dim ui-sm ui-why">{{.Why}}</td>
+        </tr>
+{{end}}
 {{define "bdTable"}}
 <div class="dt-scroll">
 <table class="dt">
@@ -54,9 +70,10 @@
     </div>
     {{if .Paper}}<div class="ui-callout">{{t "at.paperNote"}}</div>{{end}}
     <div class="ui-statrow" style="margin-top:var(--sp-3)">
-      <div><span class="ui-dim ui-sm">{{t "at.cap.conc"}}</span><b class="ui-num">{{.Book.OpenCount}} / {{.MaxConc}}</b></div>
+      <div><span class="ui-dim ui-sm">{{t "at.cap.conc"}}</span><b class="ui-num">{{.CapShared}} / {{.MaxConc}}</b></div>
+      {{range $g, $sc := .StrategyCaps}}<div title="{{t "at.cap.groupHint"}}"><span class="ui-dim ui-sm">{{printf (t "at.cap.group") $g}}</span><b class="ui-num">{{index $.CapGroups $g}} / {{if $sc.MaxConcurrent}}{{$sc.MaxConcurrent}}{{else}}∞{{end}}{{if $sc.MaxSameSide}} <span class="ui-dim ui-sm">· {{printf (t "at.cap.groupSide") $sc.MaxSameSide}}</span>{{end}}</b></div>{{end}}
       <div><span class="ui-dim ui-sm">{{t "at.cap.margin"}}</span><b class="ui-num">{{printf "%.0f" .Book.OpenMargin}} / {{printf "%.0f" .MaxMargin}}u</b></div>
-      <div><span class="ui-dim ui-sm">{{t "at.cap.today"}}</span><b class="ui-num">{{printf "%+.2f" .Book.RealizedRToday}} / {{printf "%.1f" .DailyHaltR}}R</b></div>
+      <div{{if .MixedR}} title="{{t "at.normRHint"}}"{{end}}><span class="ui-dim ui-sm">{{t "at.cap.today"}}</span><b class="ui-num">{{printf "%+.2f" .Book.RealizedRToday}} / {{printf "%.1f" .DailyHaltR}}R</b></div>
       <div><span class="ui-dim ui-sm">{{t "at.cap.sameSide"}}</span><b class="ui-num">{{if .MaxSameSide}}{{.MaxSameSide}}{{else}}<span class="ui-dim">{{t "at.unset"}}</span>{{end}}</b></div>
       <div><span class="ui-dim ui-sm">{{t "at.cap.risk"}}</span><b class="ui-num">{{if gt .RiskPct 0.0}}{{printf "%.2f" .RiskPct}}%{{else}}<span class="ui-dim">{{t "at.fixedMargin"}}</span>{{end}}</b></div>
       <div><span class="ui-dim ui-sm">{{t "at.cooldown"}}</span><b class="ui-num">{{.Cooldown}} {{t "unit.barsShort"}}</b></div>
@@ -81,7 +98,7 @@
         <tr class="{{if not .Enabled}}ui-off{{end}}">
           <td><span class="ui-sym">{{.Symbol}}</span></td><td><code class="ui-id">{{.Strategy}}</code></td><td class="ui-num">{{.TF}}</td>
           <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
-          <td class="num">{{if gt $.RiskPct 0.0}}<span class="ui-dim" title="{{t "at.byStopHint"}}">{{t "at.byStop"}}</span>{{else}}{{printf "%.0f" .MarginUSDT}}u{{end}}</td>
+          <td class="num">{{if gt .RiskPct 0.0}}<span class="ui-dim" title="{{t "at.byStopHint"}}">{{t "at.byStop"}} · {{printf "%.2f" .RiskPct}}%</span>{{else if gt $.RiskPct 0.0}}<span class="ui-dim" title="{{t "at.byStopHint"}}">{{t "at.byStop"}}</span>{{else}}{{printf "%.0f" .MarginUSDT}}u{{end}}</td>
           <td class="num">{{.Leverage}}×</td><td class="num">{{printf "%.2f" .StopPct}}</td>
           <td>{{if .Enabled}}<span class="ui-up">{{t "common.on"}}</span>{{else}}<span class="ui-dim">{{t "common.off"}}</span>{{end}}</td>
         </tr>
@@ -102,12 +119,12 @@
       <div><span class="ui-dim ui-sm">TP / {{t "trades.stop"}}</span><b class="ui-num"><span class="ui-up">{{.Sum.TP}}</span> / <span class="ui-down">{{.Sum.Stop}}</span></b></div>
       <div><span class="ui-dim ui-sm">{{t "at.st.open"}}</span><b class="ui-num">{{.Sum.Open}}</b></div>
       <div><span class="ui-dim ui-sm">{{t "trades.winRate"}}</span><b class="ui-num">{{printf "%.0f" (mulPct .Sum.WinRate)}}%</b></div>
-      <div><span class="ui-dim ui-sm">{{t "at.netR"}}</span><b class="ui-num {{if ge .Sum.NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.NetR}}R</b></div>
+      <div{{if .MixedR}} title="{{t "at.normRHint"}}"{{end}}><span class="ui-dim ui-sm">{{t "at.netR"}}{{if .MixedR}} · {{printf (t "at.normR") .RiskPct}}{{end}}</span><b class="ui-num {{if ge .Sum.NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.NetR}}R</b></div>
       {{with .PaperBal}}<div title="{{t "at.netU.hint"}}"><span class="ui-dim ui-sm">{{t "at.netU"}}</span><b class="ui-num {{if ge .Realized 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Realized}}u</b></div>{{end}}
       {{if .Sum.Unscored}}<div title="{{t "at.unscoredFires.hint"}}"><span class="ui-dim ui-sm">{{t "at.st.unscored"}}</span><b class="ui-num">{{.Sum.Unscored}}</b></div>{{end}}
-      <div title="{{t "at.floatHint"}}"><span class="ui-dim ui-sm">{{t "at.floatR"}}</span><b class="ui-num {{if ge .Sum.UnrealR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.UnrealR}}R</b></div>
+      <div title="{{t "at.floatHint"}}"><span class="ui-dim ui-sm">{{t "at.floatR"}}{{if .MixedR}} · {{printf (t "at.normR") .RiskPct}}{{end}}</span><b class="ui-num {{if ge .Sum.UnrealR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .Sum.UnrealR}}R</b></div>
     </div>
-    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "at.howto.pnl"}}</p></details>
+    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "at.howto.pnl"}}</p>{{if .MixedR}}<p>{{printf (t "at.howto.normR") .RiskPct}}</p>{{end}}</details>
   </section>
 
   {{/* Per-cut breakdown. Computed with autotrade.Breakdown over EVERY position
@@ -167,23 +184,7 @@
     <table class="dt">
       <thead><tr><th>{{t "at.time"}}</th><th>{{t "th.symbol"}}</th><th>{{t "setups.strategy"}}</th><th>{{t "th.side"}}</th><th class="num" title="{{t "at.scoreHint"}}">{{t "trades.score"}}</th><th class="num">{{t "th.entry"}}</th><th class="num">{{t "at.now"}}</th><th class="num">{{t "trades.stop"}}</th><th class="num">TP</th><th class="num">{{t "at.size"}}</th><th>{{t "th.result"}}</th><th class="num">R</th><th class="num" title="{{t "at.u.hint"}}">u</th><th>{{t "at.why"}}</th></tr></thead>
       <tbody id="at-fires-body">
-        {{range .Fires}}
-        <tr data-sym="{{.Symbol}}" data-strat="{{.Strategy}}" data-side="{{.Side}}" data-st="{{.Status}}"{{if .Resolved}} data-r="{{.NetR}}"{{end}}{{if .HasPnLU}} data-u="{{.PnLU}}"{{end}}>
-          <td class="ui-num ui-dim">{{.When}}{{if .Absorbed}} <span class="ui-tag" title="{{printf (t "at.absorbedHint") .Absorbed}}">+{{.Absorbed}}</span>{{end}}</td>
-          <td><span class="ui-sym">{{.Symbol}}</span> <span class="ui-dim ui-sm">{{.TF}}</span></td>
-          <td><code class="ui-id">{{.Strategy}}</code>{{if .Live}} <span class="ui-tag tag-red">LIVE</span>{{end}}</td>
-          <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
-          <td class="num">{{if .Score}}<span class="{{if ge .Score 60.0}}ui-up{{else if lt .Score 40.0}}ui-down{{end}}">{{printf "%.0f" .Score}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
-          <td class="num">{{fmtPx .Entry}}</td>
-          <td class="num">{{if .Cur}}<span class="{{if .CurUp}}ui-up{{else}}ui-down{{end}}">{{fmtPx .Cur}}</span>{{else}}<span class="ui-dim">—</span>{{end}}</td>
-          <td class="num">{{fmtPx .Stop}}</td><td class="num">{{fmtPx .TP}}</td>
-          <td class="num ui-dim">{{printf "%.0f" .Margin}}u × {{.Lev}}</td>
-          <td><span class="ui-so at-{{.Status}}">{{t (printf "at.st.%s" .Status)}}</span></td>
-          <td class="num">{{if .Resolved}}<b class="{{if ge .NetR 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .NetR}}</b>{{else if .Open}}<i class="{{if ge .UnrealR 0.0}}ui-up{{else}}ui-down{{end}}" title="{{t "at.floatHint"}}">{{printf "%+.2f" .UnrealR}}</i>{{else}}<span class="ui-dim">—</span>{{end}}</td>
-          <td class="num">{{if .HasPnLU}}<b class="{{if ge .PnLU 0.0}}ui-up{{else}}ui-down{{end}}">{{printf "%+.2f" .PnLU}}</b>{{else}}<span class="ui-dim">—</span>{{end}}</td>
-          <td class="ui-dim ui-sm ui-why">{{.Why}}</td>
-        </tr>
-        {{end}}
+        {{range .Fires}}{{template "atFireRow" .}}{{end}}
       </tbody>
     </table>
     </div>

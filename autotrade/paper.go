@@ -51,6 +51,27 @@ type PaperFire struct {
 	// replayed with it today; fixed-bracket replays keep the panel's
 	// max-across-rules convention so their totals do not move.
 	CooldownBars int `json:"cooldown_bars,omitempty"`
+	// RiskPct is the rule's OWN risk_pct when it overrides the book's
+	// (Rule.RiskPct), else 0 — so every fade fire, old or new, carries 0 and
+	// weighs exactly 1 in book-level R (RWeight).
+	RiskPct float64 `json:"risk_pct,omitempty"`
+}
+
+// RWeight converts this fire's R into book units: 1R of a 0.25% rule is a
+// sixth of 1R of a 1.5% rule, and the daily breaker and every book-level R
+// figure sum across rules (executor design §4.2). w = RiskPct / bookPct when
+// both are known; 1 otherwise (every fire without its own risk_pct, and a
+// fixed-margin book, which has no percentage to normalise to).
+//
+// The design proposed (RiskUSDT/Equity)/bookPct. Not used: fires since
+// 2026-10-16 record both, and the book's pct changed 1.0 → 1.5 on 10-23, so
+// that formula would re-weight every October fade by 2/3 and move existing
+// totals. Recording the override itself leaves them byte-identical.
+func (f PaperFire) RWeight(bookPct float64) float64 {
+	if f.RiskPct > 0 && bookPct > 0 {
+		return f.RiskPct / bookPct
+	}
+	return 1
 }
 
 // Expiry returns the fire's own limit expiry, or def when it carries none.

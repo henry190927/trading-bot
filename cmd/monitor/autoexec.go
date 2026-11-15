@@ -90,7 +90,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		// trend position open for weeks must stay in the book (B8).
 		fires := autotrade.ReadFiresWithOpenTrails(500)
 		kc := newKlineCache(ctx, client).withTrailDepth(cfg, fires)
-		book, unscored, trace := autotrade.BuildBookTraced(fires, kc.forFire, now, maxCooldownBars(cfg))
+		book, unscored, trace := autotrade.BuildBookWeighted(fires, kc.forFire, now, maxCooldownBars(cfg), cfg.RiskPerTradePct)
 		logBook(book, cfg, unscored)
 		// AUTOEXEC_TRACE=1 explains the two numbers the book prints. Without
 		// it, todayR is a bare figure you cannot reconcile against the /ops
@@ -372,6 +372,7 @@ func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, b
 		RiskUSDT: sz.RiskUSDT, Equity: sz.Equity,
 		ExpiryBars: r.ExpiryBars,
 		TrailM:     trig.TrailM, BarTime: barTime, CooldownBars: r.CooldownBars,
+		RiskPct: r.RiskPct, // the override only; 0 for every rule on the book's pct
 	}
 }
 
