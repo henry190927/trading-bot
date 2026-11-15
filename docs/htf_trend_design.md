@@ -109,6 +109,65 @@ Things that will NOT be done regardless of results: tune N/M/K, add a trend
 filter, drop symbols that lost, switch to an ATR trail. Any such idea is
 recorded as a hypothesis in §6 for a separate, pre-registered run.
 
-## 6. Results
+## 6. Results (run 2026-11-15, commit of §1–5 = 01ceab0)
 
-(filled in after the runs; see below)
+History: BingX 4h pages back only to **2022-10-07** (≈9000 bars) for every
+symbol; 1d reaches 2021-05. SUI from 2023-05, HYPE 2024-12, **XAG only from
+2026-02** (9 months). Reproduce: `trendbt -tf 4h -fee-bps 10 -report`.
+
+### Variant A — 4h N20/M10/K3, pooled, 10 bp (verdict fee)
+
+| window | n | netR | R/trade | WR | avgW / avgL | SD | SE | MDD R | trd/mo |
+|---|---|---|---|---|---|---|---|---|---|
+| 120d | 220 | +31.71 | +0.144 | 30% | +1.78 / −0.56 | 1.86 | 0.125 | 33.1 | 55.8 |
+| 240d | 439 | +23.54 | +0.054 | 31% | +1.37 / −0.55 | 1.50 | 0.072 | 33.1 | 55.7 |
+| 360d | 639 | +19.34 | +0.030 | 31% | +1.33 / −0.54 | 1.39 | 0.055 | 46.5 | 54.0 |
+| all (25 mo) | 2205 | +181.93 | +0.083 | 34% | +1.20 / −0.50 | 1.34 | 0.029 | 46.5 | 44.8 |
+
+6 bp: +33.57 / +27.12 / +24.18 / +197.03 — the fee costs ≈0.007 R/trade
+(median stop 5–6.5 % of price), i.e. the wide-stop design did remove fee drag.
+
+- Disjoint 60 d buckets: 25, 17 positive, total +181.93, without the best
+  +145.92 (spread). Bucket-level t = 2.74 (each period one observation —
+  the honest test, since cross-symbol trades are correlated).
+- **But the latest year is weak:** 360d R/trade +0.030, 95 % CI
+  [−0.077, +0.138]; its six buckets total +19.34 and **−8.80 without the
+  best** (Jul–Sep 2026 +28.1). The full-history PASS rests on 2023–2024.
+- Calendar, mark-to-market: **Sep–Oct 2026 −19.59 R**, **Nov 2026 +12.03 R**
+  (7 of 9 symbols positive).
+- Per-symbol, all history: 8 of 9 positive (LINK +1.7 flat, XAG −3.1 on 9 months).
+- Max concurrent positions: 9 of 9 (the whole book fires together).
+- Implied leverage (MaxLevForStop): median 7–9×, worst 1–2×.
+- `cmd/gate` (nested 120/240/360 with ±1–2 d jitter + 25 buckets): **PASS**.
+
+### Variant B — 1d N20/M10/K3, pooled, 10 bp
+
+| window | n | netR | R/trade | WR | SE | MDD R | trd/mo |
+|---|---|---|---|---|---|---|---|
+| 120d | 39 | +17.37 | +0.445 | 54% | 0.211 | 4.7 | 9.9 |
+| 240d | 77 | +15.22 | +0.198 | 40% | 0.126 | 8.3 | 9.8 |
+| 360d | 108 | +18.52 | +0.171 | 42% | 0.100 | 11.3 | 9.1 |
+| all (5.5 y) | 459 | +78.04 | +0.170 | 39% | 0.087 | 18.1 | 7.0 |
+
+Buckets 33 (18 positive), total +78.0, without best +37.8 (XRP Nov 2024
+alone +30.9); bucket t = 1.51. Sep–Oct −1.96 R, Nov +9.59 R. Median stop
+14–18 % → 2–3× max leverage; 4 trades in 2021–22 had stops > 50 % and would
+be blocked by the liq guard even at 1×. Gate: PASS.
+
+### Verdict against §5
+
+A at 10 bp: (1) all nested windows > 0 ✓ (2) drop-best total +145.9 ✓
+(3) Nov +12.0 R ✓ (4) gate PASS ✓ → **paper-ship eligible**. B: same, thinner.
+
+Caveats that the criteria do not capture: the last 12 months alone are
+concentrated in one bucket; the strategy lost −19.6 R in Sep–Oct (it bleeds
+in the regime where fades earn — which is the hedge working, but it is not
+free); MDD 46 R with 9 correlated concurrent positions means the book's
+1.5 %/trade sizing would be a ~70 % drawdown.
+
+### Hypotheses NOT tested (separate pre-registration needed)
+
+- M=20 trail on 4h: avg win is only +1.2–1.8 R, so the 10-bar trail (40 h)
+  exits trends early; the 1d variant (same bars, 6× the time) has the
+  better R/trade.
+- A portfolio cap on same-direction concurrent positions, or vol-scaled risk.

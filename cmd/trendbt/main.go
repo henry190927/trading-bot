@@ -151,6 +151,7 @@ func main() {
 	fmt.Printf("\n--- disjoint %dd buckets, pooled (trades by entry bar) ---\n", *bucketDays)
 	fmt.Printf("%-23s %5s %9s %8s %5s  %s\n", "bucket (end-offset)", "n", "netR", "R/trade", "WR", "per-symbol netR")
 	var gateBuckets []string
+	var bnet []float64
 	for off := *endOff; ; off += *bucketDays {
 		end := now.AddDate(0, 0, -off)
 		start := end.AddDate(0, 0, -*bucketDays)
@@ -168,7 +169,39 @@ func main() {
 		}
 		fmt.Printf("%s..%s (%4d) %5d %+9.2f %+8.3f %4.0f%%  %s\n", start.Format("06-01-02"), end.Format("06-01-02"), off,
 			st.n, st.net, st.rpt, st.wr, strings.Join(per, " "))
+		if st.n == 0 {
+			continue // empty leading bucket: no evidence either way, keep it out of the gate
+		}
 		gateBuckets = append(gateBuckets, fmt.Sprintf("%d %.2f %d", off, st.net, st.n))
+		bnet = append(bnet, st.net)
+	}
+	// Buckets as the unit of observation: cross-symbol trades are correlated
+	// (one crypto move fires most of the book at once), so the per-trade SE
+	// overstates the evidence. The bucket-level t treats each period as one draw.
+	if len(bnet) > 2 {
+		var sum, v float64
+		pos := 0
+		for _, x := range bnet {
+			sum += x
+			if x > 0 {
+				pos++
+			}
+		}
+		mean := sum / float64(len(bnet))
+		for _, x := range bnet {
+			v += (x - mean) * (x - mean)
+		}
+		sd := math.Sqrt(v / float64(len(bnet)-1))
+		fmt.Printf("bucket-level: %d buckets, %d positive, mean %+.2fR sd %.2f, t = %.2f\n", len(bnet), pos, mean, sd, mean/(sd/math.Sqrt(float64(len(bnet)))))
+		if k := min(6, len(bnet)); k > 0 {
+			var s, best float64
+			best = math.Inf(-1)
+			for _, x := range bnet[:k] {
+				s += x
+				best = math.Max(best, x)
+			}
+			fmt.Printf("latest %d buckets: total %+.2fR, without the best %+.2fR\n", k, s, s-best)
+		}
 	}
 
 	// Calendar periods, marked to market (includes trades entered earlier).
@@ -320,6 +353,7 @@ func printWindow(data []symData, start, end time.Time, days int, showTrades bool
 	all := collect(data, start, end, "")
 	st := stats(all, days)
 	row("POOLED", st)
+	fmt.Printf("       max concurrent open positions (pooled): %d\n", maxConcurrent(all))
 	lo, hi := st.rpt-1.96*st.se, st.rpt+1.96*st.se
 	need := 0.0
 	if st.rpt > 0 {
@@ -327,6 +361,31 @@ func printWindow(data []symData, start, end time.Time, days int, showTrades bool
 	}
 	fmt.Printf("       95%% CI on R/trade [%+.3f, %+.3f]; n needed for the CI to exclude 0 at this mean+SD ≈ %.0f\n", lo, hi, need)
 	return st
+}
+
+// maxConcurrent is the most positions open at once across symbols (entry at
+// the signal bar's close, exit at the exit bar's close).
+func maxConcurrent(ts []tradeRef) int {
+	type ev struct {
+		t time.Time
+		d int
+	}
+	var evs []ev
+	for _, r := range ts {
+		evs = append(evs, ev{r.t.EntryTime, 1}, ev{r.t.ExitTime, -1})
+	}
+	sort.Slice(evs, func(i, j int) bool {
+		if evs[i].t.Equal(evs[j].t) {
+			return evs[i].d < evs[j].d // close before open at the same instant
+		}
+		return evs[i].t.Before(evs[j].t)
+	})
+	cur, mx := 0, 0
+	for _, e := range evs {
+		cur += e.d
+		mx = max(mx, cur)
+	}
+	return mx
 }
 
 // periodR is the R one symbol earned inside [p0, p1), marked to market at
