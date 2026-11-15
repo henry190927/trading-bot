@@ -10,7 +10,7 @@ SimulateHTFTrend :153, runTrail :174). Verdict there: paper-ship eligible.
 
 - 現在的 autotrade 管線從頭到尾假設「固定停損 + 固定止盈」。htf-trend 沒有 TP，
   直接接上去會**靜默出錯**：`EvaluateFire` 對 TP=0 的多單會在下一根 K 判成「止盈」，
-  價格 0，R ≈ −16R（停損 6% 時），這一筆就會觸發 −3R 的每日熔斷，**整個自動執行器停一天**。
+  價格 0，R ≈ −16R（停損 6% 時），這一筆就會觸發每日熔斷（線上設定 −6R，程式預設 −3R），**整個自動執行器停一天**。
   所以第一步是防呆，不是接策略。
 - 紙上交易設計：把移動停損的唯一實作搬到 `autotrade`（避免 import cycle），
   新增 `EvaluateTrailFire`，從「紀錄的 fire + K 線」**重算**每根 4h 收盤後的停損，
@@ -65,7 +65,7 @@ scoring; engine changes (closed-bar evaluation stays as is).
   is not stopped on the first bar after the fire becomes `OutTP`, exit 0,
   `NetR = (0−entry)/risk` ≈ −16.7R for a 6 % stop. `EvaluateFireLive` does the
   same against the mark (:218). Consequences: book.go:139-145 adds it to
-  `RealizedRToday` → the −3R halt trips and **every rule stops for the day**;
+  `RealizedRToday` → the daily halt trips (live −6R, code default −3R) and **every rule stops for the day**;
   paperBlocked treats tp as "free to re-enter" (:362) so it re-fires next bar;
   the panel paints it green. A short is the mirror failure: `c.Low <= 0` never
   holds, so it sits at its initial stop forever and never trails. Any htf-trend
