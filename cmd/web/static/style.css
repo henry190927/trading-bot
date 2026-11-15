@@ -3253,19 +3253,20 @@ main { overflow-x: hidden; }
        via align-self below; the chart now absorbs whichever is taller. */
     align-items: stretch;
 }
-/* Panel still hugs its content — the original `align-items: start` intent,
-   scoped to the item that wanted it. */
-.chart-side { align-self: start; }
 .chart-grid.side-collapsed { grid-template-columns: 1fr; gap: 0; }
 .chart-side {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    /* content-height; cap to viewport so a very long panel still scrolls */
-    max-height: calc(100vh - 72px - var(--apptop-h));
+    /* Exactly as tall as the chart row, scrolling inside. height:0 keeps the
+       panel out of the row-height calculation (the chart sets it) and
+       min-height:100% then fills the row. This replaced a sticky panel capped
+       at 100vh: once the page scrolled to its end, the grid bottom pushed that
+       panel up under the sticky app top bar and its first cards were cut off. */
+    align-self: stretch;
+    height: 0;
+    min-height: 100%;
     overflow-y: auto;
-    position: sticky;
-    top: calc(var(--apptop-h) + var(--sp-2));
 }
 .chart-grid.side-collapsed .chart-side { display: none; }
 /* Toggle now lives in the toolbar — a normal button, no chart overlap. */
@@ -3292,7 +3293,7 @@ main { overflow-x: hidden; }
     /* mobile: one column, toggle hidden (the panel is always shown) */
     .chart-grid, .chart-grid.side-collapsed { grid-template-columns: 1fr; }
     .chart-grid.side-collapsed .chart-side { display: flex; }
-    .chart-side { position: static; max-height: none; }
+    .chart-side { height: auto; min-height: 0; overflow-y: visible; }
     .chart-side-toggle { display: none; }
     .chart-side .chart-header { flex-direction: row; flex-wrap: wrap; }
 
