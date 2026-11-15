@@ -171,3 +171,52 @@ free); MDD 46 R with 9 correlated concurrent positions means the book's
   exits trends early; the 1d variant (same bars, 6× the time) has the
   better R/trade.
 - A portfolio cap on same-direction concurrent positions, or vol-scaled risk.
+  The same-direction cap is pre-registered in §7 (vol-scaled risk is not).
+
+## 7. Pre-registration: same-side cap (written 2026-11-15, BEFORE the run)
+
+Purpose: choose `strategy_caps["htf-trend"].max_same_side` for the paper
+book the user decided on (docs/htf_trend_executor_design.md §6.1): 16 rules =
+8 symbols (BTC ETH SOL XRP SUI HYPE NEAR LINK) × {4h `htf-trend`, 1d
+`htf-trend-1d`}, all in ONE group, one position per rule. Results go in §7.1
+and must not change this section.
+
+**Model** (`trendbt -cap-run`, added after this section is committed). The 16
+rules are simulated together on one clock with the pre-registered N20 / M10 /
+K3 rules of §2, both sides, 10 bp. Each rule's candidate signals and exits are
+exactly SimulateHTFTrend's; the cap is the only new thing:
+
+- at a signal bar's close t, open group positions on the candidate's side are
+  those with entry ≤ t < exit-bar close (the executor's book: a position whose
+  exit bar has closed is gone; a same-tick fire earlier in rule order counts);
+- if that count ≥ cap the signal is REFUSED: the rule stays flat and keeps
+  scanning (its next possible signal is the next bar), so a refusal can change
+  that rule's later trades — which is what the executor would do;
+- ties at one timestamp go in rule order: the eight 4h rules in the symbol
+  order above, then the eight 1d rules (first-come, as orderForReplay);
+- cap = 0 (off) must reproduce each rule's SimulateHTFTrend trades exactly
+  (checked in the run; otherwise the model is wrong and nothing is concluded).
+
+**Sample.** Signals from 2022-10-15 (first full 4h warm-up for the 4h-history
+symbols) to the last closed bar; SUI and HYPE join when their history starts.
+Trades attributed to the window of their entry bar.
+
+**Values tested:** off (0), 3, 4, 5. No other value will be run for the verdict.
+
+**Metrics,** pooled over the 16 rules: n, netR, R/trade, SE = SD/√n, MDD in R
+(closed-trade equity in exit order, as §4); and per disjoint 60 d bucket back
+from now: netR and the within-bucket MDD.
+
+**Decision rule.** A cap c is eligible only if ALL hold, against off:
+
+1. R/trade(c) ≥ R/trade(off) − 1 × SE(off), whole sample;
+2. MDD(c) < MDD(off), whole sample;
+3. within-bucket MDD(c) ≤ MDD(off) in at least 2/3 of the buckets where the two
+   differ (the reduction is not one period);
+4. bucket-level netR difference (c − off): mean / (SD/√buckets) ≥ −1.
+
+Recommend the eligible c with the lowest whole-sample MDD; if two are within
+1R of MDD, the larger cap (less selection). No eligible value → recommend off
+(0). The latest 360 d are reported for information only, not as a criterion.
+Not done regardless of the result: per-TF caps, symbol priority orders other
+than the rule order, best-first allocation, any change to N/M/K.
