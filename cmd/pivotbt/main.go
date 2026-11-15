@@ -293,6 +293,9 @@ func main() {
 			line("POOL", func(w window) stats { return *pool[w] })
 
 			// Detail on the longest nested window and on each bucket, pooled.
+			if *verbose {
+				continue // the POOL rows were printed above
+			}
 			fmt.Printf("pooled detail:\n")
 			for _, w := range wins {
 				printRow("POOL", w, *pool[w])

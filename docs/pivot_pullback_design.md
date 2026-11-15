@@ -121,3 +121,30 @@ Run: BTC ETH SOL XRP SUI HYPE NEAR LINK XAG, 1h, fee 6 and 10 bps, nested
    deduped R/trade; otherwise the dedup ordering is creating the result.
 6. Anything noticed after the results (a different TF, lookback, target,
    gate) is written down as a hypothesis and NOT run in this round.
+
+## 6. Result 2026-11-15 — REJECTED as a book rule (no symbol eligible)
+
+`go run ./cmd/pivotbt -days 60,90,120,30 -end-offset 0,30,60,90,120,150
+-fee-bps 6,10 -arm all -gate -v` (9 symbols, 1h/4h, warmup, dedup).
+Buckets: off0 = Oct 16–Nov 15 (the drop), off30 Sep 16–Oct 16, off60 Aug 17–
+Sep 16, off90 Jul 18–Aug 17, off120 Jun 18–Jul 18, off150 May 19–Jun 18.
+
+| pooled | 60/90/120 netR (n) @6bps | @10bps | buckets off0..150 @6bps | sum | gate |
+|---|---|---|---|---|---|
+| P0 | +5.1(12) +7.1(19) +2.9(23) | +5.0 +6.8 +2.6 | +7.6 −2.4 +1.9 −4.1 −9.2 +6.2 | −0.02 | PASS*, fails §5.2 |
+| V1 | +19.9(18) +21.5(31) +11.0(45) | +19.7 +21.1 +10.3 | +18.6 +6.9 +1.6 −10.6 −15.4 +8.5 | +9.66 | UNDECIDED (concentrated) |
+| V2 | −1.4(17) +0.5(25) −4.9(30) | −1.7 −0.2 −5.9 | +6.9 −8.3 +1.8 −5.4 −11.3 +8.3 | −7.87 | FAIL |
+
+\* shipgate's breadth test did not run: only 3 of 6 P0 buckets reach 8
+trades. The pre-registered §5.2 test does: the bucket sum is −0.02R and
+−7.6R without the best bucket. P0 120d R/trade +0.128, SD 1.88, SE 0.39 —
+indistinguishable from zero. Every per-symbol read is UNDECIDED (≤ 7 trades
+per window; the rule fires ~0.03/day/symbol), so §5.3 cannot be met.
+
+V1's whole bucket total comes from the Nov drop (+18.6R, all shorts) and it
+lost −26R in Jun–Aug. That is one regime, not an edge (§5.2, §5.4).
+
+Hypotheses written down, NOT run (§5.6): (a) V1's shorts-in-a-drop as a
+regime-conditional rule; (b) the sparsity comes mostly from the 4h 3-swing
+HH-HL requirement (trend on ~15% of bars) — a looser regime read would be a
+new pre-registration, not a tweak.
