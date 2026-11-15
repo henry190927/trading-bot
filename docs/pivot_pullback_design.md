@@ -42,19 +42,26 @@ Inputs at closed 1h bar `i` (evaluated at its close):
 - `h` = the 4h bars whose `CloseTime <= cs[i].OpenTime`, last 200 of them.
   (Stricter than "closed by the 1h close" — the daemon wrapper applies the
   same filter, so live and backtest see the same 4h bars.)
-- `st = AnalyzeStructure(h, 2)`; the leg-high/leg-low bars are the last
-  swing top / bottom of `FindSwingPoints(h, 2, 0)` (the same pivots
-  `AnalyzeStructure` uses; swings confirm 2 bars late by construction).
+- Trend = `ClassifyTrendStructure(h)` (what `AnalyzeStructure.Trend` is).
+- Impulse leg = the last 4h swing top `T` of `FindSwingPoints(h, 2, 0)` and
+  the last swing bottom before it `L` (swings confirm 2 bars late by
+  construction). Zone = the 0.5–0.705 band of L→T, invalidate = L, target =
+  T + (T − L) — the `buildPivotZone` formula.
+
+  AMENDMENT (made while writing the unit test, before any backtest ran):
+  the first draft used `AnalyzeStructure(h).Zone`. That zone flips to the
+  PULLBACK leg the moment a 4h pullback low confirms (8h after it prints),
+  i.e. exactly when this entry is sought, so a dip-and-bounce would almost
+  never see an up-leg zone. The impulse leg is therefore taken explicitly.
 
 LONG (short mirrors everything):
 
-1. **Regime**: `st.Trend == StructUptrend` and `st.Zone != nil` and
-   `st.Zone.Dir == StructUptrend` (current 4h leg is an intact up-leg, no
-   4h CHoCH-down).
+1. **Regime**: Trend == `StructUptrend` (last 3 4h swing highs and lows
+   ascending — a pullback that undercuts the prior HL ends it).
 2. **Pullback segment**: 1h bars from the 4h bar that printed the leg high
    (its `OpenTime`) up to `i`, at most the last 96 bars. Need ≥ 5 bars.
-3. **Structure intact on 1h**: no close in the segment at or below
-   `Zone.Invalidate`.
+3. **Leg intact on 1h**: no close in the segment at or below `L`, and no
+   high above `T` (that would be a new, not-yet-confirmed leg).
 4. **Pullback lower high** `LH`: the last 1h swing top (strength 2, found
    inside the segment, so it confirms 2 bars late) with `LH.Price < LegHigh`.
    None → no trade.
