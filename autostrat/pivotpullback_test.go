@@ -59,7 +59,7 @@ func ppSeries(mirror bool) (cs, htf []market.Candle) {
 	return cs, htf
 }
 
-func near(a, b float64) bool { return math.Abs(a-b) < 1e-6 }
+func nearPP(a, b float64) bool { return math.Abs(a-b) < 1e-6 }
 
 func TestPivotPullbackLongFiresOnMicroBOS(t *testing.T) {
 	cs, htf := ppSeries(false)
@@ -68,7 +68,7 @@ func TestPivotPullbackLongFiresOnMicroBOS(t *testing.T) {
 	if !tr.Fire || tr.Side != "long" || !tr.Market {
 		t.Fatalf("want a market long at 1h 205, got %+v", tr)
 	}
-	if !near(tr.Entry, 157.375) || !near(tr.Stop, 129.9) || !near(tr.TP, 210.3) {
+	if !nearPP(tr.Entry, 157.375) || !nearPP(tr.Stop, 129.9) || !nearPP(tr.TP, 210.3) {
 		t.Errorf("bracket entry %.4f stop %.4f tp %.4f, want 157.375 / 129.9 / 210.3", tr.Entry, tr.Stop, tr.TP)
 	}
 	// Only the crossing bar fires: before it the close is below the lower
@@ -89,7 +89,7 @@ func TestPivotPullbackShortMirrors(t *testing.T) {
 	if !tr.Fire || tr.Side != "short" {
 		t.Fatalf("want a short at 1h 205 on the mirrored series, got %+v", tr)
 	}
-	if !near(tr.Entry, 300-157.375) || !near(tr.Stop, 300-129.9) || !near(tr.TP, 300-210.3) {
+	if !nearPP(tr.Entry, 300-157.375) || !nearPP(tr.Stop, 300-129.9) || !nearPP(tr.TP, 300-210.3) {
 		t.Errorf("bracket entry %.4f stop %.4f tp %.4f", tr.Entry, tr.Stop, tr.TP)
 	}
 }
@@ -134,7 +134,7 @@ func TestPivotPullbackParamsAreLive(t *testing.T) {
 
 	v1 := p0
 	v1.Trigger = "reclaim"
-	if tr := PivotPullbackTrigger(cs, htf, 201, true, true, v1); !tr.Fire || !near(tr.Entry, 150.875) {
+	if tr := PivotPullbackTrigger(cs, htf, 201, true, true, v1); !tr.Fire || !nearPP(tr.Entry, 150.875) {
 		t.Errorf("reclaim should fire at 201 (close back above 150.0): %+v", tr)
 	}
 	if tr := PivotPullbackTrigger(cs, htf, 201, true, true, p0); tr.Fire {
@@ -146,7 +146,7 @@ func TestPivotPullbackParamsAreLive(t *testing.T) {
 
 	v2 := p0
 	v2.Stop = "pullback"
-	if tr := PivotPullbackTrigger(cs, htf, 205, true, true, v2); !tr.Fire || !near(tr.Stop, 145.9) || !near(tr.TP, 210.3) {
+	if tr := PivotPullbackTrigger(cs, htf, 205, true, true, v2); !tr.Fire || !nearPP(tr.Stop, 145.9) || !nearPP(tr.TP, 210.3) {
 		t.Errorf("pullback stop should be the dip low 145.9 with the same TP: %+v", tr)
 	}
 
