@@ -371,6 +371,23 @@ batch backtest at every bar, not just at the end.
    then misses breakouts while a fade or manual trade is on), or allow and accept
    the shared-position risk in §3.2?
 
+### 6.1 Decisions (user, 2026-11-15)
+
+1. `risk_pct` **0.25** for every htf-trend rule.
+2. **8 crypto symbols** (BTC ETH SOL XRP SUI HYPE NEAR LINK). XAG is left out by the
+   user's call, a deliberate departure from the pre-registered 9.
+3. **1d variant runs too**, as `htf-trend-1d`, same symbols and risk.
+4. Same-side cap: run a **pre-registered trendbt** test first, then choose the value.
+5. **Separate slot budget** from the fade rules.
+6. **Shorter forward test.** The mechanics are verified OFFLINE first: P5's compare
+   tool replays trendbt's historical signals through the live resolver and panel code
+   (a synthetic paper log), so parity is checked over hundreds of past trades in one
+   run instead of waiting for them. Live paper then only has to cover what a replay
+   cannot (tick timing, kline fetch depth, grace window, restarts): all 8 symbols
+   enabled together from day one, **2 weeks** with zero unexplained P5 mismatches.
+   The edge itself still rests on the backtest; no paper length can prove it.
+7. Live collision policy: keep "any position on the symbol blocks"; revisit at P6.
+
 ## 7. What could silently go wrong
 
 - **B1 before P0/P2 land.** Enabling an htf-trend rule earlier halts the whole
