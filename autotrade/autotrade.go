@@ -29,6 +29,12 @@ type Rule struct {
 	// closed bars of its TF. 0 = the default 6 that every rule used before
 	// 2026-11-01. Copied onto each fire so replays honour it per fire.
 	ExpiryBars int `json:"expiry_bars,omitempty"`
+	// RiskPct overrides Config.RiskPerTradePct for this rule's fires (percent
+	// of equity lost at the initial stop). 0 = the book-wide value. Exists
+	// because htf-trend runs 9+ correlated positions at once with a 46R
+	// backtest MDD: at the book's 1.5% that is a ~70% drawdown, at 0.25% ~12%
+	// (docs/htf_trend_executor_design.md §4.1, user decision §6.1).
+	RiskPct float64 `json:"risk_pct,omitempty"`
 
 	// REMOVED 2026-09-02, do not re-add without an implementation:
 	//   MaxConcurrent  (per-symbol) — had zero consumers anywhere. One position
@@ -64,7 +70,70 @@ type Config struct {
 	// Display only — nothing sizes off it. 0 / "" = not shown.
 	PaperBaseUSDT float64 `json:"paper_base_usdt,omitempty"`
 	PaperSince    string  `json:"paper_since,omitempty"`
-	Rules         []Rule  `json:"rules"`
+	// StrategyCaps gives a group of strategies its OWN slot budget, keyed by
+	// group name. See StrategyCap and CheckCaps. Absent = every strategy
+	// shares max_concurrent_total and max_same_symbol_side, as before.
+	StrategyCaps map[string]StrategyCap `json:"strategy_caps,omitempty"`
+	Rules        []Rule                 `json:"rules"`
+}
+
+// StrategyCap is a separate budget for a group of strategies (user decision
+// 2026-11-15: htf-trend gets its own slots rather than competing with the
+// fade rules for max_concurrent_total — its positions sit for weeks and
+// would starve the fades, and the fades would make it skip breakouts its
+// backtest takes).
+//
+// A position whose strategy is in a group counts ONLY against that group's
+// caps: it is invisible to max_concurrent_total and max_same_symbol_side,
+// and the group's caps do not see positions outside it. The daily-loss halt
+// and max_margin_total_usdt stay book-wide — they protect the account, not a
+// strategy's share of it. Every count is 0 = UNLIMITED, like the other caps.
+type StrategyCap struct {
+	// Strategies in the group. Empty = the group key itself is the one
+	// strategy, so {"htf-trend": {...}} needs no list.
+	Strategies []string `json:"strategies,omitempty"`
+	// MaxConcurrent caps open positions in the group.
+	MaxConcurrent int `json:"max_concurrent,omitempty"`
+}
+
+// capGroup returns the StrategyCaps group a strategy belongs to, or "".
+// A strategy listed in two groups takes the alphabetically first, so the
+// answer does not depend on map iteration order.
+func (c Config) capGroup(strategy string) string {
+	best := ""
+	for g, sc := range c.StrategyCaps {
+		in := len(sc.Strategies) == 0 && g == strategy
+		for _, s := range sc.Strategies {
+			if s == strategy {
+				in = true
+			}
+		}
+		if in && (best == "" || g < best) {
+			best = g
+		}
+	}
+	return best
+}
+
+// EffectiveRiskPct is the percent of equity a rule's fire risks: the rule's
+// own risk_pct when set, else the book-wide risk_per_trade_pct. 0 = the
+// fixed margin_usdt × leverage sizing.
+func (c Config) EffectiveRiskPct(r Rule) float64 {
+	if r.RiskPct > 0 {
+		return r.RiskPct
+	}
+	return c.RiskPerTradePct
+}
+
+// NeedsEquity reports whether any enabled rule sizes from equity, so the
+// executor reads the balance only when something will use it.
+func (c Config) NeedsEquity() bool {
+	for _, r := range c.Rules {
+		if r.Enabled && c.EffectiveRiskPct(r) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Path is the on-disk config (env AUTOTRADE_PATH or the default).
@@ -95,6 +164,12 @@ func Load() Config {
 		log.Printf("autotrade: rule names unknown strategy %q — it will never fire. Known: %s",
 			name, strings.Join(KnownStrategies, " "))
 	}
+	for _, r := range c.Rules {
+		if want := TrailStrategyTF(r.Strategy); want != "" && r.TF != want {
+			log.Printf("autotrade: %s rule %s has tf %q — it is pre-registered for %s only and will never fire",
+				r.Strategy, r.Symbol, r.TF, want)
+		}
+	}
 	return c
 }
 
@@ -106,7 +181,24 @@ func Load() Config {
 // Kept here rather than in autostrat because autostrat imports autotrade; a
 // test in autostrat pins the two lists together so adding a case there without
 // adding it here fails the build gate rather than the next hand-edit.
-var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "struct-momentum", "vp-node"}
+var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "struct-momentum", "vp-node", "htf-trend", "htf-trend-1d"}
+
+// trailStrategyTF is every strategy whose fires exit on a trailing stop, and
+// the one TF each is pre-registered for (docs/htf_trend_design.md §3). Two
+// strategy NAMES rather than one name with the TF from the rule: the slot key
+// everywhere is Symbol|Strategy (B11), so a 4h and a 1d rule on one symbol
+// under one name would block each other, and re-keying every slot map on TF
+// would change every existing strategy's dedup (executor design §2.6).
+var trailStrategyTF = map[string]string{"htf-trend": "4h", "htf-trend-1d": "1d"}
+
+// IsTrailStrategy reports whether a strategy exits on a trailing stop. Used
+// before a trigger exists (kline depth, full-log slot lookup); after one, the
+// fire's own TrailM is the authority.
+func IsTrailStrategy(name string) bool { _, ok := trailStrategyTF[name]; return ok }
+
+// TrailStrategyTF is the TF a trail strategy is pre-registered for ("" when
+// name is not one). A rule on any other TF never fires (autostrat refuses it).
+func TrailStrategyTF(name string) string { return trailStrategyTF[name] }
 
 // UnknownStrategies returns the rule strategy names this build cannot execute.
 func (c Config) UnknownStrategies() []string {

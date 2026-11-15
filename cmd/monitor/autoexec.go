@@ -86,8 +86,10 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		// tick. The kline cache is shared with paperBlocked below, which
 		// otherwise refetches the same candles per rule.
 		now := time.Now().UTC()
-		kc := newKlineCache(ctx, client)
-		fires := autotrade.ReadFires(500)
+		// Plus the newest fire of any trail rule older than the 500 rows: a
+		// trend position open for weeks must stay in the book (B8).
+		fires := autotrade.ReadFiresWithOpenTrails(500)
+		kc := newKlineCache(ctx, client).withTrailDepth(cfg, fires)
 		book, unscored, trace := autotrade.BuildBookTraced(fires, kc.forFire, now, maxCooldownBars(cfg))
 		logBook(book, cfg, unscored)
 		// AUTOEXEC_TRACE=1 explains the two numbers the book prints. Without
@@ -119,9 +121,11 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 		// sizes off the same number, and an unreadable balance blocks every
 		// fire this tick (Size refuses) rather than falling back to the old
 		// fixed margin. Fixed-margin mode does not need it, so no call there.
+		// "Needed" is per rule now: a rule may carry its own risk_pct while
+		// the book-wide value is 0 (fixed margin for the rest).
 		var equity float64
 		var equityOK bool
-		if cfg.RiskPerTradePct > 0 {
+		if cfg.NeedsEquity() {
 			if b, err := client.AccountBalance(ctx); err != nil {
 				log.Printf("autoexec: balance read failed, risk sizing will block this tick: %v", err)
 			} else {
@@ -153,6 +157,12 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				continue
 			}
 			barTime := cs[len(cs)-1].CloseTime
+			if !trig.BarTime.IsZero() {
+				// The strategy says which bar it fired on (htf-trend): a trail
+				// fire is scored from exactly that bar, and the 3-bar fetch
+				// above can already see the next one if a close landed between.
+				barTime = trig.BarTime
+			}
 			st := state[key]
 			if st == nil {
 				st = &autoState{}
@@ -161,8 +171,9 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			if st.lastFireBar.Equal(barTime) {
 				continue // already acted this bar
 			}
-			// blackout gate (macro + earnings via engine's own gate on a Flat probe)
-			if autoInBlackout(sym, barTime) {
+			// blackout gate (macro + earnings via engine's own gate on a Flat probe).
+			// Trail rules take it below, after the one-position check.
+			if trig.TrailM == 0 && autoInBlackout(sym, barTime) {
 				continue
 			}
 			// one-position-per-rule: live checks the exchange; paper replays the
@@ -172,8 +183,37 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 				if pos, perr := client.OpenPositions(ctx, sym); perr == nil && len(pos) > 0 {
 					continue
 				}
-			} else if paperBlocked(kc, r, barTime) {
+			} else if paperBlocked(kc, r, barTime, trig.TrailM > 0) {
 				continue
+			}
+
+			// Trail strategies. These run AFTER the one-position check so a
+			// signal ignored because the rule already holds its trend (which
+			// the backtest ignores too) is not written down under a reason it
+			// did not have.
+			if trig.TrailM > 0 {
+				// The live trail manager is not built (design §3, P6): a live
+				// bracket with TP 0 and a stop nobody moves is not this
+				// strategy. Refused, loudly, whatever the arming says.
+				if live {
+					recordTrailSkip(st, r, trig, barTime, "live-trail-not-built: htf-trend is paper-only until the trail manager exists", book)
+					continue
+				}
+				// A breakout not taken at its close is not taken. The per-bar
+				// dedup alone would let a candidate blocked at 00:01 fire at
+				// 03:30 with Entry = the 00:00 close (B9), a fill the backtest
+				// never gets.
+				if why := trailStale(barTime, time.Now().UTC()); why != "" {
+					recordTrailSkip(st, r, trig, barTime, why, book)
+					continue
+				}
+				// Silent for fixed-bracket rules as before; written down for
+				// trail rules so every backtest signal paper skipped has a
+				// reason in the blocked log (§2.6, P5).
+				if autoInBlackout(sym, barTime) {
+					recordTrailSkip(st, r, trig, barTime, "blackout: macro/earnings", book)
+					continue
+				}
 			}
 
 			// Size from the stop (see autotrade/sizing.go). Before the caps,
@@ -203,7 +243,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			// trig.Side (not r.Side) — a rule may be configured "auto", and the
 			// trigger has already resolved the concrete direction by here.
 			if v := autotrade.CheckCaps(cfg, book, autotrade.Candidate{
-				Symbol: r.Symbol, Side: trig.Side, Margin: sz.Margin,
+				Symbol: r.Symbol, Side: trig.Side, Margin: sz.Margin, Strategy: r.Strategy,
 			}); v.Blocked {
 				// Record WHAT was denied, not just that something was (C7).
 				// The one-line log above cannot answer "would best-first have
@@ -254,7 +294,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			// Account for it immediately: buildBook only runs once per tick, so
 			// without this two rules firing in the same tick would both see an
 			// empty slot and the cap would be breached by one.
-			book.Add(autotrade.Candidate{Symbol: r.Symbol, Side: trig.Side, Margin: sz.Margin})
+			book.Add(autotrade.Candidate{Symbol: r.Symbol, Side: trig.Side, Margin: sz.Margin, Strategy: r.Strategy})
 			score := autostrat.FireScore100(ctx, client, sym, r.TF, trig.Side, trig.Entry)
 
 			if !live {
@@ -339,13 +379,24 @@ func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, b
 // already holds a live position (the prior fire is still open/pending) or is inside
 // its post-stop cooldown. This makes paper behave like one-position-per-rule instead
 // of re-entering the same persistent setup on every bar close.
-func paperBlocked(kc *klineCache, r autotrade.Rule, barTime time.Time) bool {
+//
+// trail: the rule's trigger exits on a trailing stop. Its newest fire is looked
+// up in the WHOLE log — a trend position can be older than the last 300 rows
+// while other rules keep firing, and would otherwise be re-entered while still
+// open (B8). Fixed-bracket rules keep the 300-row read.
+func paperBlocked(kc *klineCache, r autotrade.Rule, barTime time.Time, trail bool) bool {
 	var latest *autotrade.PaperFire
-	for _, f := range autotrade.ReadFires(300) { // newest-first
-		if f.Symbol == r.Symbol && f.Strategy == r.Strategy {
-			ff := f
-			latest = &ff
-			break
+	if trail {
+		if f, ok := autotrade.NewestFire(r.Symbol, r.Strategy); ok {
+			latest = &f
+		}
+	} else {
+		for _, f := range autotrade.ReadFires(300) { // newest-first
+			if f.Symbol == r.Symbol && f.Strategy == r.Strategy {
+				ff := f
+				latest = &ff
+				break
+			}
 		}
 	}
 	if latest == nil {
@@ -409,4 +460,33 @@ func autoInBlackout(sym market.Symbol, barTime time.Time) bool {
 		}
 	}
 	return false
+}
+
+// trailFireGrace is how long after the signal bar's close a trail fire may
+// still be taken. The tick is 60 s, so a healthy daemon fires within ~1 min;
+// past this the close price the fire would record is stale (B9).
+const trailFireGrace = 5 * time.Minute
+
+// trailStale returns a refusal reason when now is past the grace window of
+// the signal bar that closed at barTime, else "".
+func trailStale(barTime, now time.Time) string {
+	if age := now.Sub(barTime); age > trailFireGrace {
+		return fmt.Sprintf("stale-signal: bar closed %s ago > %s grace", age.Truncate(time.Second), trailFireGrace)
+	}
+	return ""
+}
+
+// recordTrailSkip writes a refused trail candidate to the blocked log, once
+// per rule per bar (lastBlockBar, as for caps blocks), and logs one line.
+func recordTrailSkip(st *autoState, r autotrade.Rule, trig autostrat.Trigger, barTime time.Time, why string, book autotrade.Book) {
+	if st.lastBlockBar.Equal(barTime) {
+		return
+	}
+	st.lastBlockBar = barTime
+	log.Printf("autoexec: %s %s/%s SKIPPED — %s", r.Symbol, r.TF, r.Strategy, why)
+	autotrade.AppendBlocked(autotrade.BlockedCandidate{
+		Fire:   fireRecord(r, trig, autotrade.Sizing{}, barTime, trig.Why, 0, false),
+		Reason: why, BarTime: barTime,
+		OpenCount: book.OpenCount, OpenMargin: book.OpenMargin,
+	})
 }

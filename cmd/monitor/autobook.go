@@ -33,6 +33,39 @@ type klineCache struct {
 	ctx    context.Context
 	client *bingx.Client
 	data   map[string][]market.Candle
+	// deep marks the "SYM|TF" keys a trail rule or trail fire lives on. They
+	// fetch the BingX maximum (1440 bars = 240 days of 4h) instead of 300 =
+	// 50 days, because a trail fire is recomputed from its signal bar and a
+	// trend can run longer than 50 days (B7). Every other key keeps 300.
+	deep map[string]bool
+}
+
+// klineDepth / trailKlineDepth are the per-key fetch sizes.
+const (
+	klineDepth      = 300
+	trailKlineDepth = 1440
+)
+
+// withTrailDepth marks every (symbol, TF) that an enabled trail rule or a
+// trail fire in the book's read uses as deep. Returns k for chaining.
+func (k *klineCache) withTrailDepth(cfg autotrade.Config, fires []autotrade.PaperFire) *klineCache {
+	k.deep = map[string]bool{}
+	mark := func(short, tf string) {
+		if sym, ok := autoSymbols[short]; ok {
+			k.deep[string(sym)+"|"+tf] = true
+		}
+	}
+	for _, r := range cfg.Rules {
+		if r.Enabled && autotrade.IsTrailStrategy(r.Strategy) {
+			mark(r.Symbol, r.TF)
+		}
+	}
+	for _, f := range fires {
+		if f.IsTrail() {
+			mark(f.Symbol, f.TF)
+		}
+	}
+	return k
 }
 
 func newKlineCache(ctx context.Context, client *bingx.Client) *klineCache {
@@ -56,7 +89,11 @@ func (k *klineCache) get(sym market.Symbol, tf string) []market.Candle {
 	if cs, ok := k.data[key]; ok {
 		return cs
 	}
-	cs, err := k.client.Klines(k.ctx, sym, market.Timeframe(tf), 300)
+	limit := klineDepth
+	if k.deep[key] {
+		limit = trailKlineDepth
+	}
+	cs, err := k.client.Klines(k.ctx, sym, market.Timeframe(tf), limit)
 	if err != nil {
 		cs = nil
 	}

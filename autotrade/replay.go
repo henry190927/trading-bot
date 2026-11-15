@@ -38,11 +38,11 @@ type Blocked struct {
 }
 
 type liveLeg struct {
-	symbol, side string
-	margin       float64
-	until        time.Time // zero = still open at the end of the walk
-	r            float64
-	resolved     bool
+	symbol, side, strategy string
+	margin                 float64
+	until                  time.Time // zero = still open at the end of the walk
+	r                      float64
+	resolved               bool
 }
 
 // ReplayWithCaps consumes fires in ANY order and returns positions oldest-first
@@ -89,9 +89,9 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 		for _, l := range live {
 			bk.OpenCount++
 			bk.OpenMargin += l.margin
-			bk.OpenLegs = append(bk.OpenLegs, Leg{Symbol: l.symbol, Side: l.side})
+			bk.OpenLegs = append(bk.OpenLegs, Leg{Symbol: l.symbol, Side: l.side, Strategy: l.strategy})
 		}
-		if v := CheckCaps(cfg, bk, Candidate{Symbol: f.Symbol, Side: f.Side, Margin: f.Margin}); v.Blocked {
+		if v := CheckCaps(cfg, bk, Candidate{Symbol: f.Symbol, Side: f.Side, Margin: f.Margin, Strategy: f.Strategy}); v.Blocked {
 			blocked = append(blocked, Blocked{Fire: f, Reason: v.Reason})
 			continue
 		}
@@ -107,7 +107,7 @@ func ReplayWithCaps(fires []PaperFire, cfg Config, expiryBars, cooldownBars int,
 			continue
 		}
 
-		l := liveLeg{symbol: f.Symbol, side: f.Side, margin: f.Margin, r: oc.NetR}
+		l := liveLeg{symbol: f.Symbol, side: f.Side, strategy: f.Strategy, margin: f.Margin, r: oc.NetR}
 		var hold time.Time
 		switch oc.Status {
 		case OutTP, OutStop:

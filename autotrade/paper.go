@@ -85,6 +85,17 @@ func AppendFire(pf PaperFire) {
 
 // ReadFires returns the most recent `limit` fires (newest first).
 func ReadFires(limit int) []PaperFire {
+	all := readAllFires()
+	// newest first, cap
+	out := make([]PaperFire, 0, min(limit, len(all)))
+	for i := len(all) - 1; i >= 0 && len(out) < limit; i-- {
+		out = append(out, all[i])
+	}
+	return out
+}
+
+// readAllFires is the whole log, oldest first.
+func readAllFires() []PaperFire {
 	f, err := os.Open(PaperLogPath())
 	if err != nil {
 		return nil
@@ -104,10 +115,53 @@ func ReadFires(limit int) []PaperFire {
 		}
 	}
 	_ = sc.Err()
-	// newest first, cap
-	out := make([]PaperFire, 0, limit)
-	for i := len(all) - 1; i >= 0 && len(out) < limit; i-- {
+	return all
+}
+
+// ReadFiresWithOpenTrails is ReadFires(limit) plus, appended after the
+// window (so still newest-first), the newest fire of every trail rule whose
+// newest fire has scrolled out of it (B8). A trail position can stay open
+// for weeks while other rules keep writing rows; at a fixed depth it would
+// silently leave the open book and its rule's slot, and the next breakout
+// would be re-entered while the first is still on. Only TRAIL fires are
+// added: a fixed-bracket row older than the window resolved long ago, and
+// adding it would change every existing number. With no trail fire in the
+// log this returns exactly ReadFires(limit).
+func ReadFiresWithOpenTrails(limit int) []PaperFire {
+	return withOpenTrails(readAllFires(), limit)
+}
+
+func withOpenTrails(all []PaperFire, limit int) []PaperFire {
+	out := make([]PaperFire, 0, min(limit, len(all)))
+	inWin := map[string]bool{}
+	i := len(all) - 1
+	for ; i >= 0 && len(out) < limit; i-- {
 		out = append(out, all[i])
+		inWin[all[i].Symbol+"|"+all[i].Strategy] = true
+	}
+	for ; i >= 0; i-- {
+		f := all[i]
+		k := f.Symbol + "|" + f.Strategy
+		if inWin[k] {
+			continue
+		}
+		inWin[k] = true // only the newest per rule: the slot is "newest fire per rule"
+		if f.IsTrail() {
+			out = append(out, f)
+		}
 	}
 	return out
+}
+
+// NewestFire is the newest fire for (symbol, strategy) in the WHOLE log, or
+// false when the rule never fired. paperBlocked uses it for trail rules,
+// whose open position may be older than any fixed read depth (B8).
+func NewestFire(symbol, strategy string) (PaperFire, bool) {
+	all := readAllFires()
+	for i := len(all) - 1; i >= 0; i-- {
+		if all[i].Symbol == symbol && all[i].Strategy == strategy {
+			return all[i], true
+		}
+	}
+	return PaperFire{}, false
 }

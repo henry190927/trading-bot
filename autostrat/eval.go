@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/henry190927/trading-bot/autotrade"
 	"github.com/henry190927/trading-bot/bingx"
@@ -34,7 +35,12 @@ type Trigger struct {
 	// the strategy, not a rule knob — a range-edge rule has no trail to run.
 	// 0 = fixed bracket (every strategy but htf-trend).
 	TrailM int
-	Why    string
+	// BarTime is the signal bar's CloseTime when the strategy knows it (set
+	// by htf-trend). A trail fire is scored from that exact bar, so the
+	// executor records this rather than the close of whatever bar its own
+	// separate kline fetch saw newest — the two can straddle a bar close.
+	BarTime time.Time
+	Why     string
 	// Tags is Why as labelled values, for a page to show as chips in its own
 	// language. Why stays the sentence the daemon logs and notifies with.
 	Tags []Tag
@@ -92,6 +98,14 @@ func EvalAutoTrigger(ctx context.Context, client *bingx.Client, sym market.Symbo
 		// Volume-profile node, arm A2 of cmd/vpbt: a limit inside the node
 		// price is approaching. Paper forward test from 2026-11-01.
 		return evalVPNode(ctx, client, sym, r)
+	case "htf-trend":
+		// Donchian breakout, trailing exit, no TP — variant A (4h) of
+		// docs/htf_trend_design.md. Scored by autotrade.EvaluateTrailFire.
+		return evalHTFTrend(ctx, client, sym, r)
+	case "htf-trend-1d":
+		// The same strategy, variant B (1d). A separate NAME so its slot
+		// key (Symbol|Strategy) does not collide with the 4h rule's.
+		return evalHTFTrend(ctx, client, sym, r)
 	default:
 		return Trigger{}
 	}

@@ -62,7 +62,8 @@ func MaxLevForStop(stopFrac float64) int {
 
 // Size decides quantity and leverage for one fire.
 //
-// Risk mode (cfg.RiskPerTradePct > 0): risk = equity × pct, notional =
+// Risk mode (Config.EffectiveRiskPct(r) > 0 — the rule's risk_pct, else
+// cfg.RiskPerTradePct): risk = equity × pct, notional =
 // risk / stop distance, leverage = min(rule leverage, MaxLevForStop). The
 // rule's margin_usdt is not used; margin falls out of notional / leverage
 // (= risk / (stop distance × leverage)). It is about 2 × risk when the stop
@@ -87,7 +88,8 @@ func Size(cfg Config, r Rule, entry, stop, equity float64, equityKnown bool) Siz
 	s := Sizing{StopPct: stopFrac * 100}
 	maxLev := MaxLevForStop(stopFrac)
 
-	if cfg.RiskPerTradePct <= 0 {
+	pct := cfg.EffectiveRiskPct(r) // the rule's risk_pct, else the book's
+	if pct <= 0 {
 		s.Lev = r.Leverage
 		s.Margin = r.MarginUSDT
 		s.Notional = r.MarginUSDT * float64(r.Leverage)
@@ -113,7 +115,7 @@ func Size(cfg Config, r Rule, entry, stop, equity float64, equityKnown bool) Siz
 		return s
 	}
 	s.Equity = equity
-	s.RiskUSDT = equity * cfg.RiskPerTradePct / 100
+	s.RiskUSDT = equity * pct / 100
 	s.Notional = s.RiskUSDT / stopFrac
 	s.Lev = lev
 	s.Margin = s.Notional / float64(lev)

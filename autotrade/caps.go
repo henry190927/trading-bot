@@ -46,13 +46,16 @@ type Book struct {
 func (b *Book) Add(c Candidate) {
 	b.OpenCount++
 	b.OpenMargin += c.Margin
-	b.OpenLegs = append(b.OpenLegs, Leg{Symbol: c.Symbol, Side: c.Side})
+	b.OpenLegs = append(b.OpenLegs, Leg{Symbol: c.Symbol, Side: c.Side, Strategy: c.Strategy})
 }
 
-// Leg identifies an open position by the two things a concentration rule needs.
+// Leg identifies an open position by the things a concentration rule needs.
+// Strategy places it in (or outside) a StrategyCaps group; it is known even
+// for an unscoreable fire, whose Side is not trusted.
 type Leg struct {
-	Symbol string
-	Side   string // "long" | "short"
+	Symbol   string
+	Side     string // "long" | "short"
+	Strategy string
 }
 
 // Candidate is the position CheckCaps is being asked to permit. Passed as a
@@ -65,9 +68,10 @@ type Leg struct {
 // once per tick with no candidate purely to read the daily-loss breaker before
 // doing any per-rule work. Every candidate-specific rule must skip on it.
 type Candidate struct {
-	Symbol string
-	Side   string
-	Margin float64
+	Symbol   string
+	Side     string
+	Margin   float64
+	Strategy string // selects the StrategyCaps budget; "" = the shared one
 }
 
 // CapsVerdict explains a caps decision for logging, ntfy and tests.
@@ -111,10 +115,34 @@ func CheckCaps(cfg Config, bk Book, cand Candidate) CapsVerdict {
 	//
 	// Zero = UNLIMITED, same convention as the caps above, so an existing
 	// autotrade.json unmarshals to today's behaviour.
-	if cfg.MaxSameSymbolSide > 0 && cand.Side != "" {
+	//
+	// A StrategyCaps group is its own budget (see StrategyCap): its
+	// candidates skip this cap and the shared count below, take the group's
+	// caps instead, and their legs are invisible to everyone else's.
+	group := ""
+	if cand.Side != "" {
+		group = cfg.capGroup(cand.Strategy)
+	}
+	if group != "" {
+		sc := cfg.StrategyCaps[group]
 		n := 0
 		for _, l := range bk.OpenLegs {
-			if l.Symbol == cand.Symbol && l.Side == cand.Side {
+			if cfg.capGroup(l.Strategy) == group {
+				n++
+			}
+		}
+		if sc.MaxConcurrent > 0 && n >= sc.MaxConcurrent {
+			return CapsVerdict{
+				Blocked: true,
+				Reason: fmt.Sprintf("strategy-cap %s: %d open >= cap %d",
+					group, n, sc.MaxConcurrent),
+			}
+		}
+	}
+	if group == "" && cfg.MaxSameSymbolSide > 0 && cand.Side != "" {
+		n := 0
+		for _, l := range bk.OpenLegs {
+			if l.Symbol == cand.Symbol && l.Side == cand.Side && cfg.capGroup(l.Strategy) == "" {
 				n++
 			}
 		}
@@ -126,11 +154,11 @@ func CheckCaps(cfg Config, bk Book, cand Candidate) CapsVerdict {
 			}
 		}
 	}
-	if cfg.MaxConcurrentTotal > 0 && bk.OpenCount >= cfg.MaxConcurrentTotal {
+	if shared := bk.OpenCount - groupedLegs(cfg, bk); group == "" && cfg.MaxConcurrentTotal > 0 && shared >= cfg.MaxConcurrentTotal {
 		return CapsVerdict{
 			Blocked: true,
 			Reason: fmt.Sprintf("max-concurrent-total: %d open >= cap %d",
-				bk.OpenCount, cfg.MaxConcurrentTotal),
+				shared, cfg.MaxConcurrentTotal),
 		}
 	}
 	if cfg.MaxMarginTotalUSDT > 0 && bk.OpenMargin+cand.Margin > cfg.MaxMarginTotalUSDT {
@@ -141,4 +169,20 @@ func CheckCaps(cfg Config, bk Book, cand Candidate) CapsVerdict {
 		}
 	}
 	return CapsVerdict{}
+}
+
+// groupedLegs counts open legs that belong to a StrategyCaps group — the part
+// of OpenCount the shared max_concurrent_total does not see. 0 whenever no
+// group is configured, so OpenCount stays the authority as before.
+func groupedLegs(cfg Config, bk Book) int {
+	if len(cfg.StrategyCaps) == 0 {
+		return 0
+	}
+	n := 0
+	for _, l := range bk.OpenLegs {
+		if cfg.capGroup(l.Strategy) != "" {
+			n++
+		}
+	}
+	return n
 }

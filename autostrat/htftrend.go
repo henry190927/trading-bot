@@ -1,21 +1,26 @@
 package autostrat
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
 
 	"github.com/henry190927/trading-bot/autotrade"
+	"github.com/henry190927/trading-bot/bingx"
+	"github.com/henry190927/trading-bot/indicator"
 	"github.com/henry190927/trading-bot/market"
 )
 
 // HTF trend follower: Donchian breakout entry, opposite-channel trailing exit.
-// Design + pre-registration: docs/htf_trend_design.md. NOT wired into
-// EvalAutoTrigger / KnownStrategies — it is a backtest candidate (cmd/trendbt).
+// Design + pre-registration: docs/htf_trend_design.md; executor wiring:
+// docs/htf_trend_executor_design.md. Strategies "htf-trend" (4h) and
+// "htf-trend-1d" (1d) in EvalAutoTrigger, backtested by cmd/trendbt.
 //
 // Unlike every other strategy here it has no take-profit, so
-// autotrade.EvaluateFire (fixed stop/TP) cannot score it; SimulateHTFTrend is
-// its path-dependent replacement.
+// autotrade.EvaluateFire (fixed stop/TP) cannot score it: the backtest uses
+// SimulateHTFTrend, a logged fire autotrade.EvaluateTrailFire. Both walk the
+// same autotrade.WalkTrail.
 
 // HTFTrendParams are the strategy's settings.
 type HTFTrendParams struct {
@@ -52,13 +57,13 @@ func HTFTrendTrigger(cs []market.Candle, atr float64, i int, wantLong, wantShort
 	switch {
 	case wantLong && bar.Close > hi:
 		return Trigger{
-			Fire: true, Side: "long", Market: true, Entry: bar.Close, Stop: bar.Close - d, TrailM: p.TrailM,
+			Fire: true, Side: "long", Market: true, Entry: bar.Close, Stop: bar.Close - d, TrailM: p.TrailM, BarTime: bar.CloseTime,
 			Why:  fmt.Sprintf("close %.4f broke the %d-bar high %.4f; trail = %d-bar low", bar.Close, p.EntryN, hi, p.TrailM),
 			Tags: []Tag{tag("htf-trend-break", hi, p.EntryN)},
 		}
 	case wantShort && bar.Close < lo:
 		return Trigger{
-			Fire: true, Side: "short", Market: true, Entry: bar.Close, Stop: bar.Close + d, TrailM: p.TrailM,
+			Fire: true, Side: "short", Market: true, Entry: bar.Close, Stop: bar.Close + d, TrailM: p.TrailM, BarTime: bar.CloseTime,
 			Why:  fmt.Sprintf("close %.4f broke the %d-bar low %.4f; trail = %d-bar high", bar.Close, p.EntryN, lo, p.TrailM),
 			Tags: []Tag{tag("htf-trend-break", lo, p.EntryN)},
 		}
@@ -175,4 +180,39 @@ func runTrail(cs []market.Candle, i int, side string, entry, stop float64, m int
 	t.GrossR = t.dir() * (w.Exit - entry) / risk
 	t.NetR = t.GrossR - t.FeeR
 	return t
+}
+
+// htfTrendLiveBars is how many closed bars the live trigger reads. ATR(20) is
+// Wilder-smoothed from a seed at bar 20 (indicator.ATR), and the seed's weight
+// after k more bars is (19/20)^k: at 500 bars it is ~2e-11, so the live stop
+// equals the one trendbt computes over the whole history (pinned by
+// TestHTFTrendLiveWindowParity). 300 bars would leave ~1e-6.
+const htfTrendLiveBars = 500
+
+// evalHTFTrend is the executor/scanner entry: the pre-registered parameters on
+// the rule's last closed bar. Refuses a TF the strategy is not registered for
+// (autotrade.TrailStrategyTF) rather than run an untested variant.
+func evalHTFTrend(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule) Trigger {
+	if r.TF != autotrade.TrailStrategyTF(r.Strategy) {
+		return Trigger{}
+	}
+	cs, err := client.Klines(ctx, sym, market.Timeframe(r.TF), htfTrendLiveBars)
+	if err != nil {
+		return Trigger{}
+	}
+	return htfTrendOnWindow(cs, r)
+}
+
+// htfTrendOnWindow evaluates the newest bar of a closed-bar window.
+func htfTrendOnWindow(cs []market.Candle, r autotrade.Rule) Trigger {
+	p := DefaultHTFTrendParams()
+	if len(cs) < max(p.EntryN, p.ATRPeriod)+2 {
+		return Trigger{}
+	}
+	atr := indicator.ATR(cs, p.ATRPeriod)
+	if len(atr) != len(cs) {
+		return Trigger{}
+	}
+	i := len(cs) - 1
+	return HTFTrendTrigger(cs, atr[i], i, r.Side == "long" || r.Side == "auto", r.Side == "short" || r.Side == "auto", p)
 }

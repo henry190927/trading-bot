@@ -208,7 +208,7 @@ func TestBuildBookRecordsOpenLegs(t *testing.T) {
 		if len(bk.OpenLegs) != 1 {
 			t.Fatalf("legs = %+v, want exactly 1", bk.OpenLegs)
 		}
-		if bk.OpenLegs[0] != (Leg{Symbol: "ETH", Side: "long"}) {
+		if bk.OpenLegs[0] != (Leg{Symbol: "ETH", Side: "long", Strategy: "engine"}) {
 			t.Errorf("leg = %+v, want {ETH long}", bk.OpenLegs[0])
 		}
 	})

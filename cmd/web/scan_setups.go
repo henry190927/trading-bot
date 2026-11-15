@@ -38,7 +38,10 @@ func (s *server) handleScanRecord(c *gin.Context) {
 		Target:     pf("tp"),
 		Note:       fmt.Sprintf("scan · %s/100 · %s", strings.TrimSpace(c.PostForm("score")), strings.TrimSpace(c.PostForm("why"))),
 	}
-	if su.Symbol == "" || su.Entry <= 0 {
+	// Target <= 0 is a trailing-exit row (htf-trend): /setups would score it
+	// against a target at price 0. Refused server-side too, not only by
+	// hiding the button, until /setups has a trail outcome.
+	if su.Symbol == "" || su.Entry <= 0 || su.Target <= 0 {
 		c.Redirect(http.StatusSeeOther, "/ops/scan?err=1")
 		return
 	}
@@ -57,7 +60,11 @@ type scanRow struct {
 	Side, Why                      string
 	Entry, Stop, TP, Score, RR     float64
 	Market                         bool
-	Tags                           []autostrat.Tag
+	// Trail: no take-profit, the exit is a trailing stop (htf-trend). TP and
+	// R:R are shown as "trail", and the row cannot be recorded to /setups,
+	// whose outcome tracker only knows fixed targets (§2.7).
+	Trail bool
+	Tags  []autostrat.Tag
 	// Armed distinguishes "auto is watching this and would take it" from
 	// "this strategy WOULD set up here, but no rule exists so nothing fires".
 	// Without the flag the page implied the system was watching the whole grid
@@ -201,6 +208,7 @@ func (s *server) evalScanRow(ctx context.Context, cand scanCandidate, sym market
 	row.Fire = true
 	row.Side, row.Entry, row.Stop, row.TP, row.Market, row.Why = trig.Side, trig.Entry, trig.Stop, trig.TP, trig.Market, trig.Why
 	row.Tags = trig.Tags
+	row.Trail = trig.TrailM > 0
 	row.RR = scanRR(trig.Side, trig.Entry, trig.Stop, trig.TP)
 	row.Score = autostrat.FireScore100(ctx, s.client, sym, r.TF, trig.Side, trig.Entry)
 	return row

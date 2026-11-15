@@ -50,13 +50,17 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	// +4.58R over 50 closed trades while the portfolio views said +13.01R over
 	// 79, because the log had grown to 92 fires. The row cap is a UI choice and
 	// belongs at render time, not in the arithmetic.
-	fires := autotrade.ReadFires(autotradeLogDepth)
+	//
+	// Plus any trail rule's newest fire older than that depth, as the executor
+	// reads it (autotrade.ReadFiresWithOpenTrails): identical to
+	// ReadFires(depth) until a trail fire exists.
+	fires := autotrade.ReadFiresWithOpenTrails(autotradeLogDepth)
 	// The paper balance needs every fire since paper_since; at the read depth
 	// the oldest ones can fall off, and then the balance silently drops them.
 	logFull := len(fires) >= autotradeLogDepth
 	var oldestRead time.Time
-	if len(fires) > 0 {
-		oldestRead = fires[len(fires)-1].Time // newest-first
+	if w := min(len(fires), autotradeLogDepth); w > 0 {
+		oldestRead = fires[w-1].Time // newest-first, within the depth window
 	}
 
 	// ?since=YYYY-MM-DD (TPE) narrows EVERY number on the page, not just the
@@ -106,6 +110,21 @@ func (s *server) handleOpsAutotrade(c *gin.Context) {
 	var oldestFire time.Time
 	if len(fires) > 0 {
 		oldestFire = fires[len(fires)-1].Time // newest-first
+	}
+	// A trail fire is recomputed from its signal bar and needs the M-1 bars
+	// before it for the first trail; with fewer the resolver refuses it as
+	// unscored (B7). Reach back far enough for every trail fire on the page.
+	for _, f := range fires {
+		if !f.IsTrail() {
+			continue
+		}
+		at := f.Time
+		if !f.BarTime.IsZero() {
+			at = f.BarTime
+		}
+		if need := at.Add(-time.Duration(f.TrailM+2) * market.BarDuration(market.Timeframe(f.TF))); need.Before(oldestFire) {
+			oldestFire = need
+		}
 	}
 	// Every number on this page is a replay over these candles. A symbol whose
 	// fetch fails replays as nothing: its newest fire is held open "to be safe"

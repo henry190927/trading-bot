@@ -98,11 +98,12 @@
       <td class="num">{{if .Score}}<b class="{{if ge .Score 60.0}}ui-up{{else if lt .Score 40.0}}ui-down{{end}}">{{printf "%.0f" .Score}}</b>{{else}}<span class="ui-dim">—</span>{{end}}</td>
       <td class="num">{{fmtPx .Entry}}</td>
       <td class="num ui-down">{{fmtPx .Stop}}</td>
-      <td class="num ui-up">{{fmtPx .TP}}</td>
-      <td class="num">{{printf "%.1f" .RR}}</td>
+      {{if .Trail}}<td class="num ui-dim">{{t "live.trail"}}</td>
+      <td class="num ui-dim">—</td>{{else}}<td class="num ui-up">{{fmtPx .TP}}</td>
+      <td class="num">{{printf "%.1f" .RR}}</td>{{end}}
       <td><span class="ui-tag{{if .Market}} warn{{end}}">{{if .Market}}MARKET{{else}}LIMIT{{end}}</span></td>
       <td class="live-why" title="{{.Why}}">{{range .Tags}}<span class="ui-tag why-{{.Code}}">{{whyTag .}}</span>{{else}}<code>{{.Why}}</code>{{end}}</td>
-      <td>
+      <td>{{if not .Trail}}
         <form method="post" action="/scan/record" style="margin:0">
           <input type="hidden" name="symbol" value="{{.Symbol}}">
           <input type="hidden" name="tf" value="{{.TF}}">
@@ -114,7 +115,7 @@
           <input type="hidden" name="score" value="{{printf "%.0f" .Score}}">
           <input type="hidden" name="why" value="{{if not $.Armed}}unarmed · {{end}}{{.Why}}">
           <button type="submit" class="ui-btn ghost sm" title="{{t "live.recordHint"}}">{{template "icon" "plus"}}{{t "live.record"}}</button>
-        </form>
+        </form>{{end}}
       </td>
     </tr>
   {{end}}
