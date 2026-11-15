@@ -191,3 +191,37 @@ func TestEvaluateFirePerFireExpiry(t *testing.T) {
 		t.Errorf("ExpiryBars 24: a fire 10h later is still inside the slot, got %d positions", got)
 	}
 }
+
+// TP <= 0 means "no target", never a target at price zero. Before this a long
+// entry 100 / stop 94 / TP 0 scored tp, exit 0, NetR -16.67 on its first bar —
+// enough on its own to trip the daily halt — and a short never resolved at
+// all. docs/htf_trend_executor_design.md B1.
+func TestEvaluateFireNoTargetIsOpen(t *testing.T) {
+	fireT := time.Date(2026, 8, 26, 0, 0, 0, 0, time.UTC)
+	b := func(i int, lo, hi float64) market.Candle { return bar(fireT.Add(time.Duration(i)*time.Hour), lo, hi) }
+	cs := []market.Candle{b(0, 99, 101), b(1, 97, 103), b(2, 96, 104)} // stop 94 / 106 never touched
+	for _, tc := range []struct {
+		name string
+		f    PaperFire
+		live float64
+	}{
+		{"long", PaperFire{Time: fireT, Side: "long", Market: true, Entry: 100, Stop: 94, TP: 0}, 50},
+		{"short", PaperFire{Time: fireT, Side: "short", Market: true, Entry: 100, Stop: 106, TP: 0}, 1},
+		{"long negative tp", PaperFire{Time: fireT, Side: "long", Market: true, Entry: 100, Stop: 94, TP: -1}, 50},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EvaluateFire(tc.f, cs, 6)
+			if got.Status != OutOpen || got.NetR != 0 || got.ExitPrice != 0 {
+				t.Errorf("EvaluateFire = %+v, want open with no R and no exit price", got)
+			}
+			// The live overlay must not resolve it either: a live price is
+			// always >= 0, so a long would "reach" TP=0 on every call. The
+			// live values chosen cross the STOP too — still open, because
+			// this scorer cannot know where a trailed stop is.
+			gl := EvaluateFireLive(tc.f, cs, 6, tc.live)
+			if gl.Status != OutOpen || gl.NetR != 0 {
+				t.Errorf("EvaluateFireLive = %+v, want open with no R", gl)
+			}
+		})
+	}
+}

@@ -210,7 +210,13 @@ func (s *server) evalScanRow(ctx context.Context, cand scanCandidate, sym market
 // which computed `risk` from the LONG formula and then reassigned it inside the
 // short branch — correct, but only by accident of statement order, and it
 // silently returned 0 for a zero/negative risk without saying so.
+//
+// tp <= 0 is "no target" (a trailing-exit strategy such as htf-trend), not a
+// target at price zero: that read −16.7 for a long and +16.7 for a short.
 func scanRR(side string, entry, stop, tp float64) float64 {
+	if tp <= 0 {
+		return 0
+	}
 	var risk, reward float64
 	if side == "short" {
 		risk, reward = stop-entry, entry-tp

@@ -44,6 +44,17 @@ func TestScanRR(t *testing.T) {
 	}
 }
 
+// A trailing-exit trigger carries TP 0. That is "no target", not a target at
+// price zero, which read −16.7 for a long and +16.7 for a short.
+func TestScanRRNoTarget(t *testing.T) {
+	if got := scanRR("long", 100, 94, 0); got != 0 {
+		t.Errorf("scanRR(long, tp 0) = %v, want 0", got)
+	}
+	if got := scanRR("short", 100, 106, 0); got != 0 {
+		t.Errorf("scanRR(short, tp 0) = %v, want 0", got)
+	}
+}
+
 func rule(sym, strat, tf string, stopPct float64) autotrade.Rule {
 	return autotrade.Rule{Enabled: true, Symbol: sym, Strategy: strat, TF: tf, Side: "auto", StopPct: stopPct, CooldownBars: 6}
 }

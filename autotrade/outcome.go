@@ -67,6 +67,17 @@ func EvaluateFire(f PaperFire, candles []market.Candle, expiryBars int) Outcome 
 	if risk <= 0 {
 		return Outcome{Status: OutOpen} // malformed bracket — can't score
 	}
+	// No target. A fixed-bracket scorer reading TP=0 as a price turned a long
+	// into a take-profit AT ZERO on the first bar it was not stopped (entry
+	// 100 / stop 94 → tp, exit 0, NetR -16.67), which books into the daily
+	// breaker and halts every rule; a short sat at its stop forever because
+	// Low <= 0 never holds. A trailing-exit fire (htf-trend) has no TP by
+	// design and is scored by its own resolver; reaching here with TP <= 0 is
+	// the same malformed-bracket case as above: it holds its slot and books
+	// no R. docs/htf_trend_executor_design.md B1.
+	if f.TP <= 0 {
+		return Outcome{Status: OutOpen}
+	}
 	// No candles at all keeps its old meaning (open/pending, held "to be
 	// safe"); candles that start too late are a different case — see
 	// OutUnscored.
@@ -194,8 +205,8 @@ func EvaluateFireLive(f PaperFire, candles []market.Candle, expiryBars int, live
 	} else {
 		risk = f.Stop - f.Entry
 	}
-	if risk <= 0 {
-		return out
+	if risk <= 0 || f.TP <= 0 {
+		return out // malformed bracket or no target: EvaluateFire held it open; a live cross of TP=0 is not a TP
 	}
 
 	// A resting limit the live price has since reached fills now.
