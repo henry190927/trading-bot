@@ -103,6 +103,31 @@ Symbols BTC, ETH (`feedback_strategy_scope`). 1m BingX history.
   only (new strategy name, separate design for the executor); never live
   from this test.
 
-## 6. Result
+## 6. Result 2026-11-17 — REJECTED (0 of 8 cells, both symbols)
 
-(to be filled after the run)
+`cmd/lvlbt`, BingX 1m 2026-05-11 → 11-16 (BTC 272k bars, ETH 265k), dedup
+one position per symbol, 120d pooled BTC+ETH:
+
+| cell | pos | WR | R/t @10bp | R/t gross | verdict @10bp |
+|---|---|---|---|---|---|
+| 15m-K1-opens | 508 | 30.6% | −0.366 | −0.083 | FAIL |
+| 15m-K2-opens | 486 | 34.1% | −0.212 | +0.023 | FAIL |
+| 1h-K1-opens | 370 | 29.7% | −0.315 | −0.108 | FAIL |
+| 1h-K2-opens | 330 | 31.2% | −0.235 | −0.064 | FAIL |
+| 15m-K1-all | 673 | 31.7% | −0.299 | −0.049 | FAIL |
+| 15m-K2-all | 633 | 31.0% | −0.291 | −0.070 | FAIL |
+| 1h-K1-all | 463 | 32.8% | −0.199 | −0.015 | FAIL |
+| 1h-K2-all | 345 | 33.3% | −0.149 | +0.000 | FAIL |
+
+Every cell FAILs on BTC, ETH and the pool at the verdict fee, in every
+nested window. Win rates sit at 29–34% against a 33% gross break-even
+for 2R: the read is a coin flip **before** fees, and the fee (stops ~0.35%
+→ ~0.28R/trade at 10bp) turns it into a steady bleed. Gross, ETH alone
+passes two cells (15m-K2-opens, 1h-K2-all) — K=2 helps ETH a little —
+but neither survives fees, and BTC is negative gross in all eight.
+
+Not done, deliberately: no parameter changed after results (§5). A rule
+that needs a 0.35% stop to work has to beat ~0.28R of friction per trade;
+none of these come close. Joins opensab / AMD: open- and session-anchored
+levels keep failing here; level quality (EQH/EQL pools) is what scored.
+Tests: hand-traced DO reclaim + future-bar poisoning across all 8 cells.
