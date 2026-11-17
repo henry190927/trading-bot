@@ -122,6 +122,42 @@ Nothing else (bins, 70%, buffer, 0.5%, RR 1.0) has a flag or is varied.
   shifted series must leave every fire whose time ≤ the cut unchanged
   (both variants), and the test must see ≥ 1 fire before the cut.
 
-## 7. Result
+## 7. Result 2026-11-17 — REJECTED (neither variant passes on the pool at 10bp)
 
-(filled after the run — see below)
+`cmd/mp80bt`, BingX 1m 2026-05-12 → 11-17 (BTC and ETH 272k bars each),
+dedup one position per symbol, no timeout. Fires over the whole ~189 days:
+30m×2 BTC 14 / ETH 22; 1h×1 BTC 18 / ETH 26 (≈ 1 setup per symbol-week
+survives the open-outside + acceptance + stop ≥ 0.5% + RR ≥ 1 filters).
+
+120d, 10bp (verdict) vs 0bp (gross):
+
+| variant | sym | n | WR | R/t @10bp | R/t gross | shipgate @10bp |
+|---|---|---|---|---|---|---|
+| 30m×2 | BTC | 11 | 27.3% | +0.106 | +0.243 | PASS (n=11, SE 0.81) |
+| 30m×2 | ETH | 16 | 25.0% | −0.124 | +0.007 | FAIL |
+| 30m×2 | **POOL** | 27 | 25.9% | −0.031 | +0.103 | **FAIL** (120d −0.83R) |
+| 1h×1 | BTC | 15 | 20.0% | −0.422 | −0.287 | FAIL |
+| 1h×1 | ETH | 17 | 23.5% | −0.039 | +0.092 | FAIL |
+| 1h×1 | **POOL** | 32 | 21.9% | −0.218 | −0.086 | **FAIL** (90d, 120d < 0) |
+
+Nested pool netR @10bp (60/90/120d): 30m×2 +2.0 / +1.6 / −0.8; 1h×1
++4.6 / −2.4 / −7.0. Disjoint 30d buckets (pool, off 0…150): 30m×2 +7.6
+−5.5 −0.5 −2.4 +4.8 +0.6 (n 9/10/6/2/4/4); 1h×1 +7.2 −2.6 −7.0 −4.6 +6.8
+−1.4. Both are carried by the most recent 30 days.
+
+Friction: median stop 0.77% (30m×2) / 0.78% (1h×1) → 10bp costs 0.13R
+per trade (mean charged 0.134R). The 0.5% floor did its job — fees are
+half of lvlbt's 0.28R — but there is little gross edge to protect: 30m×2
+pooled is +0.10R/t gross (SE 0.43), 1h×1 is negative gross.
+
+The "80%" does not show up: the opposite VA edge is reached before the
+stop in 22–26% of accepted re-entries (break-even at the median RR ≈
+1.5–2 is ~35–40%). At 6bp 30m×2 pool PASSes (+0.023R/t, 27 trades) — a
+reference fee, not the verdict, and a mean 1/19th of its SE.
+
+§5: 30m×2 pool FAILs at the verdict fee and the other variant's 120d
+pooled R/t is −0.218 → no candidate. BTC 30m×2's PASS rests on 11 trades
+(3 wins) with buckets of 0–2 trades; it is not evidence. Nothing in §3 was
+changed after the run. Joins opensab / AMD / lvlbt / HVN proximity:
+day-anchored levels — volume-derived ones included — do not carry an edge
+here once a realistic stop and fees are charged.
