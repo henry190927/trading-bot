@@ -151,8 +151,10 @@ half of lvlbt's 0.28R — but there is little gross edge to protect: 30m×2
 pooled is +0.10R/t gross (SE 0.43), 1h×1 is negative gross.
 
 The "80%" does not show up: the opposite VA edge is reached before the
-stop in 22–26% of accepted re-entries (break-even at the median RR ≈
-1.5–2 is ~35–40%). At 6bp 30m×2 pool PASSes (+0.023R/t, 27 trades) — a
+stop in only 22–26% of accepted re-entries. The gross R comes from 7
+wide-RR wins (implied mean win ≈ 3.2R gross in both variants) against
+20–25 full stops — a lottery-shaped payoff on n ≈ 30, not a high-hit-rate
+traverse. At 6bp 30m×2 pool PASSes (+0.023R/t, 27 trades) — a
 reference fee, not the verdict, and a mean 1/19th of its SE.
 
 §5: 30m×2 pool FAILs at the verdict fee and the other variant's 120d
