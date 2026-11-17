@@ -1,7 +1,7 @@
 // Take/skip decisions on machine-found candidates (package decision).
 //
 // The candidates are the autotrade paper fires: the home page lists every
-// fire still inside its decision window with 做 / 不做 buttons, the bell
+// fire still inside its decision window with 執行 / 否決 buttons, the bell
 // carries one alert per pending candidate (no ntfy — warnings are not
 // pushed, see alertPushes), and /decisions scores the taken, skipped and
 // unanswered groups on the same bars and fee.
@@ -189,7 +189,7 @@ func decisionConditions(now time.Time) []alert.Condition {
 		out = append(out, alert.Condition{
 			Key: decisionAlertKey(decision.ID(f)), Severity: alert.Warning,
 			Title:  "待決策:" + f.Symbol + " " + side + " · " + f.Strategy + " " + f.TF,
-			Detail: "到首頁按 做 / 不做 · 截止 " + decision.Deadline(f).In(tpe8).Format("15:04"),
+			Detail: "請至首頁決定執行或否決 · 截止 " + decision.Deadline(f).In(tpe8).Format("15:04"),
 		})
 	}
 	return out
