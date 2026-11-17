@@ -158,6 +158,118 @@ symbol dropped; no 4h TSMOM. Per-symbol verdicts are reported and never used
 to choose symbols. Any idea from the results is written as an untested
 hypothesis in §7.
 
-## 7. Results
+## 7. Results (run 2026-11-17 07:42 UTC; §1–6 committed as 4b1abeb)
 
-(filled after the run; §1–6 frozen at the commit that introduced this file)
+Reproduce: `trendbt -variants-run -cache <dir>` (harness 3987391, shipgate
+fix 8e53f77). BingX history: 4h from 2022-10-09 (SUI 2023-05, HYPE 2024-12),
+1d from 2021-05 (SOL/NEAR 2021-11, SUI 2023-09, HYPE 2024-12). Default
+`trendbt` output was checked byte-identical before/after the harness change
+(4h, 1d `-report`, 4h `-report -trades` at 6 bp, same cached klines).
+
+**Harness correction during the run (disclosed).** The first run passed the
+baseline to `shipgate.Evaluate` with its jitter readings; Evaluate collapsed
+the ARM's jitter to medians but keyed the baseline's raw readings by window,
+so the baseline's last reading (end-offset 2) was used. That made T-4h "lose"
+the 90 d window (+22.92 vs the baseline's off-2 reading +23.81; its median is
++3.82) → FAIL. Fixed in `shipgate` (baseline collapsed to the median like the
+arm, with a test) and re-run; only T-4h's verdict changed (FAIL → UNDECIDED).
+No rule, parameter or criterion was changed. Run-1 output kept for reference.
+
+### 7.1 Full history, pooled, 10 bp
+
+| arm | n | netR | R/trade | WR | SD | SE | trd/day | MDD R (closed) | MDD R (daily MTM) | 60 d bucket t | 60 d drop-best |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| C-4h (paper) | 2145 | +178.50 | +0.083 | 34% | 1.35 | 0.029 | 1.43 | 44.8 | 53.7 | +2.38 | +136.2 |
+| **T-4h** | 2801 | +248.22 | +0.089 | 35% | 1.43 | 0.027 | 1.87 | 43.0 | 52.2 | +2.67 | +192.5 |
+| C-1d (paper) | 448 | +78.98 | +0.176 | 39% | 1.88 | 0.089 | 0.23 | 16.5 | 24.9 | +1.55 | +38.7 |
+| **T-1d** | 553 | +120.84 | +0.219 | 38% | 2.00 | 0.085 | 0.28 | 17.3 | 23.9 | +1.98 | +76.9 |
+| **M30-1d** | 413 | +110.49 | +0.268 | 39% | 2.09 | 0.103 | 0.21 | 10.2 | 15.8 | +2.49 | +74.4 |
+| M60-1d | 287 | +108.25 | +0.377 | 37% | 2.53 | 0.150 | 0.15 | 11.3 | 18.3 | +2.06 | +72.5 |
+
+6 bp: C-4h +0.090, T-4h +0.096, C-1d +0.179, T-1d +0.221, M30 +0.270, M60
++0.380 R/trade — fees move nothing (wide stops). T-4h had 58 both-edges-touched
+bars (T-1d 0); TSMOM skipped 675 (N30) / 473 (N60) flips that came while in a
+position. TSMOM's average loss is −0.36R (C-1d −0.52R); likely (not checked) because at a flip the
+10-bar opposite channel is often tighter than 3×ATR, so the trail cuts
+losers early.
+
+Per symbol, full history, netR (10 bp):
+
+| | BTC | ETH | SOL | XRP | SUI | HYPE | NEAR | LINK |
+|---|---|---|---|---|---|---|---|---|
+| C-4h | +43.8 | +29.5 | +32.4 | +25.3 | +15.0 | +9.4 | +22.3 | +1.0 |
+| T-4h | +39.3 | +44.1 | +34.5 | +69.5 | +22.1 | +12.2 | +21.4 | +5.1 |
+| C-1d | +14.0 | +5.6 | +12.9 | +25.9 | +2.5 | +0.1 | +16.1 | +1.9 |
+| T-1d | +16.6 | +17.0 | +20.8 | +33.7 | +4.9 | −2.4 | +26.1 | +4.2 |
+| M30-1d | +13.0 | +13.1 | +9.6 | +43.3 | +3.3 | +3.8 | +21.2 | +3.3 |
+| M60-1d | +19.3 | +16.7 | +9.7 | +38.1 | +0.5 | +2.0 | +12.1 | +9.8 |
+
+XRP is the largest single contributor in every 1d arm (Nov 2024).
+
+### 7.2 Gate windows (pooled, 10 bp; un-jittered netR (n); six 30 d buckets newest first)
+
+| arm | 60 d | 90 d | 120 d | 30 d buckets | shipgate |
+|---|---|---|---|---|---|
+| C-4h | −12.0 (96) | +3.8 (140) | +30.3 (192) | −3.7 −8.3 +15.8 +26.5 −4.9 +9.7 | FAIL (60 d median −6.70) |
+| T-4h vs C | −2.9 (115) | +22.9 (172) | +52.8 (234) | +1.7 −4.6 +25.8 +29.9 −17.4 +14.4 | UNDECIDED: 60 d readings −2.89 / +5.82 / +11.17 |
+| C-1d | +6.9 (17) | +10.7 (29) | +14.8 (35) | +8.1 −1.2 +3.8 +4.1 −1.1 +3.4 | PASS (thin) |
+| T-1d vs C | +10.8 (19) | +25.2 (32) | +30.0 (38) | +4.6 +6.2 +14.3 +4.8 −2.0 +2.6 | PASS (thin) |
+| M30-1d | +12.0 (10) | +18.2 (15) | +19.3 (23) | +10.2 +1.9 +6.2 +1.1 −1.1 +2.2 | PASS (thin: 10 trades in 60 d) |
+| M60-1d | +10.4 (9) | +17.8 (13) | +28.6 (20) | +8.4 +2.0 +7.4 +10.7 0 +0.1 | PASS (thin) |
+
+Per symbol: every 1d arm is UNDECIDED on every symbol (1–5 trades per
+window). T-4h vs C per symbol: XRP PASS; SUI, HYPE UNDECIDED; BTC, ETH, SOL,
+NEAR, LINK FAIL (SOL: lower than C in all three windows). Not used to pick
+symbols (§6.3).
+
+### 7.3 Daily-R correlation (Pearson, pooled MTM per UTC day; full from 2022-10-15 | last 360 d)
+
+| arm | vs C-4h | vs C-1d | vs C-book (4h+1d, on paper) |
+|---|---|---|---|
+| T-4h | 0.953 / 0.971 | 0.318 / 0.538 | 0.889 / 0.945 |
+| T-1d | 0.417 / 0.625 | 0.971 / 0.948 | 0.690 / 0.770 |
+| M30-1d | 0.300 / 0.412 | **0.812 / 0.714** | **0.537 / 0.532** |
+| M60-1d | 0.364 / 0.586 | 0.842 / 0.796 | 0.600 / 0.697 |
+
+### 7.4 Verdicts against §6 (10 bp; identical at 6 bp)
+
+| arm | (1) gate | (2) full R/trade vs C | (3) 60 d paired diff t | verdict |
+|---|---|---|---|---|
+| T-4h | UNDECIDED (60 d sign flips across window ends) | +0.0886 > +0.0832 ✓ | +1.92 ✓ | **UNDECIDED** |
+| T-1d | PASS | +0.2185 > +0.1763 ✓ | +2.49 ✓ | **ADOPT-candidate** |
+
+TSMOM-30: gate PASS ✓; full netR +110.5, 60 d drop-best +74.4 ✓; N=60
+neighbour gate PASS, R/trade +0.377 ✓ → **PASS**. Duplicate label vs C-book
+0.537 → **overlapping** (not a duplicate by the pre-registered 0.7 line, not
+diversifying). Info: gate with C-1d as the baseline also PASS.
+
+### 7.5 Reading (not part of the criteria)
+
+- **T-1d** is the cleanest result: more trades (+23%), higher R/trade, the
+  same MDD, and the gain is spread (paired 60 d bucket t +2.49, 7 of 8 symbols
+  better). It is a replacement for C-1d (corr 0.97), not an addition. The 60–
+  120 d gate windows hold 19–38 trades — thin; the full-history evidence
+  (553 trades, SE 0.085) carries more weight than the gate here.
+- **T-4h** is better than C-4h on every full-history measure (R/trade +0.005,
+  ≈ +70 R more from 30% more trades, bucket t +1.92) but the improvement per
+  trade is a fraction of one SE, and the 60 d window's sign depends on the run
+  date. Not decided. Note the paper baseline C-4h itself FAILS this window set
+  (60 d −6.7 R median); the original 120/240/360 d gate it passed is a
+  different window set.
+- **TSMOM-30** has the best risk profile of the 1d arms (MDD 10 R closed /
+  16 R MTM vs 17 / 25 for C-1d, R/trade +0.27) and passes, but its daily R is
+  0.81 correlated with the 1d Donchian leg already on paper. Against the whole
+  paper book it is 0.54 ("overlapping") only because the 4h leg dominates the
+  book's variance. As an ADDITION it mostly doubles the 1d exposure; as a
+  REPLACEMENT for C-1d it is a reasonable candidate (but that comparison was
+  not pre-registered as a decision and is info only: gate vs C-1d PASS).
+- Thin-window caveat for every 1d result: 9–38 trades per gate window.
+
+### 7.6 Hypotheses NOT tested (would need their own pre-registration)
+
+- T-1d replacing C-1d on paper, and TSMOM-30 replacing (not adding to) C-1d,
+  as a head-to-head A/B with a pre-registered rule.
+- A 1d book of T-1d + M30 with a combined per-symbol position cap (they fire
+  on the same moves).
+- Why TSMOM's average loss is smaller (entry location vs the 10-bar trail):
+  a TSMOM arm with the trail starting only once it passes the initial stop.
