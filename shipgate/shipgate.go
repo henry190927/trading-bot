@@ -299,8 +299,12 @@ func Evaluate(arm Arm, baseline *Arm, c Criteria) Verdict {
 
 	// ── relative criterion ───────────────────────────────────────────────
 	if baseline != nil && c.RequireBeatBaselineEveryWindow {
+		// The baseline's jitter readings collapse to their median exactly as
+		// the arm's do. Keyed raw, the LAST reading of each window silently
+		// won, so a jittered baseline was compared at its end-offset-2 value.
+		bw, _ := collapse(baseline.Windows)
 		byDays := map[int]Window{}
-		for _, w := range baseline.Windows {
+		for _, w := range bw {
 			byDays[w.Days] = w
 		}
 		beat := 0

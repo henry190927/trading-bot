@@ -487,3 +487,21 @@ func TestBreadthFlipWithinJitterIsNotDecided(t *testing.T) {
 		t.Errorf("want a flip note, got %v", v.Notes)
 	}
 }
+
+// htf-trend touch vs close, 4h, 2026-11-17 (90d window): a jittered baseline
+// reads +3.82 / +3.82 / +23.81 and the arm +22.92 / +21.90 / +43.39. Medians
+// +3.82 vs +22.92: the arm beats it. Keyed raw, the baseline's LAST reading
+// (+23.81) used to win and the arm "lost" the window.
+func TestJitteredBaselineCollapsesToMedian(t *testing.T) {
+	arm := Arm{Name: "touch", Windows: []Window{
+		{Days: 60, NetR: 5, Trades: 115}, {Days: 90, NetR: 22.92, Trades: 172}, {Days: 90, NetR: 21.90, Trades: 173}, {Days: 90, NetR: 43.39, Trades: 175},
+		{Days: 120, NetR: 52, Trades: 234},
+	}}
+	base := Arm{Name: "close", Windows: []Window{
+		{Days: 60, NetR: -6, Trades: 96}, {Days: 90, NetR: 3.82, Trades: 140}, {Days: 90, NetR: 3.82, Trades: 140}, {Days: 90, NetR: 23.81, Trades: 142},
+		{Days: 120, NetR: 30, Trades: 192},
+	}}
+	if v := Evaluate(arm, &base, Default()); v.Result != Pass {
+		t.Fatalf("want PASS against the baseline's medians, got %s\n%s", v.Result, v)
+	}
+}
