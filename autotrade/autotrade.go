@@ -188,7 +188,7 @@ func Load() Config {
 // Kept here rather than in autostrat because autostrat imports autotrade; a
 // test in autostrat pins the two lists together so adding a case there without
 // adding it here fails the build gate rather than the next hand-edit.
-var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "struct-momentum", "vp-node", "htf-trend", "htf-trend-1d"}
+var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "struct-momentum", "vp-node", "htf-trend", "htf-trend-1d", "htf-trend-1d-touch"}
 
 // trailStrategyTF is every strategy whose fires exit on a trailing stop, and
 // the one TF each is pre-registered for (docs/htf_trend_design.md §3). Two
@@ -196,7 +196,7 @@ var KnownStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr"
 // everywhere is Symbol|Strategy (B11), so a 4h and a 1d rule on one symbol
 // under one name would block each other, and re-keying every slot map on TF
 // would change every existing strategy's dedup (executor design §2.6).
-var trailStrategyTF = map[string]string{"htf-trend": "4h", "htf-trend-1d": "1d"}
+var trailStrategyTF = map[string]string{"htf-trend": "4h", "htf-trend-1d": "1d", "htf-trend-1d-touch": "1d"}
 
 // IsTrailStrategy reports whether a strategy exits on a trailing stop. Used
 // before a trigger exists (kline depth, full-log slot lookup); after one, the

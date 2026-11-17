@@ -55,6 +55,12 @@ type PaperFire struct {
 	// (Rule.RiskPct), else 0 — so every fade fire, old or new, carries 0 and
 	// weighs exactly 1 in book-level R (RWeight).
 	RiskPct float64 `json:"risk_pct,omitempty"`
+	// Touch marks a trail fire filled INSIDE its signal bar by a resting
+	// stop-entry at the channel (htf-trend-1d-touch, 2026-11-17), not at the
+	// bar's close. The fill bar can also reach the initial stop, and the
+	// backtest scores that as a stop (it cannot know the order inside the
+	// bar), so the resolver checks the signal bar itself for a touch fire.
+	Touch bool `json:"touch,omitempty"`
 }
 
 // RWeight converts this fire's R into book units: 1R of a 0.25% rule is a

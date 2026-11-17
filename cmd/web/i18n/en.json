@@ -820,6 +820,7 @@
   "strat.vp-node": "Volume node",
   "strat.htf-trend": "HTF trend 4h",
   "strat.htf-trend-1d": "HTF trend 1d",
+  "strat.htf-trend-1d-touch": "HTF trend 1d (touch)",
   "why.htf-trend-break": "broke the %[2]d-bar channel %[1]s",
   "live.trail": "trail",
   "live.recorded": "Recorded setup #%s",

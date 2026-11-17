@@ -417,3 +417,29 @@ change · paper default, live triple-gated (autotrade.go:129-133) unchanged · n
 mutable state file · every refusal recorded with a reason · R gross on the panel,
 fee in USDT · parity test in CI · ntfy on every fire and every live stop move ·
 hedge mode handled on every order path · no rule knob without a consumer.
+
+## 8. 1d switched to touch entry (2026-11-17, user decision)
+
+After docs/htf_trend_entry_variants_design.md §7 (touch-1d ADOPT-candidate:
+R/t +0.219 vs +0.176, paired t +2.49, gate PASS; 0.97 correlated with
+close-1d, so a REPLACEMENT, not an addition) the user switched the 1d leg:
+"換成觸價進場吧". 4h stays on close entry (touch-4h UNDECIDED).
+
+- New strategy name `htf-trend-1d-touch` (TF 1d), so the 1d close-entry
+  history stays separable; its rules replace the `htf-trend-1d` rules in
+  autotrade.json and join the `htf-trend` slot group.
+- `autostrat.HTFTrendTouchTrigger`: stop-entries at the prior 20-bar channel
+  edges, ATR as of the bar before; fill = the level or the open on a gap;
+  both edges touched → nearer the open, tie = none. The backtest's rules
+  moved here as `SimulateHTFTrendTouch`; `TestSimulateTouchMatchesAutostrat`
+  pins it to the A/B's `simulateTouch` trade for trade, fee included.
+- **Paper replays the resting order from the closed bar.** The executor
+  evaluates at the 1d close and logs the fire with Entry = the intrabar fill
+  price and BarTime = that bar, `Touch: true`. So the paper fill is exact,
+  but the fire appears up to a day after the fill — on the home-page decision
+  card it can already show R moved.
+- `PaperFire.Touch` makes `EvaluateTrailFire` check the fill bar itself:
+  a fill bar that also reached the initial stop is a stop on that bar,
+  −1R, as the backtest scores it (`TestHTFTrendTouchExecutorParity`).
+- **Live** needs a real resting stop-entry order re-placed each bar plus the
+  trail manager (P6); until then live trail fires stay refused as before.

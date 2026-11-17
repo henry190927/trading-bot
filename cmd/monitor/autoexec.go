@@ -373,6 +373,7 @@ func fireRecord(r autotrade.Rule, trig autostrat.Trigger, sz autotrade.Sizing, b
 		ExpiryBars: r.ExpiryBars,
 		TrailM:     trig.TrailM, BarTime: barTime, CooldownBars: r.CooldownBars,
 		RiskPct: r.RiskPct, // the override only; 0 for every rule on the book's pct
+		Touch:   trig.Touch,
 	}
 }
 

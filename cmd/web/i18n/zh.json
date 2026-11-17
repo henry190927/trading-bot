@@ -820,6 +820,7 @@
   "strat.vp-node": "量能節點",
   "strat.htf-trend": "HTF 趨勢 4h",
   "strat.htf-trend-1d": "HTF 趨勢 1d",
+  "strat.htf-trend-1d-touch": "HTF 趨勢 1d(觸價)",
   "why.htf-trend-break": "突破 %[2]d 根通道 %[1]s",
   "live.trail": "移動停損",
   "live.recorded": "已記錄模擬單 #%s",

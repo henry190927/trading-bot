@@ -40,7 +40,10 @@ type Trigger struct {
 	// executor records this rather than the close of whatever bar its own
 	// separate kline fetch saw newest — the two can straddle a bar close.
 	BarTime time.Time
-	Why     string
+	// Touch: the fill was a resting stop-entry inside BarTime's bar, not the
+	// close (htf-trend-1d-touch). Copied to PaperFire.Touch.
+	Touch bool
+	Why   string
 	// Tags is Why as labelled values, for a page to show as chips in its own
 	// language. Why stays the sentence the daemon logs and notifies with.
 	Tags []Tag
@@ -106,6 +109,12 @@ func EvalAutoTrigger(ctx context.Context, client *bingx.Client, sym market.Symbo
 		// The same strategy, variant B (1d). A separate NAME so its slot
 		// key (Symbol|Strategy) does not collide with the 4h rule's.
 		return evalHTFTrend(ctx, client, sym, r)
+	case "htf-trend-1d-touch":
+		// 1d with a stop-entry AT the channel instead of the close
+		// (docs/htf_trend_entry_variants_design.md, ADOPT-candidate; the
+		// user switched 1d to it 2026-11-17). Paper replays the resting
+		// order from the closed bar: see HTFTrendTouchTrigger.
+		return evalHTFTrendTouch(ctx, client, sym, r)
 	default:
 		return Trigger{}
 	}

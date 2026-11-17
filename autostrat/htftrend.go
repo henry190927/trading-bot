@@ -218,3 +218,118 @@ func HTFTrendOnWindow(cs []market.Candle, r autotrade.Rule) Trigger {
 	i := len(cs) - 1
 	return HTFTrendTrigger(cs, atr[i], i, r.Side == "long" || r.Side == "auto", r.Side == "short" || r.Side == "auto", p)
 }
+
+// HTFTrendTouchTrigger is the touch-entry variant (docs/htf_trend_entry_variants_design.md
+// §3.2, user-adopted for 1d on 2026-11-17): stop-entries rest at the prior
+// N-bar channel edges before bar i opens, and this reports whether closed bar
+// i filled one. atrPrev is ATR as of bar i-1 — known before bar i opened, so
+// the stop distance is the one a resting bracket would have carried.
+//
+// Fill = the level, or bar i's open when it gapped through. Both edges
+// touched in one bar: the level nearer the open filled first; an exact tie is
+// no fire. The fire is returned even when bar i also reached the initial
+// stop: the resolver scores that as a stop on bar i (Touch), as the backtest
+// does, so a same-bar loss is booked rather than silently skipped.
+func HTFTrendTouchTrigger(cs []market.Candle, atrPrev float64, i int, wantLong, wantShort bool, p HTFTrendParams) Trigger {
+	if p.EntryN < 1 || i < p.EntryN || i >= len(cs) || atrPrev <= 0 || p.StopATR <= 0 {
+		return Trigger{}
+	}
+	hi, lo := math.Inf(-1), math.Inf(1)
+	for _, c := range cs[i-p.EntryN : i] {
+		hi = math.Max(hi, c.High)
+		lo = math.Min(lo, c.Low)
+	}
+	b := cs[i]
+	longHit := wantLong && b.High >= hi
+	shortHit := wantShort && b.Low <= lo
+	side := ""
+	switch {
+	case longHit && shortHit:
+		dl, ds := math.Max(0, hi-b.Open), math.Max(0, b.Open-lo)
+		switch {
+		case dl < ds:
+			side = "long"
+		case ds < dl:
+			side = "short"
+		}
+	case longHit:
+		side = "long"
+	case shortHit:
+		side = "short"
+	}
+	d := p.StopATR * atrPrev
+	switch side {
+	case "long":
+		e := math.Max(hi, b.Open)
+		return Trigger{
+			Fire: true, Side: "long", Market: true, Entry: e, Stop: e - d, TrailM: p.TrailM, BarTime: b.CloseTime, Touch: true,
+			Why:  fmt.Sprintf("touched the %d-bar high %.4f (fill %.4f); trail = %d-bar low", p.EntryN, hi, e, p.TrailM),
+			Tags: []Tag{tag("htf-trend-break", hi, p.EntryN)},
+		}
+	case "short":
+		e := math.Min(lo, b.Open)
+		return Trigger{
+			Fire: true, Side: "short", Market: true, Entry: e, Stop: e + d, TrailM: p.TrailM, BarTime: b.CloseTime, Touch: true,
+			Why:  fmt.Sprintf("touched the %d-bar low %.4f (fill %.4f); trail = %d-bar high", p.EntryN, lo, e, p.TrailM),
+			Tags: []Tag{tag("htf-trend-break", lo, p.EntryN)},
+		}
+	}
+	return Trigger{}
+}
+
+// SimulateHTFTrendTouch is SimulateHTFTrend with touch entries: one position
+// at a time, the next resting orders from the bar after an exit.
+func SimulateHTFTrendTouch(cs []market.Candle, atr []float64, firstSignal int, wantLong, wantShort bool, p HTFTrendParams, feeBps float64) []TrendTrade {
+	var out []TrendTrade
+	if len(atr) != len(cs) {
+		return nil
+	}
+	for i := max(firstSignal, p.EntryN, 1); i < len(cs); i++ {
+		t := HTFTrendTouchTrigger(cs, atr[i-1], i, wantLong, wantShort, p)
+		if !t.Fire {
+			continue
+		}
+		var tr TrendTrade
+		if (t.Side == "long" && cs[i].Low <= t.Stop) || (t.Side == "short" && cs[i].High >= t.Stop) {
+			tr = runTrail(cs, i, t.Side, t.Entry, t.Stop, 1, feeBps) // Risk/Fee/StopPct/MaxLev only
+			tr.ExitIdx, tr.ExitTime, tr.Exit, tr.Open, tr.BarsHeld = i, cs[i].CloseTime, t.Stop, false, 0
+			tr.GrossR = -1
+			tr.NetR = tr.GrossR - tr.FeeR
+		} else {
+			tr = runTrail(cs, i, t.Side, t.Entry, t.Stop, p.TrailM, feeBps)
+		}
+		out = append(out, tr)
+		if tr.Open {
+			break
+		}
+		i = tr.ExitIdx
+	}
+	return out
+}
+
+// evalHTFTrendTouch is the executor entry for htf-trend-1d-touch: the last
+// closed bar of the live window, ATR as of the bar before it.
+func evalHTFTrendTouch(ctx context.Context, client *bingx.Client, sym market.Symbol, r autotrade.Rule) Trigger {
+	if r.TF != autotrade.TrailStrategyTF(r.Strategy) {
+		return Trigger{}
+	}
+	cs, err := client.Klines(ctx, sym, market.Timeframe(r.TF), htfTrendLiveBars)
+	if err != nil {
+		return Trigger{}
+	}
+	return HTFTrendTouchOnWindow(cs, r)
+}
+
+// HTFTrendTouchOnWindow evaluates the newest bar of a closed-bar window.
+func HTFTrendTouchOnWindow(cs []market.Candle, r autotrade.Rule) Trigger {
+	p := DefaultHTFTrendParams()
+	if len(cs) < max(p.EntryN, p.ATRPeriod)+2 {
+		return Trigger{}
+	}
+	atr := indicator.ATR(cs, p.ATRPeriod)
+	if len(atr) != len(cs) {
+		return Trigger{}
+	}
+	i := len(cs) - 1
+	return HTFTrendTouchTrigger(cs, atr[i-1], i, r.Side == "long" || r.Side == "auto", r.Side == "short" || r.Side == "auto", p)
+}

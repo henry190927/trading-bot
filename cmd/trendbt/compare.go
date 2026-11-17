@@ -286,7 +286,7 @@ func runReplay(data []symData, tf market.Timeframe, days int, riskPct, bookPct f
 	var all []autotrade.PaperFire
 	var execRows, panelRows []cmpRow
 	cfg := autotrade.Config{RiskPerTradePct: bookPct, DailyLossHaltR: 0,
-		StrategyCaps: map[string]autotrade.StrategyCap{"htf-trend": {Strategies: []string{"htf-trend", "htf-trend-1d"}}}}
+		StrategyCaps: map[string]autotrade.StrategyCap{"htf-trend": {Strategies: []string{"htf-trend", "htf-trend-1d", "htf-trend-1d-touch"}}}}
 	for _, d := range data {
 		start := sort.Search(len(d.cs), func(k int) bool { return d.cs[k].CloseTime.After(burn) })
 		fires := emulateExecutor(d.short, d.cs, tf, start, riskPct)

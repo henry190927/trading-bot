@@ -123,6 +123,13 @@ func EvaluateTrailFire(f PaperFire, cs []market.Candle) Outcome {
 	if i < 0 || i < f.TrailM-1 {
 		return Outcome{Status: OutUnscored}
 	}
+	// A touch fire filled inside bar i; if bar i also reached the initial
+	// stop it is a stop on bar i at the stop price — conservative, and what
+	// the touch backtest scores (SimulateHTFTrendTouch).
+	if f.Touch && ((long && cs[i].Low <= f.Stop) || (!long && cs[i].High >= f.Stop)) {
+		return Outcome{Status: OutStop, FillPrice: f.Entry, FilledAt: f.Time, ExitPrice: f.Stop,
+			NetR: dir * (f.Stop - f.Entry) / risk, ExitAt: cs[i].CloseTime}
+	}
 	w := WalkTrail(cs, i, f.Side, f.Stop, f.TrailM)
 	out := Outcome{FillPrice: f.Entry, FilledAt: f.Time, ExitPrice: w.Exit, BarsHeld: w.ExitIdx - i}
 	if !w.Open {
