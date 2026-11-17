@@ -67,7 +67,32 @@ func main() {
 	capRun := flag.Bool("cap-run", false, "the pre-registered same-side cap run (docs/htf_trend_design.md §7): -symbols × {4h, 1d} as one group (caprun.go)")
 	capValues := flag.String("cap-values", "0,3,4,5", "with -cap-run: the pre-registered caps (0 = off, must come first)")
 	capStart := flag.String("cap-start", "2022-10-15", "with -cap-run: first signal date")
+	entryS := flag.String("entry", "close", "entry variant (docs/htf_trend_entry_variants_design.md): close (the baseline) | touch (stop-entry at the channel, intrabar) | tsmom (sign flip of the -tsmom-n bar return)")
+	tsN := flag.Int("tsmom-n", 30, "with -entry tsmom: return lookback in bars (pre-registered 30 on 1d, neighbour 60)")
+	variantsRun := flag.Bool("variants-run", false, "the pre-registered entry-variant run (docs/htf_trend_entry_variants_design.md §5-6): the 8 paper symbols, close/touch on 4h+1d and tsmom 30/60 on 1d, 10 and 6 bp (variants.go)")
 	flag.Parse()
+
+	if *entryS != "close" && *entryS != "touch" && *entryS != "tsmom" {
+		log.Fatalf("-entry %q: close | touch | tsmom", *entryS)
+	}
+	if *variantsRun {
+		syms := *symbols
+		set := false
+		flag.Visit(func(f *flag.Flag) { set = set || f.Name == "symbols" })
+		if !set {
+			syms = "BTC,ETH,SOL,XRP,SUI,HYPE,NEAR,LINK" // the paper book's 8
+		}
+		from, err := time.Parse("2006-01-02", *since)
+		if err != nil {
+			log.Fatalf("-since: %v", err)
+		}
+		client := bingx.New("", "")
+		load := func(sym market.Symbol, tf market.Timeframe) ([]market.Candle, error) {
+			return fetch(client, sym, tf, from, *cacheDir, *cacheTTL)
+		}
+		runVariants(load, strings.Split(syms, ","), []float64{10, 6}, date(2022, 10, 15))
+		return
+	}
 
 	if *capRun {
 		syms := *symbols
@@ -152,7 +177,7 @@ func main() {
 			continue
 		}
 		atr := indicator.ATR(cs, p.ATRPeriod)
-		tr := autostrat.SimulateHTFTrend(cs, atr, wu, wantLong, wantShort, p, *feeBps)
+		tr := simulateEntry(*entryS, *tsN, cs, atr, wu, wantLong, wantShort, p, *feeBps)
 		data = append(data, symData{short: short, cs: cs, trades: tr})
 	}
 	if len(data) == 0 {
@@ -160,7 +185,7 @@ func main() {
 	}
 
 	if *compareLog != "" || *replayDays > 0 {
-		if p != autostrat.DefaultHTFTrendParams() || *side != "auto" {
+		if p != autostrat.DefaultHTFTrendParams() || *side != "auto" || *entryS != "close" {
 			log.Fatal("-compare-log / -replay-days compare against the executor, which runs the pre-registered parameters on both sides")
 		}
 		if *compareLog != "" {
@@ -172,6 +197,9 @@ func main() {
 	now := time.Now().UTC()
 	fmt.Printf("=== htf-trend · %s · N %d / M %d / K %.1f×ATR%d · fee %.1fbp · side %s · warmup %d bars ===\n",
 		tf, p.EntryN, p.TrailM, p.StopATR, p.ATRPeriod, *feeBps, *side, wu)
+	if *entryS != "close" {
+		fmt.Printf("!!! entry variant %q (tsmom-n %d) — docs/htf_trend_entry_variants_design.md\n", *entryS, *tsN)
+	}
 	for _, d := range data {
 		fmt.Printf("    %-5s history %s → %s (%d bars), first signal bar %s\n", d.short,
 			d.cs[0].OpenTime.Format("2006-01-02"), d.cs[len(d.cs)-1].CloseTime.Format("2006-01-02"), len(d.cs),
