@@ -93,8 +93,19 @@ func (k *klineCache) get(sym market.Symbol, tf string) []market.Candle {
 	if k.deep[key] {
 		limit = trailKlineDepth
 	}
+	// Retried: a failed fetch makes every fire on this key unscoreable, and
+	// the book counts those OPEN (fail-safe). Observed 2026-11-17 after the
+	// 16 deep trail keys went live: the open count swung 5 → 13 of 16 and
+	// todayR between −1.00 and +0.00 from one tick to the next, silently —
+	// the error was dropped here. A transient miss (rate limit) now gets
+	// three tries, and a key that still fails says so once per tick.
 	cs, err := k.client.Klines(k.ctx, sym, market.Timeframe(tf), limit)
+	for attempt := 1; err != nil && attempt < 3 && k.ctx.Err() == nil; attempt++ {
+		time.Sleep(time.Duration(attempt) * 400 * time.Millisecond)
+		cs, err = k.client.Klines(k.ctx, sym, market.Timeframe(tf), limit)
+	}
 	if err != nil {
+		log.Printf("autoexec: klines %s %s (%d bars) failed after retries — its fires count as OPEN this tick: %v", sym, tf, limit, err)
 		cs = nil
 	}
 	k.data[key] = cs
