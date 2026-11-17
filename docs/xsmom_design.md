@@ -177,6 +177,95 @@ dropped or added. Per-symbol contributions are reported and never used to
 choose symbols. Any idea from the results is written as an untested
 hypothesis in §8.
 
-## 8. Results
+## 8. Results (run 2026-11-17 09:24 UTC; §1–7 committed as cb0f953, harness 6b4936f)
 
-(filled after the run; §1–7 above are frozen at the commit that adds this file)
+Reproduce: `xsmombt -cache <dir>` (env without BingX keys). BingX 1d history:
+BTC/ETH/LINK 2021-05-14, XRP 2021-06-01, SOL/NEAR 2021-11-04, SUI 2023-09-24,
+HYPE 2024-12-19; ETH has 3 missing daily bars (an open ETH leg is simply held
+over a gap; a rebalance on a missing bar treats ETH as ineligible). First
+book: A 2021-12-06, B 2021-11-29, C 2023-10-30 (k = 3 needs 7 eligible).
+No rule, parameter or criterion was changed after the run.
+
+### 8.1 Full history, pooled
+
+| arm | fee | n | netR | R/trade | WR | avgW / avgL | SD | SE | trd/day | MDD R closed | MDD R daily MTM | 60 d bucket t | 60 d drop-best |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **A** L30 k2 | 10 bp | 375 | +43.62 | +0.116 | 46% | +0.96 / −0.61 | 1.57 | 0.081 | 0.21 | 10.7 | 14.6 | +1.27 | +13.0 |
+| A | 0 bp (gross) | 375 | +45.82 | +0.122 | 47% | | | | | 10.5 | 14.4 | +1.33 | +15.1 |
+| B L14 k2 | 10 bp | 514 | +30.32 | +0.059 | 46% | +0.77 / −0.55 | 0.96 | 0.042 | 0.28 | 8.2 | 8.2 | +2.10 | +24.4 |
+| C L30 k3 | 10 bp | 306 | +37.26 | +0.122 | 48% | +1.04 / −0.72 | 1.58 | 0.090 | 0.28 | 13.7 | 13.3 | +1.80 | +22.6 |
+
+6 bp: A +0.119, B +0.061, C +0.124 R/trade. Fees are ≈0.006 R/trade (wide
+1d stops) — fees are not the issue here.
+
+Per symbol, A at 10 bp (netR, legs): BTC −0.5 (54), ETH −0.3 (52), SOL +17.9
+(56), XRP +8.6 (53), SUI −1.4 (29), HYPE +4.5 (24), NEAR +7.7 (48), LINK +7.2
+(59). Gross: BTC −0.0, ETH +0.0, SOL +18.1, XRP +8.9, SUI −1.3, HYPE +4.6,
+NEAR +7.9, LINK +7.5.
+
+**Side split, A at 10 bp: long legs +43.33 R (190, +0.228/t), short legs
++0.29 R (185, +0.002/t).** B: long +33.2 / short −2.9; C: long +43.2 / short
+−6.0. The whole full-history result is the LONG side; the short bottom-k earns
+nothing. Exits (A): stop 88, rebalance 283, open 4.
+
+### 8.2 Gate — nested 60/90/120 (+1/2 d jitter) + six 30 d buckets, 10 bp, pooled
+
+| arm | 60 d | 90 d | 120 d | 30 d buckets (off 0 → 150), netR/n | shipgate.Default() |
+|---|---|---|---|---|---|
+| **A** | −3.2 (20) | −1.3 (27) | +0.4 (29) | −1.9/12 −1.3/8 +1.8/7 +1.8/2 +2.3/6 +1.5/4 | **FAIL** (60 d, 90 d ≤ 0; median R/trade −0.050) |
+| B | −1.1 (18) | +0.8 (28) | +4.5 (34) | −1.9/9 +0.8/9 +1.9/10 +3.7/6 +1.2/12 +1.7/7 | **FAIL** (60 d ≤ 0) |
+| C | −3.7 (25) | −2.8 (34) | −2.3 (40) | −2.6/15 −1.1/10 +1.0/9 +0.5/6 +6.3/10 +0.1/6 | **FAIL** (all three windows ≤ 0) |
+
+Gross (0 bp) gives the same three FAILs (A 60 d −3.05, 90 d −1.15). Every
+per-symbol gate is UNDECIDED (1–6 legs per window).
+
+### 8.3 Correlation with the htf-trend paper book (daily R, 10 bp)
+
+Book on the same data: H4 = 4h close entry (n 2145, +0.083 R/t), T1 = 1d touch
+(n 553, +0.219 R/t), BOOK = H4 + T1. Span 2022-10-15 → 2026-11-17 (1494 days).
+
+| arm | vs H4 | vs T1 | vs BOOK | (last 360 d: vs BOOK) |
+|---|---|---|---|---|
+| A | +0.153 | +0.481 | **+0.308** | +0.264 |
+| B | +0.130 | +0.448 | +0.277 | +0.235 |
+| C | +0.120 | +0.439 | +0.265 | +0.295 |
+
+Same span: BOOK daily mean +0.195 R, SD 3.43, MDD 65.6 R; A +0.027 R/day, SD
+0.56, MDD 14.6 R; BOOK + A: mean +0.222, SD 3.64, MDD 65.4 R — A adds a little
+return and essentially no drawdown relief at equal per-leg risk.
+
+### 8.4 Funding (NOT modelled; estimate)
+
+BingX returns ≤ 1000 funding points ≈ the last 11 months (HYPE since
+2026-06). On A's 67 legs inside that history: **+0.18 R total, +0.003 R/leg
+received** (range −0.006 … +0.019 R/leg by symbol). Two orders of magnitude
+below the R/trade and below the fee; ignoring funding does not change any
+verdict.
+
+### 8.5 Decision (§6)
+
+1. Gate A: **FAIL** — 60 d −3.19 R, 90 d −1.34 R, median R/trade −0.050.
+2. Full-history netR +43.62 > 0 and 60 d drop-best +13.0 > 0 — holds.
+3. Neighbour B: R/trade +0.059 but its gate FAILs (60 d −1.11) — fails.
+4. corr(A, BOOK) +0.31 — would have been "diversifying" (< 0.4); vs the 1d
+   touch leg alone it is +0.48.
+
+**Verdict: REJECTED** (criterion 1). Not wired; no paper rule.
+
+### 8.6 Reading (facts, then untested hypotheses)
+
+- Flow: A is 0.21 legs/day (≈ 1.5 per week); B 0.28. It would not add the
+  order flow that was the reason to look at it — the 4h htf-trend leg alone is
+  1.4 trades/day.
+- The full-history PASS-shaped numbers (+43.6 R, t 1.27) are the long side
+  only, concentrated in SOL/XRP/NEAR/LINK. A long-top-k book with a ≈ 0 short
+  side is a directional long-alt-momentum book, which is why its daily R
+  correlates +0.48 with the 1d trend leg. The "market-neutral dispersion"
+  premise of §1 did not show up in this 8-coin universe.
+- The latest 60–90 days lose on every arm, so it fails the same recency test
+  that htf-trend's own latest year is weak on.
+- Hypotheses NOT tested here (each would need its own pre-registration):
+  a long-only top-k rotation (the short side carries no edge but full risk);
+  a larger universe (XSMOM literature uses dozens of coins; 8 with k = 2 is a
+  noisy rank); vol-scaled rather than stop-scaled sizing. None is recommended
+  as a flow source: at ≈ 0.2–0.3 legs/day the frequency problem stays.
