@@ -1258,5 +1258,18 @@
   "dec.r.skip:news": "news",
   "dec.r.skip:structure": "structure against",
   "dec.r.skip:chop": "chop",
-  "dec.r.skip:other": "other"
+  "dec.r.skip:other": "other",
+  "dec.curves": "Cumulative curves",
+  "dec.curvesU": "in u (each fire sized from equity × risk % at fire time)",
+  "dec.curvesR": "in R (some fires carry no sizing, so u is not comparable)",
+  "dec.curve": "Curve",
+  "dec.maxDD": "Max DD",
+  "dec.c.take": "Your executes",
+  "dec.c.all": "Take everything",
+  "dec.c.skip": "Your vetoes",
+  "dec.curvesHowto": "All three lines share one time axis (exit order). 'Your executes' = only what you executed; 'Take everything' = every candidate incl. expired; 'Your vetoes' = what the vetoed ones would have done. Executes above take-everything and vetoes negative means your selection works. u is hypothetical and never touches the paper balance.",
+  "dec.cand": "candidate",
+  "dec.riskU": "risk",
+  "at.candidate": "candidate",
+  "at.candidateHint": "candidates only (home execute/veto): not in the paper book, no slot, no breaker"
 }

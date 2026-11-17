@@ -75,6 +75,10 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 			hb.SetIdle("autoexec", true, "autotrade.json enabled=false → 每輪短路")
 			continue
 		}
+		// Candidate-only rules first and independent of the book: a halted
+		// book must not stop the decision log's feed (autocand.go).
+		runCandidates(ctx, client, cfg, state)
+
 		live := cfg.LiveArmed()
 		if live {
 			hb.SetIdle("autoexec", false, "自動執行器 · LIVE")
@@ -135,7 +139,7 @@ func runAutoExecutor(ctx context.Context, client *bingx.Client) {
 
 		for i := range cfg.Rules {
 			r := cfg.Rules[i]
-			if !r.Enabled {
+			if !r.Enabled || r.CandidateOnly { // candidates: runCandidates, never the book
 				continue
 			}
 			sym, ok := autoSymbols[r.Symbol]

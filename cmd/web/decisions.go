@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -32,6 +33,17 @@ const decisionFeeBps = 10
 const decisionReadDepth = 200
 
 var tpe8 = time.FixedZone("UTC+8", 8*3600)
+
+// decisionFires is every fire that can be a candidate, newest first: the
+// paper book's and the candidate_only rules' (autotrade.CandidateLogPath).
+func decisionFires(limit int) []autotrade.PaperFire {
+	fs := append(autotrade.ReadFires(limit), autotrade.ReadCandidates(limit)...)
+	sort.SliceStable(fs, func(i, j int) bool { return fs[i].Time.After(fs[j].Time) })
+	if len(fs) > 2*limit {
+		fs = fs[:2*limit]
+	}
+	return fs
+}
 
 // liveMarkShort is the live mark by short symbol (0 when unknown).
 func (s *server) liveMarkShort(ctx context.Context, sym string) float64 {
@@ -66,6 +78,9 @@ type pendingView struct {
 	MinsLeft int     `json:"mins_left"`
 	RNow     float64 `json:"r_now"`
 	HasMark  bool    `json:"has_mark"`
+	// Candidate: from a candidate_only rule — not in the paper book.
+	Candidate bool    `json:"candidate"`
+	RiskUSDT  float64 `json:"risk_usdt"`
 }
 
 // handleAPIDecisions — GET /api/decisions: the candidates awaiting a decision.
@@ -75,7 +90,7 @@ func (s *server) handleAPIDecisions(c *gin.Context) {
 	defer cancel()
 	now := time.Now()
 	decided, _, _ := decision.Latest(decision.Path())
-	pend := decision.Pending(autotrade.ReadFires(decisionReadDepth), decided, now)
+	pend := decision.Pending(decisionFires(decisionReadDepth), decided, now)
 	marks := map[string]float64{}
 	out := make([]pendingView, 0, len(pend))
 	for _, f := range pend {
@@ -91,6 +106,7 @@ func (s *server) handleAPIDecisions(c *gin.Context) {
 			At: f.Time.In(tpe8).Format("01/02 15:04"), Deadline: dl.In(tpe8).Format("15:04"),
 			MinsLeft: int(math.Ceil(dl.Sub(now).Minutes())),
 			RNow:     decision.RMoved(f, m), HasMark: m > 0,
+			Candidate: f.Candidate, RiskUSDT: f.RiskUSDT,
 		})
 	}
 	tr := s.translator(langOf(c))
@@ -135,7 +151,7 @@ func (s *server) handleAPIDecide(c *gin.Context) {
 
 	var f autotrade.PaperFire
 	found := false
-	for _, x := range autotrade.ReadFires(decisionReadDepth) {
+	for _, x := range decisionFires(decisionReadDepth) {
 		if decision.ID(x) == id {
 			f, found = x, true
 			break
@@ -181,7 +197,7 @@ func decisionAlertKey(id string) string { return "decision:" + id }
 func decisionConditions(now time.Time) []alert.Condition {
 	decided, _, _ := decision.Latest(decision.Path())
 	var out []alert.Condition
-	for _, f := range decision.Pending(autotrade.ReadFires(decisionReadDepth), decided, now) {
+	for _, f := range decision.Pending(decisionFires(decisionReadDepth), decided, now) {
 		side := "多"
 		if f.Side == "short" {
 			side = "空"
@@ -223,6 +239,8 @@ type decisionRow struct {
 	Status                                string
 	NetR                                  float64
 	Settled                               bool
+	U                                     float64 // NetR × RiskUSDT; 0 without sizing
+	HasU, Candidate                       bool
 }
 
 type decisionGroup struct {
@@ -230,6 +248,7 @@ type decisionGroup struct {
 	N, Settled, Open   int
 	Wins               int
 	SumR, RPT, SE, WR  float64
+	SumU               float64
 	AvgRAtDecision     float64
 	payoffs, rAtDecide []float64
 }
@@ -278,7 +297,7 @@ func (s *server) handleDecisionsPage(c *gin.Context) {
 		r := decided[id]
 		items = append(items, item{r.Fire, r.Decision, &r})
 	}
-	for _, f := range autotrade.ReadFires(autotradeLogDepth) {
+	for _, f := range decisionFires(autotradeLogDepth) {
 		if g, ok := decision.Group(f, decided, now); ok && g == "none" {
 			items = append(items, item{f, g, nil})
 		}
@@ -293,6 +312,7 @@ func (s *server) handleDecisionsPage(c *gin.Context) {
 	}
 	reasonG := map[string]*decisionGroup{}
 	var rows []decisionRow
+	var settledEv []curveEvent
 	for _, it := range items {
 		f := it.f
 		key := f.Symbol + "|" + f.TF
@@ -319,6 +339,10 @@ func (s *server) handleDecisionsPage(c *gin.Context) {
 		row := decisionRow{
 			At: f.Time.In(tpe8).Format("01/02 15:04"), Symbol: f.Symbol, Side: f.Side, TF: f.TF,
 			Strategy: f.Strategy, Group: it.group, Status: string(oc.Status), NetR: oc.NetR, Settled: settled,
+			Candidate: f.Candidate,
+		}
+		if settled && f.RiskUSDT > 0 {
+			row.U, row.HasU = decision.U(f, oc.NetR), true
 		}
 		g := groups[it.group]
 		g.N++
@@ -331,6 +355,8 @@ func (s *server) handleDecisionsPage(c *gin.Context) {
 			}
 		}
 		if settled {
+			settledEv = append(settledEv, curveEvent{At: oc.ExitAt, Group: it.group, R: oc.NetR, U: row.U})
+			g.SumU += row.U
 			g.SumR += oc.NetR
 			g.payoffs = append(g.payoffs, oc.NetR)
 			if oc.NetR > 0 {
@@ -375,5 +401,80 @@ func (s *server) handleDecisionsPage(c *gin.Context) {
 		"Groups": gs, "Reasons": rs, "Rows": rows, "FetchFails": fetchFails, "Bad": bad,
 		"Since": decision.Since.Format("2006-01-02"), "FeeBps": decisionFeeBps,
 		"Diff": diff, "DiffSE": diffSE, "Enough": t.Settled >= 30 && sk.Settled >= 30,
+		"Curves": decisionCurves(settledEv),
 	})
+}
+
+// curveEvent is one settled candidate, at its exit.
+type curveEvent struct {
+	At    time.Time
+	Group string
+	R, U  float64
+}
+
+// decisionCurve is one cumulative line: what the account would have done
+// taking exactly that set of candidates, at each fire's own sizing.
+type decisionCurve struct {
+	Key            string
+	N              int
+	R, U           float64
+	MaxDDR, MaxDDU float64
+	Points         string // SVG polyline points, in the shared chart box
+}
+
+const curveW, curveH = 600.0, 160.0
+
+// decisionCurves builds 執行 (take), 全部候選 (everything offered) and 否決
+// (skip), oldest exit first, all drawn on one scale. The chart is in u when
+// every settled event has sizing, else in R.
+func decisionCurves(ev []curveEvent) gin.H {
+	sort.SliceStable(ev, func(i, j int) bool { return ev[i].At.Before(ev[j].At) })
+	inU := len(ev) > 0
+	for _, e := range ev {
+		if e.U == 0 && e.R != 0 {
+			inU = false
+		}
+	}
+	keys := []string{decision.Take, "all", decision.Skip}
+	type pt struct{ x, v float64 }
+	series := map[string][]pt{}
+	var out []*decisionCurve
+	lo, hi := 0.0, 0.0
+	for _, k := range keys {
+		c := &decisionCurve{Key: k}
+		peakR, peakU := 0.0, 0.0
+		for gi, e := range ev {
+			if k != "all" && e.Group != k {
+				continue
+			}
+			c.N++
+			c.R += e.R
+			c.U += e.U
+			peakR, peakU = math.Max(peakR, c.R), math.Max(peakU, c.U)
+			c.MaxDDR, c.MaxDDU = math.Max(c.MaxDDR, peakR-c.R), math.Max(c.MaxDDU, peakU-c.U)
+			v := c.R
+			if inU {
+				v = c.U
+			}
+			// x is the event's place in the shared exit-time order, so the
+			// three lines sit on one time axis.
+			series[k] = append(series[k], pt{float64(gi+1) / float64(len(ev)) * curveW, v})
+			lo, hi = math.Min(lo, v), math.Max(hi, v)
+		}
+		out = append(out, c)
+	}
+	span := hi - lo
+	if span == 0 {
+		span = 1
+	}
+	y := func(v float64) float64 { return curveH - (v-lo)/span*curveH }
+	for _, c := range out {
+		var b strings.Builder
+		fmt.Fprintf(&b, "0,%.1f", y(0))
+		for _, p := range series[c.Key] {
+			fmt.Fprintf(&b, " %.1f,%.1f", p.x, y(p.v))
+		}
+		c.Points = b.String()
+	}
+	return gin.H{"Lines": out, "InU": inU, "ZeroY": y(0), "W": curveW, "H": curveH, "Any": len(ev) > 0}
 }

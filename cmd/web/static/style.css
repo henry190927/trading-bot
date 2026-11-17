@@ -4675,3 +4675,11 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .dec-chips[data-kind="skip"] .dec-chip.on { color: var(--red); border-color: rgba(var(--red-rgb), .6); background: rgba(var(--red-rgb), .12); }
 .dec-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .dec-actions .ui-btn { margin-top: 0; min-width: 72px; justify-content: center; }
+.dec-chart { width: 100%; height: 160px; display: block; margin: var(--sp-2) 0; }
+.dec-zero { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dec-line { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dec-line-take { stroke: var(--blue); }
+.dec-line-all { stroke: var(--text-dim); stroke-dasharray: 4 3; }
+.dec-line-skip { stroke: var(--red); }
+.dec-key { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--text-dim); }
+.dec-key.dec-line-take { background: var(--blue); } .dec-key.dec-line-skip { background: var(--red); }

@@ -59,8 +59,17 @@ type Record struct {
 
 // ID is stable for a fire: the same row of the paper log always maps to it.
 func ID(f autotrade.PaperFire) string {
-	return fmt.Sprintf("%d-%s-%s-%s-%s", f.Time.Unix(), f.Symbol, f.TF, f.Strategy, f.Side)
+	id := fmt.Sprintf("%d-%s-%s-%s-%s", f.Time.Unix(), f.Symbol, f.TF, f.Strategy, f.Side)
+	if f.Candidate {
+		return "c-" + id // a candidate and a book fire of one rule cannot share an id
+	}
+	return id
 }
+
+// U is a settled R in USDT at the fire's own sizing (RiskUSDT, recorded at
+// fire time from the account equity and the rule's risk %): what the trade
+// would have made or lost if executed. 0 when the fire carries no sizing.
+func U(f autotrade.PaperFire, r float64) float64 { return r * f.RiskUSDT }
 
 // Deadline is the last moment a decision on f counts: one bar of its TF,
 // clamped to [30m, 4h] — long enough to see it away from the screen, short

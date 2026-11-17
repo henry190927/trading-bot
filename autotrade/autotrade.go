@@ -35,6 +35,13 @@ type Rule struct {
 	// backtest MDD: at the book's 1.5% that is a ~70% drawdown, at 0.25% ~12%
 	// (docs/htf_trend_executor_design.md §4.1, user decision §6.1).
 	RiskPct float64 `json:"risk_pct,omitempty"`
+	// CandidateOnly: the rule is evaluated and its fires are sized as if
+	// executed, but they go to the candidate log (CandidateLogPath), never
+	// the paper book — they hold no slot, count against no cap, cannot trip
+	// the daily breaker and do not move the paper balance. For rules that
+	// failed the fee re-gate but still feed the take/skip decision log
+	// (2026-11-17). Needs enabled=true as well.
+	CandidateOnly bool `json:"candidate_only,omitempty"`
 
 	// REMOVED 2026-09-02, do not re-add without an implementation:
 	//   MaxConcurrent  (per-symbol) — had zero consumers anywhere. One position

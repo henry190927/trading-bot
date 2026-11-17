@@ -1258,5 +1258,18 @@
   "dec.r.skip:news": "消息面",
   "dec.r.skip:structure": "結構不對",
   "dec.r.skip:chop": "盤整",
-  "dec.r.skip:other": "其他"
+  "dec.r.skip:other": "其他",
+  "dec.curves": "累積曲線",
+  "dec.curvesU": "單位 u(各筆依觸發當下權益 × 風險 % 計算)",
+  "dec.curvesR": "單位 R(部分單沒有倉位資料,u 無法比較)",
+  "dec.curve": "曲線",
+  "dec.maxDD": "最大回撤",
+  "dec.c.take": "你的執行",
+  "dec.c.all": "全部照單",
+  "dec.c.skip": "你否決的",
+  "dec.curvesHowto": "三條線使用同一條時間軸(依出場時間排序)。「你的執行」= 只做你按執行的單;「全部照單」= 所有候選都做(含逾時未決);「你否決的」= 你擋下的那些單如果做了會怎樣。執行線高於全部照單、否決線為負,代表挑選有效。u 是假設執行的金額,不計入 paper 帳戶餘額。",
+  "dec.cand": "候選",
+  "dec.riskU": "風險",
+  "at.candidate": "候選",
+  "at.candidateHint": "只產生候選(首頁執行/否決),不進 paper 帳本、不佔位、不計熔斷"
 }

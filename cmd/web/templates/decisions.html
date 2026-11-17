@@ -21,7 +21,7 @@
     <header class="ui-card-h"><h2>{{template "icon" "flag"}}{{t "dec.title"}}</h2><span class="ui-sub">{{t "dec.since"}} {{.Since}} · {{t "dec.fee"}} {{.FeeBps}}bp</span></header>
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>{{t "dec.group"}}</th><th class="num">{{t "dec.n"}}</th><th class="num">{{t "dec.settled"}}</th><th class="num">{{t "dec.open"}}</th><th class="num">WR</th><th class="num">ΣR</th><th class="num">R/t</th><th class="num">SE</th><th class="num">{{t "dec.rAtDecision"}}</th></tr></thead>
+      <thead><tr><th>{{t "dec.group"}}</th><th class="num">{{t "dec.n"}}</th><th class="num">{{t "dec.settled"}}</th><th class="num">{{t "dec.open"}}</th><th class="num">WR</th><th class="num">ΣR</th><th class="num">Σu</th><th class="num">R/t</th><th class="num">SE</th><th class="num">{{t "dec.rAtDecision"}}</th></tr></thead>
       <tbody>
       {{range .Groups}}
         <tr>
@@ -29,6 +29,7 @@
           <td class="num">{{.N}}</td><td class="num">{{.Settled}}</td><td class="num">{{.Open}}</td>
           <td class="num">{{if .Settled}}{{printf "%.0f" .WR}}%{{else}}—{{end}}</td>
           <td class="num {{rClass .SumR}}">{{fmtR .SumR}}</td>
+          <td class="num {{rClass .SumU}}">{{printf "%+.2f" .SumU}}</td>
           <td class="num {{rClass .RPT}}">{{if .Settled}}{{printf "%+.3f" .RPT}}{{else}}—{{end}}</td>
           <td class="num ui-dim">{{if gt .Settled 1}}{{printf "%.3f" .SE}}{{else}}—{{end}}</td>
           <td class="num ui-dim">{{if ne .Key "none"}}{{printf "%+.2f" .AvgRAtDecision}}{{else}}—{{end}}</td>
@@ -41,6 +42,29 @@
       {{if not .Enough}}<span class="ui-tag tag-yellow">{{t "dec.notEnough"}}</span>{{end}}</p>
     <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "dec.howto"}}</p></details>
   </section>
+
+  {{with .Curves}}{{if .Any}}
+  <section class="ui-card">
+    <header class="ui-card-h"><h2>{{template "icon" "pulse"}}{{t "dec.curves"}}</h2><span class="ui-sub">{{if .InU}}{{t "dec.curvesU"}}{{else}}{{t "dec.curvesR"}}{{end}}</span></header>
+    <svg class="dec-chart" viewBox="0 0 {{.W}} {{.H}}" preserveAspectRatio="none" role="img" aria-label="{{t "dec.curves"}}">
+      <line x1="0" x2="{{.W}}" y1="{{.ZeroY}}" y2="{{.ZeroY}}" class="dec-zero"/>
+      {{range .Lines}}<polyline class="dec-line dec-line-{{.Key}}" points="{{.Points}}"/>{{end}}
+    </svg>
+    <div class="dt-scroll">
+    <table class="dt">
+      <thead><tr><th>{{t "dec.curve"}}</th><th class="num">{{t "dec.settled"}}</th><th class="num">ΣR</th><th class="num">Σu</th><th class="num">{{t "dec.maxDD"}} R</th><th class="num">{{t "dec.maxDD"}} u</th></tr></thead>
+      <tbody>
+      {{range .Lines}}
+        <tr><td><span class="dec-key dec-line-{{.Key}}"></span>{{t (printf "dec.c.%s" .Key)}}</td><td class="num">{{.N}}</td>
+          <td class="num {{rClass .R}}">{{fmtR .R}}</td><td class="num {{rClass .U}}">{{printf "%+.2f" .U}}</td>
+          <td class="num ui-dim">{{printf "%.2f" .MaxDDR}}</td><td class="num ui-dim">{{printf "%.2f" .MaxDDU}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+    <details class="ui-howto"><summary>{{t "common.howToRead"}}</summary><p>{{t "dec.curvesHowto"}}</p></details>
+  </section>
+  {{end}}{{end}}
 
   {{if .Reasons}}
   <section class="ui-card">
@@ -63,18 +87,19 @@
     {{if .Rows}}
     <div class="dt-scroll">
     <table class="dt">
-      <thead><tr><th>{{t "dec.at"}}</th><th>{{t "th.symbol"}}</th><th>{{t "th.side"}}</th><th>{{t "dec.strategy"}}</th><th>{{t "dec.group"}}</th><th>{{t "dec.reason"}}</th><th class="num">{{t "dec.rAtDecision"}}</th><th>{{t "dec.status"}}</th><th class="num">R</th></tr></thead>
+      <thead><tr><th>{{t "dec.at"}}</th><th>{{t "th.symbol"}}</th><th>{{t "th.side"}}</th><th>{{t "dec.strategy"}}</th><th>{{t "dec.group"}}</th><th>{{t "dec.reason"}}</th><th class="num">{{t "dec.rAtDecision"}}</th><th>{{t "dec.status"}}</th><th class="num">R</th><th class="num">u</th></tr></thead>
       <tbody>
       {{range .Rows}}
         <tr>
           <td class="ui-num ui-dim">{{.At}}</td><td>{{.Symbol}}</td>
           <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
-          <td class="ui-dim">{{.Strategy}} {{.TF}}</td>
+          <td class="ui-dim">{{.Strategy}} {{.TF}}{{if .Candidate}} <span class="ui-tag tag-yellow">{{t "dec.cand"}}</span>{{end}}</td>
           <td>{{t (printf "dec.g.%s" .Group)}}</td>
           <td class="ui-sm">{{$g := .Group}}{{range .Reasons}}<span class="ui-tag">{{t (printf "dec.r.%s:%s" $g .)}}</span> {{end}}</td>
           <td class="num ui-dim">{{if .HasDecision}}{{printf "%+.2f" .RAtDecision}}{{else}}—{{end}}</td>
           <td class="ui-dim">{{.Status}}</td>
           <td class="num {{if .Settled}}{{rClass .NetR}}{{end}}">{{if .Settled}}{{printf "%+.2f" .NetR}}{{else}}—{{end}}</td>
+          <td class="num {{if .HasU}}{{rClass .U}}{{end}}">{{if .HasU}}{{printf "%+.2f" .U}}{{else}}—{{end}}</td>
         </tr>
       {{end}}
       </tbody>

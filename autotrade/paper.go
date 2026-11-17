@@ -61,6 +61,11 @@ type PaperFire struct {
 	// backtest scores that as a stop (it cannot know the order inside the
 	// bar), so the resolver checks the signal bar itself for a touch fire.
 	Touch bool `json:"touch,omitempty"`
+	// Candidate marks a fire from a candidate_only rule (2026-11-17): written
+	// to the candidate log, never the paper log, so no book, cap, breaker or
+	// paper balance can see it. It exists to be decided on (package decision)
+	// and scored there, in R and in u (RiskUSDT is sized as if executed).
+	Candidate bool `json:"candidate,omitempty"`
 }
 
 // RWeight converts this fire's R into book units: 1R of a 0.25% rule is a
@@ -122,8 +127,11 @@ func ReadFires(limit int) []PaperFire {
 }
 
 // readAllFires is the whole log, oldest first.
-func readAllFires() []PaperFire {
-	f, err := os.Open(PaperLogPath())
+func readAllFires() []PaperFire { return readAllFiresAt(PaperLogPath()) }
+
+// readAllFiresAt reads any fire log (the paper log, or the candidate log).
+func readAllFiresAt(path string) []PaperFire {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil
 	}

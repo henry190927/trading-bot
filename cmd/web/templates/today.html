@@ -36,7 +36,7 @@
        /api/decisions returns something, so a quiet day costs no space. */}}
   <section class="ui-card dec-card" id="dec-card" hidden
     data-take="{{t "dec.take"}}" data-skip="{{t "dec.skip"}}" data-left="{{t "dec.left"}}" data-moved="{{t "dec.moved"}}"
-    data-trail="{{t "dec.trail"}}" data-limit="{{t "dec.limit"}}" data-err="{{t "dec.err"}}"
+    data-trail="{{t "dec.trail"}}" data-limit="{{t "dec.limit"}}" data-err="{{t "dec.err"}}" data-cand="{{t "dec.cand"}}" data-risk="{{t "dec.riskU"}}"
     data-long="{{t "side.long"}}" data-short="{{t "side.short"}}">
     <header class="ui-card-h"><h2>{{template "icon" "flag"}}{{t "dec.pendingTitle"}} <span class="ui-count" id="dec-count">0</span></h2><span class="ui-sub">{{t "dec.pendingSub"}}</span><a class="ui-link" href="/decisions">{{t "dec.scoreboard"}} {{template "icon" "arrow"}}</a></header>
     <ul class="ui-list" id="dec-list"></ul>
@@ -672,8 +672,10 @@
       return '<li class="dec-item" data-id="' + esc(p.id) + '">' +
         '<div class="ui-row"><span class="ui-side ' + esc(p.side) + '">' + esc(side) + '</span>' +
         '<span class="ui-sym">' + esc(p.symbol) + '</span><span class="ui-dim">' + esc(p.strategy) + ' ' + esc(p.tf) + (p.market ? '' : ' · ' + L.limit) + '</span>' +
+        (p.candidate ? '<span class="ui-tag tag-yellow">' + L.cand + '</span>' : '') +
         '<span class="ui-grow"></span><span class="ui-num ui-dim ui-sm">' + esc(p.at) + '</span></div>' +
         '<div class="ui-row ui-sm"><span class="ui-num">E ' + px(p.entry) + '</span><span class="ui-num r-neg">SL ' + px(p.stop) + '</span><span class="ui-num r-pos">TP ' + esc(tgt) + '</span>' + moved +
+        (p.risk_usdt > 0 ? '<span class="ui-dim">' + L.risk + ' ' + p.risk_usdt.toFixed(2) + 'u</span>' : '') +
         '<span class="ui-grow"></span><span class="ui-dim">' + L.left.replace('%d', p.mins_left).replace('%s', esc(p.deadline)) + '</span></div>' +
         (p.why ? '<div class="ui-dim ui-sm dec-why">' + esc(p.why) + '</div>' : '') +
         chips(p.id, 'take', d.take_reasons || []) + chips(p.id, 'skip', d.skip_reasons || []) +

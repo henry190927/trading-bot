@@ -100,7 +100,7 @@
           <td><span class="ui-side {{.Side}}">{{t (printf "side.%s" .Side)}}</span></td>
           <td class="num">{{if gt .RiskPct 0.0}}<span class="ui-dim" title="{{t "at.byStopHint"}}">{{t "at.byStop"}} · {{printf "%.2f" .RiskPct}}%</span>{{else if gt $.RiskPct 0.0}}<span class="ui-dim" title="{{t "at.byStopHint"}}">{{t "at.byStop"}}</span>{{else}}{{printf "%.0f" .MarginUSDT}}u{{end}}</td>
           <td class="num">{{.Leverage}}×</td><td class="num">{{printf "%.2f" .StopPct}}</td>
-          <td>{{if .Enabled}}<span class="ui-up">{{t "common.on"}}</span>{{else}}<span class="ui-dim">{{t "common.off"}}</span>{{end}}</td>
+          <td>{{if and .Enabled .CandidateOnly}}<span class="ui-tag tag-yellow" title="{{t "at.candidateHint"}}">{{t "at.candidate"}}</span>{{else if .Enabled}}<span class="ui-up">{{t "common.on"}}</span>{{else}}<span class="ui-dim">{{t "common.off"}}</span>{{end}}</td>
         </tr>
         {{end}}
       </tbody>
