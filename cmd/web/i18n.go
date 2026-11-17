@@ -180,6 +180,7 @@ var sections = []section{
 	{"portfolio", "/journal", "portfolio", []tab{
 		{"tab.trades", "/journal", nil},
 		{"tab.setups", "/setups", nil},
+		{"tab.decisions", "/decisions", nil},
 		{"tab.auto", "/ops/autotrade", nil},
 		{"tab.verify", "/ops/verify", nil},
 	}},

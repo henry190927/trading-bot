@@ -268,6 +268,23 @@ func (e *Engine) Ack(id int64) (n int, err error) {
 	return n, nil
 }
 
+// AckKey acknowledges every unread alert with this key — for an alert whose
+// action happens elsewhere (a take/skip decision on the home page), so the
+// bell clears the moment it is acted on rather than when it is clicked.
+func (e *Engine) AckKey(key string) (n int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := e.now()
+	for _, a := range e.byID {
+		if a.Key == key && a.Unread() {
+			a.AckedAt = now
+			e.record(now, "ack", *a)
+			n++
+		}
+	}
+	return n
+}
+
 // Snapshot is what the UI reads.
 type Snapshot struct {
 	// Version changes whenever anything was recorded, so a poller can skip

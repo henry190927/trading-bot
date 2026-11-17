@@ -289,6 +289,7 @@ func (s *server) startAlerts(ctx context.Context) {
 
 	go func() {
 		var rt restartTracker
+		var acker decisionAcker
 		tick := time.NewTicker(alertEvery)
 		defer tick.Stop()
 		for {
@@ -304,7 +305,10 @@ func (s *server) startAlerts(ctx context.Context) {
 						"新行程 pid "+strconv.Itoa(in.beat.PID))
 				}
 			}
-			eng.Observe(evaluateAlerts(in))
+			firing, held := evaluateAlerts(in)
+			dc := decisionConditions(now)
+			eng.Observe(append(firing, dc...), held)
+			acker.observe(eng, dc)
 			select {
 			case <-ctx.Done():
 				return

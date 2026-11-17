@@ -32,6 +32,16 @@
     <a class="ui-kpi" href="/alerts"><div class="ui-kpi-label">{{t "today.kpi.alerts"}}</div><div class="ui-kpi-val{{if .Unread}} ui-down{{end}}">{{.Unread}}</div></a>
   </section>
 
+  {{/* Take/skip on machine candidates (cmd/web/decisions.go). Hidden until
+       /api/decisions returns something, so a quiet day costs no space. */}}
+  <section class="ui-card dec-card" id="dec-card" hidden
+    data-take="{{t "dec.take"}}" data-skip="{{t "dec.skip"}}" data-left="{{t "dec.left"}}" data-moved="{{t "dec.moved"}}"
+    data-trail="{{t "dec.trail"}}" data-limit="{{t "dec.limit"}}" data-err="{{t "dec.err"}}"
+    data-long="{{t "side.long"}}" data-short="{{t "side.short"}}">
+    <header class="ui-card-h"><h2>{{template "icon" "flag"}}{{t "dec.pendingTitle"}} <span class="ui-count" id="dec-count">0</span></h2><span class="ui-sub">{{t "dec.pendingSub"}}</span><a class="ui-link" href="/decisions">{{t "dec.scoreboard"}} {{template "icon" "arrow"}}</a></header>
+    <ul class="ui-list" id="dec-list"></ul>
+  </section>
+
   {{/* Two columns that end level: the cards stretch to the taller column, so
        an empty state never leaves a hole. The market table, the one long
        block, runs full width underneath. */}}
@@ -633,6 +643,83 @@
   // establish), then hand over to SSE.
   poll();
   startStream();
+})();
+</script>
+<script>
+/* Take/skip cards (cmd/web/decisions.go). Polls every 15s; a card's chips
+   are kept across refreshes so a half-picked reason is not wiped. */
+(function () {
+  var card = document.getElementById('dec-card');
+  if (!card) return;
+  var list = document.getElementById('dec-list'), countEl = document.getElementById('dec-count');
+  var L = card.dataset, picked = {}, busy = {};
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function px(v) { if (!v) return '—'; var a = Math.abs(v); return v.toFixed(a >= 1000 ? 1 : a >= 10 ? 2 : 4); }
+  function chips(id, kind, rs) {
+    return '<div class="dec-chips" data-kind="' + kind + '"><span class="ui-dim ui-sm dec-chips-l">' + (kind === 'take' ? L.take : L.skip) + '</span>' + rs.map(function (r) {
+      var on = picked[id] && picked[id][kind + ':' + r.key];
+      return '<button type="button" class="ui-tag dec-chip' + (on ? ' on' : '') + '" data-id="' + esc(id) + '" data-k="' + kind + ':' + esc(r.key) + '">' + esc(r.label) + '</button>';
+    }).join('') + '</div>';
+  }
+  function render(d) {
+    var ps = d.pending || [];
+    countEl.textContent = ps.length;
+    card.hidden = ps.length === 0;
+    list.innerHTML = ps.map(function (p) {
+      var side = p.side === 'short' ? L.short : L.long;
+      var tgt = p.trail ? L.trail : px(p.tp);
+      var moved = p.has_mark ? '<span class="ui-num ' + (p.r_now >= 0 ? 'r-pos' : 'r-neg') + '">' + L.moved + ' ' + (p.r_now >= 0 ? '+' : '') + p.r_now.toFixed(2) + 'R</span>' : '';
+      return '<li class="dec-item" data-id="' + esc(p.id) + '">' +
+        '<div class="ui-row"><span class="ui-side ' + esc(p.side) + '">' + esc(side) + '</span>' +
+        '<span class="ui-sym">' + esc(p.symbol) + '</span><span class="ui-dim">' + esc(p.strategy) + ' ' + esc(p.tf) + (p.market ? '' : ' · ' + L.limit) + '</span>' +
+        '<span class="ui-grow"></span><span class="ui-num ui-dim ui-sm">' + esc(p.at) + '</span></div>' +
+        '<div class="ui-row ui-sm"><span class="ui-num">E ' + px(p.entry) + '</span><span class="ui-num r-neg">SL ' + px(p.stop) + '</span><span class="ui-num r-pos">TP ' + esc(tgt) + '</span>' + moved +
+        '<span class="ui-grow"></span><span class="ui-dim">' + L.left.replace('%d', p.mins_left).replace('%s', esc(p.deadline)) + '</span></div>' +
+        (p.why ? '<div class="ui-dim ui-sm dec-why">' + esc(p.why) + '</div>' : '') +
+        chips(p.id, 'take', d.take_reasons || []) + chips(p.id, 'skip', d.skip_reasons || []) +
+        '<div class="dec-actions"><button type="button" class="ui-btn sm dec-go" data-id="' + esc(p.id) + '" data-d="take">' + L.take + '</button>' +
+        '<button type="button" class="ui-btn ghost sm dec-go" data-id="' + esc(p.id) + '" data-d="skip">' + L.skip + '</button>' +
+        '<span class="ui-sm r-neg dec-msg"></span></div></li>';
+    }).join('');
+  }
+  function refresh() {
+    fetch('/api/decisions', {cache: 'no-store'}).then(function (r) { return r.json(); }).then(render).catch(function () {});
+  }
+  list.addEventListener('click', function (e) {
+    var chip = e.target.closest('.dec-chip');
+    if (chip) {
+      var id = chip.dataset.id, k = chip.dataset.k;
+      picked[id] = picked[id] || {};
+      picked[id][k] = !picked[id][k];
+      chip.classList.toggle('on', picked[id][k]);
+      return;
+    }
+    var go = e.target.closest('.dec-go');
+    if (!go || busy[go.dataset.id]) return;
+    var id = go.dataset.id, dec = go.dataset.d, rs = [];
+    Object.keys(picked[id] || {}).forEach(function (k) {
+      if (picked[id][k] && k.indexOf(dec + ':') === 0) rs.push(k.slice(dec.length + 1));
+    });
+    busy[id] = true;
+    var li = go.closest('.dec-item'), msg = li.querySelector('.dec-msg');
+    li.querySelectorAll('.dec-go').forEach(function (b) { b.disabled = true; });
+    var body = 'id=' + encodeURIComponent(id) + '&decision=' + dec + '&reasons=' + encodeURIComponent(rs.join(','));
+    fetch('/api/decisions', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+      .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); })
+      .then(function (res) {
+        busy[id] = false;
+        if (!res.ok) {
+          msg.textContent = L.err + ' ' + (res.j.error || '');
+          li.querySelectorAll('.dec-go').forEach(function (b) { b.disabled = false; });
+          return;
+        }
+        delete picked[id];
+        refresh();
+      })
+      .catch(function () { busy[id] = false; msg.textContent = L.err; li.querySelectorAll('.dec-go').forEach(function (b) { b.disabled = false; }); });
+  });
+  refresh();
+  setInterval(function () { if (!document.hidden) refresh(); }, 15000);
 })();
 </script>
 </body>
