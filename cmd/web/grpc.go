@@ -5,8 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/henry190927/trading-bot/grpcsrv"
 )
@@ -22,8 +20,8 @@ import (
 //
 // The cost of that choice is that gRPC shares the web process's fate. It is
 // bounded by keeping the surface read-only and opt-in: GRPC_BIND unset means
-// no listener, no signal handler and no behaviour change at all. That mirrors
-// PPROF_BIND in main.go, which made the same call for the same reason.
+// no listener and no behaviour change at all. That mirrors PPROF_BIND in
+// main.go, which made the same call for the same reason.
 
 // Subscribe adapts the hub to grpcsrv.PriceSource.
 //
@@ -41,50 +39,44 @@ var _ grpcsrv.PriceSource = (*tickerHub)(nil)
 //
 //	GRPC_BIND=127.0.0.1:9090 make web
 //
-// It returns immediately; the server runs in the background alongside Gin.
-func startGRPC(hub *tickerHub) {
+// It returns immediately; the server runs in the background alongside Gin and
+// shuts down when ctx is cancelled (main cancels it on SIGTERM / SIGINT).
+// The returned channel is closed once gRPC has fully stopped — streams
+// drained, GOAWAY flushed — so main can wait for it. It is already closed
+// when gRPC is not configured or failed to start.
+func startGRPC(ctx context.Context, hub *tickerHub) <-chan struct{} {
+	done := make(chan struct{})
 	bind := os.Getenv("GRPC_BIND")
 	if bind == "" {
-		return
+		close(done)
+		return done
 	}
-	// Bind BEFORE installing the signal handler. A port clash must leave the
-	// process exactly as it was — HTTP serving, SIGTERM still fatal by
-	// default — rather than half-wired into a shutdown path that no longer
-	// has a server to shut down.
 	// ListenConfig rather than net.Listen: the repo's noctx linter is on, and
-	// it is right that a listener should be cancellable. There is nothing to
-	// cancel at this point in startup, so the context is Background and the
-	// shutdown story is the one in Serve.
+	// it is right that a listener should be cancellable. A port clash leaves
+	// the web UI running — losing gRPC is not a reason to take it down.
 	var lc net.ListenConfig
-	lis, err := lc.Listen(context.Background(), "tcp", bind)
+	lis, err := lc.Listen(ctx, "tcp", bind)
 	if err != nil {
 		log.Printf("grpc: NOT started — listen %s: %v (HTTP unaffected)", bind, err)
-		return
+		close(done)
+		return done
 	}
 
-	// Taking over SIGTERM is the part worth being careful about. Until now
-	// this process had no handler, so SIGTERM killed it instantly; systemctl
-	// restart trading-web was immediate. NotifyContext suppresses that
-	// default, which means every path out of here MUST end in the process
-	// actually exiting, or a restart would stall until systemd's stop timeout
-	// ran out and SIGKILLed it.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-
+	// Signal handling lives in main, not here. This used to install its own
+	// SIGTERM handler and os.Exit(0) once gRPC stopped, which ended the
+	// process before the HTTP side had drained anything. Now main owns the
+	// shutdown order: HTTP and gRPC drain side by side, then the process
+	// exits.
 	go func() {
+		defer close(done)
 		serveErr := grpcsrv.Serve(ctx, lis, hub, log.Printf)
 		if ctx.Err() == nil {
 			// Serve died on its own (listener closed, fatal transport error),
-			// not because of a signal. Hand SIGTERM back to the default
-			// handler and leave the web UI running — losing gRPC is not a
-			// reason to take the dashboard down.
+			// not because of shutdown. Keep the web UI running without gRPC.
 			log.Printf("grpc: stopped unexpectedly: %v — continuing without gRPC", serveErr)
-			stop()
 			return
 		}
-		// Shutdown finished: streams drained, GOAWAY flushed. The HTTP side is
-		// NOT drained here, deliberately — see docs/grpc.md. It dies with the
-		// process, which is exactly what SIGTERM already did to it.
-		log.Printf("grpc: shutdown complete — exiting")
-		os.Exit(0)
+		log.Printf("grpc: shutdown complete")
 	}()
+	return done
 }

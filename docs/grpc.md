@@ -61,8 +61,8 @@ gRPC 在這裡是**第二種 transport，不是第二條資料路徑**。
 │    func (h *tickerHub) Subscribe() { return h.subscribe() }      │
 │                                     一行 exported wrapper        │
 │                                     (介面只吃大寫開頭的方法)    │
-│    startGRPC(hub)                   讀 GRPC_BIND · listen        │
-│                                     接管 SIGTERM · go Serve      │
+│    startGRPC(ctx, hub)              讀 GRPC_BIND · listen        │
+│                                     go Serve · 回傳 done channel │
 └──────────────────────────────────────────────────────────────────┘
     │
     ▼
@@ -105,28 +105,24 @@ gRPC 在這裡是**第二種 transport，不是第二條資料路徑**。
 | | `Serve(ctx, lis, src, logf)` | ⭐ 跑起來 + 關機編排(見 0.4) |
 | **`cmd/web/grpc.go`** | `(*tickerHub).Subscribe()` | 一行 exported wrapper(介面只吃大寫方法) |
 | | `var _ grpcsrv.PriceSource = ...` | ⭐ 編譯期斷言:真的 hub 合得上 seam |
-| | `startGRPC(hub)` | 讀 `GRPC_BIND` → listen → 接管 SIGTERM → `go Serve` |
-| **`cmd/web/main.go`** | `startGRPC(srv.hub)` | 唯一的接線,**5 行** |
+| | `startGRPC(ctx, hub)` | 讀 `GRPC_BIND` → listen → `go Serve` → 回傳 done channel |
+| **`cmd/web/main.go`** | `startGRPC(ctx, srv.hub)` | 接線 + **統一接管 SIGTERM**(2026-11-21 起,見 5.4) |
 
 ### 0.3 啟動順序
 
 ```
 main()
-  └─ startGRPC(hub)
+  ├─ ctx = signal.NotifyContext(SIGTERM, SIGINT)   ⭐ 2026-11-21 起由 main 統一接管
+  └─ startGRPC(ctx, hub)
        │
-       ├─ GRPC_BIND 沒設? ──► 直接 return
-       │                      ⭐ 不建 listener · 不接管 signal
-       │                         整個 process 行為完全不變
+       ├─ GRPC_BIND 沒設? ──► 回傳已關閉的 done channel
+       │                      ⭐ 不建 listener,行為完全不變
        │
        ├─ lc.Listen(tcp, bind)
-       │     └─ 失敗? ──► log + return
-       │                  ⭐ HTTP 不受影響,維持原狀
+       │     └─ 失敗? ──► log + 回傳已關閉的 done channel
+       │                  ⭐ HTTP 不受影響
        │
-       ├─ signal.NotifyContext(SIGTERM, SIGINT)
-       │     ⭐ 順序很重要:「先 bind 再接管 signal」
-       │        port 被佔用時,不會留下「signal 被接管但沒有 server 可關」的半殘狀態
-       │
-       └─ go grpcsrv.Serve(ctx, lis, hub, log.Printf)
+       └─ go grpcsrv.Serve(ctx, lis, hub, log.Printf)  → 結束時 close(done)
               └─ NewService(src) → NewServer(svc) → gs.Serve(lis)
                    NewServer 做三件事:
                      · keepalive(30s ping / 10s timeout)
@@ -134,8 +130,8 @@ main()
                      · RegisterMarketDataServer(gs, svc)
 ```
 
-> ⭐ **先 bind 再接管 signal**。port 被佔用的話,整個 process 維持原狀 ——
-> 而不是「signal 已經被接管、但沒有 server 可以關」的半殘狀態。
+> ⭐ 2026-11-21 以前,`startGRPC` 自己接管 SIGTERM(「先 bind 再接管」),gRPC 關完就 `os.Exit(0)`,
+> HTTP 端完全沒有收尾。現在 signal 由 `main` 統一處理,HTTP、gRPC、背景 sweep 一起收尾(見 5.4)。
 
 ### 0.4 關機順序(⭐ 最值得看的一段)
 
@@ -158,7 +154,7 @@ SIGTERM / Ctrl-C
  defer release()                     │                       硬斷
  ⭐ refcount 減一                     └──────────┬────────────────┘
       │                                          ▼
-      ▼                                     os.Exit(0)
+      ▼                                     close(done) → main 等 HTTP + sweep + gRPC 都收完才結束
  還有別的 subscriber 嗎?
       │
       └─ 沒有 ──► hub cancel 自己的 loop
@@ -183,7 +179,7 @@ grpc: draining streams, then GracefulStop (grace 15s)
 stream: stats loop stopped (no subscribers)            ← refcount 還回去了
 stream: markprice ws stopped after 3s (no subscribers) ← 上游 websocket 才關
 grpc: stopped gracefully
-grpc: shutdown complete — exiting
+grpc: shutdown complete
 ```
 
 
@@ -197,7 +193,7 @@ proto/marketdata/v1/marketdata.pb.go        # 產生檔，已 commit
 proto/marketdata/v1/marketdata_grpc.pb.go   # 產生檔，已 commit
 grpcsrv/server.go                           # service 實作 + Serve()
 grpcsrv/server_test.go                      # bufconn 端對端測試（兩個 RPC 都測）
-cmd/web/grpc.go                             # 接線：hub adapter + GRPC_BIND + SIGTERM
+cmd/web/grpc.go                             # 接線：hub adapter + GRPC_BIND(SIGTERM 由 main.go 統一處理)
 ```
 
 ---
@@ -239,8 +235,7 @@ make proto
 
 ## 3. 啟動 server
 
-gRPC 是 **opt-in** 的。`GRPC_BIND` 沒設 → 不開 listener、不裝 signal handler、
-行為跟以前完全一樣。
+gRPC 是 **opt-in** 的。`GRPC_BIND` 沒設 → 不開 listener,行為跟以前完全一樣。
 
 ```bash
 make grpc                      # 等同 GRPC_BIND=127.0.0.1:9090 go run ./cmd/web
@@ -428,28 +423,26 @@ ERROR:
 中間那兩行 `no subscribers` 很重要：它證明 gRPC stream 真的是 hub 的 subscriber，
 而且離開時把 refcount 還回去了 —— 所以 hub 關掉了上游 websocket。
 
-### 5.4 SIGTERM 的接管，以及為什麼 HTTP 端**沒有**一起做 graceful
+### 5.4 SIGTERM 的接管:HTTP、gRPC、背景 sweep 一起收尾(2026-11-21 起)
 
-`cmd/web` 以前完全沒有 signal handler，SIGTERM 就是直接殺掉行程。
-`signal.NotifyContext` 會**取消掉**那個預設行為，所以 `startGRPC` 裡每一條離開的路徑
-都必須真的讓行程結束，否則 `systemctl restart trading-web` 會卡到 systemd 的
-stop timeout 用完再 SIGKILL —— 那是一個貨真價實的 regression。
+**以前**:`cmd/web` 只有在開 gRPC 時才接管 SIGTERM(`startGRPC` 裡的 `signal.NotifyContext`),
+gRPC 收完就 `os.Exit(0)`;HTTP 用 `r.Run`,沒有 `Shutdown`,收到 SIGTERM 時進行中的請求(包括正在下單的表單)直接消失。
+當時刻意沒做 HTTP 端,理由是 SSE stream 永遠不會自己結束,`http.Server.Shutdown` 會等到 timeout。
 
-所以：
+**現在**:`main` 統一接管 SIGTERM / SIGINT,順序是:
 
-- 正常關機路徑：drain → GracefulStop → `os.Exit(0)`。
-- `Serve` 自己死掉（不是因為 signal）：log 一行，`stop()` 把 SIGTERM 還給預設 handler，
-  web 繼續跑。少了 gRPC 不是把 dashboard 一起關掉的理由。
+1. `http.Server.Shutdown`(上限 15 秒):停止接新連線、等進行中的請求做完。
+2. SSE 的問題用 `RegisterOnShutdown(hub.closeSubscribers)` 解:關機時把每個訂閱者的 channel 關掉,
+   SSE handler 讀到 channel 關了就返回。gRPC 的 stream 也是 hub 的訂閱者,同樣會結束(它本來就會被 Drain)。
+3. 等**正在跑的那一輪 trade sweep** 做完:sweep 用 `context.WithoutCancel` 做事,訊號只決定「不再開始下一輪」。
+   不然一輪 sweep 被砍在「已下單、還沒記下 order id」之間,下一次啟動會再下一次單。
+4. 等 gRPC 的 done channel(Drain → GracefulStop → 15 秒後 Stop,和以前一樣)。
+5. 第一個訊號之後呼叫 `stop()`,第二個 SIGTERM 會用預設方式直接結束行程。
 
-**HTTP / SSE 端刻意沒有改成 graceful**，有兩個理由：
+`deploy/compose.yaml` 的 `stop_grace_period: 30s` 要一直大於 HTTP 15 秒(gRPC 的 15 秒是同時跑的)。
 
-1. 任務範圍明確說不要改既有 endpoint 的行為。`r.Run(bind)` 一個字都沒動。
-2. 就算要改也沒那麼單純：SSE stream **永遠不會自己結束**，所以
-   `http.Server.Shutdown` 必然會等到 timeout。真要做就得再設計一次，
-   而那是另一件事，不該夾帶在這個 commit 裡。
-
-淨效果：SIGTERM 之後，HTTP 端的體驗和**今天完全一樣**（行程直接消失），
-gRPC 端則多了一次有秩序的收尾。
+測試:`cmd/web/shutdown_test.go` 用真的 `http.Server` + 一條開著的 SSE 連線,證明 `Shutdown` 會立刻結束、
+client 端看到 stream 結束;拿掉 `RegisterOnShutdown` 那行,測試會在 3 秒逾時後失敗。
 
 ### 5.5 stream client 斷線時會發生什麼
 
@@ -592,4 +585,4 @@ hub 用一個 fake 取代，它複製了 hub 契約裡會影響這個服務的�
 - **`live: false` 在 JSON 輸出裡會整個欄位消失**（proto3 預設值不序列化）。
   Go client 讀 `GetLive()` 不受影響。
 - **gRPC 和 web 行程同生共死**（見 5.1，這是重用 hub 的代價）。
-- **HTTP/SSE 端沒有 graceful shutdown**（見 5.4，刻意沒做）。
+- ~~HTTP/SSE 端沒有 graceful shutdown~~ → 2026-11-21 已補上（見 5.4）。

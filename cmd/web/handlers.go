@@ -576,13 +576,19 @@ const tradeSweepEvery = 30 * time.Second
 // It stays in cmd/web rather than the monitor daemon because cmd/web is the
 // only journal writer: a daemon placing an order without writing its id would
 // leave this process seeing an empty id and placing a second order.
+//
+// ctx only decides whether ANOTHER pass starts. A pass already running
+// finishes on a context that shutdown does not cancel: a sweep cut off between
+// placing an order and recording its id would leave the next run seeing an
+// empty id and placing the order a second time. main waits for the pass.
 func (s *server) tradeSweepLoop(ctx context.Context) {
+	work := context.WithoutCancel(ctx)
 	t := time.NewTicker(tradeSweepEvery)
 	defer t.Stop()
 	for {
-		s.sweepOpenTrades(ctx)
-		s.sweepExits(ctx)
-		s.refreshGone(ctx)
+		s.sweepOpenTrades(work)
+		s.sweepExits(work)
+		s.refreshGone(work)
 		select {
 		case <-ctx.Done():
 			return

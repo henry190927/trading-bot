@@ -15,6 +15,8 @@ import (
 	"net/http"
 	_ "net/http/pprof" // registers /debug/pprof/* on DefaultServeMux
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -284,21 +286,83 @@ func main() {
 		}()
 	}
 
+	// One place owns SIGTERM / SIGINT. ctx is cancelled on the first signal
+	// and every long-running part below shuts down from it.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
 	// gRPC MarketData, opt-in via GRPC_BIND and fed by the SAME hub the SSE
 	// stream uses — see cmd/web/grpc.go and docs/grpc.md. Unset = no listener,
-	// no signal handler, nothing changes.
-	startGRPC(srv.hub)
+	// nothing changes.
+	grpcDone := startGRPC(ctx, srv.hub)
 
 	// In-app alerts: evaluates the rules every 15s and serves the bell.
-	srv.startAlerts(context.Background())
+	srv.startAlerts(ctx)
 
 	// Fill detection + auto TP1/stop/TP2 placement for journal trades, every
 	// 30s whether or not a browser is open (see tradeSweepLoop).
-	go srv.tradeSweepLoop(context.Background())
+	sweepDone := make(chan struct{})
+	go func() {
+		defer close(sweepDone)
+		srv.tradeSweepLoop(ctx)
+	}()
 
+	// http.Server rather than r.Run: r.Run has no Shutdown, so SIGTERM used to
+	// drop every in-flight request (a form submit mid order placement
+	// included). No WriteTimeout: SSE responses are open-ended by design.
+	httpSrv := &http.Server{
+		Addr:              bind,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+	// Shutdown waits for handlers to return, and an SSE stream never returns
+	// on its own. Closing the hub's subscribers ends them. Runs after the
+	// listeners are closed, so no new stream can subscribe in between.
+	httpSrv.RegisterOnShutdown(srv.hub.closeSubscribers)
+
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- httpSrv.ListenAndServe() }()
 	log.Printf("trading-bot-web listening on %s (Asia/Taipei)", bind)
-	if err := r.Run(bind); err != nil {
-		log.Fatalf("server: %v", err)
+
+	select {
+	case err := <-serveErr:
+		log.Fatalf("server: %v", err) // never started (port taken, bad address)
+	case <-ctx.Done():
+	}
+	stop() // a second signal now kills the process the default way
+
+	shutdown(httpSrv, sweepDone, grpcDone)
+}
+
+// httpShutdownGrace bounds the HTTP drain. compose's stop_grace_period (30s)
+// must stay above this plus the gRPC grace (15s, which runs in parallel).
+const httpShutdownGrace = 15 * time.Second
+
+// shutdown drains HTTP, waits for an in-progress trade sweep and for gRPC,
+// each bounded, then returns so main exits.
+func shutdown(httpSrv *http.Server, sweepDone, grpcDone <-chan struct{}) {
+	log.Printf("shutdown: signal received — draining (max %s)", httpShutdownGrace)
+	ctx, cancel := context.WithTimeout(context.Background(), httpShutdownGrace)
+	defer cancel()
+
+	if err := httpSrv.Shutdown(ctx); err != nil {
+		log.Printf("shutdown: http drain incomplete: %v — closing remaining connections", err)
+		_ = httpSrv.Close()
+	} else {
+		log.Printf("shutdown: http drained")
+	}
+	waitFor(ctx, "trade sweep", sweepDone)
+	waitFor(ctx, "grpc", grpcDone)
+	log.Printf("shutdown: complete")
+}
+
+// waitFor waits for done or ctx, whichever comes first, and says which.
+func waitFor(ctx context.Context, what string, done <-chan struct{}) {
+	select {
+	case <-done:
+	case <-ctx.Done():
+		log.Printf("shutdown: gave up waiting for %s: %v", what, ctx.Err())
 	}
 }
 

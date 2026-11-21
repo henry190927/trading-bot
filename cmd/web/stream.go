@@ -255,6 +255,24 @@ func (h *tickerHub) subscribe() (<-chan []byte, []byte, func()) {
 	}
 }
 
+// closeSubscribers ends every open stream and stops the loops. Each
+// subscriber's channel is closed, which the SSE and gRPC handlers read as
+// "feed closed" and return. Used on shutdown: http.Server.Shutdown waits for
+// handlers to finish, and a healthy SSE stream never finishes on its own.
+// A release func called afterwards finds its channel gone and does nothing.
+func (h *tickerHub) closeSubscribers() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for ch := range h.subs {
+		delete(h.subs, ch)
+		close(ch)
+	}
+	if h.running {
+		h.cancel()
+		h.running = false
+	}
+}
+
 func (h *tickerHub) statsLoop(ctx context.Context) {
 	log.Printf("stream: stats loop started (REST every %s)", statsInterval)
 	defer log.Printf("stream: stats loop stopped (no subscribers)")
