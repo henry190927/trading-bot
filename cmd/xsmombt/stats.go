@@ -322,8 +322,6 @@ func gateArmOf(data []symData, only string, now time.Time) shipgate.Arm {
 	return a
 }
 
-func ptr(a shipgate.Arm) *shipgate.Arm { return &a }
-
 // printGateTable: per symbol and pooled, the nested windows (un-jittered
 // reading), 120d R/trade, the six 30d buckets and the absolute gate verdict.
 func printGateTable(data []symData, now time.Time) {

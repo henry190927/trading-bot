@@ -118,8 +118,12 @@ func Append(path string, r Record) error {
 	if err != nil {
 		return err
 	}
-	defer fh.Close()
 	_, err = fh.Write(append(b, '\n'))
+	// The Close error matters on a write: it can be where a failed flush
+	// shows up. Report it unless the write already failed.
+	if cerr := fh.Close(); err == nil {
+		err = cerr
+	}
 	return err
 }
 

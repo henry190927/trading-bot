@@ -118,7 +118,7 @@ func TestHealthServerServes(t *testing.T) {
 	var resp *http.Response
 	var err error
 	for i := 0; i < 50; i++ { // the listener starts in a goroutine
-		if resp, err = http.Get("http://" + addr + "/livez"); err == nil {
+		if resp, err = httpGet(t, "http://"+addr+"/livez"); err == nil {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -132,11 +132,22 @@ func TestHealthServerServes(t *testing.T) {
 		t.Errorf("/livez on a fresh registry = %d %s", resp.StatusCode, body)
 	}
 	for _, p := range []string{"/healthz", "/metrics"} {
-		r, err := http.Get("http://" + addr + p)
+		r, err := httpGet(t, "http://"+addr+p)
 		if err != nil || r.StatusCode != http.StatusOK {
 			t.Errorf("%s = %v %v", p, r, err)
 			continue
 		}
 		r.Body.Close()
 	}
+}
+
+// httpGet is http.Get bound to the test's context (the noctx linter forbids
+// a bare http.Get: a request should be cancellable).
+func httpGet(t *testing.T, url string) (*http.Response, error) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return http.DefaultClient.Do(req)
 }

@@ -33,6 +33,13 @@ jobs:
           go-version-file: go.mod
       - name: vet
         run: go vet ./...
+      # The same linters `make lint` runs (.golangci.yml). Pinned to the
+      # version used locally, so a lint result never differs between a
+      # laptop and CI.
+      - name: lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.13.2
       - name: test -race
         run: go test -race -count=1 ./...
 

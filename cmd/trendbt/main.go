@@ -449,7 +449,8 @@ func printWindow(data []symData, start, end time.Time, days int, showTrades bool
 	lo, hi := st.rpt-1.96*st.se, st.rpt+1.96*st.se
 	need := 0.0
 	if st.rpt > 0 {
-		need = math.Pow(1.96*st.sd/st.rpt, 2)
+		z := 1.96 * st.sd / st.rpt
+		need = z * z
 	}
 	fmt.Printf("       95%% CI on R/trade [%+.3f, %+.3f]; n needed for the CI to exclude 0 at this mean+SD ≈ %.0f\n", lo, hi, need)
 	return st
