@@ -37,11 +37,10 @@
     </div>
     <div class="ui-actions val-actions">
       <a href="/validate?symbol={{.Short}}&amp;side={{sigSide $r.Side}}&amp;entry={{fmtPrice $r.Entry}}&amp;tf={{$r.Timeframe}}" class="ui-btn ghost">{{t "val.tweak"}}</a>
-      <button type="button" class="ui-btn ghost ai-analyze-validate" data-short="{{.Short}}" data-tf="{{.TF}}" data-side="{{$r.Side.String}}" data-entry="{{printf "%.4f" $r.Entry}}">{{t "trades.ai"}}</button>
+      <button type="button" class="ui-btn ghost" data-copilot="validate" data-symbol="{{.Short}}" data-tf="{{.TF}}" data-side="{{$r.Side.String}}" data-entry="{{printf "%.4f" $r.Entry}}">{{template "icon" "spark"}}{{t "trades.ai"}}</button>
       <a href="{{validateRecordHref $r .Short}}" class="ui-btn">{{template "icon" "plus"}}{{t "val.record"}}</a>
     </div>
   </section>
-  <div class="ai-result hidden" data-result-for="validate"></div>
 
   {{if .SessionWarn}}<div class="ui-banner warn">{{template "icon" "alert"}}<span>{{.SessionWarn}}</span></div>{{end}}
 
@@ -113,45 +112,6 @@
   </section>
 </main>
 
-<script>window.VAL_I18N = {loading: {{t "scan.aiLoading"}}, network: {{t "scan.aiNetwork"}}};</script>
 <script src="/static/copy.js"></script>
-<script src="/static/ai-render.js"></script>
-<script>
-// AI analysis of THIS proposed trade (not the engine's own plan): POSTs
-// (short, tf, side, entry) to /ai/analyze/validate and renders it inline.
-(function () {
-    var btn = document.querySelector('.ai-analyze-validate');
-    var pane = document.querySelector('[data-result-for="validate"]');
-    if (!btn || !pane) return;
-    btn.addEventListener('click', function () {
-        if (!pane.classList.contains('hidden')) { pane.classList.add('hidden'); return; }
-        pane.classList.remove('hidden');
-        if (pane.dataset.loaded === '1') return;
-        pane.innerHTML = '<em class="ai-loading">' + window.VAL_I18N.loading + '</em>';
-        btn.disabled = true;
-        var fd = new URLSearchParams();
-        fd.append('short', btn.dataset.short);
-        fd.append('tf',    btn.dataset.tf);
-        fd.append('side',  btn.dataset.side);
-        fd.append('entry', btn.dataset.entry);
-        fetch('/ai/analyze/validate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: fd.toString(),
-        })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-        .then(function (res) {
-            btn.disabled = false;
-            if (!res.ok) { window.aiRender.renderInto(pane, { error: res.body.error || '?' }); return; }
-            window.aiRender.renderInto(pane, res.body);
-            pane.dataset.loaded = '1';
-        })
-        .catch(function (err) {
-            btn.disabled = false;
-            window.aiRender.renderInto(pane, { error: window.VAL_I18N.network + ' ' + err.message });
-        });
-    });
-})();
-</script>
 </body>
 </html>

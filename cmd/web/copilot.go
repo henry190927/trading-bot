@@ -48,7 +48,7 @@ const (
 //	                     next to the journal)
 //	COPILOT_AUDIT_PATH   tool-call log (default: copilot_audit.jsonl next to
 //	                     the journal)
-func newCopilot(p ai.Provider, bx *bingx.Client) *copilotService {
+func newCopilot(s *server, p ai.Provider, bx *bingx.Client) *copilotService {
 	g, ok := p.(*ai.GeminiClient)
 	if !ok {
 		return &copilotService{disabled: "the copilot needs AI_PROVIDER=gemini (tool calling is Gemini-only so far)"}
@@ -62,7 +62,7 @@ func newCopilot(p ai.Provider, bx *bingx.Client) *copilotService {
 	// The model picked in the drawer's selector (persisted by
 	// /api/ai/model) always goes first.
 	chain.Primary = g.CurrentModel
-	reg, err := tools.NewRegistry(tools.ReadTools(webToolDeps(bx))...)
+	reg, err := tools.NewRegistry(webTools(s, bx)...)
 	if err != nil {
 		return &copilotService{disabled: "tools: " + err.Error()}
 	}
@@ -72,6 +72,24 @@ func newCopilot(p ai.Provider, bx *bingx.Client) *copilotService {
 		apiKey: key,
 		agent:  &copilot.Agent{LLM: chain, Tools: reg, APIKey: key, Audit: audit.Write},
 	}
+}
+
+// webTools is the copilot's tool set: the shared read tools (package tools)
+// with get_trade swapped for the web's richer version, plus analyze_symbol and
+// validate_setup — the context the page-level AI buttons used to send.
+func webTools(s *server, bx *bingx.Client) []tools.Tool {
+	web := s.webAnalysisTools()
+	override := map[string]bool{}
+	for _, t := range web {
+		override[t.Name] = true
+	}
+	var out []tools.Tool
+	for _, t := range tools.ReadTools(webToolDeps(bx)) {
+		if !override[t.Name] {
+			out = append(out, t)
+		}
+	}
+	return append(out, web...)
 }
 
 // webToolDeps gives the shared tools the web's symbol set (every UI symbol,

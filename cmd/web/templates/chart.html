@@ -132,8 +132,10 @@
       {{/* Record the current structure read as a setup — same #cs-record-btn
            the renderer wires, moved here from the structure card (mockup). */}}
       <button type="button" class="ui-btn sm cs-record-btn" id="cs-record-btn" title="{{t "chart.recordHint"}}">{{template "icon" "flag"}}{{t "chart.record"}}</button>
-      <button type="button" class="ai-analyze-btn" id="chart-ai-btn"
-              data-symbol="{{.Symbol}}" data-tf="{{.TF}}">{{t "chart.ui.ai"}} ▸</button>
+      {{/* Opens the AI copilot drawer with "analyze <symbol> <tf>" filled in
+           (static/copilot.js). data-symbol / data-tf follow the chart. */}}
+      <button type="button" class="ai-analyze-btn" id="chart-ai-btn" data-copilot="symbol"
+              data-symbol="{{.Symbol}}" data-tf="{{.TF}}">{{template "icon" "spark"}}{{t "chart.ui.ai"}}</button>
       <button type="button" class="chart-side-toggle" id="chart-side-toggle" title="{{t "chart.panelToggle"}}" aria-expanded="true" aria-label="{{t "chart.ui.panelAria"}}">⇥</button>
     </div>
   </div>
@@ -810,8 +812,6 @@
     </span>
   </div>
 
-  <div id="chart-ai-result" class="ai-result hidden" data-result-for="chart"></div>
-
 </main>
 
 <footer>
@@ -819,7 +819,6 @@
 </footer>
 
 <script src="/static/copy.js"></script>
-<script src="/static/ai-render.js"></script>
 <script src="/static/lightweight-charts.standalone.production.js"></script>
 <script>
 (function () {
@@ -943,8 +942,6 @@
         "verdict.AVOID": {{t "chart.js.verdict.AVOID"}},
         "err.short": {{t "chart.js.err.short"}},
         "load.loading": {{t "chart.js.load.loading"}},
-        "ai.loading": {{t "chart.js.ai.loading"}},
-        "ai.empty": {{t "chart.js.ai.empty"}},
         "q.recordBtn": {{t "chart.js.q.recordBtn"}},
         "q.validateBtn": {{t "chart.js.q.validateBtn"}},
         "q.recording": {{t "chart.js.q.recording"}},
@@ -1042,7 +1039,6 @@
     var verdEl   = document.getElementById('chart-verdict');
     var linerEl  = document.getElementById('chart-oneliner-text'); // text span; sibling ⚑ button stays put
     var aiBtn    = document.getElementById('chart-ai-btn');
-    var aiPane   = document.getElementById('chart-ai-result');
     var refreshBtn = document.getElementById('chart-refresh');
 
     // ── Chart construction ──────────────────────────────────────────
@@ -2369,9 +2365,8 @@
     var glossaryCloseBtn = document.getElementById('glossary-close');
     var infoBtn          = document.getElementById('layers-info');
     var glossaryModal    = glossaryBackdrop ? glossaryBackdrop.querySelector('.glossary-modal') : null;
-    // Language: share the same localStorage key ai-render.js uses so
-    // switching lang in one modal follows through to AI analysis text
-    // and vice versa.
+    // Language preference for the glossary modal (the key name is
+    // historical: it was shared with the retired inline AI analysis).
     var GLOSS_LANG_KEY = 'ai-lang';
     // The glossary (and AI text, which shares the key) opens in the PAGE's
     // language, set on the server from the lang cookie. The in-modal EN/中
@@ -3723,8 +3718,6 @@
     // ── Wiring ─────────────────────────────────────────────────────
     symSel.addEventListener('change', function () {
         history.replaceState({}, '', '/chart?symbol=' + currentSym() + '&tf=' + currentTF());
-        aiPane.classList.add('hidden');
-        aiPane.dataset.loaded = '';
         tkMarkActive();
         load();
     });
@@ -3733,8 +3726,6 @@
             tfPills.forEach(function (x) { x.classList.remove('active'); });
             p.classList.add('active');
             history.replaceState({}, '', '/chart?symbol=' + currentSym() + '&tf=' + currentTF());
-            aiPane.classList.add('hidden');
-            aiPane.dataset.loaded = '';
             load();
         });
     });
@@ -3924,52 +3915,6 @@
         if (document.hidden) stopPoll(); else startPoll();
     });
     startPoll();
-
-    // AI Analyze — reuses shared aiRender helper (bilingual output).
-    aiBtn.addEventListener('click', function () {
-        console.log('[chart] AI analyze clicked', {sym: aiBtn.dataset.symbol, tf: aiBtn.dataset.tf});
-        if (!aiPane.classList.contains('hidden')) { aiPane.classList.add('hidden'); return; }
-        aiPane.classList.remove('hidden');
-        // Bring the pane into view — otherwise it lives below the
-        // chart and looks like nothing happened.
-        aiPane.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (aiPane.dataset.loaded === '1') return;
-        aiPane.innerHTML = '<em class="ai-loading">' + CT['ai.loading'] + ' ' + aiBtn.dataset.symbol + ' ' + aiBtn.dataset.tf + '…</em>';
-        aiBtn.disabled = true;
-        // Guard: if aiRender didn't load (script blocked, cached-out,
-        // etc.) we'd silently fail. Fall back to inline HTML so the
-        // user at least sees the response.
-        function renderFallback(target, payload) {
-            if (window.aiRender && window.aiRender.renderInto) {
-                window.aiRender.renderInto(target, payload);
-                return;
-            }
-            if (payload.error) {
-                target.innerHTML = '<div class="ai-error">' + payload.error + '</div>';
-            } else if (payload.text) {
-                target.innerHTML = '<pre style="white-space:pre-wrap;color:var(--text);">' + payload.text.replace(/</g, '&lt;') + '</pre>';
-            } else {
-                target.innerHTML = '<div class="ai-error">' + CT['ai.empty'] + '</div>';
-            }
-        }
-        fetch('/ai/analyze/symbol/' + aiBtn.dataset.symbol + '/' + aiBtn.dataset.tf, { method: 'POST' })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-            .then(function (res) {
-                aiBtn.disabled = false;
-                console.log('[chart] AI analyze response', res);
-                if (!res.ok) {
-                    renderFallback(aiPane, { error: res.body.error || 'unknown error' });
-                    return;
-                }
-                renderFallback(aiPane, res.body);
-                aiPane.dataset.loaded = '1';
-            })
-            .catch(function (err) {
-                aiBtn.disabled = false;
-                console.error('[chart] AI analyze fetch failed', err);
-                renderFallback(aiPane, { error: 'network error: ' + (err && err.message ? err.message : String(err)) });
-            });
-    });
 
     // ── "+ at price" quick action ──────────────────────────────────
     // Floating + marker tracks the crosshair Y position on the right

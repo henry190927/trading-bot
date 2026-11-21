@@ -1292,5 +1292,8 @@
   "copilot.stop.max_steps": "查了好幾輪還沒查完,先回答到這裡;可以把問題問得更具體。",
   "copilot.stop.empty": "AI 這次沒有給出回答,請換個問法再試。",
   "copilot.model": "模型",
-  "copilot.modelErr": "切換模型失敗,維持原本的模型。"
+  "copilot.modelErr": "切換模型失敗,維持原本的模型。",
+  "copilot.ask.symbol": "分析 %s %s 現在的狀況",
+  "copilot.ask.trade": "檢討交易 #%s",
+  "copilot.ask.validate": "評估這個進場:%s %s %s @ %s"
 }

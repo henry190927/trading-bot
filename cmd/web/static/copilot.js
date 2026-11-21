@@ -160,6 +160,32 @@
       form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true }));
     }
   });
+  // Page buttons with data-copilot open the drawer with a question filled
+  // in (not sent: the free tier is ~20 requests per model per day, so the
+  // user presses Enter). data-copilot = symbol | trade | validate.
+  function question(el) {
+    var d = el.dataset;
+    switch (d.copilot) {
+      case 'symbol': return fmt(I['copilot.ask.symbol'], (d.symbol || '').toUpperCase(), d.tf || '');
+      case 'trade': return fmt(I['copilot.ask.trade'], d.id || '');
+      case 'validate': return fmt(I['copilot.ask.validate'], (d.side || '').toLowerCase(), (d.symbol || '').toUpperCase(), d.tf || '', d.entry || '');
+    }
+    return '';
+  }
+  function prefill(text) {
+    setOpen(true);
+    if (!text) return;
+    input.value = text;
+    setTimeout(function () { input.focus(); input.setSelectionRange(text.length, text.length); }, 0);
+  }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest && e.target.closest('[data-copilot]');
+    if (!el) return;
+    e.preventDefault();
+    prefill(question(el));
+  });
+  window.Copilot = { prefill: prefill };
+
   renderAll();
   // A link ending in #copilot opens the drawer (e.g. from another page).
   if (location.hash === '#copilot') setOpen(true);

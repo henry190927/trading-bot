@@ -111,16 +111,7 @@
           <div class="ui-detail-actions">
             {{if .IsOpen}}<a href="/journal/{{.ID}}/close" class="ui-btn" style="margin-top:0">{{t "trades.close"}}</a>{{end}}
             <a href="/journal/{{.ID}}/edit" class="ui-btn ghost" style="margin-top:0">{{t "trades.edit"}}</a>
-            <button type="button" class="ui-btn ghost btn-analyze" style="margin-top:0" data-trade-id="{{.ID}}">{{t "trades.ai"}}</button>
-          </div>
-          <div class="ai-analysis-pane" data-pane-for="{{.ID}}" hidden>
-            <div class="ai-analysis-header">
-              <strong>{{t "trades.aiTitle"}}</strong>
-              <span class="ai-meta" data-meta-for="{{.ID}}"></span>
-              <button type="button" class="ai-close-btn" data-close-pane="{{.ID}}" aria-label="close">×</button>
-            </div>
-            <div class="ai-analysis-body" data-body-for="{{.ID}}"></div>
-            <div class="ai-disclaimer">{{t "trades.aiDisclaimer"}}</div>
+            <button type="button" class="ui-btn ghost" style="margin-top:0" data-copilot="trade" data-id="{{.ID}}">{{template "icon" "spark"}}{{t "trades.ai"}}</button>
           </div>
         </div>
       </td></tr>
@@ -160,96 +151,10 @@
 })();
 </script>
 <script src="/static/copy.js"></script>
-<script src="/static/ai-render.js"></script>
 <script src="/static/perf-tabs.js"></script>
 <script>
 /* Performance-group tabs moved to /static/perf-tabs.js (shared with /ops/autotrade). */
 
-// AI Analyze button — toggles the per-trade analysis pane. First click
-// hits POST /ai/analyze/:id, subsequent clicks just toggle visibility
-// (server-side cache prevents re-billing on repeat clicks anyway).
-(function () {
-    function fmtCost(usd) {
-        if (!usd && usd !== 0) return '';
-        if (usd === 0) return '(DRY-RUN, $0)';
-        return '($' + usd.toFixed(4) + ')';
-    }
-    // Minimal markdown-to-HTML renderer: handles fenced code blocks,
-    // headings, bold, italic, and inline code. Not a full parser — we
-    // trust the LLM output isn't adversarial. Keeps the pane readable
-    // without pulling a library.
-    function renderMD(s) {
-        // Escape HTML first.
-        s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        // Fenced code blocks.
-        s = s.replace(/```([\s\S]*?)```/g, function (_, code) {
-            return '<pre><code>' + code + '</code></pre>';
-        });
-        // Headings.
-        s = s.replace(/^### (.+)$/gm, '<h4>$1</h4>');
-        s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-        s = s.replace(/^# (.+)$/gm, '<h2>$1</h2>');
-        // Bold + italic + inline code.
-        s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-        s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-        s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-        // Tables (very light — only convert pipe rows into <table>).
-        var lines = s.split('\n');
-        var out = [];
-        var inTable = false;
-        for (var i = 0; i < lines.length; i++) {
-            var ln = lines[i];
-            if (ln.match(/^\s*\|.*\|\s*$/)) {
-                if (!inTable) { out.push('<table class="ai-md-table">'); inTable = true; }
-                // Skip pure separator rows (---|---|---).
-                if (ln.match(/^\s*\|?\s*:?-+:?(\s*\|\s*:?-+:?)+\s*\|?\s*$/)) continue;
-                var cells = ln.replace(/^\s*\||\|\s*$/g, '').split('|').map(function (c) { return c.trim(); });
-                var tag = (i > 0 && lines[i + 1] && lines[i + 1].match(/^\s*\|?\s*:?-+/)) ? 'th' : 'td';
-                out.push('<tr><' + tag + '>' + cells.join('</' + tag + '><' + tag + '>') + '</' + tag + '></tr>');
-            } else {
-                if (inTable) { out.push('</table>'); inTable = false; }
-                out.push(ln);
-            }
-        }
-        if (inTable) out.push('</table>');
-        return out.join('\n').replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>');
-    }
-
-    document.querySelectorAll('.btn-analyze').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var id = btn.dataset.tradeId;
-            var pane = document.querySelector('[data-pane-for="' + id + '"]');
-            var body = document.querySelector('[data-body-for="' + id + '"]');
-            if (!pane || !body) return;
-            if (!pane.hidden) { pane.hidden = true; return; }
-            pane.hidden = false;
-            if (body.dataset.loaded === '1') return;
-            body.innerHTML = '<em class="ai-loading">' + {{t "trades.aiLoading"}} + '</em>';
-            btn.disabled = true;
-            fetch('/ai/analyze/' + id, { method: 'POST' })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                .then(function (res) {
-                    if (!res.ok) {
-                        window.aiRender.renderInto(body, { error: res.body.error || 'unknown error' });
-                        return;
-                    }
-                    window.aiRender.renderInto(body, res.body);
-                    body.dataset.loaded = '1';
-                })
-                .catch(function (e) {
-                    window.aiRender.renderInto(body, { error: 'network error: ' + e });
-                })
-                .finally(function () { btn.disabled = false; });
-        });
-    });
-    document.querySelectorAll('.ai-close-btn').forEach(function (b) {
-        b.addEventListener('click', function () {
-            var id = b.dataset.closePane;
-            var pane = document.querySelector('[data-pane-for="' + id + '"]');
-            if (pane) pane.hidden = true;
-        });
-    });
-})();
 </script>
 </body>
 </html>

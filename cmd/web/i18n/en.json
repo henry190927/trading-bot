@@ -1292,5 +1292,8 @@
   "copilot.stop.max_steps": "Stopped after several rounds of lookups; this answer may be incomplete. A more specific question helps.",
   "copilot.stop.empty": "The AI gave no answer this time; try rephrasing.",
   "copilot.model": "Model",
-  "copilot.modelErr": "Could not switch models; keeping the current one."
+  "copilot.modelErr": "Could not switch models; keeping the current one.",
+  "copilot.ask.symbol": "Analyze %s %s right now",
+  "copilot.ask.trade": "Review trade #%s",
+  "copilot.ask.validate": "Assess this entry: %s %s %s @ %s"
 }

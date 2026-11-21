@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -188,5 +189,49 @@ func TestAIModelEndpointsNeverLeakTheKey(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if strings.Contains(w.Body.String(), secretKey) {
 		t.Errorf("POST leaked the key: %s", w.Body.String())
+	}
+}
+
+// The page-level AI buttons are gone; their context is served as tools.
+// get_trade must be the web's richer version, and no name may repeat.
+func TestWebToolsReplaceTheOldAnalysisEndpoints(t *testing.T) {
+	s := &server{client: bingx.New("", "")}
+	ts := webTools(s, s.client)
+	reg, err := tools.NewRegistry(ts...)
+	if err != nil {
+		t.Fatalf("duplicate or bad tool: %v", err)
+	}
+	for _, name := range []string{"get_trade", "analyze_symbol", "validate_setup", "get_journal_history", "get_recent_candles"} {
+		if _, ok := reg.Get(name); !ok {
+			t.Errorf("tool %q missing", name)
+		}
+	}
+	gt, _ := reg.Get("get_trade")
+	if !strings.Contains(gt.Description, "higher timeframes") {
+		t.Error("get_trade is the thin shared version, not the web's")
+	}
+}
+
+func TestValidateSetupRejectsBadArgsBeforeTheExchange(t *testing.T) {
+	s := &server{client: bingx.New("", "")}
+	ctx := t.Context()
+	if _, err := s.validateSetupContext(ctx, "BTC", "1h", "sideways", 100); err == nil || !strings.Contains(err.Error(), "long or short") {
+		t.Errorf("bad side: %v", err)
+	}
+	if _, err := s.validateSetupContext(ctx, "BTC", "1h", "long", 0); err == nil || !strings.Contains(err.Error(), "positive") {
+		t.Errorf("zero entry: %v", err)
+	}
+	if _, err := s.validateSetupContext(ctx, "NOPE", "1h", "long", 1); err == nil {
+		t.Error("unknown symbol accepted")
+	}
+}
+
+func TestOldAIAnalyzeRoutesAreGone(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(src), "/ai/analyze") {
+		t.Error("main.go still registers a /ai/analyze route; the copilot replaced them")
 	}
 }

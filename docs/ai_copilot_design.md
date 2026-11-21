@@ -157,7 +157,8 @@ for step := 0; step < MaxSteps; step++ {          // 例如 6
 | 期 | 內容 | 價值 |
 |---|---|---|
 | P1 ✅ | tools 套件(MCP 改用)+ Provider tool calling + agent loop + 最簡聊天抽屜(不串流)。2026-11-21 完成:`tools/`、`ai/toolcall.go`、`ai/quota.go`(§11 的備援鏈 + 每日斷路器)、`copilot/`、`cmd/web/copilot.go` + `static/copilot.js`;設定見 `cmd/web/copilot.go` 的 `COPILOT_*` 環境變數 | 能追問、AI 自己查資料 |
-| P2 | SSE 串流 + 每頁自動帶上下文;三個「AI 分析」按鈕改成開聊天框 | 收斂入口 |
+| P2 (部分 ✅) | SSE 串流 + 每頁自動帶上下文;三個「AI 分析」按鈕改成開聊天框 | 收斂入口 |
+| | 2026-11-21 已做:/scan、/chart、/journal、/validate 的 AI 按鈕改成開抽屜並**預填問題**(不自動送出,省免費額度);舊的 `/ai/analyze*` 三個 endpoint、結果快取、`ai-render.js` 刪除;原本按鈕送給模型的背景資料改由 `get_trade`(web 版)/ `analyze_symbol` / `validate_setup` 三個工具提供(`cmd/web/ai_context.go`);抽屜加模型選單(`/api/ai/model`,選的模型排第一)。**還沒做:SSE 串流、每頁自動帶上下文。** | |
 | P3 | 寫入提議 + 確認卡(HITL) | 從「建議」到「一鍵執行」 |
 | P4 | deep_analysis(fan-out) | 省 token、深度 |
 

@@ -108,9 +108,9 @@ func main() {
 	if !aiProvider.IsDryRun() && ai.APIKeyForProvider(aiProvider) == "" {
 		switch providerName {
 		case "anthropic":
-			log.Printf("[ai] ANTHROPIC_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable ANTHROPIC_DRY_RUN=true.")
+			log.Printf("[ai] ANTHROPIC_API_KEY not set — the AI copilot needs a key. Set the env var or enable ANTHROPIC_DRY_RUN=true.")
 		default:
-			log.Printf("[ai] GEMINI_API_KEY not set — /ai/analyze endpoints will return an error. Set the env var or enable GEMINI_DRY_RUN=true.")
+			log.Printf("[ai] GEMINI_API_KEY not set — the AI copilot will be off. Set the env var or enable GEMINI_DRY_RUN=true.")
 		}
 	}
 	srv := &server{
@@ -120,10 +120,8 @@ func main() {
 		ai:             aiProvider,
 		aiProviderName: providerName,
 		aiModelPath:    aiModelPath,
-		aiCache:        make(map[int]aiCacheEntry),
-		aiSymbolCache:  make(map[string]aiCacheEntry),
 	}
-	srv.copilot = newCopilot(aiProvider, bxClient)
+	srv.copilot = newCopilot(srv, aiProvider, bxClient)
 	if srv.copilot.disabled != "" {
 		log.Printf("[copilot] off: %s", srv.copilot.disabled)
 	} else {
@@ -152,9 +150,6 @@ func main() {
 	r.POST("/journal/:id/edit", srv.handleJournalEditPost)
 	r.POST("/journal/:id/delete", srv.handleJournalDelete)
 	r.POST("/journal/:id/unwind", srv.handleJournalUnwind)
-	r.POST("/ai/analyze/:id", srv.handleAIAnalyzeTrade)
-	r.POST("/ai/analyze/symbol/:short/:tf", srv.handleAIAnalyzeSymbol)
-	r.POST("/ai/analyze/validate", srv.handleAIAnalyzeValidate)
 	r.GET("/api/ai/model", srv.handleAIModelGet)
 	// Copilot chat drawer (copilot.go). Read-only in P1.
 	r.POST("/api/copilot/chat", srv.handleCopilotChat)

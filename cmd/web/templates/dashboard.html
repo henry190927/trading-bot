@@ -128,9 +128,8 @@
             {{if .Diagnose}}<a class="ui-btn ghost" style="margin-top:0" href="{{diagnoseHref . $.TF}}">{{t "scan.validate"}}</a>{{end}}
             {{if hasPlan .Signal}}<a class="ui-btn" style="margin-top:0" href="{{recordHref . $.TF}}">{{template "icon" "plus"}}{{t "scan.record"}}</a>{{end}}
             <button type="button" class="ui-btn ghost js-copy" style="margin-top:0" data-flash="{{t "scan.copied"}}" title="{{t "scan.copyRowHint"}}" data-copy="{{.Short}} {{$.TF}} {{sideText .Signal.Side}} @ {{fmtPrice .Signal.Price}} | MR {{.Signal.MRScore}} MOM {{.Signal.MomentumScore}} total {{.Signal.Score}}{{if .Signal.POCMig.POCShort}} | drift {{driftArrow .Signal.POCMig.Trend}} {{printf "%+.2f%%" (mulPct .Signal.POCMig.DriftPct)}}{{end}}{{if .Diagnose}} | diag {{sideStr .Diagnose.Side.String}} MR {{printf "%.0f" (score100 .Diagnose.TotalMR)}} MOM {{printf "%.0f" (score100 .Diagnose.TotalMOM)}} ratio {{printf "%.1f" (score100 .Diagnose.Total)}}/100 {{verdictShort .Diagnose.Verdict}}{{end}}">{{t "scan.copyRow"}}</button>
-            <button type="button" class="ui-btn ghost ai-analyze-btn" style="margin-top:0" data-symbol="{{.Short}}" data-tf="{{$.TF}}">{{t "trades.ai"}}</button>
+            <button type="button" class="ui-btn ghost" style="margin-top:0" data-copilot="symbol" data-symbol="{{.Short}}" data-tf="{{$.TF}}">{{template "icon" "spark"}}{{t "trades.ai"}}</button>
           </div>
-          <div class="ai-result hidden" data-result-for="{{.Short}}-{{$.TF}}"></div>
         </div>
       </td></tr>
       {{end}}
@@ -141,15 +140,17 @@
   </section>
 </main>
 
-<script>window.SCAN_I18N = {loading: {{t "scan.aiLoading"}}, network: {{t "scan.aiNetwork"}}};</script>
 <script src="/static/copy.js"></script>
-<script src="/static/ai-render.js"></script>
 <script>
 /* The page reloads itself every 30s for fresh scans, but never while a row
-   is open: a reload would close it under the reader. */
+   or the AI copilot drawer is open: a reload would close it under the
+   reader (and drop a copilot answer still on its way). */
 (function () {
   var INTERVAL_MS = 30000, timer = null;
-  function anyOpen() { return !!document.querySelector('.ui-tdetail:not([hidden])'); }
+  function anyOpen() {
+    var cp = document.getElementById('copilot');
+    return !!document.querySelector('.ui-tdetail:not([hidden])') || !!(cp && !cp.hidden);
+  }
   function schedule() {
     clearTimeout(timer);
     timer = setTimeout(function () { if (anyOpen()) schedule(); else location.reload(); }, INTERVAL_MS);
@@ -167,32 +168,6 @@
     }
     tr.addEventListener('click', function (e) { if (!e.target.closest('a,button')) toggle(); });
     tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
-  });
-
-  document.querySelectorAll('.ai-analyze-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var sym = btn.dataset.symbol, tf = btn.dataset.tf;
-      var pane = document.querySelector('[data-result-for="' + sym + '-' + tf + '"]');
-      if (!pane) return;
-      if (!pane.classList.contains('hidden') && pane.dataset.loaded === '1') { pane.classList.add('hidden'); return; }
-      pane.classList.remove('hidden');
-      if (pane.dataset.loaded === '1') return;
-      pane.innerHTML = '<div class="ai-loading">' + window.SCAN_I18N.loading + '</div>' +
-        '<div class="skeleton skel-line w90"></div><div class="skeleton skel-line w70"></div><div class="skeleton skel-line w50"></div>';
-      btn.disabled = true;
-      fetch('/ai/analyze/symbol/' + sym + '/' + tf, { method: 'POST' })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-        .then(function (res) {
-          btn.disabled = false;
-          if (!res.ok) { window.aiRender.renderInto(pane, { error: res.body.error || '?' }); return; }
-          window.aiRender.renderInto(pane, res.body);
-          pane.dataset.loaded = '1';
-        })
-        .catch(function (err) {
-          btn.disabled = false;
-          window.aiRender.renderInto(pane, { error: window.SCAN_I18N.network + ' ' + err.message });
-        });
-    });
   });
 
   // Arriving from a "tradeable" link (#row-BTC) opens that row.

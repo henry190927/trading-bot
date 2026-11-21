@@ -1,3 +1,5 @@
+> ⚠️ 2026-11-21:頁面上的「AI 分析」按鈕與 `/ai/analyze*` endpoint 已移除,改由 AI 助手(聊天抽屜)統一處理,見 `docs/ai_copilot_design.md`。下文描述的是舊的單次分析流程。
+
 # AI Advisor Architecture
 
 The trading-web AI advisor layer wraps the user's existing
