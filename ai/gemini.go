@@ -335,7 +335,7 @@ func (g *GeminiClient) Send(ctx context.Context, opts SendOptions) (*Response, e
 		return nil, fmt.Errorf("ai/gemini: marshal request: %w", err)
 	}
 
-	raw, err := g.postGenerate(ctx, model, opts.APIKey, payload)
+	raw, err := g.postGenerate(ctx, model, opts.APIKey, payload, true)
 	if err != nil {
 		return nil, err
 	}
@@ -418,9 +418,14 @@ func (g *GeminiClient) apiBase() string {
 }
 
 // postGenerate POSTs payload to model's generateContent and returns the body
-// of a 200. Transient upstream errors (429, 500–504) are retried twice with
-// backoff; a final non-200 comes back as *GeminiHTTPError.
-func (g *GeminiClient) postGenerate(ctx context.Context, model, apiKey string, payload []byte) ([]byte, error) {
+// of a 200. Transient upstream errors (500–504) are retried twice with
+// backoff, and 429 too when retry429 is set; a final non-200 comes back as
+// *GeminiHTTPError.
+//
+// The copilot passes retry429=false: its QuotaChain decides what a 429 means
+// (daily quota spent → switch model; per-minute → wait the server's
+// retryDelay). Blindly retrying a per-day 429 only burns time.
+func (g *GeminiClient) postGenerate(ctx context.Context, model, apiKey string, payload []byte, retry429 bool) ([]byte, error) {
 	url := g.apiBase() + model + ":generateContent?key=" + apiKey
 	var lastErr error
 	for attempt := 0; attempt <= 2; attempt++ {
@@ -453,7 +458,7 @@ func (g *GeminiClient) postGenerate(ctx context.Context, model, apiKey string, p
 			return raw, nil
 		}
 		lastErr = &GeminiHTTPError{Status: resp.StatusCode, Body: raw}
-		retryable := resp.StatusCode == http.StatusTooManyRequests || (resp.StatusCode >= 500 && resp.StatusCode <= 504)
+		retryable := (retry429 && resp.StatusCode == http.StatusTooManyRequests) || (resp.StatusCode >= 500 && resp.StatusCode <= 504)
 		if !retryable {
 			return nil, lastErr
 		}

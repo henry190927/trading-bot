@@ -90,7 +90,9 @@ type ToolCaller interface {
 
 var _ ToolCaller = (*GeminiClient)(nil)
 
-// SendWithTools sends one step of a tool conversation to Gemini.
+// SendWithTools sends one step of a tool conversation to Gemini. A 429 is
+// returned at once (as *GeminiHTTPError), not retried: QuotaChain owns that
+// decision.
 func (g *GeminiClient) SendWithTools(ctx context.Context, req ToolRequest) (*ToolResponse, error) {
 	if req.APIKey == "" && !g.DryRun {
 		return nil, errors.New("ai/gemini: APIKey required (env GEMINI_API_KEY)")
@@ -114,7 +116,7 @@ func (g *GeminiClient) SendWithTools(ctx context.Context, req ToolRequest) (*Too
 	if err != nil {
 		return nil, err
 	}
-	raw, err := g.postGenerate(ctx, model, req.APIKey, payload)
+	raw, err := g.postGenerate(ctx, model, req.APIKey, payload, false)
 	if err != nil {
 		return nil, err
 	}
