@@ -48,6 +48,9 @@ const (
 type GeminiClient struct {
 	HTTP   *http.Client
 	DryRun bool
+	// BaseURL overrides the API root (tests point it at an httptest
+	// server). Empty = the public endpoint.
+	BaseURL string
 
 	mu    sync.RWMutex
 	model string // empty → GEMINI_MODEL env var → DefaultGeminiModel
@@ -332,58 +335,9 @@ func (g *GeminiClient) Send(ctx context.Context, opts SendOptions) (*Response, e
 		return nil, fmt.Errorf("ai/gemini: marshal request: %w", err)
 	}
 
-	url := geminiAPIBase + model + ":generateContent?key=" + opts.APIKey
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	raw, err := g.postGenerate(ctx, model, opts.APIKey, payload)
 	if err != nil {
-		return nil, fmt.Errorf("ai/gemini: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// Retry transient upstream errors (503 UNAVAILABLE, 429 rate-limited,
-	// 500 backend flapping). Google routinely returns 503 during spike
-	// windows even though the client's own quota is untouched. Two
-	// retries with backoff give ~10s total wait — plenty for a spike to
-	// clear without hanging the UI unreasonably.
-	var resp *http.Response
-	var raw []byte
-	for attempt := 0; attempt <= 2; attempt++ {
-		if attempt > 0 {
-			// Rebuild the request body — some http.Client implementations
-			// exhaust bytes.Reader on the first Do(), so subsequent
-			// retries would send an empty payload. Cheap to reconstruct.
-			req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-			if err != nil {
-				return nil, fmt.Errorf("ai/gemini: rebuild retry request: %w", err)
-			}
-			req.Header.Set("Content-Type", "application/json")
-			// Backoff: 1s → 3s.
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(time.Duration(attempt*2+1) * time.Second):
-			}
-		}
-		resp, err = g.HTTP.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("ai/gemini: http do: %w", err)
-		}
-		raw, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("ai/gemini: read response: %w", err)
-		}
-		if resp.StatusCode == http.StatusOK {
-			break
-		}
-		// Retryable? 429 / 500 / 502 / 503 / 504.
-		if resp.StatusCode == 429 || (resp.StatusCode >= 500 && resp.StatusCode <= 504) {
-			if attempt < 2 {
-				log.Printf("ai/gemini: http %d transient, retrying (attempt %d/2)", resp.StatusCode, attempt+1)
-				continue
-			}
-		}
-		// Non-retryable OR retry budget exhausted — surface verbatim.
-		return nil, fmt.Errorf("ai/gemini: http %d: %s", resp.StatusCode, raw)
+		return nil, err
 	}
 
 	var decoded struct {
@@ -442,4 +396,70 @@ func GeminiAPIKeyFromEnv() string {
 // GeminiDryRunFromEnv reports whether GEMINI_DRY_RUN=true.
 func GeminiDryRunFromEnv() bool {
 	return os.Getenv("GEMINI_DRY_RUN") == "true"
+}
+
+// GeminiHTTPError is a non-200 answer from generateContent, after retries.
+// Callers that care (the copilot's quota handling) inspect Status and Body;
+// everyone else gets the same message the client has always returned.
+type GeminiHTTPError struct {
+	Status int
+	Body   []byte
+}
+
+func (e *GeminiHTTPError) Error() string {
+	return fmt.Sprintf("ai/gemini: http %d: %s", e.Status, e.Body)
+}
+
+func (g *GeminiClient) apiBase() string {
+	if g.BaseURL != "" {
+		return strings.TrimSuffix(g.BaseURL, "/") + "/"
+	}
+	return geminiAPIBase
+}
+
+// postGenerate POSTs payload to model's generateContent and returns the body
+// of a 200. Transient upstream errors (429, 500–504) are retried twice with
+// backoff; a final non-200 comes back as *GeminiHTTPError.
+func (g *GeminiClient) postGenerate(ctx context.Context, model, apiKey string, payload []byte) ([]byte, error) {
+	url := g.apiBase() + model + ":generateContent?key=" + apiKey
+	var lastErr error
+	for attempt := 0; attempt <= 2; attempt++ {
+		if attempt > 0 {
+			// Backoff: 1s → 3s. Google routinely returns 503 during spike
+			// windows even though the client's own quota is untouched.
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt*2+1) * time.Second):
+			}
+		}
+		// A fresh request per attempt: a bytes.Reader body is consumed by
+		// the first Do.
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+		if err != nil {
+			return nil, fmt.Errorf("ai/gemini: build request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := g.HTTP.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("ai/gemini: http do: %w", err)
+		}
+		raw, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("ai/gemini: read response: %w", err)
+		}
+		if resp.StatusCode == http.StatusOK {
+			return raw, nil
+		}
+		lastErr = &GeminiHTTPError{Status: resp.StatusCode, Body: raw}
+		retryable := resp.StatusCode == http.StatusTooManyRequests || (resp.StatusCode >= 500 && resp.StatusCode <= 504)
+		if !retryable {
+			return nil, lastErr
+		}
+		if attempt < 2 {
+			log.Printf("ai/gemini: http %d transient, retrying (attempt %d/2)", resp.StatusCode, attempt+1)
+		}
+	}
+	return nil, lastErr
 }
