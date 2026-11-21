@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -47,6 +48,10 @@ type server struct {
 
 	// sweepMu serialises sweepOpenTrades (fill detection + auto orders).
 	sweepMu sync.Mutex
+	// journalMu guards every read-modify-write of journal.csv; it is held
+	// only around the file I/O (journal_write.go). Lock order: sweepMu, then
+	// journalMu.
+	journalMu sync.Mutex
 	// gone tracks open trades whose position the exchange no longer has
 	// (position_gone.go), refreshed by tradeSweepLoop.
 	gone goneState
@@ -608,16 +613,15 @@ func (s *server) sweepOpenTrades(ctx context.Context) {
 	}
 	// The sweep spent BingX round trips holding a copy of the journal. Writing
 	// that copy back would erase a row recorded or edited in the meantime, so
-	// re-read and carry over only the fields the sweep owns.
-	fresh, err := journal.ReadAll("")
-	if err != nil {
-		log.Printf("trade sweep: re-read journal: %v", err)
-		return
-	}
-	if mergeSweep(fresh, before, trades) {
-		if err := journal.WriteAll("", fresh); err != nil {
-			log.Printf("trade sweep: journal write failed: %v", err)
+	// re-read (under journalMu) and carry over only the fields the sweep owns.
+	err = s.updateJournal(func(fresh []journal.Trade) ([]journal.Trade, error) {
+		if !mergeSweep(fresh, before, trades) {
+			return nil, errNoChange
 		}
+		return fresh, nil
+	})
+	if err != nil {
+		log.Printf("trade sweep: journal write failed: %v", err)
 	}
 }
 
@@ -1125,11 +1129,6 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		return
 	}
 
-	trades, err := journal.ReadAll("")
-	if err != nil {
-		rerender("read journal: " + err.Error())
-		return
-	}
 	var leverage int
 	if leverageStr != "" {
 		n, err := strconv.Atoi(leverageStr)
@@ -1170,7 +1169,7 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	}
 
 	t := journal.Trade{
-		ID:         journal.NextID(trades),
+		// ID is assigned by appendTrade at write time.
 		OpenedAt:   now,
 		AnalyzedAt: analyzedAt,
 		Symbol:     symbol,
@@ -1195,9 +1194,8 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		// journal.AccountLeverage degrades to 0 rather than guessing.
 		EquityUSDT: s.equityAtEntry(c.Request.Context()),
 	}
-	trades = append(trades, t)
-	idx := len(trades) - 1
-	if err := journal.WriteAll("", trades); err != nil {
+	t, err = s.appendTrade(t)
+	if err != nil {
 		rerender("write journal: " + err.Error())
 		return
 	}
@@ -1207,12 +1205,13 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 	// retry later — never blocks the user from recording the plan.
 	statuses := []string{}
 	if openPos {
-		st, msg := s.placeEntryOnBingX(c.Request.Context(), s.translator(langOf(c)), &trades[idx])
+		st, msg := s.placeEntryOnBingX(c.Request.Context(), s.translator(langOf(c)), &t)
 		statuses = append(statuses, "entry:"+st+":"+msg)
 	}
-	// Persist any orderIds that got written by the helper.
-	if trades[idx].EntryOrderID != "" {
-		if err := journal.WriteAll("", trades); err != nil {
+	// Persist any orderIds the helper set, onto the row as it is now (the
+	// sweep may have touched it while the order was in flight).
+	if t.EntryOrderID != "" {
+		if err := s.updateTrade(t.ID, func(row *journal.Trade) error { copyOrderState(row, &t); return nil }); err != nil {
 			log.Printf("auto-open: post-place journal write failed: %v", err)
 		}
 	}
@@ -1670,14 +1669,7 @@ func (s *server) handleJournalUnwind(c *gin.Context) {
 
 	// Drop the row regardless of unwind outcome — the user pressed
 	// "Unwind + Delete" and we logged whatever happened on BingX side.
-	out := make([]journal.Trade, 0, len(trades)-1)
-	for i, x := range trades {
-		if i == idx {
-			continue
-		}
-		out = append(out, x)
-	}
-	if err := journal.WriteAll("", out); err != nil {
+	if err := s.deleteTrade(id); err != nil {
 		c.String(http.StatusInternalServerError, "write journal: %s", err.Error())
 		return
 	}
@@ -1845,35 +1837,44 @@ func (s *server) handleJournalClosePost(c *gin.Context) {
 		}
 	}
 
-	trades[idx].ClosedAt = closedAt
-	trades[idx].ExitPrice = exit
-	trades[idx].Outcome = outcome
-	trades[idx].CloseNotes = notes
-	if outcome == "no-fill" {
-		trades[idx].RRealized = 0
-	} else {
-		trades[idx].RRealized = journal.RealizedR(trades[idx], exit)
-	}
-
 	// Cancel any still-pending BingX orderIds tied to this trade. Closing
 	// a journal row implies "this trade is done"; anything BingX still
 	// thinks is open (sweep-placed TP1 reduce-only, residual stop, etc.)
 	// is by definition an orphan. Default ON; the user can untick the
-	// checkbox on the close form to skip (rare).
+	// checkbox on the close form to skip (rare). The exchange calls run on
+	// a working copy, outside journalMu.
+	work := trades[idx]
 	cancelOrders := c.PostForm("cancel_orders") == "on"
 	cancelMsgs := []string{}
 	if cancelOrders {
-		cancelMsgs = s.cancelTrackedOrdersOnBingX(c.Request.Context(), &trades[idx])
+		cancelMsgs = s.cancelTrackedOrdersOnBingX(c.Request.Context(), &work)
 	}
 
-	if err := journal.WriteAll("", trades); err != nil {
+	// Apply the close to the row as it is now: a partial exit the sweep
+	// recorded meanwhile still counts toward the realized R.
+	err = s.updateTrade(work.ID, func(row *journal.Trade) error {
+		row.ClosedAt = closedAt
+		row.ExitPrice = exit
+		row.Outcome = outcome
+		row.CloseNotes = notes
+		if outcome == "no-fill" {
+			row.RRealized = 0
+		} else {
+			row.RRealized = journal.RealizedR(*row, exit)
+		}
+		if cancelOrders {
+			copyOrderState(row, &work)
+		}
+		return nil
+	})
+	if err != nil {
 		rerender("write journal: " + err.Error())
 		return
 	}
 
 	redirect := "/journal"
 	if len(cancelMsgs) > 0 {
-		flash := s.translator(langOf(c))("flash.closeCancel", trades[idx].ID) + "\n" + strings.Join(cancelMsgs, "\n")
+		flash := s.translator(langOf(c))("flash.closeCancel", work.ID) + "\n" + strings.Join(cancelMsgs, "\n")
 		redirect = "/journal?tp1_status=ok&tp1_msg=" + url.QueryEscape(flash)
 	}
 	c.Redirect(http.StatusSeeOther, redirect)
@@ -2083,56 +2084,73 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 		marginUSDT = v
 	}
 
-	// Apply mutations
-	trades[idx].Symbol = sym
-	trades[idx].Side = side
-	trades[idx].TF = strings.TrimSpace(c.PostForm("tf"))
-	trades[idx].Score = strings.TrimSpace(c.PostForm("score"))
-	trades[idx].Anchor = strings.TrimSpace(c.PostForm("anchor"))
-	trades[idx].OpenNotes = strings.TrimSpace(c.PostForm("open_notes"))
-	trades[idx].CloseNotes = strings.TrimSpace(c.PostForm("close_notes"))
-	trades[idx].Leverage = leverage
-	trades[idx].MarginUSDT = marginUSDT
-	trades[idx].Entry = entry
-	trades[idx].Stop = stop
-	trades[idx].TP1 = tp1
-	trades[idx].TP2 = tp2
-	trades[idx].OpenedAt = openedAt
-	trades[idx].AnalyzedAt = analyzedAt
-	trades[idx].FilledAt = filledAt
-	trades[idx].ClosedAt = closedAt
-	trades[idx].Outcome = outcome
-	trades[idx].ExitPrice = exitPrice
-	trades[idx].SignalCtx = strings.TrimSpace(c.PostForm("signal_ctx"))
-	if legTouched {
-		if legPrice == 0 {
-			trades[idx].TP1FillPrice, trades[idx].TP1FillPct, trades[idx].TP1FilledAt = 0, 0, time.Time{}
-		} else {
-			if trades[idx].TP1FilledAt.IsZero() {
-				trades[idx].TP1FilledAt = time.Now()
-			}
-			trades[idx].TP1FillPrice, trades[idx].TP1FillPct = legPrice, legPct
-		}
-	}
-	switch {
-	case closedAt.IsZero():
-		trades[idx].RRealized = 0
-	case outcome == "no-fill":
-		trades[idx].RRealized = 0
-	default:
-		trades[idx].RRealized = journal.RealizedR(trades[idx], exitPrice)
-	}
-
 	// Persist the auto-placement intent flags from the edit form. Editing
 	// always reflects the current checkbox state — unchecked = clear future
 	// auto-retry for that order type.
 	autoStop := c.PostForm("place_stop") == "on"
 	autoTP2 := c.PostForm("place_tp2") == "on"
-	trades[idx].TP1Auto = false // legacy flag; nothing places TP1 any more
-	trades[idx].StopAuto = autoStop
-	trades[idx].TP2Auto = autoTP2
+	ver := c.PostForm("ver")
 
-	if err := journal.WriteAll("", trades); err != nil {
+	// Apply mutations to the row as it is now, under journalMu. The version
+	// check is repeated here: the one above compared against the copy read
+	// when the request started, and the sweep may have written since.
+	err = s.updateTrade(trades[idx].ID, func(row *journal.Trade) error {
+		if journal.Version(*row) != ver {
+			return errStaleEdit
+		}
+		row.Symbol = sym
+		row.Side = side
+		row.TF = strings.TrimSpace(c.PostForm("tf"))
+		row.Score = strings.TrimSpace(c.PostForm("score"))
+		row.Anchor = strings.TrimSpace(c.PostForm("anchor"))
+		row.OpenNotes = strings.TrimSpace(c.PostForm("open_notes"))
+		row.CloseNotes = strings.TrimSpace(c.PostForm("close_notes"))
+		row.Leverage = leverage
+		row.MarginUSDT = marginUSDT
+		row.Entry = entry
+		row.Stop = stop
+		row.TP1 = tp1
+		row.TP2 = tp2
+		row.OpenedAt = openedAt
+		row.AnalyzedAt = analyzedAt
+		row.FilledAt = filledAt
+		row.ClosedAt = closedAt
+		row.Outcome = outcome
+		row.ExitPrice = exitPrice
+		row.SignalCtx = strings.TrimSpace(c.PostForm("signal_ctx"))
+		if legTouched {
+			if legPrice == 0 {
+				row.TP1FillPrice, row.TP1FillPct, row.TP1FilledAt = 0, 0, time.Time{}
+			} else {
+				if row.TP1FilledAt.IsZero() {
+					row.TP1FilledAt = time.Now()
+				}
+				row.TP1FillPrice, row.TP1FillPct = legPrice, legPct
+			}
+		}
+		switch {
+		case closedAt.IsZero():
+			row.RRealized = 0
+		case outcome == "no-fill":
+			row.RRealized = 0
+		default:
+			row.RRealized = journal.RealizedR(*row, exitPrice)
+		}
+		row.TP1Auto = false // legacy flag; nothing places TP1 any more
+		row.StopAuto = autoStop
+		row.TP2Auto = autoTP2
+		return nil
+	})
+	if errors.Is(err, errStaleEdit) {
+		fresh, _, _, lerr := s.loadTradeByID(c)
+		if lerr != nil {
+			c.String(http.StatusNotFound, "%s", lerr.Error())
+			return
+		}
+		s.page(c, http.StatusConflict, "journal_edit.html", editFormData(fresh, tr("jf.err.stale", fresh.ID)))
+		return
+	}
+	if err != nil {
 		rerender("write journal: " + err.Error())
 		return
 	}
@@ -2292,21 +2310,12 @@ func (s *server) handleAIAnalyzeTrade(c *gin.Context) {
 
 // handleJournalDelete removes a trade by ID (POST only).
 func (s *server) handleJournalDelete(c *gin.Context) {
-	_, _, trades, err := s.loadTradeByID(c)
+	t, _, _, err := s.loadTradeByID(c)
 	if err != nil {
 		c.String(http.StatusNotFound, "%s", err.Error())
 		return
 	}
-	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
-	out := make([]journal.Trade, 0, len(trades))
-	for _, t := range trades {
-		if t.ID == id {
-			continue
-		}
-		out = append(out, t)
-	}
-	if err := journal.WriteAll("", out); err != nil {
+	if err := s.deleteTrade(t.ID); err != nil {
 		c.String(http.StatusInternalServerError, "write journal: %s", err.Error())
 		return
 	}
@@ -3761,20 +3770,9 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		}
 	}
 
-	trades, err := journal.ReadAll("")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "read journal: " + err.Error()})
-		return
-	}
-	nextID := 1
-	for _, t := range trades {
-		if t.ID >= nextID {
-			nextID = t.ID + 1
-		}
-	}
 	now := time.Now()
 	t := journal.Trade{
-		ID:         nextID,
+		// ID is assigned by appendTrade at write time.
 		OpenedAt:   now,
 		AnalyzedAt: now,
 		Symbol:     symbol,
@@ -3795,11 +3793,10 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		t.StopAuto = true
 		t.TP2Auto = tp2 > 0
 	}
-	trades = append(trades, t)
-	idx := len(trades) - 1
 	// The row is written BEFORE any order goes out, same as /journal/open:
 	// an exchange failure must never lose the record of what was intended.
-	if err := journal.WriteAll("", trades); err != nil {
+	t, err = s.appendTrade(t)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "write journal: " + err.Error()})
 		return
 	}
@@ -3814,18 +3811,22 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		Msg    string `json:"msg"`
 	}
 	ctx := c.Request.Context()
-	st, msg := s.placeEntryOnBingX(ctx, tr, &trades[idx])
+	st, msg := s.placeEntryOnBingX(ctx, tr, &t)
 	legs := []leg{{"entry", st, msg}}
-	if st != "ok" {
-		// The entry never reached the exchange (risk gate, no key, API
-		// error), so the row is a plan, not an order. Drop the "place this
-		// for me" flags: bracket.Decide honours StopAuto against ANY live
-		// position on this symbol and side, and a refused order should not
-		// leave an intent behind that later attaches to a position opened
-		// some other way.
-		trades[idx].StopAuto, trades[idx].TP2Auto = false, false
-	}
-	if err := journal.WriteAll("", trades); err != nil {
+	err = s.updateTrade(t.ID, func(row *journal.Trade) error {
+		copyOrderState(row, &t)
+		if st != "ok" {
+			// The entry never reached the exchange (risk gate, no key, API
+			// error), so the row is a plan, not an order. Drop the "place this
+			// for me" flags: bracket.Decide honours StopAuto against ANY live
+			// position on this symbol and side, and a refused order should not
+			// leave an intent behind that later attaches to a position opened
+			// some other way.
+			row.StopAuto, row.TP2Auto = false, false
+		}
+		return nil
+	})
+	if err != nil {
 		log.Printf("chart quick-open: post-place journal write failed: %v", err)
 	}
 	out := gin.H{"ok": true, "id": t.ID, "orders": legs}
@@ -3834,7 +3835,7 @@ func (s *server) handleAPIChartJournalOpen(c *gin.Context) {
 		// lay them out instead of printing one long sentence. qty is the
 		// lot-floored size placeEntryOnBingX sent; the exchange may round it
 		// again to its own step (SUI #93: 1628.8201 sent, 1628 on the book).
-		tt := trades[idx]
+		tt := t
 		qty := floorTo(tt.MarginUSDT*float64(tt.Leverage)/tt.Entry, lotPrec(tt.Symbol))
 		out["summary"] = gin.H{
 			"symbol": tt.Symbol, "side": tt.Side, "entry": tt.Entry, "qty": qty,

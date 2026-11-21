@@ -198,14 +198,14 @@ func (s *server) sweepExits(ctx context.Context) {
 	if len(added) == 0 {
 		return
 	}
-	fresh, err := journal.ReadAll("")
-	if err != nil {
-		return
-	}
-	if mergeExits(fresh, added) {
-		if err := journal.WriteAll("", fresh); err != nil {
-			log.Printf("exits: journal write failed: %v", err)
+	err = s.updateJournal(func(fresh []journal.Trade) ([]journal.Trade, error) {
+		if !mergeExits(fresh, added) {
+			return nil, errNoChange
 		}
+		return fresh, nil
+	})
+	if err != nil {
+		log.Printf("exits: journal write failed: %v", err)
 	}
 }
 

@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -152,20 +153,11 @@ func (s *server) handleMoveTP(c *gin.Context) {
 }
 
 // recordFinalTP points the row's final take-profit at the new order: tp2 and
-// tp2_order_id. Under sweepMu, like recordStopOrderID, so it cannot
-// interleave with the background sweep's read-merge-write.
+// tp2_order_id. Locked like recordStopOrderID.
 func (s *server) recordFinalTP(id int, price float64, orderID string) {
 	s.sweepMu.Lock()
 	defer s.sweepMu.Unlock()
-	trades, err := journal.ReadAll("")
-	if err != nil {
-		return
-	}
-	for i := range trades {
-		if trades[i].ID == id {
-			trades[i].TP2, trades[i].TP2OrderID = price, orderID
-			_ = journal.WriteAll("", trades)
-			return
-		}
+	if err := s.updateTrade(id, func(t *journal.Trade) error { t.TP2, t.TP2OrderID = price, orderID; return nil }); err != nil {
+		log.Printf("move-tp: record final tp for #%d: %v", id, err)
 	}
 }

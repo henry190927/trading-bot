@@ -201,10 +201,6 @@ func (s *server) handleOpsEntry(c *gin.Context) {
 // TP1 is a separate reduce-only order placed after the fill, and recording one
 // that does not exist would make /ops/verify report a stop that is not there.
 func (s *server) journalEntry(ctx context.Context, plan entryplan.Plan, symbol, orderID string, c *gin.Context) error {
-	trades, err := journal.ReadAll("")
-	if err != nil {
-		return err
-	}
 	now := time.Now().UTC()
 	notes := strings.TrimSpace(c.PostForm("notes"))
 	if notes == "" {
@@ -213,7 +209,7 @@ func (s *server) journalEntry(ctx context.Context, plan entryplan.Plan, symbol, 
 			plan.Entry, plan.Qty, plan.MarginUSDT, plan.Leverage, plan.Stop, plan.TP, plan.Entry)
 	}
 	t := journal.Trade{
-		ID:         journal.NextID(trades),
+		// ID is assigned by appendTrade at write time.
 		OpenedAt:   now,
 		AnalyzedAt: now,
 		Symbol:     strings.ToUpper(symbol),
@@ -250,5 +246,6 @@ func (s *server) journalEntry(ctx context.Context, plan entryplan.Plan, symbol, 
 	}
 	// FilledAt stays zero: the order is RESTING. Marking it filled here is
 	// what would make /ops/verify demand a position that does not exist yet.
-	return journal.WriteAll("", append(trades, t))
+	_, err := s.appendTrade(t)
+	return err
 }

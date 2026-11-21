@@ -19,6 +19,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -148,22 +149,14 @@ func (s *server) handleMoveStop(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// recordStopOrderID points the row's stop_order_id at the new order. Read,
-// set one field by ID, write — under sweepMu, so it cannot interleave with
-// the background sweep's own read-merge-write.
+// recordStopOrderID points the row's stop_order_id at the new order. Under
+// sweepMu, so a sweep never acts on the old id mid-change, and written through
+// updateTrade (journalMu), so it cannot interleave with any other writer.
 func (s *server) recordStopOrderID(id int, orderID string) {
 	s.sweepMu.Lock()
 	defer s.sweepMu.Unlock()
-	trades, err := journal.ReadAll("")
-	if err != nil {
-		return
-	}
-	for i := range trades {
-		if trades[i].ID == id {
-			trades[i].StopOrderID = orderID
-			_ = journal.WriteAll("", trades)
-			return
-		}
+	if err := s.updateTrade(id, func(t *journal.Trade) error { t.StopOrderID = orderID; return nil }); err != nil {
+		log.Printf("move-stop: record stop order id for #%d: %v", id, err)
 	}
 }
 
