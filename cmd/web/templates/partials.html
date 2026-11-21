@@ -2,7 +2,7 @@
 {{/* icon — the one line-icon set. Emoji are not icons: they render */}}
 {{/* differently per OS and never match the type around them.       */}}
 {{/* ============================================================ */}}
-{{define "icon"}}<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{if eq . "today"}}<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>{{else if eq . "chart"}}<path d="M7 3v4M7 17v4M17 6v3M17 15v3"/><rect x="5" y="7" width="4" height="10" rx="1"/><rect x="15" y="9" width="4" height="6" rx="1"/>{{else if eq . "portfolio"}}<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/>{{else if eq . "research"}}<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/>{{else if eq . "settings"}}<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>{{else if eq . "bell"}}<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>{{else if eq . "search"}}<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>{{else if eq . "menu"}}<path d="M4 6h16M4 12h16M4 18h16"/>{{else if eq . "logo"}}<path d="M4 18 10 9l4 5 6-9"/>{{else if eq . "alert"}}<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>{{else if eq . "flag"}}<path d="M4 21V4M4 4h12l-2 4 2 4H4"/>{{else if eq . "plus"}}<path d="M12 5v14M5 12h14"/>{{else if eq . "arrow"}}<path d="M5 12h14M13 6l6 6-6 6"/>{{else if eq . "check"}}<path d="M20 6 9 17l-5-5"/>{{else if eq . "pause"}}<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>{{else if eq . "wallet"}}<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2"/>{{else if eq . "pulse"}}<path d="M3 12h4l3-7 4 14 3-7h4"/>{{else if eq . "collapse"}}<path d="M15 6l-6 6 6 6"/><path d="M20 4v16"/>{{else if eq . "spark"}}<path d="M12 3c.6 4.2 2.3 6.4 7 7.5-4.7 1.1-6.4 3.3-7 7.5-.6-4.2-2.3-6.4-7-7.5 4.7-1.1 6.4-3.3 7-7.5z"/><path d="M19 3.5v3M17.5 5h3"/>{{end}}</svg>{{end}}
+{{define "icon"}}<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{if eq . "today"}}<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>{{else if eq . "chart"}}<path d="M7 3v4M7 17v4M17 6v3M17 15v3"/><rect x="5" y="7" width="4" height="10" rx="1"/><rect x="15" y="9" width="4" height="6" rx="1"/>{{else if eq . "portfolio"}}<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/>{{else if eq . "research"}}<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/>{{else if eq . "settings"}}<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>{{else if eq . "bell"}}<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>{{else if eq . "search"}}<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>{{else if eq . "menu"}}<path d="M4 6h16M4 12h16M4 18h16"/>{{else if eq . "logo"}}<path d="M4 18 10 9l4 5 6-9"/>{{else if eq . "alert"}}<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>{{else if eq . "flag"}}<path d="M4 21V4M4 4h12l-2 4 2 4H4"/>{{else if eq . "plus"}}<path d="M12 5v14M5 12h14"/>{{else if eq . "arrow"}}<path d="M5 12h14M13 6l6 6-6 6"/>{{else if eq . "check"}}<path d="M20 6 9 17l-5-5"/>{{else if eq . "pause"}}<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>{{else if eq . "wallet"}}<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2"/>{{else if eq . "pulse"}}<path d="M3 12h4l3-7 4 14 3-7h4"/>{{else if eq . "collapse"}}<path d="M15 6l-6 6 6 6"/><path d="M20 4v16"/>{{else if eq . "copy"}}<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>{{else if eq . "x"}}<path d="M6 6l12 12M18 6 6 18"/>{{else if eq . "stop"}}<rect x="7" y="7" width="10" height="10" rx="1.5"/>{{else if eq . "panel-right"}}<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>{{else if eq . "chevron"}}<path d="m9 6 6 6-6 6"/>{{else if eq . "send"}}<path d="M12 19V5M6 11l6-6 6 6"/>{{else if eq . "spark"}}<path d="M12 3c.6 4.2 2.3 6.4 7 7.5-4.7 1.1-6.4 3.3-7 7.5-.6-4.2-2.3-6.4-7-7.5 4.7-1.1 6.4-3.3 7-7.5z"/><path d="M19 3.5v3M17.5 5h3"/>{{end}}</svg>{{end}}
 
 {{/* ============================================================ */}}
 {{/* topnav — the shell every page includes: rail, top bar with the */}}
@@ -22,13 +22,36 @@
     'copilot.thinking': {{t "copilot.thinking"}}, 'copilot.used': {{t "copilot.used"}},
     'copilot.quota': {{t "copilot.quota"}}, 'copilot.quotaLeft': {{t "copilot.quotaLeft"}}, 'copilot.quotaOut': {{t "copilot.quotaOut"}},
     'copilot.err.net': {{t "copilot.err.net"}}, 'copilot.err.off': {{t "copilot.err.off"}}, 'copilot.modelErr': {{t "copilot.modelErr"}},
-    'copilot.ask.symbol': {{t "copilot.ask.symbol"}}, 'copilot.ask.trade': {{t "copilot.ask.trade"}}, 'copilot.ask.validate': {{t "copilot.ask.validate"}}
+    'copilot.ask.symbol': {{t "copilot.ask.symbol"}}, 'copilot.ask.trade': {{t "copilot.ask.trade"}}, 'copilot.ask.validate': {{t "copilot.ask.validate"}},
+    'copilot.err.quota': {{t "copilot.err.quota"}}, 'copilot.stopped': {{t "copilot.stopped"}}, 'copilot.retry': {{t "copilot.retry"}},
+    'copilot.switchModel': {{t "copilot.switchModel"}}, 'copilot.copy': {{t "copilot.copy"}}, 'copilot.left': {{t "copilot.left"}},
+    'copilot.usedN': {{t "copilot.usedN"}}, 'copilot.waiting': {{t "copilot.waiting"}}, 'copilot.close': {{t "copilot.close"}}, 'copilot.send': {{t "copilot.send"}}, 'copilot.stop': {{t "copilot.stop"}}, 'copilot.collapse': {{t "copilot.collapse"}},
+    'copilot.tool.analyze_symbol': {{t "copilot.tool.analyze_symbol"}}, 'copilot.tool.validate_setup': {{t "copilot.tool.validate_setup"}},
+    'copilot.tool.get_trade': {{t "copilot.tool.get_trade"}}, 'copilot.tool.get_recent_candles': {{t "copilot.tool.get_recent_candles"}},
+    'copilot.tool.get_journal_history': {{t "copilot.tool.get_journal_history"}}, 'copilot.tool.get_open_positions': {{t "copilot.tool.get_open_positions"}},
+    'copilot.tool.get_macro_events_near': {{t "copilot.tool.get_macro_events_near"}}, 'copilot.tool.get_backtest_facts': {{t "copilot.tool.get_backtest_facts"}},
+    'copilot.chip.chart1': {{t "copilot.chip.chart1"}}, 'copilot.chip.chart2': {{t "copilot.chip.chart2"}}, 'copilot.chip.macro': {{t "copilot.chip.macro"}},
+    'copilot.chip.positions': {{t "copilot.chip.positions"}}, 'copilot.chip.recent': {{t "copilot.chip.recent"}}, 'copilot.chip.losses': {{t "copilot.chip.losses"}},
+    'copilot.chip.last': {{t "copilot.chip.last"}}, 'copilot.chip.week': {{t "copilot.chip.week"}}, 'copilot.chip.btc': {{t "copilot.chip.btc"}}
   };
 </script>
 <script>
   /* Rail width before it paints: wide (icon + label) unless the user
      narrowed it, so a reload never flashes the other state. */
   try { if (localStorage.getItem('rail') === 'narrow') document.documentElement.setAttribute('data-rail', 'narrow'); } catch (e) {}
+  /* A docked copilot is part of the layout: apply it before paint so moving
+     between pages never flashes or shifts. Same rule as layout() in
+     static/copilot.js — keep the two in step. Overlay / sheet start closed. */
+  try {
+    if (localStorage.getItem('copilot.open') === '1') {
+      var cw = innerWidth, rw = cw >= 1024 ? (document.documentElement.getAttribute('data-rail') === 'narrow' ? 64 : 200) : 0;
+      var fit = cw - rw - 560, sw = parseInt(localStorage.getItem('copilot.w'), 10) || 400;
+      if (cw > 560 && cw >= 1024 && fit >= 320) {
+        document.documentElement.setAttribute('data-copilot', 'dock');
+        document.documentElement.style.setProperty('--copilot-w', Math.max(320, Math.min(sw, 720, fit)) + 'px');
+      }
+    }
+  } catch (e) {}
 </script>
 <aside class="rail" id="rail" aria-label="primary">
   <a class="rail-logo" href="/" aria-label="{{t "nav.home"}}">{{template "icon" "logo"}}</a>
@@ -51,7 +74,7 @@
     </div>
     <a class="at-icon at-lang" href="/lang/{{.Shell.OtherLang}}?next={{.Shell.Here}}" title="{{t "lang.switchTitle"}}">{{t "lang.switch"}}</a>
     <button type="button" class="at-icon alert-bell" data-alert-bell aria-label="{{t "alerts.title"}}" aria-haspopup="true">{{template "icon" "bell"}}<span class="alert-badge" hidden></span></button>
-    <button type="button" class="at-icon copilot-open" id="copilot-open" aria-label="{{t "copilot.open"}}" title="{{t "copilot.open"}}" aria-expanded="false" aria-controls="copilot">{{template "icon" "spark"}}</button>
+    <button type="button" class="at-icon copilot-open" id="copilot-open" aria-label="{{t "copilot.open"}}" title="{{t "copilot.open"}} (⌘/)" aria-expanded="false" aria-controls="copilot">{{template "icon" "spark"}}</button>
     <span class="at-clock num" id="at-clock" title="UTC+8"></span>
   </div>
 </header>
@@ -60,6 +83,9 @@
      id instead of falling back to an emoji. Add a name here when a script
      needs one. */}}
 <template id="ico-check">{{template "icon" "check"}}</template>
+<template id="ico-copy">{{template "icon" "copy"}}</template>
+<template id="ico-chevron">{{template "icon" "chevron"}}</template>
+<template id="ico-spark">{{template "icon" "spark"}}</template>
 <script>
   (function () {
     var rail = document.getElementById('rail'), scrim = document.getElementById('rail-scrim'), b = document.getElementById('rail-open');
@@ -105,26 +131,33 @@
 <script src="/static/alerts.js" defer></script>
 
 <!-- Copilot chat drawer (static/copilot.js, cmd/web/copilot.go). -->
-<aside class="copilot" id="copilot" role="dialog" aria-label="{{t "copilot.title"}}" hidden>
+<aside class="copilot" id="copilot" aria-label="{{t "copilot.title"}}" data-symbols="{{.Shell.Symbols}}" data-lang="{{.Shell.Lang}}">
   <header class="copilot-head">
-    <strong>{{template "icon" "spark"}}{{t "copilot.title"}}</strong>
-    <button type="button" class="copilot-btn" id="copilot-clear" title="{{t "copilot.clear"}}">{{t "copilot.clear"}}</button>
-    <button type="button" class="copilot-btn copilot-x" id="copilot-close" aria-label="{{t "copilot.close"}}">×</button>
+    <strong class="copilot-title">{{template "icon" "spark"}}{{t "copilot.title"}}</strong>
+    <button type="button" class="copilot-iconbtn" id="copilot-clear" title="{{t "copilot.new"}}" aria-label="{{t "copilot.new"}}">{{template "icon" "plus"}}</button>
+    <button type="button" class="copilot-iconbtn" id="copilot-close" title="{{t "copilot.collapse"}}" aria-label="{{t "copilot.collapse"}}"><span class="cp-ico-dock">{{template "icon" "panel-right"}}</span><span class="cp-ico-float">{{template "icon" "x"}}</span></button>
   </header>
-  <div class="copilot-sub">
-    <label class="copilot-model"><span>{{t "copilot.model"}}</span>
-      <select id="copilot-model" aria-label="{{t "copilot.model"}}"><option value="">…</option></select>
-    </label>
-    <span class="copilot-quota" id="copilot-quota"></span>
-  </div>
   <div class="copilot-log" id="copilot-log" aria-live="polite">
-    <p class="copilot-hint">{{t "copilot.hint"}}</p>
+    <div class="copilot-empty" id="copilot-empty">
+      <div class="copilot-empty-ico">{{template "icon" "spark"}}</div>
+      <p class="copilot-hint">{{t "copilot.hint"}}</p>
+      <div class="copilot-chips" id="copilot-chips"></div>
+    </div>
   </div>
-  <form class="copilot-form" id="copilot-form">
-    <textarea id="copilot-input" rows="2" placeholder="{{t "copilot.placeholder"}}" aria-label="{{t "copilot.placeholder"}}"></textarea>
-    <button type="submit" class="btn-ops" id="copilot-send">{{t "copilot.send"}}</button>
+  <form class="copilot-composer" id="copilot-form">
+    <div class="copilot-box">
+      <textarea id="copilot-input" rows="1" placeholder="{{t "copilot.placeholder"}}" aria-label="{{t "copilot.placeholder"}}"></textarea>
+      <div class="copilot-tools-row">
+        <select class="copilot-model-sel" id="copilot-model" aria-label="{{t "copilot.model"}}" title="{{t "copilot.model"}}"><option value="">…</option></select>
+        <span class="copilot-quota" id="copilot-quota"></span>
+        <span class="copilot-spacer"></span>
+        <button type="submit" class="copilot-send" id="copilot-send" aria-label="{{t "copilot.send"}}" title="{{t "copilot.send"}}"><span class="cp-ico-send">{{template "icon" "send"}}</span><span class="cp-ico-stop">{{template "icon" "stop"}}</span></button>
+      </div>
+    </div>
+    <p class="copilot-kbd-hint" id="copilot-kbd">{{t "copilot.kbd"}}</p>
   </form>
 </aside>
+<script src="/static/copilot-render.js" defer></script>
 <script src="/static/copilot.js" defer></script>
 
 <div class="cmdk-backdrop" id="cmdk-backdrop" hidden>

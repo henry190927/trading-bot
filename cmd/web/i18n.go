@@ -153,6 +153,9 @@ type shellData struct {
 	Here      string // request URI, for the language switch to come back to
 	Nav       []shellNav
 	Tabs      []shellTab
+	// Symbols is the UI universe, space separated: the copilot renderer
+	// links only these names to /chart.
+	Symbols string
 }
 
 // section groups pages under one rail item. A page is in the section whose
@@ -221,7 +224,7 @@ func locate(path string) (si, ti int) {
 }
 
 func buildShell(path, here, lang string) shellData {
-	sh := shellData{Lang: lang, HTMLLang: "en", OtherLang: "zh", Here: here}
+	sh := shellData{Lang: lang, HTMLLang: "en", OtherLang: "zh", Here: here, Symbols: strings.Join(uiSymbols, " ")}
 	if lang == "zh" {
 		sh.HTMLLang, sh.OtherLang = "zh-Hant", "en"
 	}

@@ -329,12 +329,30 @@
       var KEY = 'chart-side-collapsed';
       try { if (localStorage.getItem(KEY) === '1') g.classList.add('side-collapsed'); } catch (e) {}
       b.setAttribute('aria-expanded', g.classList.contains('side-collapsed') ? 'false' : 'true');
+      var auto = false; // collapsed by the docked copilot, not by the user
       b.addEventListener('click', function () {
+        auto = false;
         var c = g.classList.toggle('side-collapsed');
         b.setAttribute('aria-expanded', c ? 'false' : 'true');
         try { localStorage.setItem(KEY, c ? '1' : '0'); } catch (e) {}
         window.dispatchEvent(new Event('resize')); // nudge LWC autoSize
       });
+      // A docked copilot (static/copilot.js) takes ~400px; with this 340px
+      // column also open the chart would be squeezed to a strip. Fold the
+      // column while docked and the chart area is under 1000px, without
+      // saving that as the user's choice; unfold when the copilot leaves.
+      function fit(e) {
+        var docked = e.detail && e.detail.mode === 'dock';
+        var narrow = (g.clientWidth || 0) - 340 < 1000; // chart width with the column open
+        if (docked && narrow && !g.classList.contains('side-collapsed')) {
+          g.classList.add('side-collapsed'); auto = true;
+        } else if (auto && (!docked || g.clientWidth >= 1000 + 340)) {
+          g.classList.remove('side-collapsed'); auto = false;
+        } else return;
+        b.setAttribute('aria-expanded', g.classList.contains('side-collapsed') ? 'false' : 'true');
+        window.dispatchEvent(new Event('resize'));
+      }
+      document.addEventListener('copilot:layout', fit);
     })();
   </script>
 

@@ -4684,58 +4684,240 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .dec-key { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--text-dim); }
 .dec-key.dec-line-take { background: var(--blue); } .dec-key.dec-line-skip { background: var(--red); }
 
-/* ---- Copilot chat drawer (static/copilot.js) ---------------------------
-   Right-hand panel under the app top bar; full width on a phone. Tokens
-   only — no color-mix (see the rgba-fallback note at the top). */
+/* ---- Copilot panel (static/copilot.js, static/copilot-render.js) -------
+   copilot.js sets html[data-copilot] = dock | overlay | sheet (absent =
+   closed) and --copilot-w. dock pushes the page (body padding), so the chart
+   reflows instead of being covered; overlay floats under the top bar when
+   the page would get too narrow; sheet is full screen on a phone. Never
+   animate the padding: the chart would redraw every frame. Tokens only, no
+   color-mix (see the rgba-fallback note at the top). */
+:root { --copilot-w: 400px; }
 .copilot {
-    position: fixed; z-index: 75; right: 0; top: var(--apptop-h); bottom: 0;
-    width: min(420px, 100vw); display: flex; flex-direction: column;
+    position: fixed; z-index: 35; right: 0; top: 0; bottom: 0;
+    width: var(--copilot-w); display: flex; flex-direction: column;
     background: var(--surface); border-left: 1px solid var(--border);
-    box-shadow: var(--shadow-2);
+    transform: translateX(100%); visibility: hidden;
 }
-.copilot[hidden] { display: none; }
-.copilot-head {
-    display: flex; align-items: center; gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border);
+html[data-copilot] .copilot { transform: none; visibility: visible; }
+html.copilot-anim .copilot { transition: transform 180ms cubic-bezier(.2,.8,.2,1), visibility 0s linear 0s; }
+html.copilot-anim:not([data-copilot]) .copilot { transition: transform 140ms ease-in, visibility 0s linear 140ms; }
+@media (prefers-reduced-motion: reduce) { html.copilot-anim .copilot { transition: none; } }
+
+html[data-copilot="dock"] body { padding-right: var(--copilot-w); }
+html[data-copilot="dock"] .toast-stack { right: calc(var(--copilot-w) + var(--sp-4)); }
+html[data-copilot="overlay"] .copilot { top: var(--apptop-h); box-shadow: var(--shadow-2); z-index: 75; }
+html[data-copilot="sheet"] .copilot { left: 0; width: auto; border-left: 0; z-index: 95; padding-bottom: env(safe-area-inset-bottom); }
+html[data-copilot="sheet"], html[data-copilot="sheet"] body { overflow: hidden; }
+.copilot.is-sheet { width: auto; left: 0; border-left: 0; }
+html:not([data-copilot]) .copilot.is-sheet { transform: translateY(100%); }
+
+/* The top bar is inside body, so docking narrows it; compact it by its own
+   width rather than the viewport's. */
+.apptop { container: apptop / inline-size; }
+@container apptop (max-width: 820px) {
+    .at-search { width: 32px; padding: 0; justify-content: center; }
+    .at-search span, .at-search kbd { display: none; }
 }
-.copilot-head strong { display: inline-flex; align-items: center; gap: 6px; }
-.copilot-quota { flex: 1; font-size: 12px; color: var(--text-dim); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.copilot-quota.out { color: var(--red); }
-.copilot-btn {
-    background: none; border: 1px solid var(--border); border-radius: var(--r-md);
-    color: var(--text-dim); font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer;
-}
-.copilot-btn:hover { color: var(--text); }
-.copilot-x { font-size: 16px; line-height: 1; padding: 2px 8px; }
-.copilot-log { flex: 1; overflow-y: auto; padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
-.copilot-hint { color: var(--text-dim); font-size: 13px; margin: 0; }
-.copilot-msg { max-width: 92%; border-radius: var(--r-md); padding: 8px 10px; font-size: 14px; line-height: 1.55; }
-.copilot-msg .copilot-text { white-space: pre-wrap; word-break: break-word; }
-.copilot-msg.user { align-self: flex-end; background: var(--surface-2); border: 1px solid var(--border); }
-.copilot-msg.assistant { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); }
-.copilot-msg.pending { color: var(--text-dim); font-style: italic; }
-.copilot-msg.error { align-self: stretch; background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
-.copilot-meta { margin-top: 4px; font-size: 11.5px; color: var(--text-dim); }
-.copilot-form { display: flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--border); }
-.copilot-form textarea {
-    flex: 1; resize: none; min-height: 44px; max-height: 160px;
-    background: var(--bg); color: var(--text); border: 1px solid var(--border);
-    border-radius: var(--r-md); padding: 8px; font: inherit; font-size: 14px;
-}
-.copilot-form textarea:focus { outline: none; box-shadow: var(--focus); }
+@container apptop (max-width: 640px) { .at-clock { display: none; } }
+.copilot-open[aria-expanded="true"] { background: var(--wash-blue); color: var(--blue); border-color: var(--blue); }
+
 /* The section tabs scroll sideways instead of pushing the right-hand buttons
    (search, language, bell, copilot) off a narrow screen: a flex item will not
    shrink below its content without min-width: 0. */
 .at-tabs { min-width: 0; flex: 0 1 auto; }
 .at-right { flex-shrink: 0; }
-@media (max-width: 560px) { .copilot { left: 0; width: auto; border-left: 0; } }
-.copilot-head strong { flex: 1; }
-.copilot-sub {
-    display: flex; align-items: center; gap: var(--sp-2);
-    padding: 6px var(--sp-3); border-bottom: 1px solid var(--border);
+
+.copilot-head {
+    height: var(--apptop-h); flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-1);
+    padding: 0 var(--sp-2) 0 var(--sp-4); border-bottom: 1px solid var(--border);
 }
-.copilot-model { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); min-width: 0; }
-.copilot-model select {
-    max-width: 220px; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-    border-radius: var(--r-md); font: inherit; font-size: 12px; padding: 2px 6px;
+html[data-copilot="overlay"] .copilot-head { height: 44px; }
+.copilot-title { flex: 1; display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-base); font-weight: 600; }
+.copilot-title .ico { width: 16px; height: 16px; color: var(--blue); }
+.copilot-iconbtn {
+    display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+    border: 0; background: transparent; color: var(--text-dim); border-radius: var(--r-sm); cursor: pointer;
 }
+.copilot-iconbtn:hover { background: var(--row-hover); color: var(--text); }
+.copilot-iconbtn .ico { width: 16px; height: 16px; }
+.copilot-iconbtn > span { display: grid; place-items: center; }
+.cp-ico-float { display: none !important; }
+html[data-copilot="overlay"] .cp-ico-dock, html[data-copilot="sheet"] .cp-ico-dock { display: none !important; }
+html[data-copilot="overlay"] .cp-ico-float, html[data-copilot="sheet"] .cp-ico-float { display: grid !important; }
+
+.copilot-log {
+    position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-5);
+}
+.copilot-empty { padding: var(--sp-5) 0 0; }
+.copilot-empty[hidden] { display: none; }
+.copilot-empty-ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--wash-blue); color: var(--blue); }
+.copilot-empty-ico .ico { width: 16px; height: 16px; }
+.copilot-hint { margin: var(--sp-3) 0 0; color: var(--text-dim); font-size: var(--fs-base); line-height: 1.6; max-width: 34ch; }
+.copilot-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4); }
+.copilot-chip {
+    background: var(--chip); border: 1px solid var(--chip-border); border-radius: var(--r-pill);
+    padding: 6px 12px; font: inherit; font-size: var(--fs-sm); color: var(--text); cursor: pointer; text-align: left;
+}
+.copilot-chip:hover { border-color: var(--blue); }
+
+.copilot-msg { font-size: var(--fs-md); line-height: 1.6; }
+.copilot-msg.user {
+    align-self: flex-end; max-width: 85%; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--r-md) var(--r-md) 4px var(--r-md); padding: var(--sp-2) var(--sp-3);
+    white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.copilot-msg.assistant { align-self: stretch; min-width: 0; }
+.copilot-msg.pending { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-dim); font-size: var(--fs-sm); }
+.cp-dots { display: inline-flex; gap: 4px; }
+.cp-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); animation: cp-pulse 1.2s infinite ease-in-out; }
+.cp-dots span:nth-child(2) { animation-delay: .2s; } .cp-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes cp-pulse { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cp-dots span { animation: none; opacity: .6; } }
+.copilot-msg.error {
+    align-self: stretch; background: var(--red-bg); color: var(--red); border: 1px solid var(--red);
+    border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm);
+}
+.copilot-retry { background: none; border: 0; padding: 0; margin-left: 6px; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+/* Tool trace above a reply: what the copilot looked up. */
+.cp-trace { margin-bottom: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); }
+.cp-trace summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cp-trace summary::-webkit-details-marker { display: none; }
+.cp-trace summary .ico { width: 12px; height: 12px; transition: transform var(--t-fast); }
+.cp-trace[open] summary .ico { transform: rotate(90deg); }
+.cp-tool { font-family: var(--mono); padding: 1px 6px; border-radius: 6px; background: var(--chip); border: 1px solid var(--chip-border); color: var(--text); }
+.cp-tool.err { color: var(--red); border-color: var(--red); }
+.cp-trace-body { margin-top: 6px; padding-left: 18px; font-family: var(--mono); line-height: 1.6; overflow-wrap: anywhere; }
+.cp-trace-body .err { color: var(--red); }
+
+.cp-note { margin-top: var(--sp-3); border-left: 2px solid var(--yellow); padding-left: var(--sp-2); font-size: var(--fs-sm); color: var(--text-dim); }
+.cp-actions { display: flex; align-items: center; gap: var(--sp-1); margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); opacity: 0; transition: opacity var(--t-fast); }
+.copilot-msg:hover .cp-actions, .copilot-msg:focus-within .cp-actions, .copilot-msg.last .cp-actions { opacity: 1; }
+@media (hover: none) { .cp-actions { opacity: 1; } }
+.cp-actions .copilot-iconbtn { width: 24px; height: 24px; }
+.cp-actions .copilot-iconbtn .ico { width: 14px; height: 14px; }
+.cp-plain { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Rendered reply (copilot-render.js). Colour in prose, pills in cards. */
+.cp-body { color: var(--text); overflow-wrap: anywhere; }
+.cp-body > * { margin: 0; }
+.cp-body > * + * { margin-top: var(--sp-3); }
+.cp-h { font-size: var(--fs-base); font-weight: 600; color: var(--text); }
+.cp-body > .cp-h { margin-top: var(--sp-4); }
+.cp-h.sub { color: var(--text-dim); }
+.cp-hr { border: 0; border-top: 1px solid var(--border); }
+.cp-quote { border-left: 2px solid var(--border); padding-left: var(--sp-3); color: var(--text-dim); }
+.cp-list { padding-left: 1.2em; }
+.cp-list li + li { margin-top: var(--sp-1); }
+.cp-list li::marker { color: var(--text-dim); }
+.cp-list .cp-list { margin-top: var(--sp-1); }
+.cp-code { font-family: var(--mono); font-size: .9em; background: var(--chip); padding: 0 4px; border-radius: 4px; }
+.cp-pre {
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: var(--sp-2) var(--sp-3); font: var(--fs-sm)/1.5 var(--mono); overflow-x: auto; white-space: pre;
+}
+.cp-num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: .94em; }
+.cp-num.pos { color: var(--green); } .cp-num.neg { color: var(--red); }
+.cp-dir { font-weight: 600; }
+.cp-dir.long { color: var(--green); } .cp-dir.short { color: var(--red); } .cp-dir.flat { color: var(--yellow); }
+.cp-pill { display: inline-block; border-radius: var(--r-pill); padding: 1px 8px; font-size: var(--fs-xs); font-weight: 600; line-height: 1.6; background: var(--wash-blue); color: var(--blue); }
+.cp-pill.long { background: var(--wash-green); color: var(--green); }
+.cp-pill.short { background: var(--wash-red); color: var(--red); }
+.cp-pill.flat { background: var(--wash-yellow); color: var(--yellow); }
+.cp-sym, .cp-ref {
+    font: 600 var(--fs-sm) var(--mono); padding: 0 5px; border-radius: 6px;
+    background: var(--chip); border: 1px solid var(--chip-border); color: var(--text); text-decoration: none;
+}
+a.cp-sym:hover { border-color: var(--blue); }
+.cp-ref { color: var(--blue); }
+.cp-tf { font-family: var(--mono); color: var(--text-dim); font-size: .9em; }
+.cp-callout.warn {
+    background: var(--wash-yellow); border-left: 3px solid var(--yellow); border-radius: var(--r-sm);
+    padding: var(--sp-2) var(--sp-3); font-size: var(--fs-base);
+}
+.cp-callout-k { color: var(--yellow); }
+
+.cp-verdict { border-left: 3px solid var(--blue); background: var(--wash-blue); border-radius: var(--r-sm); padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4); }
+.cp-verdict.long { border-left-color: var(--green); background: var(--wash-green); }
+.cp-verdict.short { border-left-color: var(--red); background: var(--wash-red); }
+.cp-verdict.flat { border-left-color: var(--yellow); background: var(--wash-yellow); }
+.cp-verdict-label { display: flex; gap: var(--sp-2); align-items: center; font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .04em; }
+.cp-verdict-text { margin-top: var(--sp-1); font-size: var(--fs-md); font-weight: 600; line-height: 1.5; color: var(--text); }
+
+.cp-levels { border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; font-size: var(--fs-base); }
+/* Fixed columns: each row is its own grid, so auto widths would not line up. */
+.cp-level { display: grid; grid-template-columns: 64px 120px minmax(0, 1fr); gap: var(--sp-2); align-items: center; padding: 6px var(--sp-3); border-top: 1px solid var(--border); }
+.cp-level:first-child { border-top: 0; }
+.cp-level-type { font-size: var(--fs-xs); font-weight: 600; display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
+.cp-level-type::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.cp-level.res .cp-level-type { color: var(--red); }
+.cp-level.sup .cp-level-type { color: var(--green); }
+.cp-level.zone { background: var(--mr-bg); } .cp-level.zone .cp-level-type { color: var(--mr); }
+.cp-level.now { background: var(--wash-blue); } .cp-level.now .cp-level-type { color: var(--blue); }
+.cp-level-px { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; white-space: nowrap; }
+.cp-level-note { color: var(--text-dim); font-size: var(--fs-sm); }
+
+/* Grid lines are each cell's top/left border pulled 1px outside it; the
+   box clips the outer ones. (A gap over a border-coloured background would
+   paint any empty last-row slot solid.) */
+.cp-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden;
+}
+.cp-stat { padding: var(--sp-2) var(--sp-3); min-width: 0; border-top: 1px solid var(--border); border-left: 1px solid var(--border); margin: -1px 0 0 -1px; }
+.cp-stat.wide { grid-column: 1 / -1; }
+.cp-stat-k { font-size: var(--fs-xs); color: var(--text-dim); }
+.cp-stat-v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-md); font-weight: 600; margin-top: 2px; }
+.cp-stat.wide .cp-stat-v { font-family: var(--sans); font-weight: 500; font-size: var(--fs-base); }
+.cp-stat.stop .cp-stat-v { color: var(--red); } .cp-stat.tp .cp-stat-v { color: var(--green); }
+.cp-stat.rr.good .cp-stat-v { color: var(--green); } .cp-stat.rr.bad .cp-stat-v { color: var(--red); }
+.cp-stat-v .cp-num { font-size: 1em; }
+
+.cp-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.cp-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
+.cp-table th { background: var(--th-bg); color: var(--text-dim); font-weight: 600; text-align: left; font-size: var(--fs-xs); }
+.cp-table th, .cp-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.cp-table tr:last-child td { border-bottom: 0; }
+.cp-table td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Composer: one box holding the input, model, quota and send/stop. */
+.copilot-composer { flex: 0 0 auto; padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+.copilot-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: var(--sp-2) var(--sp-2) var(--sp-1) var(--sp-3);
+}
+.copilot-box:focus-within { border-color: var(--blue); }
+.copilot-box textarea {
+    display: block; width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: var(--text);
+    font: inherit; font-size: var(--fs-md); line-height: var(--lh-base); max-height: 200px; padding: 2px 0;
+}
+.copilot-tools-row { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-1); min-width: 0; }
+.copilot-model-sel {
+    min-width: 0; max-width: 180px; border: 0; background: transparent; color: var(--text-dim);
+    font: inherit; font-size: var(--fs-sm); padding: 2px 4px; border-radius: 6px; cursor: pointer;
+}
+.copilot-model-sel:hover { background: var(--row-hover); color: var(--text); }
+.copilot-quota { font-size: var(--fs-xs); font-family: var(--mono); color: var(--text-dim); white-space: nowrap; }
+.copilot-quota.low { color: var(--yellow); } .copilot-quota.out { color: var(--red); }
+.copilot-spacer { flex: 1; }
+.copilot-send {
+    display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; padding: 0;
+    border: 0; border-radius: 50%; background: var(--blue); color: var(--on-accent); cursor: pointer;
+}
+.copilot-send > span { display: grid; place-items: center; }
+.copilot-send .ico { width: 16px; height: 16px; stroke-width: 2.2; }
+.copilot-send:disabled { background: var(--wash-dim); color: var(--text-dim); cursor: default; }
+.copilot-send .cp-ico-stop { display: none; }
+.copilot-send.stop { background: var(--text); color: var(--bg); }
+.copilot-send.stop .cp-ico-send { display: none; } .copilot-send.stop .cp-ico-stop { display: grid; }
+.copilot-kbd-hint { margin: var(--sp-2) 0 0; text-align: center; font-size: var(--fs-xs); color: var(--text-dim); }
+.copilot-kbd-hint[hidden] { display: none; }
+
+/* /chart toolbar while docked: the one-row rule above is keyed to the
+   viewport, but the docked panel takes ~400px of it. Let the row wrap and
+   keep every label on one line. */
+html[data-copilot="dock"] .chart-controls { flex-wrap: wrap; row-gap: var(--sp-2); }
+html[data-copilot="dock"] .chart-controls .layer-chip,
+html[data-copilot="dock"] .chart-controls-end > * { white-space: nowrap; }
+html[data-copilot="dock"] .chart-controls-end { margin-left: auto; }
