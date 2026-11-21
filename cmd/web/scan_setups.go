@@ -144,10 +144,28 @@ type scanCandidate struct {
 	armed bool
 }
 
-// scanStrategies is the set autostrat.EvalAutoTrigger can dispatch on. Kept
-// here rather than derived from the config, because the whole point is to
-// evaluate combinations the config does NOT contain.
+// scanStrategies are the strategies /scan synthesizes a row for on every
+// symbol. Kept here rather than derived from the config, because the whole
+// point is to evaluate combinations the config does NOT contain. Every
+// strategy autostrat.EvalAutoTrigger dispatches on must be either here or in
+// scanExcluded, with the reason — TestWebStrategyListsCoverKnownStrategies
+// fails otherwise, so a new strategy is a decision, not an omission.
 var scanStrategies = []string{"range-edge", "engine", "sweep-reject", "htf-snr", "vp-node"}
+
+// scanExcluded are dispatchable strategies /scan deliberately does not
+// synthesize. Configured rules of these strategies still appear (armed rows
+// come from the config, not from this list).
+var scanExcluded = map[string]string{
+	// Synthesized rows default to the 1h timeframe; these legs run on 4h / 1d
+	// with a trailing stop, so a synthesized 1h row would evaluate them on
+	// the wrong timeframe.
+	"htf-trend":          "4h trend leg; a synthesized 1h row would use the wrong timeframe",
+	"htf-trend-1d":       "1d trend leg; a synthesized 1h row would use the wrong timeframe",
+	"htf-trend-1d-touch": "1d trend leg; a synthesized 1h row would use the wrong timeframe",
+	// Added to the dispatch after the grid was built; not yet decided whether
+	// /scan should synthesize it on every symbol.
+	"struct-momentum": "not yet decided whether /scan should synthesize it",
+}
 
 // scanGrid returns every configured+enabled rule, followed by a synthesized
 // rule for each (symbol, strategy) pair the config does not cover.
