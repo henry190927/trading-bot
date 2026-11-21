@@ -123,6 +123,12 @@ func main() {
 		aiCache:        make(map[int]aiCacheEntry),
 		aiSymbolCache:  make(map[string]aiCacheEntry),
 	}
+	srv.copilot = newCopilot(aiProvider, bxClient)
+	if srv.copilot.disabled != "" {
+		log.Printf("[copilot] off: %s", srv.copilot.disabled)
+	} else {
+		log.Printf("[copilot] on: models %v", srv.copilot.chain.Models())
+	}
 	// The hub's only dependency is "give me a snapshot" — the same builder
 	// /api/tickers serves, so both transports carry identical numbers.
 	srv.hub = newTickerHub(func(ctx context.Context) any { return srv.buildTickers(ctx) })
@@ -150,6 +156,9 @@ func main() {
 	r.POST("/ai/analyze/symbol/:short/:tf", srv.handleAIAnalyzeSymbol)
 	r.POST("/ai/analyze/validate", srv.handleAIAnalyzeValidate)
 	r.GET("/api/ai/model", srv.handleAIModelGet)
+	// Copilot chat drawer (copilot.go). Read-only in P1.
+	r.POST("/api/copilot/chat", srv.handleCopilotChat)
+	r.GET("/api/copilot/status", srv.handleCopilotStatus)
 	r.POST("/api/ai/model", srv.handleAIModelPost)
 	r.GET("/validate", srv.handleValidateForm)
 	r.POST("/validate", srv.handleValidatePost)

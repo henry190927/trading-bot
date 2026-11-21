@@ -55,6 +55,9 @@ type server struct {
 	// gone tracks open trades whose position the exchange no longer has
 	// (position_gone.go), refreshed by tradeSweepLoop.
 	gone goneState
+	// copilot is the chat drawer's agent (copilot.go); nil or disabled
+	// when no Gemini key is configured.
+	copilot *copilotService
 	// aiProviderName is a friendly label ("gemini", "anthropic", or
 	// "gemini(fallback-from-xxx)") for logs + cache-key namespacing.
 	aiProviderName string

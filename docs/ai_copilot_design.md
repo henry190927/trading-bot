@@ -156,7 +156,7 @@ for step := 0; step < MaxSteps; step++ {          // 例如 6
 
 | 期 | 內容 | 價值 |
 |---|---|---|
-| P1 | tools 套件(MCP 改用)+ Provider tool calling + agent loop + 最簡聊天抽屜(不串流) | 能追問、AI 自己查資料 |
+| P1 ✅ | tools 套件(MCP 改用)+ Provider tool calling + agent loop + 最簡聊天抽屜(不串流)。2026-11-21 完成:`tools/`、`ai/toolcall.go`、`ai/quota.go`(§11 的備援鏈 + 每日斷路器)、`copilot/`、`cmd/web/copilot.go` + `static/copilot.js`;設定見 `cmd/web/copilot.go` 的 `COPILOT_*` 環境變數 | 能追問、AI 自己查資料 |
 | P2 | SSE 串流 + 每頁自動帶上下文;三個「AI 分析」按鈕改成開聊天框 | 收斂入口 |
 | P3 | 寫入提議 + 確認卡(HITL) | 從「建議」到「一鍵執行」 |
 | P4 | deep_analysis(fan-out) | 省 token、深度 |
