@@ -42,6 +42,10 @@ jobs:
           version: v2.13.2
       - name: test -race
         run: go test -race -count=1 ./...
+      # The copilot reply renderer is plain JS (no build step, no deps);
+      # node ships on the runner.
+      - name: js test
+        run: node --test cmd/web/jstest/*.test.js
 
   image:
     needs: check
