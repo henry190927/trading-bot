@@ -1290,5 +1290,7 @@
   "copilot.err.quota": "Today's free quota is used up; it resets at 15:00–16:00 Taiwan time.",
   "copilot.err.net": "Could not reach the server.",
   "copilot.stop.max_steps": "Stopped after several rounds of lookups; this answer may be incomplete. A more specific question helps.",
-  "copilot.stop.empty": "The AI gave no answer this time; try rephrasing."
+  "copilot.stop.empty": "The AI gave no answer this time; try rephrasing.",
+  "copilot.model": "Model",
+  "copilot.modelErr": "Could not switch models; keeping the current one."
 }

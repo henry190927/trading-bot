@@ -144,7 +144,7 @@ func (g *GeminiClient) ListModels(ctx context.Context, apiKey string) ([]string,
 		return stub, nil
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		"https://generativelanguage.googleapis.com/v1beta/models?key="+apiKey, nil)
+		strings.TrimSuffix(g.apiBase(), "/")+"?key="+apiKey, nil)
 	if err != nil {
 		return nil, err
 	}

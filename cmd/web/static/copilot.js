@@ -13,6 +13,8 @@
   var input = document.getElementById('copilot-input');
   var send = document.getElementById('copilot-send');
   var quotaEl = document.getElementById('copilot-quota');
+  var modelSel = document.getElementById('copilot-model');
+  var modelsLoaded = false;
   var KEY = 'copilot.msgs';
   var msgs = load();
   var busy = false;
@@ -61,10 +63,46 @@
       else if (quotaEl) { quotaEl.textContent = I['copilot.err.off'] || ''; quotaEl.className = 'copilot-quota out'; }
     }).catch(function () {});
   }
+  // The model selector is the same setting the server persists for every
+  // AI call (/api/ai/model); the chosen model is tried first, configured
+  // fallbacks after it.
+  function loadModels() {
+    if (!modelSel || modelsLoaded) return;
+    fetch('/api/ai/model', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      var list = (j && j.available) || [];
+      if (j && j.current && list.indexOf(j.current) < 0) list.unshift(j.current);
+      if (!list.length) return;
+      modelSel.textContent = '';
+      list.forEach(function (m) {
+        var o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        if (m === j.current) o.selected = true;
+        modelSel.appendChild(o);
+      });
+      modelSel.dataset.current = j.current || '';
+      modelsLoaded = true;
+    }).catch(function () {});
+  }
+  if (modelSel) modelSel.addEventListener('change', function () {
+    var v = modelSel.value, prev = modelSel.dataset.current || '';
+    modelSel.disabled = true;
+    fetch('/api/ai/model', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ model: v }).toString()
+    }).then(function (r) {
+      if (!r.ok) throw new Error('switch failed');
+      modelSel.dataset.current = v;
+      refreshStatus();
+    }).catch(function () {
+      modelSel.value = prev;
+      bubble('error', I['copilot.modelErr'] || 'model switch failed');
+    }).then(function () { modelSel.disabled = false; });
+  });
   function setOpen(open) {
     box.hidden = !open;
     openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) { refreshStatus(); setTimeout(function () { input.focus(); }, 0); }
+    if (open) { refreshStatus(); loadModels(); setTimeout(function () { input.focus(); }, 0); }
   }
 
   function ask(text) {

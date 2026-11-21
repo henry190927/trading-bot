@@ -1290,5 +1290,7 @@
   "copilot.err.quota": "今天的免費額度用完了,台灣時間下午 3–4 點重置。",
   "copilot.err.net": "連不上伺服器。",
   "copilot.stop.max_steps": "查了好幾輪還沒查完,先回答到這裡;可以把問題問得更具體。",
-  "copilot.stop.empty": "AI 這次沒有給出回答,請換個問法再試。"
+  "copilot.stop.empty": "AI 這次沒有給出回答,請換個問法再試。",
+  "copilot.model": "模型",
+  "copilot.modelErr": "切換模型失敗,維持原本的模型。"
 }

@@ -164,3 +164,29 @@ func TestCleanHistory(t *testing.T) {
 		}
 	}
 }
+
+// /api/ai/model lists models with the key in the URL. A failure must not
+// hand that URL (and the key) to the browser.
+func TestAIModelEndpointsNeverLeakTheKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("GEMINI_API_KEY", secretKey)
+	g := ai.NewGemini()
+	g.BaseURL = "http://127.0.0.1:1/v1beta/models/"
+	s := &server{ai: g, aiProviderName: "gemini", aiModelPath: filepath.Join(t.TempDir(), "m.txt")}
+	r := gin.New()
+	r.GET("/api/ai/model", s.handleAIModelGet)
+	r.POST("/api/ai/model", s.handleAIModelPost)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/ai/model", nil))
+	if w.Code != http.StatusBadGateway || strings.Contains(w.Body.String(), secretKey) || strings.Contains(w.Body.String(), "127.0.0.1") {
+		t.Errorf("GET: %d %s", w.Code, w.Body.String())
+	}
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/ai/model", strings.NewReader("model=x"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if strings.Contains(w.Body.String(), secretKey) {
+		t.Errorf("POST leaked the key: %s", w.Body.String())
+	}
+}

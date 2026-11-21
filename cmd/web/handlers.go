@@ -4361,7 +4361,10 @@ func (s *server) handleAIModelGet(c *gin.Context) {
 	apiKey := ai.APIKeyForProvider(s.ai)
 	models, err := gc.ListModels(c.Request.Context(), apiKey)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "list models failed: " + err.Error()})
+		// The list call's URL carries the key: log it redacted, never
+		// send it to the browser.
+		log.Printf("[ai] list models: %s", redact(err.Error(), apiKey))
+		c.JSON(http.StatusBadGateway, gin.H{"error": "list models failed"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -4388,7 +4391,8 @@ func (s *server) handleAIModelPost(c *gin.Context) {
 	apiKey := ai.APIKeyForProvider(s.ai)
 	models, err := gc.ListModels(c.Request.Context(), apiKey)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "list models failed: " + err.Error()})
+		log.Printf("[ai] list models: %s", redact(err.Error(), apiKey))
+		c.JSON(http.StatusBadGateway, gin.H{"error": "list models failed"})
 		return
 	}
 	// Validate: must be in the filtered available list.

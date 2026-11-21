@@ -252,3 +252,27 @@ func TestConcurrentRequestsCountEverySuccess(t *testing.T) {
 		t.Errorf("persisted used = %d, want %d", got, n)
 	}
 }
+
+// The model picked in the UI goes first; configured models are fallbacks.
+func TestPrimaryModelIsTriedFirst(t *testing.T) {
+	ms := newModelServer()
+	q := newChain(t, ms, "", "a", "b")
+	pick := "b"
+	q.Primary = func() string { return pick }
+	if got := q.Models(); len(got) != 2 || got[0] != "b" || got[1] != "a" {
+		t.Fatalf("models = %v, want [b a]", got)
+	}
+	if err := ask(t, q); err != nil {
+		t.Fatal(err)
+	}
+	if ms.counted["b"] != 1 || ms.counted["a"] != 0 {
+		t.Errorf("requests a=%d b=%d, want b first", ms.counted["a"], ms.counted["b"])
+	}
+	pick = "z" // a model outside the configured list still leads
+	if got := q.Models(); got[0] != "z" || len(got) != 3 {
+		t.Errorf("models = %v", got)
+	}
+	if st := q.Status(); st[0].Model != "z" {
+		t.Errorf("status order = %+v", st)
+	}
+}

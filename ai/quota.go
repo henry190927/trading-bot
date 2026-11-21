@@ -31,6 +31,9 @@ type QuotaChain struct {
 	models []string
 	path   string
 
+	// Primary, when set, names the model to try first on every request —
+	// the one picked in the UI. The configured models follow as fallbacks.
+	Primary func() string
 	// Now is the clock; tests replace it.
 	Now func() time.Time
 	// MaxRateWait caps how long a per-minute 429 may make the caller wait.
@@ -91,17 +94,32 @@ func NewQuotaChain(client *GeminiClient, models []string, statePath string) *Quo
 	return q
 }
 
-// Models returns the chain, in order.
-func (q *QuotaChain) Models() []string { return append([]string(nil), q.models...) }
+// Models returns the chain in the order it is tried: Primary first, then
+// the configured models.
+func (q *QuotaChain) Models() []string {
+	out := make([]string, 0, len(q.models)+1)
+	if q.Primary != nil {
+		if p := strings.TrimSpace(q.Primary()); p != "" {
+			out = append(out, p)
+		}
+	}
+	for _, m := range q.models {
+		if len(out) == 0 || m != out[0] {
+			out = append(out, m)
+		}
+	}
+	return out
+}
 
 // SendWithTools sends req on the first model that is not spent. req.Model is
 // ignored: the chain picks the model.
 func (q *QuotaChain) SendWithTools(ctx context.Context, req ToolRequest) (*ToolResponse, error) {
-	if len(q.models) == 0 {
+	models := q.Models()
+	if len(models) == 0 {
 		return nil, errors.New("ai: quota chain has no models")
 	}
 	var lastErr error
-	for _, model := range q.models {
+	for _, model := range models {
 		if q.blocked(model) {
 			continue
 		}
@@ -303,8 +321,9 @@ func (q *QuotaChain) Status() []ModelStatus {
 	defer q.mu.Unlock()
 	q.rollover()
 	now := q.Now()
-	out := make([]ModelStatus, 0, len(q.models))
-	for _, model := range q.models {
+	models := q.Models()
+	out := make([]ModelStatus, 0, len(models))
+	for _, model := range models {
 		st := ModelStatus{Model: model}
 		if m := q.state.Models[model]; m != nil {
 			st.Used, st.Limit = m.Used, m.Limit

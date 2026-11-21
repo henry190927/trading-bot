@@ -4729,3 +4729,13 @@ a.ui-row:hover .ui-sym { color: var(--blue); }
 .at-tabs { min-width: 0; flex: 0 1 auto; }
 .at-right { flex-shrink: 0; }
 @media (max-width: 560px) { .copilot { left: 0; width: auto; border-left: 0; } }
+.copilot-head strong { flex: 1; }
+.copilot-sub {
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: 6px var(--sp-3); border-bottom: 1px solid var(--border);
+}
+.copilot-model { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); min-width: 0; }
+.copilot-model select {
+    max-width: 220px; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--r-md); font: inherit; font-size: 12px; padding: 2px 6px;
+}

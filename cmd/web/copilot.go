@@ -41,8 +41,9 @@ const (
 
 // newCopilot wires the copilot from the environment:
 //
-//	COPILOT_MODELS       comma-separated Gemini models, tried in order
-//	                     (default: the active GEMINI_MODEL)
+//	COPILOT_MODELS       comma-separated fallback Gemini models, tried in
+//	                     order after the model selected in the UI (the
+//	                     same setting /api/ai/model changes)
 //	COPILOT_QUOTA_PATH   per-model usage file (default: copilot_quota.json
 //	                     next to the journal)
 //	COPILOT_AUDIT_PATH   tool-call log (default: copilot_audit.jsonl next to
@@ -56,12 +57,11 @@ func newCopilot(p ai.Provider, bx *bingx.Client) *copilotService {
 	if key == "" && !g.DryRun {
 		return &copilotService{disabled: "GEMINI_API_KEY is not set"}
 	}
-	models := splitList(os.Getenv("COPILOT_MODELS"))
-	if len(models) == 0 {
-		models = []string{g.CurrentModel()}
-	}
 	dir := filepath.Dir(journal.DefaultPath())
-	chain := ai.NewQuotaChain(g, models, envOr("COPILOT_QUOTA_PATH", filepath.Join(dir, "copilot_quota.json")))
+	chain := ai.NewQuotaChain(g, splitList(os.Getenv("COPILOT_MODELS")), envOr("COPILOT_QUOTA_PATH", filepath.Join(dir, "copilot_quota.json")))
+	// The model picked in the drawer's selector (persisted by
+	// /api/ai/model) always goes first.
+	chain.Primary = g.CurrentModel
 	reg, err := tools.NewRegistry(tools.ReadTools(webToolDeps(bx))...)
 	if err != nil {
 		return &copilotService{disabled: "tools: " + err.Error()}
