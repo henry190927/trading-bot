@@ -1,5 +1,6 @@
-# The production stack on the VPS. Deployed by .github/workflows/deploy.yml
-# through scripts/trading-deploy; operated with `ops`. See docs/operations.md.
+# The production stack on the VPS. Deployed by the deploy job in
+# .github/workflows/ci.yml through deploy/trading-deploy; operated with `ops`.
+# See docs/operations.md.
 #
 # Two env files, on purpose:
 #   /opt/trading/.env        secrets only (exchange + AI keys, ntfy topic);

@@ -102,6 +102,7 @@ You fill one rule per symbol; the executor watches + fires. Editing the file (ho
 4. **Max concurrent** (global + per-symbol) — never stack.
 5. **One-position-per-symbol** — skip if an open position/pending order exists (check journal + BingX Positions API).
 6. **Daily-loss kill-switch** (dailyLossHaltR) — halt ALL + ntfy + require manual re-arm.
+   > **As built:** the halt re-arms **automatically at 00:00 UTC** (`autotrade.CheckCaps`, `autotrade/caps.go`); there is no manual re-arm step.
 7. **Blackout gate** — no auto-entry inside a macro/earnings window.
 8. **Post-stop cooldown** — don't re-enter a just-stopped setup for N bars.
 9. **Wrong-side-of-mark guard** (already in the engine) — don't place a limit already through market.
@@ -132,7 +133,7 @@ You fill one rule per symbol; the executor watches + fires. Editing the file (ho
 ## 9. Cross-cutting checklist (state, don't assume)
 - [ ] Two independent kill switches (cfg.Enabled + AUTOTRADE_ENABLED); default OFF.
 - [ ] paper=true default; real orders impossible until BOTH paper=false and AUTOTRADE_ENABLED=true.
-- [ ] Daily-loss halt + manual re-arm; ntfy on every placed/filled/stopped/killed.
+- [ ] Daily-loss halt + manual re-arm; ntfy on every placed/filled/stopped/killed. *(As built: automatic re-arm at 00:00 UTC — see item 6.)*
 - [ ] Reconcile open positions vs BingX each tick (no double-entry after a restart).
 - [ ] Blackout (macro+earnings) respected; closed-bar triggers (backtest parity) except zone-touch which is live-poll.
 - [ ] Every auto-trade written to journal with an `auto=true` tag + rule id.
