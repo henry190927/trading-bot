@@ -25,7 +25,7 @@
     'copilot.ask.symbol': {{t "copilot.ask.symbol"}}, 'copilot.ask.trade': {{t "copilot.ask.trade"}}, 'copilot.ask.validate': {{t "copilot.ask.validate"}},
     'copilot.err.quota': {{t "copilot.err.quota"}}, 'copilot.stopped': {{t "copilot.stopped"}}, 'copilot.retry': {{t "copilot.retry"}},
     'copilot.switchModel': {{t "copilot.switchModel"}}, 'copilot.copy': {{t "copilot.copy"}}, 'copilot.left': {{t "copilot.left"}},
-    'copilot.usedN': {{t "copilot.usedN"}}, 'copilot.waiting': {{t "copilot.waiting"}}, 'copilot.close': {{t "copilot.close"}}, 'copilot.send': {{t "copilot.send"}}, 'copilot.stop': {{t "copilot.stop"}}, 'copilot.collapse': {{t "copilot.collapse"}},
+    'copilot.usedN': {{t "copilot.usedN"}}, 'copilot.quotaToday': {{t "copilot.quotaToday"}}, 'copilot.checked': {{t "copilot.checked"}}, 'copilot.failed': {{t "copilot.failed"}}, 'copilot.noTools': {{t "copilot.noTools"}}, 'copilot.waiting': {{t "copilot.waiting"}}, 'copilot.close': {{t "copilot.close"}}, 'copilot.send': {{t "copilot.send"}}, 'copilot.stop': {{t "copilot.stop"}}, 'copilot.collapse': {{t "copilot.collapse"}},
     'copilot.tool.analyze_symbol': {{t "copilot.tool.analyze_symbol"}}, 'copilot.tool.validate_setup': {{t "copilot.tool.validate_setup"}},
     'copilot.tool.get_trade': {{t "copilot.tool.get_trade"}}, 'copilot.tool.get_recent_candles': {{t "copilot.tool.get_recent_candles"}},
     'copilot.tool.get_journal_history': {{t "copilot.tool.get_journal_history"}}, 'copilot.tool.get_open_positions': {{t "copilot.tool.get_open_positions"}},
@@ -135,7 +135,7 @@
   <header class="copilot-head">
     <strong class="copilot-title">{{template "icon" "spark"}}{{t "copilot.title"}}</strong>
     <button type="button" class="copilot-iconbtn" id="copilot-clear" title="{{t "copilot.new"}}" aria-label="{{t "copilot.new"}}">{{template "icon" "plus"}}</button>
-    <button type="button" class="copilot-iconbtn" id="copilot-close" title="{{t "copilot.collapse"}}" aria-label="{{t "copilot.collapse"}}"><span class="cp-ico-dock">{{template "icon" "panel-right"}}</span><span class="cp-ico-float">{{template "icon" "x"}}</span></button>
+    <button type="button" class="copilot-iconbtn" id="copilot-close" title="{{t "copilot.collapse"}} (⌘/)" aria-label="{{t "copilot.collapse"}}"><span class="cp-ico-dock">{{template "icon" "panel-right"}}</span><span class="cp-ico-float">{{template "icon" "x"}}</span></button>
   </header>
   <div class="copilot-log" id="copilot-log" aria-live="polite">
     <div class="copilot-empty" id="copilot-empty">
@@ -145,6 +145,7 @@
     </div>
   </div>
   <form class="copilot-composer" id="copilot-form">
+    <div class="copilot-quick" id="copilot-quick" hidden></div>
     <div class="copilot-box">
       <textarea id="copilot-input" rows="1" placeholder="{{t "copilot.placeholder"}}" aria-label="{{t "copilot.placeholder"}}"></textarea>
       <div class="copilot-tools-row">

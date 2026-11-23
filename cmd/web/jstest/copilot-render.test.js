@@ -75,7 +75,9 @@ test('example 1: verdict, list, levels ladder, stat grid, callout', () => {
 
   const f = render(EX1);
   assert.equal(byClass(f, 'cp-verdict')[0].className, 'cp-verdict short');
-  assert.equal(byClass(f, 'cp-sym')[0].attrs.href, '/chart?symbol=BTC');
+  // In the verdict a symbol is plain text (one clean sentence).
+  assert.ok(byClass(f, 'cp-verdict-text')[0].textContent.startsWith('BTC 1h'));
+  assert.equal(byClass(f, 'cp-sym').length, 0);
   const neg = byClass(f, 'neg').map((n) => n.textContent);
   assert.ok(neg.includes('-6.30%'), neg.join(','));
   // A date-time is not a price, and -42/100 is not coloured.
@@ -92,7 +94,7 @@ test('example 2: bold verdict key, signed R decides the tone, table cells', () =
   assert.equal(b[0].text.startsWith('#93'), true, b[0].text);
   const f = render(EX2);
   assert.equal(byClass(f, 'cp-verdict')[0].className, 'cp-verdict short');
-  assert.equal(byClass(f, 'cp-ref')[0].textContent, '#93');
+  assert.ok(byClass(f, 'cp-verdict-text')[0].textContent.startsWith('#93 ETH'));
   const tds = f.find((n) => n.tag === 'td');
   assert.equal(tds[1].className, 'num');
   assert.equal(byClass(tds[1], 'pos')[0].textContent, '+3.1%');
@@ -153,14 +155,16 @@ test('a bilingual one-shot reply shows only the zh block, bold lines are heading
   const real = '[EN]\n## BTC 1h Setup\n\n**1. Structure:**\n*   **Swing:** up\n[/EN]\n\n[ZH-TW]\n## BTC 1h 設置分析\n\n**1. 結構與盤勢判讀：**\n*   **擺盪序列：** 上升\n\n**4. 決策：**\n*   **等待。** 觀望\n[/ZH-TW]';
   const b = R.parse(real, 'zh');
   assert.deepEqual(b.map((x) => x.t), ['h', 'h', 'list', 'h', 'list']);
-  assert.equal(b[1].text, '1. 結構與盤勢判讀');
+  assert.equal(b[1].text, '結構與盤勢判讀');
+  assert.equal(b[1].num, '1');
   assert.equal(R.parse(real, 'en')[0].text, 'BTC 1h Setup');
   const f = render(real);
   assert.ok(!f.textContent.includes('[EN]') && !f.textContent.includes('Swing'));
   // Headings are plain text: no symbol chip or timeframe tag inside.
-  const h = f.find((n) => n.tag === 'h4')[0];
-  assert.equal(h.kids.length, 0);
-  assert.equal(h.textContent, 'BTC 1h 設置分析');
+  const hs = f.find((n) => n.tag === 'h4');
+  assert.equal(hs[0].kids.length, 1); // one text node: no chip, no tag
+  assert.equal(hs[0].textContent, 'BTC 1h 設置分析');
+  assert.equal(byClass(hs[1], 'cp-h-num')[0].textContent, '1');
 });
 
 test('KV lines with the colon inside the bold still make a stat grid', () => {
@@ -175,4 +179,12 @@ test('a verdict label alone on its line takes the next line', () => {
   assert.equal(b[0].tone, 'long');
   assert.equal(b[0].text, '偏多,等回踩 63,000 再進');
   assert.equal(b[1].t, 'p');
+});
+
+test('the verdict keeps colour but not chips; stats carry their cell count', () => {
+  const f = render('結論:BTC 1h 偏空,#93 不追\n\n進場: 1\n止損: 2\n止盈: 3\nRR: 2R\n持倉: 3h 20m');
+  const v = byClass(f, 'cp-verdict-text')[0];
+  assert.equal(byClass(v, 'cp-sym').length + byClass(v, 'cp-ref').length + byClass(v, 'cp-tf').length, 0);
+  assert.equal(byClass(v, 'cp-dir')[0].className, 'cp-dir short');
+  assert.equal(byClass(f, 'cp-stats')[0].attrs['data-n'], '5');
 });

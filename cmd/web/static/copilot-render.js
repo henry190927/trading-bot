@@ -213,6 +213,15 @@
     return { k: k, v: v, tone: tone, wide: v.length > 18 };
   }
 
+  // A heading's trailing colon goes; a leading "1." / "1)" / "一、" becomes
+  // its own number badge.
+  function heading(level, text) {
+    var t = String(text).replace(/\*\*/g, '').replace(/\s*[:：]\s*$/, '').trim(), num = '';
+    var m = t.match(/^(\d{1,2})[.)、]\s*(.+)$/) || t.match(/^([一二三四五六七八九十]{1,3})、\s*(.+)$/);
+    if (m) { num = m[1]; t = m[2]; }
+    return { t: 'h', level: level, num: num, text: t };
+  }
+
   function cells(line) {
     var s = line.trim();
     if (s.charAt(0) === '|') s = s.slice(1);
@@ -277,8 +286,8 @@
         continue;
       }
       if (HR_RE.test(line)) { flush(); blocks.push({ t: 'hr' }); i++; continue; }
-      if ((m = line.match(H_RE))) { flush(); blocks.push({ t: 'h', level: m[1].length, text: m[2].replace(/\*\*/g, '') }); i++; continue; }
-      if ((m = line.match(BOLD_H_RE)) && !LIST_RE.test(line)) { flush(); blocks.push({ t: 'h', level: 2, text: m[1] }); i++; continue; }
+      if ((m = line.match(H_RE))) { flush(); blocks.push(heading(m[1].length, m[2])); i++; continue; }
+      if ((m = line.match(BOLD_H_RE)) && !LIST_RE.test(line)) { flush(); blocks.push(heading(2, m[1])); i++; continue; }
       if ((m = line.match(CALLOUT_RE))) { flush(); blocks.push({ t: 'callout', label: m[1], text: m[2] }); i++; continue; }
       if (line.indexOf('|') >= 0 && i + 1 < lines.length && TSEP_RE.test(lines[i + 1]) && lines[i + 1].indexOf('-') >= 0) {
         flush();
@@ -322,14 +331,16 @@
     return e;
   }
 
-  function appendInline(doc, parent, toks, opts, card) {
+  // plain: symbols, #ids and timeframes stay text (the verdict sentence).
+  function appendInline(doc, parent, toks, opts, card, plain) {
     toks.forEach(function (k) {
+      if (plain && (k.t === 'sym' || k.t === 'ref' || k.t === 'tf')) { parent.appendChild(doc.createTextNode(k.s)); return; }
       switch (k.t) {
         case 'text': parent.appendChild(doc.createTextNode(k.s)); break;
         case 'code': parent.appendChild(el(doc, 'code', 'cp-code', k.s)); break;
         case 'strong': {
           var s = el(doc, 'strong');
-          appendInline(doc, s, k.kids, opts, card);
+          appendInline(doc, s, k.kids, opts, card, plain);
           parent.appendChild(s);
           break;
         }
@@ -346,9 +357,9 @@
       }
     });
   }
-  function rich(doc, tag, cls, text, opts, card) {
+  function rich(doc, tag, cls, text, opts, card, plain) {
     var e = el(doc, tag, cls);
-    appendInline(doc, e, inline(text, opts, card), opts, card);
+    appendInline(doc, e, inline(text, opts, card), opts, card, plain);
     return e;
   }
 
@@ -368,7 +379,7 @@
           lab.appendChild(el(doc, 'span', null, b.label));
           if (b.tone) lab.appendChild(el(doc, 'span', 'cp-pill ' + cls, L[b.tone]));
           e.appendChild(lab);
-          e.appendChild(rich(doc, 'div', 'cp-verdict-text', b.text, opts, false));
+          e.appendChild(rich(doc, 'div', 'cp-verdict-text', b.text, opts, false, true));
           break;
         }
         case 'levels': {
@@ -389,6 +400,9 @@
         }
         case 'stats': {
           e = el(doc, 'div', 'cp-stats');
+          // The column count follows the cell count (style.css), so no row
+          // is left with one orphan cell.
+          e.setAttribute('data-n', String(b.items.filter(function (it) { return !it.wide; }).length));
           b.items.forEach(function (it) {
             var c = el(doc, 'div', 'cp-stat' + (it.tone === 'stop' || it.tone === 'tp' ? ' ' + it.tone : '') +
               (it.tone === 'good' || it.tone === 'bad' ? ' rr ' + it.tone : '') + (it.wide ? ' wide' : ''));
@@ -398,7 +412,13 @@
           });
           break;
         }
-        case 'h': e = el(doc, 'h4', 'cp-h' + (b.level >= 3 ? ' sub' : ''), b.text); break;
+        case 'h': {
+          // Plain text: chips and tags inside a heading read as noise.
+          e = el(doc, 'h4', 'cp-h ' + (b.level >= 3 ? 'sub' : 'sec'));
+          if (b.num) e.appendChild(el(doc, 'span', 'cp-h-num', b.num));
+          e.appendChild(doc.createTextNode(b.text));
+          break;
+        }
         case 'hr': e = el(doc, 'hr', 'cp-hr'); break;
         case 'callout': {
           e = el(doc, 'div', 'cp-callout warn');

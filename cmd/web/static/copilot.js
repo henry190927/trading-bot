@@ -135,7 +135,7 @@
       quotaEl.title = fmt(I['copilot.quotaLeft'], live.model, live.remaining);
       quotaEl.className = 'copilot-quota' + (live.remaining <= 5 ? ' low' : '');
     } else {
-      quotaEl.textContent = fmt(I['copilot.usedN'], live.used || 0);
+      quotaEl.textContent = fmt(I['copilot.quotaToday'], live.used || 0);
       quotaEl.title = fmt(I['copilot.quota'], live.model, live.used || 0);
       quotaEl.className = 'copilot-quota';
     }
@@ -197,26 +197,32 @@
     else if (a.id != null) arg = '#' + a.id;
     return arg ? name + ' ' + arg : name;
   }
+  // trace is one quiet line above a reply: what the copilot looked up
+  // (details on click), or a yellow "no data checked" when it answered
+  // from memory — the user should know the reply is ungrounded.
   function trace(m) {
     if (Array.isArray(m.tools) && m.tools.length) {
       var d = el('details', 'cp-trace'), s = el('summary');
       s.appendChild(icon('chevron'));
-      s.appendChild(el('span', null, I['copilot.used'] || ''));
-      m.tools.slice(0, 3).forEach(function (t) { s.appendChild(el('span', 'cp-tool' + (t.error ? ' err' : ''), toolLabel(t) + (t.error ? ' ✕' : ''))); });
-      if (m.tools.length > 3) s.appendChild(el('span', null, '+' + (m.tools.length - 3)));
       var ms = m.tools.reduce(function (a, t) { return a + (t.ms || 0); }, 0);
-      if (ms) s.appendChild(el('span', null, '· ' + (ms / 1000).toFixed(1) + 's'));
+      var failed = m.tools.filter(function (t) { return t.error; }).length;
+      var sum = fmt(I['copilot.checked'], m.tools.length) + ' · ' + m.tools.map(toolLabel).join('、') + (ms ? ' · ' + (ms / 1000).toFixed(1) + 's' : '');
+      s.appendChild(el('span', 'cp-trace-sum', sum));
+      if (failed) s.appendChild(el('span', 'cp-trace-fail', '· ' + fmt(I['copilot.failed'], failed)));
       d.appendChild(s);
       var body = el('div', 'cp-trace-body');
       m.tools.forEach(function (t) {
+        var row = el('div', 'cp-trace-row');
+        row.appendChild(el('span', 'cp-tool' + (t.error ? ' err' : ''), toolLabel(t)));
         var args = t.args ? Object.keys(t.args).map(function (k) { return k + '=' + t.args[k]; }).join(', ') : '';
-        var line = el('div', null, t.name + '(' + args + ') · ' + (t.ms || 0) + 'ms' + (t.bytes ? ' · ' + (t.bytes / 1024).toFixed(1) + 'KB' : ''));
-        body.appendChild(line);
+        row.appendChild(el('span', null, t.name + '(' + args + ') · ' + (t.ms || 0) + 'ms' + (t.bytes ? ' · ' + (t.bytes / 1024).toFixed(1) + 'KB' : '')));
+        body.appendChild(row);
         if (t.error) body.appendChild(el('div', 'err', t.error));
       });
       d.appendChild(body);
       return d;
     }
+    if (Array.isArray(m.tools)) return el('div', 'cp-trace none', I['copilot.noTools'] || '');
     if (m.meta) return el('div', 'cp-trace', m.meta); // entries saved before the trace existed
     return null;
   }
@@ -293,6 +299,7 @@
     var none = !log.querySelector('.copilot-msg');
     empty.hidden = !none;
     if (kbd) kbd.hidden = !none;
+    syncQuick();
   }
 
   // Suggestion chips fill the input; they never send (the free tier is
@@ -316,6 +323,27 @@
     });
   }
 
+  // On /chart, once a conversation exists (the empty state has its own
+  // chips), one quick "analyze this chart" chip sits above the input while
+  // it is empty. It replaces the page's AI button, hidden while the panel
+  // is open. Prefills only.
+  var quick = document.getElementById('copilot-quick');
+  function syncQuick() {
+    if (!quick) return;
+    var src = document.getElementById('chart-ai-btn');
+    var show = !!src && !!log.querySelector('.copilot-msg') && !input.value.trim() && !busy;
+    quick.hidden = !show;
+    if (!show) return;
+    var q = question(src);
+    if (quick.dataset.q === q) return;
+    quick.dataset.q = q;
+    quick.textContent = '';
+    var b = el('button', 'copilot-chip sm', q);
+    b.type = 'button';
+    b.addEventListener('click', function () { prefill(q); });
+    quick.appendChild(b);
+  }
+
   // ---- asking -----------------------------------------------------------------
 
   function setBusy(ctrl) {
@@ -325,7 +353,7 @@
     send.title = label; send.setAttribute('aria-label', label);
     syncSend();
   }
-  function syncSend() { send.disabled = !busy && !input.value.trim(); }
+  function syncSend() { send.disabled = !busy && !input.value.trim(); syncQuick(); }
   function grow() {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 200) + 'px';

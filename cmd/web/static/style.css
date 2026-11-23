@@ -4732,7 +4732,7 @@ html:not([data-copilot]) .copilot.is-sheet { transform: translateY(100%); }
     padding: 0 var(--sp-2) 0 var(--sp-4); border-bottom: 1px solid var(--border);
 }
 html[data-copilot="overlay"] .copilot-head { height: 44px; }
-.copilot-title { flex: 1; display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-base); font-weight: 600; }
+.copilot-title { flex: 1; display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-md); font-weight: 600; }
 .copilot-title .ico { width: 16px; height: 16px; color: var(--blue); }
 .copilot-iconbtn {
     display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
@@ -4740,6 +4740,7 @@ html[data-copilot="overlay"] .copilot-head { height: 44px; }
 }
 .copilot-iconbtn:hover { background: var(--row-hover); color: var(--text); }
 .copilot-iconbtn .ico { width: 16px; height: 16px; }
+.copilot-head .copilot-iconbtn { width: 32px; height: 32px; }
 .copilot-iconbtn > span { display: grid; place-items: center; }
 .cp-ico-float { display: none !important; }
 html[data-copilot="overlay"] .cp-ico-dock, html[data-copilot="sheet"] .cp-ico-dock { display: none !important; }
@@ -4747,13 +4748,19 @@ html[data-copilot="overlay"] .cp-ico-float, html[data-copilot="sheet"] .cp-ico-f
 
 .copilot-log {
     position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-    padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-5);
+    padding: var(--sp-4) var(--sp-4) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-5);
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent; scrollbar-gutter: stable;
 }
-.copilot-empty { padding: var(--sp-5) 0 0; }
+.copilot-log::-webkit-scrollbar { width: 8px; }
+.copilot-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; border: 2px solid var(--surface); }
+/* A question and its answer pair up (16px); turns stay 24px apart. */
+.copilot-msg.user + .copilot-msg.assistant { margin-top: calc(var(--sp-2) * -1); }
+/* Settles just above the composer, where the eye is (not 700px above it). */
+.copilot-empty { margin-top: auto; padding: 0 0 var(--sp-2); }
 .copilot-empty[hidden] { display: none; }
 .copilot-empty-ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--wash-blue); color: var(--blue); }
 .copilot-empty-ico .ico { width: 16px; height: 16px; }
-.copilot-hint { margin: var(--sp-3) 0 0; color: var(--text-dim); font-size: var(--fs-base); line-height: 1.6; max-width: 34ch; }
+.copilot-hint { margin: var(--sp-3) 0 0; color: var(--text-dim); font-size: var(--fs-base); line-height: 1.6; max-width: 36ch; }
 .copilot-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4); }
 .copilot-chip {
     background: var(--chip); border: 1px solid var(--chip-border); border-radius: var(--r-pill);
@@ -4763,10 +4770,11 @@ html[data-copilot="overlay"] .cp-ico-float, html[data-copilot="sheet"] .cp-ico-f
 
 .copilot-msg { font-size: var(--fs-md); line-height: 1.6; }
 .copilot-msg.user {
-    align-self: flex-end; max-width: 85%; background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: var(--r-md) var(--r-md) 4px var(--r-md); padding: var(--sp-2) var(--sp-3);
+    align-self: flex-end; max-width: 80%; background: var(--surface-2); border: 0;
+    border-radius: var(--r-lg) var(--r-lg) 4px var(--r-lg); padding: 10px 14px;
     white-space: pre-wrap; overflow-wrap: anywhere;
 }
+:root[data-theme="light"] .copilot-msg.user { background: var(--chip); }
 .copilot-msg.assistant { align-self: stretch; min-width: 0; }
 .copilot-msg.pending { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-dim); font-size: var(--fs-sm); }
 .cp-dots { display: inline-flex; gap: 4px; }
@@ -4780,15 +4788,21 @@ html[data-copilot="overlay"] .cp-ico-float, html[data-copilot="sheet"] .cp-ico-f
 }
 .copilot-retry { background: none; border: 0; padding: 0; margin-left: 6px; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 
-/* Tool trace above a reply: what the copilot looked up. */
-.cp-trace { margin-bottom: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); }
-.cp-trace summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Tool trace above a reply: one quiet line; chips only when expanded. */
+.cp-trace { margin-bottom: var(--sp-2); font-size: var(--fs-xs); color: var(--text-dim); min-width: 0; }
+.cp-trace summary { list-style: none; cursor: pointer; display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; }
+.cp-trace-sum { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cp-trace-fail { color: var(--red); white-space: nowrap; }
+.cp-trace.none { color: var(--yellow); }
+.cp-trace-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cp-trace-row + .cp-trace-row { margin-top: 4px; }
 .cp-trace summary::-webkit-details-marker { display: none; }
 .cp-trace summary .ico { width: 12px; height: 12px; transition: transform var(--t-fast); }
 .cp-trace[open] summary .ico { transform: rotate(90deg); }
 .cp-tool { font-family: var(--mono); padding: 1px 6px; border-radius: 6px; background: var(--chip); border: 1px solid var(--chip-border); color: var(--text); }
 .cp-tool.err { color: var(--red); border-color: var(--red); }
 .cp-trace-body { margin-top: 6px; padding-left: 18px; font-family: var(--mono); line-height: 1.6; overflow-wrap: anywhere; }
+.copilot-msg.assistant > .cp-note:first-child { margin-top: 0; }
 .cp-trace-body .err { color: var(--red); }
 
 .cp-note { margin-top: var(--sp-3); border-left: 2px solid var(--yellow); padding-left: var(--sp-2); font-size: var(--fs-sm); color: var(--text-dim); }
@@ -4800,17 +4814,23 @@ html[data-copilot="overlay"] .cp-ico-float, html[data-copilot="sheet"] .cp-ico-f
 .cp-plain { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Rendered reply (copilot-render.js). Colour in prose, pills in cards. */
-.cp-body { color: var(--text); overflow-wrap: anywhere; }
+.cp-body { color: var(--text); overflow-wrap: anywhere; max-width: 640px; container: cpbody / inline-size; }
 .cp-body > * { margin: 0; }
 .cp-body > * + * { margin-top: var(--sp-3); }
-.cp-h { font-size: var(--fs-base); font-weight: 600; color: var(--text); }
-.cp-body > .cp-h { margin-top: var(--sp-4); }
-.cp-h.sub { color: var(--text-dim); }
+/* Headings separate sections: body size, a hairline above, more space
+   before than after, and a small number badge for "1." style titles. */
+.cp-h { display: flex; align-items: baseline; gap: var(--sp-2); font-size: var(--fs-md); font-weight: 600; line-height: var(--lh-tight); color: var(--text); }
+.cp-body > .cp-h { margin-top: var(--sp-5); }
+.cp-body > .cp-h + * { margin-top: var(--sp-2); }
+.cp-h.sec { padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.cp-body > .cp-h.sec:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.cp-h.sub { font-size: var(--fs-base); color: var(--text-dim); }
+.cp-h-num { font: 600 var(--fs-xs)/1 var(--mono); color: var(--text-dim); padding: 3px 6px; border-radius: 6px; background: var(--chip); border: 1px solid var(--chip-border); }
 .cp-hr { border: 0; border-top: 1px solid var(--border); }
 .cp-quote { border-left: 2px solid var(--border); padding-left: var(--sp-3); color: var(--text-dim); }
-.cp-list { padding-left: 1.2em; }
-.cp-list li + li { margin-top: var(--sp-1); }
-.cp-list li::marker { color: var(--text-dim); }
+.cp-list { padding-left: 1.1em; }
+.cp-list li + li { margin-top: var(--sp-2); }
+.cp-list li::marker { color: var(--text-dim); font-size: .9em; }
 .cp-list .cp-list { margin-top: var(--sp-1); }
 .cp-code { font-family: var(--mono); font-size: .9em; background: var(--chip); padding: 0 4px; border-radius: 4px; }
 .cp-pre {
@@ -4830,6 +4850,15 @@ html[data-copilot="overlay"] .cp-ico-float, html[data-copilot="sheet"] .cp-ico-f
     background: var(--chip); border: 1px solid var(--chip-border); color: var(--text); text-decoration: none;
 }
 a.cp-sym:hover { border-color: var(--blue); }
+/* One prose voice: in running text numbers stay in the body font (tabular
+   figures), timeframes are plain, a symbol is a soft borderless tag. Mono
+   and bordered chips are for cards, tables and code, where columns align. */
+.cp-p .cp-num, .cp-list .cp-num, .cp-verdict-text .cp-num, .cp-callout .cp-num, .cp-quote .cp-num {
+    font-family: inherit; font-size: 1em; font-variant-numeric: tabular-nums; font-weight: 500; }
+.cp-p .cp-tf, .cp-list .cp-tf, .cp-callout .cp-tf { font: inherit; color: inherit; }
+.cp-p .cp-sym, .cp-list .cp-sym, .cp-callout .cp-sym, .cp-p .cp-ref, .cp-list .cp-ref {
+    font: 600 .93em var(--sans); border: 0; padding: 1px 5px; background: var(--wash-dim); border-radius: 4px; }
+.cp-p a.cp-sym:hover, .cp-list a.cp-sym:hover { background: var(--wash-blue); color: var(--blue); }
 .cp-ref { color: var(--blue); }
 .cp-tf { font-family: var(--mono); color: var(--text-dim); font-size: .9em; }
 .cp-callout.warn {
@@ -4838,16 +4867,17 @@ a.cp-sym:hover { border-color: var(--blue); }
 }
 .cp-callout-k { color: var(--yellow); }
 
-.cp-verdict { border-left: 3px solid var(--blue); background: var(--wash-blue); border-radius: var(--r-sm); padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4); }
+.cp-verdict { border-left: 3px solid var(--blue); background: var(--wash-blue); border-radius: var(--r-sm); padding: var(--sp-3) var(--sp-4); }
 .cp-verdict.long { border-left-color: var(--green); background: var(--wash-green); }
 .cp-verdict.short { border-left-color: var(--red); background: var(--wash-red); }
 .cp-verdict.flat { border-left-color: var(--yellow); background: var(--wash-yellow); }
-.cp-verdict-label { display: flex; gap: var(--sp-2); align-items: center; font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .04em; }
-.cp-verdict-text { margin-top: var(--sp-1); font-size: var(--fs-md); font-weight: 600; line-height: 1.5; color: var(--text); }
+.cp-verdict-label { display: flex; gap: var(--sp-2); align-items: center; font-size: var(--fs-xs); font-weight: 600; color: var(--text-dim); letter-spacing: .04em; }
+.cp-verdict-text { margin-top: var(--sp-1); font-size: var(--fs-md); font-weight: 500; line-height: 1.55; color: var(--text); }
 
-.cp-levels { border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; font-size: var(--fs-base); }
-/* Fixed columns: each row is its own grid, so auto widths would not line up. */
-.cp-level { display: grid; grid-template-columns: 64px 120px minmax(0, 1fr); gap: var(--sp-2); align-items: center; padding: 6px var(--sp-3); border-top: 1px solid var(--border); }
+.cp-levels { display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; font-size: var(--fs-base); }
+/* Rows share the parent's columns (subgrid), so prices and notes line up. */
+.cp-level { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: var(--sp-4); align-items: center; padding: 6px var(--sp-3); border-top: 1px solid var(--border); }
+@supports not (grid-template-columns: subgrid) { .cp-level { grid-template-columns: 64px 128px minmax(0, 1fr); } }
 .cp-level:first-child { border-top: 0; }
 .cp-level-type { font-size: var(--fs-xs); font-weight: 600; display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
 .cp-level-type::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
@@ -4862,13 +4892,20 @@ a.cp-sym:hover { border-color: var(--blue); }
    box clips the outer ones. (A gap over a border-coloured background would
    paint any empty last-row slot solid.) */
 .cp-stats {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    display: grid; grid-template-columns: repeat(2, 1fr);
     border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden;
 }
+/* Columns follow the cell count (data-n, set by the renderer): no orphan. */
+.cp-stats[data-n="1"] { grid-template-columns: 1fr; }
+.cp-stats[data-n="3"], .cp-stats[data-n="6"] { grid-template-columns: repeat(3, 1fr); }
+.cp-stats[data-n="5"] { grid-template-columns: repeat(6, 1fr); }
+.cp-stats[data-n="5"] .cp-stat { grid-column: span 2; }
+.cp-stats[data-n="5"] .cp-stat:nth-child(n+4) { grid-column: span 3; }
+@container cpbody (min-width: 440px) { .cp-stats[data-n="4"] { grid-template-columns: repeat(4, 1fr); } }
 .cp-stat { padding: var(--sp-2) var(--sp-3); min-width: 0; border-top: 1px solid var(--border); border-left: 1px solid var(--border); margin: -1px 0 0 -1px; }
-.cp-stat.wide { grid-column: 1 / -1; }
-.cp-stat-k { font-size: var(--fs-xs); color: var(--text-dim); }
-.cp-stat-v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-md); font-weight: 600; margin-top: 2px; }
+.cp-stats .cp-stat.wide { grid-column: 1 / -1; }
+.cp-stat-k { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .02em; }
+.cp-stat-v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-md); font-weight: 600; margin-top: 4px; }
 .cp-stat.wide .cp-stat-v { font-family: var(--sans); font-weight: 500; font-size: var(--fs-base); }
 .cp-stat.stop .cp-stat-v { color: var(--red); } .cp-stat.tp .cp-stat-v { color: var(--green); }
 .cp-stat.rr.good .cp-stat-v { color: var(--green); } .cp-stat.rr.bad .cp-stat-v { color: var(--red); }
@@ -4882,27 +4919,40 @@ a.cp-sym:hover { border-color: var(--blue); }
 .cp-table td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Composer: one box holding the input, model, quota and send/stop. */
-.copilot-composer { flex: 0 0 auto; padding: var(--sp-2) var(--sp-3) var(--sp-3); }
-.copilot-box {
-    background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md);
-    padding: var(--sp-2) var(--sp-2) var(--sp-1) var(--sp-3);
+.copilot-composer { position: relative; flex: 0 0 auto; padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+/* The log scrolls under a short fade instead of text cut against the box. */
+.copilot-composer::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -20px; height: 20px; pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--surface));
 }
+.copilot-box {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 10px var(--sp-2) 6px var(--sp-3); transition: border-color var(--t-fast);
+}
+:root[data-theme="light"] .copilot-box { background: var(--surface); box-shadow: var(--shadow-card); }
+.copilot-quick { display: flex; gap: var(--sp-1); margin-bottom: var(--sp-2); }
+.copilot-quick[hidden] { display: none; }
+.copilot-chip.sm { padding: 3px 10px; font-size: var(--fs-xs); }
 .copilot-box:focus-within { border-color: var(--blue); }
 .copilot-box textarea {
     display: block; width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: var(--text);
-    font: inherit; font-size: var(--fs-md); line-height: var(--lh-base); max-height: 200px; padding: 2px 0;
+    font: inherit; font-size: var(--fs-md); line-height: var(--lh-base); min-height: 24px; max-height: 200px; padding: 2px 0;
 }
+.copilot-box textarea::placeholder { color: var(--text-dim); }
 .copilot-tools-row { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-1); min-width: 0; }
 .copilot-model-sel {
-    min-width: 0; max-width: 180px; border: 0; background: transparent; color: var(--text-dim);
-    font: inherit; font-size: var(--fs-sm); padding: 2px 4px; border-radius: 6px; cursor: pointer;
+    min-width: 0; max-width: 160px; border: 0; background: transparent; color: var(--text-dim);
+    font: inherit; font-size: var(--fs-sm); padding: 2px 6px; border-radius: 6px; cursor: pointer;
+    field-sizing: content; /* the chevron hugs the name (Chromium; others keep the old width) */
 }
 .copilot-model-sel:hover { background: var(--row-hover); color: var(--text); }
-.copilot-quota { font-size: var(--fs-xs); font-family: var(--mono); color: var(--text-dim); white-space: nowrap; }
+.copilot-quota { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--text-dim); white-space: nowrap; }
+.copilot-quota::before { content: "·"; margin-right: var(--sp-2); color: var(--border); }
+.copilot-quota:empty::before { content: none; }
 .copilot-quota.low { color: var(--yellow); } .copilot-quota.out { color: var(--red); }
 .copilot-spacer { flex: 1; }
 .copilot-send {
-    display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; padding: 0;
+    display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; padding: 0;
     border: 0; border-radius: 50%; background: var(--blue); color: var(--on-accent); cursor: pointer;
 }
 .copilot-send > span { display: grid; place-items: center; }
@@ -4913,11 +4963,28 @@ a.cp-sym:hover { border-color: var(--blue); }
 .copilot-send.stop .cp-ico-send { display: none; } .copilot-send.stop .cp-ico-stop { display: grid; }
 .copilot-kbd-hint { margin: var(--sp-2) 0 0; text-align: center; font-size: var(--fs-xs); color: var(--text-dim); }
 .copilot-kbd-hint[hidden] { display: none; }
+@media (hover: none) { .copilot-kbd-hint { display: none; } }
 
-/* /chart toolbar while docked: the one-row rule above is keyed to the
-   viewport, but the docked panel takes ~400px of it. Let the row wrap and
-   keep every label on one line. */
-html[data-copilot="dock"] .chart-controls { flex-wrap: wrap; row-gap: var(--sp-2); }
-html[data-copilot="dock"] .chart-controls .layer-chip,
-html[data-copilot="dock"] .chart-controls-end > * { white-space: nowrap; }
-html[data-copilot="dock"] .chart-controls-end { margin-left: auto; }
+/* /chart toolbar: the one-row rule above is keyed to the viewport, but a
+   docked copilot takes ~400px of it. Key the compaction off the chart
+   column's real width instead (its width comes from body, never from its
+   content, so the container query cannot loop). */
+.chart-main { container: chartmain / inline-size; }
+.chart-controls .layer-chip, .chart-controls-end > * { white-space: nowrap; }
+@container chartmain (max-width: 1100px) {
+    .chart-controls .layer-menu-count.is-zero { display: none; }
+    .chart-controls-end .cs-record-btn { font-size: 0; gap: 0; padding: 0; width: 34px; justify-content: center; }
+    .chart-controls-end .cs-record-btn .ico { width: 16px; height: 16px; }
+    .chart-controls .layer-reset-label { display: none; }
+}
+@container chartmain (max-width: 820px) {
+    /* still too narrow: two deliberate rows, not one full row plus an orphan */
+    .chart-controls { flex-wrap: wrap; row-gap: var(--sp-2); }
+    .chart-controls > .chart-toolbar { flex: 1 0 100%; }
+    .chart-controls-end { margin-left: auto; }
+}
+/* The page's AI button only opens the panel; once it is open the panel has
+   its own "analyze this chart" chip. */
+html[data-copilot] #chart-ai-btn { display: none; }
+.ai-analyze-btn { display: inline-flex; align-items: center; gap: 6px; }
+.ai-analyze-btn .ico { width: 14px; height: 14px; }
