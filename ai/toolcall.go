@@ -70,6 +70,9 @@ type ToolRequest struct {
 	Tools       []ToolDecl
 	MaxTokens   int     // 0 = provider default
 	Temperature float64 // 0 = provider default
+	// RequireTool makes the model call one of Tools in this turn instead of
+	// answering from memory (Gemini functionCallingConfig mode ANY).
+	RequireTool bool
 }
 
 // ToolResponse is the model's next turn.
@@ -157,6 +160,9 @@ func geminiToolPayload(req ToolRequest) ([]byte, error) {
 			decls = append(decls, decl)
 		}
 		body["tools"] = []map[string]any{{"functionDeclarations": decls}}
+		if req.RequireTool {
+			body["toolConfig"] = map[string]any{"functionCallingConfig": map[string]any{"mode": "ANY"}}
+		}
 	}
 	gen := map[string]any{}
 	if req.MaxTokens > 0 {

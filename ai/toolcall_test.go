@@ -201,3 +201,25 @@ func TestSendStillWorksThroughPostGenerate(t *testing.T) {
 		t.Errorf("resp = %+v", resp)
 	}
 }
+
+// RequireTool sends functionCallingConfig mode ANY; without it the model
+// chooses (no toolConfig at all).
+func TestRequireToolSetsModeAny(t *testing.T) {
+	f := &fakeGemini{replies: []string{callReply, textReply}}
+	g := newFakeClient(t, f)
+	turns := []Turn{{Role: RoleUser, Text: "how is BTC"}}
+	if _, err := g.SendWithTools(context.Background(), ToolRequest{APIKey: "k", Turns: turns, Tools: testTools, RequireTool: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.SendWithTools(context.Background(), ToolRequest{APIKey: "k", Turns: turns, Tools: testTools}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := f.bodies[0]["toolConfig"].(map[string]any)
+	fc, _ := cfg["functionCallingConfig"].(map[string]any)
+	if fc["mode"] != "ANY" {
+		t.Errorf("toolConfig = %v, want functionCallingConfig.mode ANY", f.bodies[0]["toolConfig"])
+	}
+	if _, ok := f.bodies[1]["toolConfig"]; ok {
+		t.Errorf("toolConfig sent without RequireTool: %v", f.bodies[1]["toolConfig"])
+	}
+}

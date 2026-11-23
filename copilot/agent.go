@@ -75,6 +75,11 @@ type Agent struct {
 	MaxTokens int
 	// Audit, when set, receives every tool call.
 	Audit func(ToolTrace)
+	// NeedsData, when set and true for the question, makes the first step
+	// call a tool. A small model otherwise answers a "how is BTC now"
+	// question from memory, with no numbers; the free-tier cost is the same
+	// as when it does look things up (one tool step, then the answer).
+	NeedsData func(question string) bool
 }
 
 // Defaults applied by Run when a field is zero.
@@ -113,16 +118,18 @@ func (a *Agent) Run(ctx context.Context, history []Message, pageContext string) 
 		turns = append(turns, ai.Turn{Role: role, Text: text})
 	}
 	decls := declarations(a.Tools)
+	mustLook := a.NeedsData != nil && len(decls) > 0 && a.NeedsData(history[len(history)-1].Text)
 
 	res := &Result{}
 	var lastText string
 	for step := 0; step < maxSteps; step++ {
 		resp, err := a.LLM.SendWithTools(ctx, ai.ToolRequest{
-			APIKey:    a.APIKey,
-			System:    a.System,
-			Turns:     turns,
-			Tools:     decls,
-			MaxTokens: a.MaxTokens,
+			APIKey:      a.APIKey,
+			System:      a.System,
+			Turns:       turns,
+			Tools:       decls,
+			MaxTokens:   a.MaxTokens,
+			RequireTool: mustLook && step == 0,
 		})
 		if err != nil {
 			return res, err

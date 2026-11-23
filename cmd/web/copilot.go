@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -70,9 +71,32 @@ func newCopilot(s *server, p ai.Provider, bx *bingx.Client) *copilotService {
 	return &copilotService{
 		chain:  chain,
 		apiKey: key,
-		agent:  &copilot.Agent{LLM: chain, Tools: reg, APIKey: key, Audit: audit.Write},
+		agent:  &copilot.Agent{LLM: chain, Tools: reg, APIKey: key, Audit: audit.Write, NeedsData: needsData},
 	}
 }
+
+// needsDataRe matches questions that cannot be answered without looking
+// something up: a trade id, a timeframe, or a word about positions, trades,
+// levels, macro events or backtests.
+var needsDataRe = regexp.MustCompile(`(?i)#\d+|\b(?:5m|15m|30m|1h|2h|4h|1d)\b|持倉|倉位|部位|交易|日誌|進場|出場|止損|止盈|價位|支撐|壓力|樞紐|現價|行情|走勢|狀況|分析|總經|事件|數據|回測|勝率|K ?線|position|trade|journal|entry|stop|level|support|resistance|price|macro|event|backtest|win ?rate|candle|analy`)
+
+// needsData reports whether the copilot must call a tool before answering
+// q (copilot.Agent.NeedsData): any UI symbol named, or needsDataRe.
+func needsData(q string) bool {
+	up := strings.ToUpper(q)
+	for _, s := range uiSymbols {
+		if i := strings.Index(up, s); i >= 0 {
+			before := i == 0 || !isASCIILetter(up[i-1])
+			after := i+len(s) == len(up) || !isASCIILetter(up[i+len(s)])
+			if before && after {
+				return true
+			}
+		}
+	}
+	return needsDataRe.MatchString(q)
+}
+
+func isASCIILetter(b byte) bool { return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') }
 
 // webTools is the copilot's tool set: the shared read tools (package tools)
 // with get_trade swapped for the web's richer version, plus analyze_symbol and

@@ -235,3 +235,22 @@ func TestOldAIAnalyzeRoutesAreGone(t *testing.T) {
 		t.Error("main.go still registers a /ai/analyze route; the copilot replaced them")
 	}
 }
+
+func TestNeedsData(t *testing.T) {
+	for q, want := range map[string]bool{
+		"分析 BTC 1h 現在的狀況":  true,
+		"#93 這筆交易做得如何":     true,
+		"我現在有持倉嗎?":         true,
+		"今天有哪些總經事件?":       true,
+		"how is eth doing": true,
+		"XAU?":             true,
+		"hi":               false,
+		"謝謝":               false,
+		"你是誰":              false,
+		"APPLE pie":        false, // APP only as a whole word
+	} {
+		if got := needsData(q); got != want {
+			t.Errorf("needsData(%q) = %v, want %v", q, got, want)
+		}
+	}
+}

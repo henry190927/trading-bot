@@ -203,3 +203,19 @@ func TestLongToolOutputIsTruncated(t *testing.T) {
 		t.Errorf("truncated = %q", got)
 	}
 }
+
+// NeedsData forces a tool call on the first step only, and only for the
+// questions it picks.
+func TestNeedsDataRequiresAToolOnTheFirstStep(t *testing.T) {
+	needs := func(q string) bool { return strings.Contains(q, "BTC") }
+	llm := &scriptLLM{turns: []ai.Turn{{Role: ai.RoleModel, Calls: []ai.ToolCall{call("fast", nil)}}, {Role: ai.RoleModel, Text: "ok"}}}
+	ask(t, &Agent{LLM: llm, Tools: registry(t), NeedsData: needs}, "how is BTC")
+	if !llm.reqs[0].RequireTool || llm.reqs[1].RequireTool {
+		t.Errorf("RequireTool per step = %v, %v; want true, false", llm.reqs[0].RequireTool, llm.reqs[1].RequireTool)
+	}
+	llm2 := &scriptLLM{turns: []ai.Turn{{Role: ai.RoleModel, Text: "hi"}}}
+	ask(t, &Agent{LLM: llm2, Tools: registry(t), NeedsData: needs}, "hello")
+	if llm2.reqs[0].RequireTool {
+		t.Error("a greeting was forced to call a tool")
+	}
+}
