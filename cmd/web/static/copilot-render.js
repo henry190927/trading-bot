@@ -43,11 +43,15 @@
   var VERDICT_KEYS = { '結論': 1, '總結': 1, 'verdict': 1, 'tl;dr': 1 };
   var CALLOUT_RE = /^\s*(?:>\s*)?(?:\*\*)?(注意|風險|提醒|Note|Risk|Warning|Caution)(?:\*\*)?\s*[:：]\s*(.*)$/;
   var KV_LABELS = '進場|入場|止損|停損|止盈|目標|TP\\d?|SL|出場|RR|R:R|風報比|結果|倉位|槓桿|持倉|Entry|Stop|Target|Exit|Result|Size|Leverage|Held';
-  var KV_RE = new RegExp('^\\s*(?:[-*•‧]\\s+)?(?:\\*\\*)?(' + KV_LABELS + ')(?:\\*\\*)?\\s*[:：]\\s*(.+?)\\s*$');
+  var KV_RE = new RegExp('^\\s*(?:[-*•‧]\\s+)?(?:\\*\\*)?(' + KV_LABELS + ')\\s*(?:\\*\\*)?\\s*[:：]\\s*(?:\\*\\*\\s*)?(.+?)\\s*$');
   var STOP_K = /^(止損|停損|SL|Stop)$/, TP_K = /^(止盈|目標|TP\d?|Target)$/, RR_K = /^(RR|R:R|風報比)$/;
   var FENCE_RE = /^\s*```\s*([\w-]*)\s*$/;
   var HR_RE = /^\s*(?:-{3,}|\*{3,}|_{3,}|—{2,})\s*$/;
   var H_RE = /^\s*(#{1,6})\s+(.+?)\s*#*\s*$/;
+  // A line that is nothing but bold ("**1. 結構判讀：**") is how models write
+  // a section heading when they skip "##".
+  var BOLD_H_RE = /^\s*\*\*([^*\n]{1,60}?)\s*[:：]?\s*\*\*\s*[:：]?\s*$/;
+  var LANG_BLOCK_RE = /\[(EN|ZH-TW)\]([\s\S]*?)(?:\[\/\1\]|(?=\[(?:EN|ZH-TW)\])|$)/g;
   var LIST_RE = /^(\s*)([-*•‧]|\d{1,2}[.)])\s+(.*)$/;
   var TSEP_RE = /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$/;
   var LINK_RE = /\[([^\]\n]+)\]\((?:[^()\n]|\([^()\n]*\))*\)/g;
@@ -218,8 +222,23 @@
 
   // parse(text) → [{t:'verdict'|'levels'|'pre'|'stats'|'h'|'hr'|'quote'|
   //                    'callout'|'list'|'table'|'p', …}]
-  function parse(text) {
-    var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  // pickLanguage keeps one block of a reply written as [EN]…[/EN]
+  // [ZH-TW]…[/ZH-TW] (the old one-shot format): lang's block, else the other.
+  function pickLanguage(text, lang) {
+    if (!/\[(?:EN|ZH-TW)\]/.test(text)) return text;
+    var blocks = {}, m;
+    LANG_BLOCK_RE.lastIndex = 0;
+    while ((m = LANG_BLOCK_RE.exec(text)) !== null) {
+      if (m[0] === '') { LANG_BLOCK_RE.lastIndex++; continue; }
+      if (!blocks[m[1]]) blocks[m[1]] = m[2].trim();
+    }
+    var want = lang === 'en' ? 'EN' : 'ZH-TW', other = want === 'EN' ? 'ZH-TW' : 'EN';
+    return blocks[want] || blocks[other] || text.replace(/\[\/?(?:EN|ZH-TW)\]/g, '').trim();
+  }
+
+  function parse(text, lang) {
+    text = pickLanguage(String(text || ''), lang);
+    var lines = text.replace(/\r\n?/g, '\n').split('\n');
     var blocks = [], para = [], i = 0;
     function flush() { if (para.length) { blocks.push({ t: 'p', lines: para }); para = []; } }
     function kvAt(j) { return j < lines.length && KV_RE.test(lines[j]); }
@@ -230,7 +249,16 @@
 
       if (!blocks.length && !para.length) {
         var v = verdictOf(line);
-        if (v) { blocks.push({ t: 'verdict', label: v.label, text: v.text, tone: verdictTone(v.text) }); i++; continue; }
+        if (v) {
+          i++;
+          // "**結論:**" alone on its line: the sentence is the next line.
+          if (!v.text) {
+            while (i < lines.length && !lines[i].trim()) i++;
+            if (i < lines.length) { v.text = lines[i].replace(LIST_RE, '$3').trim(); i++; }
+          }
+          blocks.push({ t: 'verdict', label: v.label, text: v.text, tone: verdictTone(v.text) });
+          continue;
+        }
       }
       if ((m = line.match(FENCE_RE))) {
         flush();
@@ -249,7 +277,8 @@
         continue;
       }
       if (HR_RE.test(line)) { flush(); blocks.push({ t: 'hr' }); i++; continue; }
-      if ((m = line.match(H_RE))) { flush(); blocks.push({ t: 'h', level: m[1].length, text: m[2] }); i++; continue; }
+      if ((m = line.match(H_RE))) { flush(); blocks.push({ t: 'h', level: m[1].length, text: m[2].replace(/\*\*/g, '') }); i++; continue; }
+      if ((m = line.match(BOLD_H_RE)) && !LIST_RE.test(line)) { flush(); blocks.push({ t: 'h', level: 2, text: m[1] }); i++; continue; }
       if ((m = line.match(CALLOUT_RE))) { flush(); blocks.push({ t: 'callout', label: m[1], text: m[2] }); i++; continue; }
       if (line.indexOf('|') >= 0 && i + 1 < lines.length && TSEP_RE.test(lines[i + 1]) && lines[i + 1].indexOf('-') >= 0) {
         flush();
@@ -369,7 +398,7 @@
           });
           break;
         }
-        case 'h': e = rich(doc, 'h4', 'cp-h' + (b.level >= 3 ? ' sub' : ''), b.text, opts, false); break;
+        case 'h': e = el(doc, 'h4', 'cp-h' + (b.level >= 3 ? ' sub' : ''), b.text); break;
         case 'hr': e = el(doc, 'hr', 'cp-hr'); break;
         case 'callout': {
           e = el(doc, 'div', 'cp-callout warn');
@@ -428,7 +457,7 @@
   // render(text, opts) → DocumentFragment. opts: {lang, symbols, tf, doc}.
   function render(text, opts) {
     opts = opts || {};
-    return build(parse(text), opts.doc || root.document, opts);
+    return build(parse(text, opts.lang), opts.doc || root.document, opts);
   }
 
   var api = { parse: parse, inline: inline, build: build, render: render, DEFAULT_SYMBOLS: DEFAULT_SYMBOLS };

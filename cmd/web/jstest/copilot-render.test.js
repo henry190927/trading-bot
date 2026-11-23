@@ -147,3 +147,32 @@ test('the renderer never touches innerHTML', () => {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML|document\.write/.test(code));
 });
+
+// The real production reply that started this (flash-lite, 2026-11-23).
+test('a bilingual one-shot reply shows only the zh block, bold lines are headings', () => {
+  const real = '[EN]\n## BTC 1h Setup\n\n**1. Structure:**\n*   **Swing:** up\n[/EN]\n\n[ZH-TW]\n## BTC 1h 設置分析\n\n**1. 結構與盤勢判讀：**\n*   **擺盪序列：** 上升\n\n**4. 決策：**\n*   **等待。** 觀望\n[/ZH-TW]';
+  const b = R.parse(real, 'zh');
+  assert.deepEqual(b.map((x) => x.t), ['h', 'h', 'list', 'h', 'list']);
+  assert.equal(b[1].text, '1. 結構與盤勢判讀');
+  assert.equal(R.parse(real, 'en')[0].text, 'BTC 1h Setup');
+  const f = render(real);
+  assert.ok(!f.textContent.includes('[EN]') && !f.textContent.includes('Swing'));
+  // Headings are plain text: no symbol chip or timeframe tag inside.
+  const h = f.find((n) => n.tag === 'h4')[0];
+  assert.equal(h.kids.length, 0);
+  assert.equal(h.textContent, 'BTC 1h 設置分析');
+});
+
+test('KV lines with the colon inside the bold still make a stat grid', () => {
+  const b = R.parse('**進場:** 58,750\n**止損：** 59,500\n- **RR:** 2.5R');
+  assert.equal(b[0].t, 'stats');
+  assert.deepEqual(b[0].items.map((i) => [i.k, i.v]), [['進場', '58,750'], ['止損', '59,500'], ['RR', '2.5R']]);
+});
+
+test('a verdict label alone on its line takes the next line', () => {
+  const b = R.parse('**結論：**\n\n- 偏多,等回踩 63,000 再進\n\n其他');
+  assert.equal(b[0].t, 'verdict');
+  assert.equal(b[0].tone, 'long');
+  assert.equal(b[0].text, '偏多,等回踩 63,000 再進');
+  assert.equal(b[1].t, 'p');
+});
