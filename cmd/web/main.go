@@ -28,6 +28,8 @@ import (
 	"github.com/henry190927/trading-bot/econcal"
 	"github.com/henry190927/trading-bot/indicator"
 	"github.com/henry190927/trading-bot/macro"
+	"github.com/henry190927/trading-bot/venue"
+	"github.com/henry190927/trading-bot/venue/bingxvenue"
 )
 
 //go:embed templates/*.html static
@@ -121,6 +123,8 @@ func main() {
 		aiProviderName: providerName,
 		aiModelPath:    aiModelPath,
 	}
+	srv.venues = venue.NewRegistry(instrumentsPath(), log.Printf)
+	srv.venues.Register(bingxvenue.New(bxClient))
 	srv.copilot = newCopilot(srv, aiProvider, bxClient)
 	if srv.copilot.disabled != "" {
 		log.Printf("[copilot] off: %s", srv.copilot.disabled)
@@ -302,6 +306,10 @@ func main() {
 
 	// In-app alerts: evaluates the rules every 15s and serves the bell.
 	srv.startAlerts(ctx)
+
+	// Symbol catalog (viewable.go): loads the disk mirror, then refreshes
+	// from BingX now and every 24h. Read paths only; trading never reads it.
+	go srv.venues.Run(ctx, 24*time.Hour)
 
 	// Fill detection + auto TP1/stop/TP2 placement for journal trades, every
 	// 30s whether or not a browser is open (see tradeSweepLoop).

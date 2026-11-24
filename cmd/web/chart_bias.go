@@ -255,12 +255,14 @@ func computeChartOI(sym market.Symbol) gin.H {
 // because each TF is a full scanOne (~0.5s) and the strip is refreshed on
 // the chart's 20s poll.
 func (s *server) handleChartBias(c *gin.Context) {
-	short := strings.ToUpper(strings.TrimSpace(c.DefaultQuery("symbol", "BTC")))
-	sym, err := resolveWebSymbol(short)
+	// Read-only path: any catalog symbol (viewable.go). The cache keys on
+	// the canonical Key, so the map is bounded by the catalog's size.
+	vs, err := s.resolveViewable(c.DefaultQuery("symbol", "BTC"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	sym, short := vs.Sym, vs.Key
 
 	// Three states, not two: fresh cache, someone else already recomputing,
 	// or this request does the work.

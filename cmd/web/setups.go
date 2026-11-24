@@ -303,6 +303,12 @@ func (s *server) handleAPIChartSetupRecord(c *gin.Context) {
 	}
 	in.RecordedAt = time.Now()
 	in.Outcome = ""
+	// Recording a setup is part of the trading workflow (/setups scores it
+	// as a would-be trade): list symbols only (viewable.go).
+	if _, err := resolveWebSymbol(in.Symbol); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Auto-tag the ACTIVE strategy for this (symbol,TF) and whether it actually
 	// fires now — server-side + authoritative (don't trust the client). Lets

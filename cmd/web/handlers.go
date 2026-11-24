@@ -33,6 +33,7 @@ import (
 	"github.com/henry190927/trading-bot/protect"
 	"github.com/henry190927/trading-bot/signal"
 	"github.com/henry190927/trading-bot/validator"
+	"github.com/henry190927/trading-bot/venue"
 )
 
 type server struct {
@@ -44,6 +45,10 @@ type server struct {
 
 	client *bingx.Client
 	ai     ai.Provider
+
+	// venues is the read-only symbol catalog (viewable.go). nil in tests
+	// that do not set it, which makes resolveViewable = resolveWebSymbol.
+	venues *venue.Registry
 
 	// sweepMu serialises sweepOpenTrades (fill detection + auto orders).
 	sweepMu sync.Mutex
@@ -1072,6 +1077,13 @@ func (s *server) handleJournalOpen(c *gin.Context) {
 		rerender(tr("jf.err.symbolSide"))
 		return
 	}
+	// The journal is a trading path: list symbols only, even when no order
+	// is placed. A catalog-only symbol is viewable, never journaled
+	// (viewable.go; trading_paths_test.go).
+	if _, err := resolveWebSymbol(symbol); err != nil {
+		rerender(err.Error())
+		return
+	}
 	entry, err := parseFloatPositive(entryStr, "entry")
 	if err != nil {
 		rerender(err.Error())
@@ -1915,6 +1927,10 @@ func (s *server) handleJournalEditPost(c *gin.Context) {
 	side := strings.ToLower(strings.TrimSpace(c.PostForm("side")))
 	if sym == "" || (side != "long" && side != "short") {
 		rerender(tr("jf.err.symbolSide"))
+		return
+	}
+	if _, err := resolveWebSymbol(sym); err != nil { // list only, as on create
+		rerender(err.Error())
 		return
 	}
 
@@ -3912,11 +3928,21 @@ func (s *server) handleChartPage(c *gin.Context) {
 	// embedded JS is where the live-price polling lives, so a
 	// user with a cached shell will silently run last-week's code.
 	c.Header("Cache-Control", "no-store, must-revalidate")
+	symbol := strings.ToUpper(defaultStr(c.Query("symbol"), "BTC"))
+	display, offList := symbol, false
+	// A catalog symbol opens under its canonical Key; one the list does not
+	// carry gets its own <option> in the dropdown (chart.html). An unknown
+	// symbol renders as before and the data call reports the error.
+	if vs, err := s.resolveViewable(symbol); err == nil {
+		symbol, display, offList = vs.Key, vs.Display, !vs.Tradable
+	}
 	s.page(c, http.StatusOK, "chart.html", gin.H{
-		"Symbol":  strings.ToUpper(defaultStr(c.Query("symbol"), "BTC")),
-		"TF":      defaultStr(c.Query("tf"), "1h"),
-		"Symbols": uiSymbols,
-		"TFs":     []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
+		"Symbol":        symbol,
+		"SymbolDisplay": display,
+		"OffList":       offList,
+		"TF":            defaultStr(c.Query("tf"), "1h"),
+		"Symbols":       uiSymbols,
+		"TFs":           []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},
 	})
 }
 
@@ -3925,13 +3951,14 @@ func (s *server) handleChartPage(c *gin.Context) {
 // rule-based summary in one payload. Called by the /chart page JS on
 // load AND on every symbol/TF change. Cached briefly via HTTP headers.
 func (s *server) handleChartData(c *gin.Context) {
-	short := strings.ToUpper(strings.TrimSpace(c.DefaultQuery("symbol", "BTC")))
-	tfStr := strings.TrimSpace(c.DefaultQuery("tf", "1h"))
-	sym, err := resolveWebSymbol(short)
+	// Read-only path: any catalog symbol (viewable.go), not just the list.
+	vs, err := s.resolveViewable(c.DefaultQuery("symbol", "BTC"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	sym, short := vs.Sym, vs.Key
+	tfStr := strings.TrimSpace(c.DefaultQuery("tf", "1h"))
 	tf := market.Timeframe(tfStr)
 
 	// light=1 (used by the 2s auto-poll) skips the slowly-changing extras —
@@ -4137,6 +4164,8 @@ func (s *server) handleChartData(c *gin.Context) {
 		c.Header("Cache-Control", "no-store")
 		c.JSON(http.StatusOK, gin.H{
 			"symbol":    short,
+			"display":   vs.Display,
+			"tradable":  vs.Tradable,
 			"tf":        tfStr,
 			"candles":   ohlcArr,
 			"bollinger": gin.H{"upper": upper, "mid": mid, "lower": lower},
@@ -4247,6 +4276,9 @@ func (s *server) handleChartData(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"symbol":     short,
+		"display":    vs.Display,
+		"tradable":   vs.Tradable,
+		"class":      vs.Class,
 		"tf":         tfStr,
 		"contract":   string(sym),
 		"candles":    ohlcArr,

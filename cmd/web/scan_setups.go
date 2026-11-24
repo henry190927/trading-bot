@@ -41,7 +41,7 @@ func (s *server) handleScanRecord(c *gin.Context) {
 	// Target <= 0 is a trailing-exit row (htf-trend): /setups would score it
 	// against a target at price 0. Refused server-side too, not only by
 	// hiding the button, until /setups has a trail outcome.
-	if su.Symbol == "" || su.Entry <= 0 || su.Target <= 0 {
+	if _, err := resolveWebSymbol(su.Symbol); err != nil || su.Entry <= 0 || su.Target <= 0 {
 		c.Redirect(http.StatusSeeOther, "/ops/scan?err=1")
 		return
 	}

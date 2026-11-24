@@ -28,6 +28,7 @@
       <select id="chart-symbol" class="chart-select">
         {{$cs := .Symbol}}
         {{range .Symbols}}<option value="{{.}}" {{if eq . $cs}}selected{{end}}>{{.}}</option>{{end}}
+        {{if .OffList}}<option value="{{.Symbol}}" selected data-offlist="1">{{.SymbolDisplay}}</option>{{end}}
       </select>
       <div class="chart-tf-pills" role="radiogroup" aria-label="{{t "chart.ui.tfAria"}}">
         {{$ct := .TF}}
@@ -239,7 +240,7 @@
        rewrites className to "chart-header <band>" on every refresh. */}}
   <section class="cs-card cs-price">
     <div class="chart-header-symrow">
-      <span class="chart-header-sym" id="chart-header-sym">{{.Symbol}}-USDT</span>
+      <span class="chart-header-sym" id="chart-header-sym">{{.SymbolDisplay}}-USDT</span>
       <span class="badge badge--lg side-flat" id="chart-side">—</span>
       <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
     </div>
@@ -2618,7 +2619,7 @@
         var diag = data.diagnose || {};
 
         // Left-tile: big price + 24h stats.
-        headerSym.textContent = (data.symbol || '?') + '-USDT';
+        headerSym.textContent = (data.display || data.symbol || '?') + '-USDT';
         headerTf.textContent = data.tf || '?';
         var lastCandle = (data.candles && data.candles.length) ? data.candles[data.candles.length - 1] : null;
         // markPrice FIRST. The old order preferred lastCandle.close so the
