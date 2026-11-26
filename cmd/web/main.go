@@ -183,6 +183,10 @@ func main() {
 	r.GET("/chart", srv.handleChartPage)
 	r.GET("/api/chart/data", srv.handleChartData)
 	r.GET("/api/chart/bias", srv.handleChartBias)
+	// Symbol catalog search + the server-side watchlist (watchlist.go).
+	r.GET("/api/instruments", srv.handleInstruments)
+	r.GET("/api/watchlist", srv.handleWatchlistGet)
+	r.POST("/api/watchlist", srv.handleWatchlistPost)
 	r.GET("/api/tickers", srv.handleTickers)
 	r.GET("/api/stream/tickers", srv.handleStreamTickers)
 	// The fan-out's counters (drop rate, websocket health) for curl. They were

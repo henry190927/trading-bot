@@ -3936,10 +3936,19 @@ func (s *server) handleChartPage(c *gin.Context) {
 	if vs, err := s.resolveViewable(symbol); err == nil {
 		symbol, display, offList = vs.Key, vs.Display, !vs.Tradable
 	}
+	// Watchlist entries off the list get dropdown options too, so switching
+	// to one from the strip is an in-page change, not a reload.
+	var watchOpts []symItem
+	for _, vs := range s.watchTickerKeys() {
+		if vs.Key != symbol {
+			watchOpts = append(watchOpts, symItem{Key: vs.Key, Display: vs.Display})
+		}
+	}
 	s.page(c, http.StatusOK, "chart.html", gin.H{
 		"Symbol":        symbol,
 		"SymbolDisplay": display,
 		"OffList":       offList,
+		"WatchOpts":     watchOpts,
 		"TF":            defaultStr(c.Query("tf"), "1h"),
 		"Symbols":       uiSymbols,
 		"TFs":           []string{"5m", "15m", "30m", "1h", "2h", "4h", "1d"},

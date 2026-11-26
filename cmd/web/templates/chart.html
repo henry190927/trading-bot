@@ -9,13 +9,16 @@
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/theme.js" defer></script>
 </head>
-<body>
+<body{{if .OffList}} class="view-only"{{end}}>
 
 {{template "topnav" .}}
 
 <main class="chart-main">
 
   <div class="chart-ticker-wrap">
+    {{/* + opens the ⌘K search in add-to-watchlist mode (partials.html). */}}
+    <button type="button" class="chart-fav-filter chart-watch-add" id="chart-watch-add"
+            title="{{t "chart.watchAdd"}}" aria-label="{{t "chart.watchAdd"}}">+</button>
     <button type="button" class="chart-fav-filter" id="chart-fav-filter"
             title="{{t "chart.favOnlyHint"}}"
             aria-pressed="false">☆ <span id="chart-fav-count"></span></button>
@@ -29,6 +32,7 @@
         {{$cs := .Symbol}}
         {{range .Symbols}}<option value="{{.}}" {{if eq . $cs}}selected{{end}}>{{.}}</option>{{end}}
         {{if .OffList}}<option value="{{.Symbol}}" selected data-offlist="1">{{.SymbolDisplay}}</option>{{end}}
+        {{range .WatchOpts}}<option value="{{.Key}}" data-offlist="1">{{.Display}}</option>{{end}}
       </select>
       <div class="chart-tf-pills" role="radiogroup" aria-label="{{t "chart.ui.tfAria"}}">
         {{$ct := .TF}}
@@ -243,6 +247,7 @@
       <span class="chart-header-sym" id="chart-header-sym">{{.SymbolDisplay}}-USDT</span>
       <span class="badge badge--lg side-flat" id="chart-side">—</span>
       <span class="chart-header-tf" id="chart-header-tf">{{.TF}}</span>
+      <span class="badge view-only-badge" id="chart-view-only" title="{{t "chart.viewOnlyTip"}}">{{t "chart.viewOnly"}}</span>
     </div>
     <div class="chart-header-price-row">
       <span class="chart-header-price" id="chart-header-price">—</span>
@@ -264,6 +269,9 @@
       <h2>{{t "chart.engineScore"}}</h2>
       <span class="cs-verdict" id="chart-banner-score-band">—</span>
     </div>
+    {{/* Off the tradable list the engine falls back to MR (signal.StrategyFor)
+         with parameters never tested on this symbol — design §8, §11.3. */}}
+    <div class="cs-uncal" id="cs-uncal">{{t "chart.uncalibrated"}}</div>
     <div class="cs-score">
       <div class="cs-score-num"><span class="chart-banner-score-num" id="chart-banner-score-num">—</span><small>/100</small></div>
       <div class="cs-bars">
@@ -932,6 +940,7 @@
         "trend.LH-LL downtrend": {{t "chart.read.trendDown"}},
         "trend.neutral": {{t "chart.read.trendNeutral"}},
         "fav.none": {{t "chart.js.fav.none"}},
+        "watch.failed": {{t "chart.js.watch.failed"}},
         "fav.showAll": {{t "chart.js.fav.showAll"}},
         "fav.onlyFavs": {{t "chart.js.fav.onlyFavs"}},
         "load.failed": {{t "chart.js.load.failed"}},
@@ -1364,6 +1373,12 @@
 
     // ── State + fetch ──────────────────────────────────────────────
     function currentSym() { return symSel.value; }
+    // For people: an off-list symbol's value is its venue ID
+    // ("bingx:NCSKTSLA2USD-USDT"); its option text is the display name.
+    function currentSymLabel() {
+        var o = symSel.options[symSel.selectedIndex];
+        return (o && o.textContent) || symSel.value;
+    }
     function currentTF()  {
         var active = document.querySelector('.chart-tf-pills .tf-pill.active');
         return active ? active.dataset.tf : '1h';
@@ -2620,6 +2635,9 @@
 
         // Left-tile: big price + 24h stats.
         headerSym.textContent = (data.display || data.symbol || '?') + '-USDT';
+        // Off the tradable list: hide trade actions, flag the engine score
+        // as uncalibrated (CSS keys off body.view-only).
+        if (typeof data.tradable === 'boolean') document.body.classList.toggle('view-only', !data.tradable);
         headerTf.textContent = data.tf || '?';
         var lastCandle = (data.candles && data.candles.length) ? data.candles[data.candles.length - 1] : null;
         // markPrice FIRST. The old order preferred lastCandle.close so the
@@ -3371,25 +3389,110 @@
     // show: the CURRENT symbol is always rendered even when it is not a
     // favourite, or switching to an unstarred symbol would hide the chip for
     // the chart you are looking at.
-    var FAV_KEY = 'tw-chart-favs', FAVFILTER_KEY = 'tw-chart-fav-only';
-    var favs = {}, favOnly = false;
-    try {
-        favs = JSON.parse(localStorage.getItem(FAV_KEY) || '{}') || {};
-        favOnly = localStorage.getItem(FAVFILTER_KEY) === '1';
-    } catch (e) { favs = {}; favOnly = false; }
+    //
+    // The stars ARE the watchlist (symbol catalog P2): one server-side list
+    // (GET/POST /api/watchlist, watchlist.go), so the phone and the laptop
+    // agree. favs maps Key → true; watchInfo keeps the display name of
+    // off-list entries. Only the filter toggle stays per-device.
+    var FAV_KEY = 'tw-chart-favs', FAVFILTER_KEY = 'tw-chart-fav-only', FAV_MIGRATED = 'tw-chart-favs-migrated';
+    var favs = {}, watchInfo = {}, favOnly = false;
+    try { favOnly = localStorage.getItem(FAVFILTER_KEY) === '1'; } catch (e) { favOnly = false; }
     function favCount() { return Object.keys(favs).filter(function (k) { return favs[k]; }).length; }
     function saveFavs() {
-        try {
-            localStorage.setItem(FAV_KEY, JSON.stringify(favs));
-            localStorage.setItem(FAVFILTER_KEY, favOnly ? '1' : '0');
-        } catch (e) {}
+        try { localStorage.setItem(FAVFILTER_KEY, favOnly ? '1' : '0'); } catch (e) {}
     }
+    function escHTML(v) {
+        return String(v).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function setWatch(items) {
+        favs = {}; watchInfo = {};
+        (items || []).forEach(function (it) {
+            favs[it.key] = true;
+            watchInfo[it.key] = it;
+            if (!it.tradable && !it.stale) ensureSymOption(it.key, it.display);
+        });
+    }
+    // An off-list symbol needs its own <option>, or `symSel.value = key`
+    // no-ops and the chip click falls back to a full navigation.
+    function ensureSymOption(key, display) {
+        for (var i = 0; i < symSel.options.length; i++) if (symSel.options[i].value === key) return;
+        var o = document.createElement('option');
+        o.value = key; o.textContent = display || key; o.setAttribute('data-offlist', '1');
+        symSel.appendChild(o);
+    }
+    function watchPost(key, on) {
+        return fetch('/api/watchlist', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: key, action: on ? 'add' : 'remove' })
+        }).then(function (r) {
+            return r.json().then(function (d) {
+                if (!r.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+                setWatch(d.items);
+                return d;
+            });
+        });
+    }
+    function watchRefresh() {
+        if (tkRows) applyTickers(tkRows, true);
+        paintFavButton();
+    }
+    window.chartWatchChanged = function (items) { setWatch(items); watchRefresh(); };
+    // ⌘K picks a symbol while on /chart: switch in place, no reload.
+    window.chartSwitchSymbol = function (key, display) {
+        ensureSymOption(key, display);
+        if (symSel.value === key) return;
+        symSel.value = key;
+        if (symSel.value !== key) { location.href = '/chart?symbol=' + encodeURIComponent(key) + '&tf=' + encodeURIComponent(currentTF()); return; }
+        symSel.dispatchEvent(new Event('change'));
+    };
+    // One-time move of this browser's old localStorage stars to the server.
+    function migrateLocalFavs() {
+        var old = {};
+        try {
+            if (localStorage.getItem(FAV_MIGRATED) === '1') return Promise.resolve();
+            old = JSON.parse(localStorage.getItem(FAV_KEY) || '{}') || {};
+        } catch (e) { return Promise.resolve(); }
+        var keys = Object.keys(old).filter(function (k) { return old[k] && !favs[k]; });
+        var chain = Promise.resolve();
+        keys.forEach(function (k) { chain = chain.then(function () { return watchPost(k, true).catch(function () {}); }); });
+        return chain.then(function () {
+            try { localStorage.setItem(FAV_MIGRATED, '1'); localStorage.removeItem(FAV_KEY); } catch (e) {}
+        });
+    }
+    function loadWatch() {
+        fetch('/api/watchlist', { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { setWatch(d && d.items); return migrateLocalFavs(); })
+            .then(watchRefresh)
+            .catch(function () { /* the strip still works without it */ });
+    }
+    // The strip = the list rows, plus watched off-list rows, plus the current
+    // symbol when it is off-list and unwatched (so it can be starred). A
+    // watched symbol the snapshot has not caught up with yet (just added)
+    // gets a price-less row until the next refresh.
+    //
     // Fail OPEN: with the filter on and nothing starred, show everything. An
     // empty strip reads as "the feed is down", which is a different and much
     // more alarming thing than "you have not picked any favourites".
     function visibleRows(rows) {
-        if (!favOnly || favCount() === 0) return rows;
         var cur = currentSym();
+        var have = {};
+        rows = rows.filter(function (t) {
+            if (t.watch && !favs[t.symbol] && t.symbol !== cur) return false; // just removed
+            have[t.symbol] = true;
+            return true;
+        });
+        Object.keys(watchInfo).forEach(function (k) {
+            var it = watchInfo[k];
+            if (!have[k] && !it.tradable) { rows.push({ symbol: k, display: it.display, watch: true }); have[k] = true; }
+        });
+        if (cur && !have[cur]) {
+            var opt = symSel.options[symSel.selectedIndex];
+            rows.push({ symbol: cur, display: opt ? opt.textContent : cur, watch: true });
+        }
+        if (!favOnly || favCount() === 0) return rows;
         return rows.filter(function (t) { return favs[t.symbol] || t.symbol === cur; });
     }
     function paintFavButton() {
@@ -3424,16 +3527,18 @@
             // The star is a SPAN inside the chip, not a nested <button> —
             // nested buttons are invalid HTML and browsers flatten them, which
             // would make every star tap also switch the chart.
-            return '<button type="button" class="chart-ticker-item" data-sym="' + t.symbol + '">'
+            // display comes from the exchange's contract list: escaped.
+            var key = escHTML(t.symbol);
+            return '<button type="button" class="chart-ticker-item" data-sym="' + key + '">'
                  + '<span class="tk-fav' + (favs[t.symbol] ? ' on' : '') + '" role="button" tabindex="-1"'
-                 + ' aria-label="favourite ' + t.symbol + '">' + (favs[t.symbol] ? '★' : '☆') + '</span>'
-                 + '<span class="tk-sym">' + t.symbol + '</span>'
+                 + ' aria-label="favourite ' + key + '">' + (favs[t.symbol] ? '★' : '☆') + '</span>'
+                 + '<span class="tk-sym' + (t.watch ? ' tk-sym-off' : '') + '">' + escHTML(t.display || t.symbol) + '</span>'
                  + '<span class="tk-px"></span>'
                  + '<span class="tk-chg"></span></button>';
         }).join('');
-        rows.forEach(function (t) {
-            var btn = el.querySelector('.chart-ticker-item[data-sym="' + t.symbol + '"]');
-            if (btn) tkEls[t.symbol] = { btn: btn, px: btn.querySelector('.tk-px'), chg: btn.querySelector('.tk-chg') };
+        el.querySelectorAll('.chart-ticker-item').forEach(function (btn) {
+            var k = btn.getAttribute('data-sym');
+            tkEls[k] = { btn: btn, px: btn.querySelector('.tk-px'), chg: btn.querySelector('.tk-chg'), fav: btn.querySelector('.tk-fav') };
         });
     }
 
@@ -3457,6 +3562,13 @@
             if (e.chg.textContent !== c.txt) e.chg.textContent = c.txt;
             e.chg.className = c.cls;
             e.btn.classList.toggle('is-active', t.symbol === cur);
+            // Stars follow the watchlist, which can arrive after the strip
+            // was built from the first snapshot (same chips → no rebuild).
+            var on = !!favs[t.symbol];
+            if (e.fav && e.fav.classList.contains('on') !== on) {
+                e.fav.classList.toggle('on', on);
+                e.fav.textContent = on ? '★' : '☆';
+            }
         });
     }
 
@@ -3522,6 +3634,11 @@
         });
         tkStream.onerror = function () { tkAlive = false; tkStartPolling(); };
     }
+    loadWatch();
+    (function () {
+        var wa = document.getElementById('chart-watch-add');
+        if (wa) wa.addEventListener('click', function () { if (window.cmdkOpen) window.cmdkOpen('add'); });
+    })();
     (function () {
         var fb = document.getElementById('chart-fav-filter');
         if (fb) {
@@ -3545,15 +3662,22 @@
                 e.stopPropagation();
                 e.preventDefault();
                 var fs = star.closest('.chart-ticker-item').getAttribute('data-sym');
-                favs[fs] = !favs[fs];
-                if (!favs[fs]) delete favs[fs];
-                saveFavs();
-                star.textContent = favs[fs] ? '★' : '☆';
-                star.classList.toggle('on', !!favs[fs]);
-                paintFavButton();
-                // Re-render only while the filter is on — otherwise the strip
-                // does not change and a rebuild would drop the price flashes.
-                if (favOnly && tkRows) applyTickers(tkRows, true);
+                var on = !favs[fs];
+                // Optimistic: flip the star now, put it back if the server
+                // refuses (full list, unknown symbol, write failure).
+                star.textContent = on ? '★' : '☆';
+                star.classList.toggle('on', on);
+                watchPost(fs, on).then(function () {
+                    paintFavButton();
+                    // Rebuild only while the filter is on or for an off-list
+                    // row (which leaves the strip when unstarred) — otherwise
+                    // the strip is unchanged and a rebuild drops price flashes.
+                    if (tkRows && (favOnly || (watchInfo[fs] && !watchInfo[fs].tradable) || !on)) applyTickers(tkRows, true);
+                }).catch(function (err) {
+                    star.textContent = on ? '☆' : '★';
+                    star.classList.toggle('on', !on);
+                    if (window.toast) window.toast(CT['watch.failed'] + err.message, 'err');
+                });
                 return;
             }
             var btn = e.target.closest('.chart-ticker-item');
@@ -3592,7 +3716,7 @@
         if (bannerScoreBand) bannerScoreBand.textContent = CT['err.short'];
         if (bannerActText)   bannerActText.textContent = '⚠ ' + msg;
         if (bannerActNote)   bannerActNote.textContent = '';
-        if (window.toast) window.toast(currentSym() + ' ' + currentTF() + ' ' + CT['load.failed'] + ' ' + msg, 'err');
+        if (window.toast) window.toast(currentSymLabel() + ' ' + currentTF() + ' ' + CT['load.failed'] + ' ' + msg, 'err');
     }
 
     // F4 — optimistic draw from a per-(symbol,TF) memo.
@@ -3701,7 +3825,7 @@
         if (cached) {
             applyChart(cached);
             applyHeader(cached);
-            linerEl.textContent = sym + ' ' + tf + ' · ' + CT['load.updating'];
+            linerEl.textContent = currentSymLabel() + ' ' + tf + ' · ' + CT['load.updating'];
         } else {
             linerEl.textContent = CT['load.loading'] + ' ' + sym + ' ' + tf + '…';
         }
@@ -3736,8 +3860,10 @@
 
     // ── Wiring ─────────────────────────────────────────────────────
     symSel.addEventListener('change', function () {
-        history.replaceState({}, '', '/chart?symbol=' + currentSym() + '&tf=' + currentTF());
-        tkMarkActive();
+        history.replaceState({}, '', '/chart?symbol=' + encodeURIComponent(currentSym()) + '&tf=' + currentTF());
+        // The chip set depends on the current symbol (an unwatched off-list
+        // one gets its own chip), so rebuild rather than only re-highlight.
+        if (tkRows) applyTickers(tkRows, true); else tkMarkActive();
         load();
     });
     tfPills.forEach(function (p) {
@@ -4077,7 +4203,7 @@
             if (!ohlcRoot || !bar) return;
             var isUp = bar.close >= bar.open;
             ohlcRoot.className = 'chart-ohlc ' + (isUp ? 'is-up' : 'is-down');
-            ohlcSymEl.textContent = currentSym();
+            ohlcSymEl.textContent = currentSymLabel();
             ohlcTfEl.textContent = currentTF();
             ohlcOEl.textContent = fmtOHLC(bar.open);
             ohlcHEl.textContent = fmtOHLC(bar.high);

@@ -1327,5 +1327,20 @@
   "copilot.chip.losses": "What do my recent losses have in common?",
   "copilot.chip.last": "Review my latest trade",
   "copilot.chip.week": "Macro events this week?",
-  "copilot.chip.btc": "Analyze BTC 1h right now"
+  "copilot.chip.btc": "Analyze BTC 1h right now",
+  "chart.watchAdd": "Search a symbol to add to the watchlist",
+  "chart.viewOnly": "View only",
+  "chart.viewOnlyTip": "Not on the tradable list: chart, structure and backtests only — no orders, journal or protection",
+  "chart.uncalibrated": "Uncalibrated: default MR, never backtested on this symbol",
+  "chart.js.watch.failed": "Watchlist update failed: ",
+  "cmdk.addPlaceholder": "Search a symbol to add to the watchlist (code or name, e.g. TSLA, EURUSD)",
+  "cmdk.tradable": "tradable",
+  "cmdk.viewOnly": "view only",
+  "cmdk.added": "Added to watchlist: ",
+  "cmdk.class.crypto": "crypto",
+  "cmdk.class.us-stock": "US stock",
+  "cmdk.class.fx": "FX",
+  "cmdk.class.commodity": "commodity",
+  "cmdk.class.index": "index",
+  "cmdk.class.tw-stock": "TW stock"
 }

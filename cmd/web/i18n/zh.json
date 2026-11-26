@@ -1327,5 +1327,20 @@
   "copilot.chip.losses": "最近的虧損單有什麼共通點?",
   "copilot.chip.last": "檢討最新一筆交易",
   "copilot.chip.week": "這週有哪些總經事件?",
-  "copilot.chip.btc": "分析 BTC 1h 現在的狀況"
+  "copilot.chip.btc": "分析 BTC 1h 現在的狀況",
+  "chart.watchAdd": "搜尋標的,加入自選",
+  "chart.viewOnly": "僅分析",
+  "chart.viewOnlyTip": "不在可交易清單:可以看圖、結構與回測,不能下單、記錄或保護",
+  "chart.uncalibrated": "未校準:預設 MR,未經此標的回測",
+  "chart.js.watch.failed": "自選清單更新失敗:",
+  "cmdk.addPlaceholder": "搜尋標的加入自選(代碼或名稱,例如 TSLA、EURUSD)",
+  "cmdk.tradable": "可交易",
+  "cmdk.viewOnly": "僅分析",
+  "cmdk.added": "已加入自選:",
+  "cmdk.class.crypto": "加密",
+  "cmdk.class.us-stock": "美股",
+  "cmdk.class.fx": "外匯",
+  "cmdk.class.commodity": "商品",
+  "cmdk.class.index": "指數",
+  "cmdk.class.tw-stock": "台股"
 }

@@ -330,10 +330,14 @@
     paint(rows, silent || rebuilt);
   }
 
+  // The snapshot also carries /chart's watchlist rows (watch:true, off the
+  // tradable list); this table is the list only.
+  function listRows(rows){ return rows.filter(function(r){ return !r.watch; }); }
+
   function poll(){
     fetch('/api/tickers?_='+Date.now(), {cache:'no-store'})
       .then(function(r){ return r.json(); })
-      .then(function(d){ last = (d && d.tickers) || []; render(false); markUpdated(); })
+      .then(function(d){ last = listRows((d && d.tickers) || []); render(false); markUpdated(); })
       .catch(function(){});
   }
   // ── Transport ────────────────────────────────────────────────────────
@@ -618,7 +622,7 @@
       // to stop the fallback. Tearing the poller down on open() would strand
       // the table if a proxy buffered the stream into silence.
       if(!sseAlive){ sseAlive = true; stopPolling(); }
-      last = d.tickers;
+      last = listRows(d.tickers);
       render(false);
       markUpdated();
     });

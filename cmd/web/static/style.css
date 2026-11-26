@@ -4988,3 +4988,43 @@ a.cp-sym:hover { border-color: var(--blue); }
 html[data-copilot] #chart-ai-btn { display: none; }
 .ai-analyze-btn { display: inline-flex; align-items: center; gap: 6px; }
 .ai-analyze-btn .ico { width: 14px; height: 14px; }
+
+/* ── Symbol catalog P2: view-only symbols (docs/symbol_catalog_design.md §7) ──
+   body.view-only is set server-side for an off-list symbol and toggled by the
+   chart JS on every symbol switch (data.tradable). The server refuses the
+   trade actions anyway (trading_paths_test.go); hiding them is so the page
+   does not offer what it cannot do. */
+.chart-watch-add { font-weight: 700; font-size: var(--fs-md, 1rem); }
+.view-only-badge,
+.cs-uncal { display: none; }
+body.view-only .view-only-badge {
+    display: inline-flex;
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+    background: transparent;
+}
+body.view-only .cs-uncal {
+    display: block;
+    margin: 0 0 0.4rem;
+    padding: 0.3rem 0.5rem;
+    border-left: 3px solid var(--yellow);
+    background: var(--wash-yellow);
+    color: var(--text);
+    font-size: var(--fs-xs);
+}
+body.view-only #cs-record-btn,
+body.view-only #chart-price-plus { display: none !important; }
+/* Until P5: the copilot's tools resolve list symbols only, so "analyze" on
+   an off-list symbol would only come back as an error. */
+body.view-only #chart-ai-btn { display: none !important; }
+.tk-sym-off { font-style: italic; }
+.cmdk-tag {
+    margin-left: auto;
+    padding: 0 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+}
+.cmdk-tag.tradable { color: var(--green, #3fb950); border-color: var(--green, #3fb950); }

@@ -659,15 +659,29 @@ func (s *server) buildTickers(ctx context.Context) gin.H {
 	// Fan out across the (now larger) symbol set so the strip stays snappy —
 	// each symbol is 2 API calls (mark + klines); sequential over 11 symbols
 	// would crawl. Output order is preserved by index.
-	out := make([]gin.H, len(tickerSymbols))
+	type tkJob struct {
+		row gin.H
+		sym market.Symbol
+		ok  bool
+	}
+	jobs := make([]tkJob, 0, len(tickerSymbols))
+	for _, short := range tickerSymbols {
+		sym, err := resolveWebSymbol(short)
+		jobs = append(jobs, tkJob{gin.H{"symbol": short, "cat": symbolCategory(short)}, sym, err == nil})
+	}
+	// Watchlist entries off the list (watchlist.go) ride along as extra rows
+	// tagged watch:true. Only /chart's strip shows them; /today skips them.
+	// They get no websocket mark, so their price moves at the REST cadence.
+	for _, vs := range s.watchTickerKeys() {
+		jobs = append(jobs, tkJob{gin.H{"symbol": vs.Key, "display": vs.Display, "cat": string(vs.Class), "watch": true}, vs.Sym, true})
+	}
+	out := make([]gin.H, len(jobs))
 	var wg sync.WaitGroup
-	for i, short := range tickerSymbols {
+	for i, j := range jobs {
 		wg.Add(1)
-		go func(idx int, short string) {
+		go func(idx int, row gin.H, sym market.Symbol, ok bool) {
 			defer wg.Done()
-			row := gin.H{"symbol": short, "cat": symbolCategory(short)}
-			sym, err := resolveWebSymbol(short)
-			if err == nil && s.client != nil {
+			if ok && s.client != nil {
 				// Price = live mark. The chart header now reads the same mark
 				// (it used to prefer the forming kline's close, which lags and
 				// sticks — measured 8-14 pts behind on BTC 2026-09-03, which is
@@ -718,7 +732,7 @@ func (s *server) buildTickers(ctx context.Context) gin.H {
 				}
 			}
 			out[idx] = row
-		}(i, short)
+		}(i, j.row, j.sym, j.ok)
 	}
 	wg.Wait()
 
