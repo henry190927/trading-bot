@@ -78,7 +78,7 @@ func writeWatchKeys(keys []string) error {
 	_, werr := tmp.Write(b)
 	cerr := tmp.Close()
 	if err := errors.Join(werr, cerr, os.Chmod(tmp.Name(), 0o664)); err != nil {
-		os.Remove(tmp.Name())
+		_ = os.Remove(tmp.Name()) // best-effort cleanup of the temp file
 		return err
 	}
 	return os.Rename(tmp.Name(), path)

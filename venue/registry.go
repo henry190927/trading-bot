@@ -72,7 +72,9 @@ func (r *Registry) Run(ctx context.Context, every time.Duration) {
 	if err := r.LoadCache(); err != nil {
 		r.logf("[venue] cache: %v", err)
 	}
-	r.Refresh(ctx)
+	// Refresh logs each venue's failure itself; the joined error is for
+	// callers that want it (tests), not for this loop.
+	_ = r.Refresh(ctx)
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
@@ -80,7 +82,7 @@ func (r *Registry) Run(ctx context.Context, every time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			r.Refresh(ctx)
+			_ = r.Refresh(ctx)
 		}
 	}
 }
@@ -183,16 +185,16 @@ func (r *Registry) saveCache() error {
 		return err
 	}
 	if _, err := tmp.Write(b); err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name()) // best-effort cleanup of the temp file
 		return err
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmp.Name())
+		_ = os.Remove(tmp.Name())
 		return err
 	}
 	if err := os.Chmod(tmp.Name(), 0o664); err != nil {
-		os.Remove(tmp.Name())
+		_ = os.Remove(tmp.Name())
 		return err
 	}
 	return os.Rename(tmp.Name(), r.cachePath)
